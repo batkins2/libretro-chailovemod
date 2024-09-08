@@ -68,3 +68,9 @@
 	url = https://github.com/grumbel/SDL_tty.git
 	ignore = dirty
 	branch = master
+[submodule "sdl2-libretro"]
+	path = sdl2-libretro
+	url = https://github.com/r-type/sdl2-libretro.git
+[submodule "SDL2_tty"]
+	path = SDL2_tty
+	url = https://github.com/batkins2/SDL2_tty.git
