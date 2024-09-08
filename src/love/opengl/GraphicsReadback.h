@@ -21,7 +21,7 @@
 #pragma once
 
 // LOVE
-#include "graphics/GraphicsReadback.h"
+#include "../graphicsreadback.h"
 #include "FenceSync.h"
 #include "../common/math.h"
 
@@ -36,8 +36,8 @@ class GraphicsReadback final : public love::graphics::GraphicsReadback
 {
 public:
 
-	GraphicsReadback(love::graphics::Graphics *gfx, ReadbackMethod method, love::graphics::Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset);
-	GraphicsReadback(love::graphics::Graphics *gfx, ReadbackMethod method, love::graphics::Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty);
+	GraphicsReadback(love::graphics::gfx *gfx, ReadbackMethod method, love::graphics::Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset);
+	GraphicsReadback(love::graphics::gfx *gfx, ReadbackMethod method, love::graphics::Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty);
 	virtual ~GraphicsReadback();
 
 	void wait() override;

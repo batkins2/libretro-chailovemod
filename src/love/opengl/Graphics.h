@@ -30,11 +30,11 @@
 #include "OpenGL.h"
 
 // LOVE
-#include "graphics/Graphics.h"
+#include "../gfx.h"
 #include "../common/Color.h"
 
-#include "image/Image.h"
-#include "image/ImageData.h"
+#include "../image/Image.h"
+#include "../image/ImageData.h"
 
 #include "Texture.h"
 #include "Shader.h"
@@ -49,7 +49,7 @@ namespace graphics
 namespace opengl
 {
 
-class Graphics final : public love::graphics::Graphics
+class Graphics final : public love::graphics::gfx
 {
 public:
 

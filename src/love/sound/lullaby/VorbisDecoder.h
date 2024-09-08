@@ -24,7 +24,7 @@
 // LOVE
 #include "../../common/Stream.h"
 #include "../../common/int.h"
-#include "sound/Decoder.h"
+#include "../Decoder.h"
 
 // vorbis
 #define OV_EXCLUDE_STATIC_CALLBACKS

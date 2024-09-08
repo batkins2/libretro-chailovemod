@@ -109,9 +109,9 @@ namespace opengl { extern love::graphics::gfx *createInstance(); }
 #ifdef LOVE_GRAPHICS_METAL
 namespace metal { extern love::graphics::gfx *createInstance(); }
 #endif
-#ifdef LOVE_GRAPHICS_VULKAN
-namespace vulkan { extern love::graphics::gfx* createInstance(); }
-#endif
+// #ifdef LOVE_GRAPHICS_VULKAN
+// namespace vulkan { extern love::graphics::gfx* createInstance(); }
+// #endif
 
 static const Renderer rendererOrder[] = {
 	RENDERER_METAL,
@@ -157,10 +157,10 @@ gfx *gfx::createInstance()
 			if (std::find(_renderers.begin(), _renderers.end(), r) == _renderers.end())
 				continue;
 
-#ifdef LOVE_GRAPHICS_VULKAN
-			if (r == RENDERER_VULKAN)
-				instance = vulkan::createInstance();
-#endif
+// #ifdef LOVE_GRAPHICS_VULKAN
+// 			if (r == RENDERER_VULKAN)
+// 				instance = vulkan::createInstance();
+// #endif
 			if (r == RENDERER_OPENGL)
 				instance = opengl::createInstance();
 #ifdef LOVE_GRAPHICS_METAL
@@ -2925,7 +2925,7 @@ STRINGMAP_CLASS_END(gfx, gfx::StackType, gfx::STACK_MAX_ENUM, stackType)
 STRINGMAP_BEGIN(Renderer, RENDERER_MAX_ENUM, renderer)
 {
 	{ "opengl", RENDERER_OPENGL },
-	{ "vulkan", RENDERER_VULKAN },
+	// { "vulkan", RENDERER_VULKAN },
 	{ "metal",  RENDERER_METAL  },
 }
 STRINGMAP_END(Renderer, RENDERER_MAX_ENUM, renderer)

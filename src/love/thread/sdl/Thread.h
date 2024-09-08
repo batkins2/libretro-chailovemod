@@ -22,11 +22,11 @@
 #define LOVE_THREAD_SDL_THREAD_H
 
 // LOVE
-#include "thread/Thread.h"
+#include "../Thread.h"
 #include "threads.h"
 
 // SDL
-#include <SDL_thread.h>
+// #include <SDL2/SDL_thread.h>
 
 namespace love
 {

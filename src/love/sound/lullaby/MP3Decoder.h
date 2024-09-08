@@ -23,7 +23,7 @@
 
 // LOVE
 #include "../../common/Stream.h"
-#include "sound/Decoder.h"
+#include "../Decoder.h"
 
 // dr_mp3
 #include "dr/dr_mp3.h"

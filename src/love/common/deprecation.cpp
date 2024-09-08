@@ -20,7 +20,7 @@
 
 #include "../common/config.h"
 #include "deprecation.h"
-#include "thread/threads.h"
+#include "../thread/threads.h"
 
 #include <atomic>
 #include <map>

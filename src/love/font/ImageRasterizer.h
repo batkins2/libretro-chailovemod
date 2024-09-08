@@ -22,8 +22,8 @@
 #define LOVE_FONT_IMAGE_RASTERIZER_H
 
 // LOVE
-#include "font/Rasterizer.h"
-#include "image/ImageData.h"
+#include "Rasterizer.h"
+#include "../image/ImageData.h"
 #include "../common/Color.h"
 
 #include <map>

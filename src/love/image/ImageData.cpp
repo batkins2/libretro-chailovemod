@@ -20,7 +20,7 @@
 
 #include "ImageData.h"
 #include "Image.h"
-#include "filesystem/Filesystem.h"
+#include "../filesystem/Filesystem.h"
 
 #include <algorithm> // min/max
 

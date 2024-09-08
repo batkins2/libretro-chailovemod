@@ -24,7 +24,7 @@
 // LOVE
 #include "../common/config.h"
 #include "Rasterizer.h"
-#include "image/ImageData.h"
+#include "../image/ImageData.h"
 
 // C++
 #include <unordered_map>

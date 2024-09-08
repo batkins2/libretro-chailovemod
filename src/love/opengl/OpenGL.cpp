@@ -25,8 +25,8 @@
 #include "Shader.h"
 #include "../common/Exception.h"
 
-#include "graphics/Graphics.h"
-#include "graphics/Buffer.h"
+#include "../gfx.h"
+#include "../buffer.h"
 
 // C++
 #include <algorithm>
@@ -449,7 +449,7 @@ void OpenGL::initMaxValues()
 		maxLODBias = 0.0f;
 }
 
-void OpenGL::prepareDraw(love::graphics::Graphics *gfx)
+void OpenGL::prepareDraw(love::graphics::gfx *gfx)
 {
 	TempDebugGroup debuggroup("Prepare OpenGL draw");
 

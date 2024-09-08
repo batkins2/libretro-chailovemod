@@ -22,7 +22,7 @@
 #include "FontMod.h"
 #include "BMFontRasterizer.h"
 #include "ImageRasterizer.h"
-#include "data/DataModule.h"
+#include "../data/DataModule.h"
 
 #include "libraries/utf8/utf8.h"
 

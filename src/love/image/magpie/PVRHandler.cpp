@@ -20,8 +20,8 @@
 
 // LOVE
 #include "PVRHandler.h"
-#include "../common/int.h"
-#include "../common/Exception.h"
+#include "../../common/int.h"
+#include "../../common/Exception.h"
 
 // C++
 #include <algorithm>

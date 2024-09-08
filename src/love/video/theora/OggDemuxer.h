@@ -25,7 +25,7 @@
 #include <functional>
 
 // LOVE
-#include "filesystem/File.h"
+#include "../../filesystem/File.h"
 
 // OGG
 #include <ogg/ogg.h>

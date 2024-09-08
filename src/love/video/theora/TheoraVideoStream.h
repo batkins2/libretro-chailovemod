@@ -21,12 +21,12 @@
 #ifndef LOVE_VIDEO_THEORA_VIDEOSTREAM_H
 #define LOVE_VIDEO_THEORA_VIDEOSTREAM_H
 
-#include "video/VideoStream.h"
+#include "../VideoStream.h"
 
 // LOVE
 #include "../../common/int.h"
-#include "filesystem/File.h"
-#include "thread/threads.h"
+#include "../../filesystem/File.h"
+#include "../../thread/threads.h"
 #include "OggDemuxer.h"
 
 // OGG/Theora

@@ -21,7 +21,7 @@
 #pragma once
 
 // LOVE
-#include "font/TextShaper.h"
+#include "../TextShaper.h"
 
 extern "C"
 {

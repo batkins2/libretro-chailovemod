@@ -21,9 +21,9 @@
 #pragma once
 
 // LOVE
-#include "graphics/Shader.h"
-#include "graphics/Graphics.h"
-#include "graphics/Volatile.h"
+#include "../shader.h"
+#include "../gfx.h"
+#include "../volatile.h"
 #include "OpenGL.h"
 
 // STL
@@ -70,7 +70,7 @@ public:
 	ptrdiff_t getHandle() const override;
 	void setVideoTextures(love::graphics::Texture *ytexture, love::graphics::Texture *cbtexture, love::graphics::Texture *crtexture) override;
 
-	void updateBuiltinUniforms(love::graphics::Graphics *gfx, int viewportW, int viewportH);
+	void updateBuiltinUniforms(love::graphics::gfx *gfx, int viewportW, int viewportH);
 
 	const std::vector<Buffer *> &getActiveWritableStorageBuffers() const { return activeWritableStorageBuffers; }
 	const std::vector<StorageTextureBinding> &getStorageTextureBindings() const { return storageTextureBindings; }

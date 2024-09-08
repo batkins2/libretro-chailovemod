@@ -22,10 +22,10 @@
 #define LOVE_THREAD_SDL_THREADS_H
 
 #include "../../common/config.h"
-#include "thread/threads.h"
+#include "../threads.h"
 
-#include <SDL_thread.h>
-#include <SDL_version.h>
+#include <SDL2/SDL_thread.h>
+#include <SDL2/SDL_version.h>
 
 namespace love
 {

@@ -23,8 +23,8 @@
 // LOVE
 #include "../common/config.h"
 #include "../common/Range.h"
-#include "graphics/Buffer.h"
-#include "graphics/Volatile.h"
+#include "../buffer.h"
+#include "../volatile.h"
 
 // OpenGL
 #include "OpenGL.h"
@@ -34,7 +34,7 @@ namespace love
 namespace graphics
 {
 
-class Graphics;
+class gfx;
 
 namespace opengl
 {
@@ -43,7 +43,7 @@ class Buffer final : public love::graphics::Buffer, public Volatile
 {
 public:
 
-	Buffer(love::graphics::Graphics *gfx, const Settings &settings, const std::vector<DataDeclaration> &format, const void *data, size_t size, size_t arraylength);
+	Buffer(love::graphics::gfx *gfx, const Settings &settings, const std::vector<DataDeclaration> &format, const void *data, size_t size, size_t arraylength);
 	virtual ~Buffer();
 
 	// Implements Volatile.

@@ -21,8 +21,8 @@
 #include "GraphicsReadback.h"
 #include "Buffer.h"
 #include "Texture.h"
-#include "graphics/Graphics.h"
-#include "data/ByteData.h"
+#include "Graphics.h"
+#include "../data/ByteData.h"
 
 namespace love
 {
@@ -31,7 +31,7 @@ namespace graphics
 namespace opengl
 {
 
-GraphicsReadback::GraphicsReadback(love::graphics::Graphics *gfx, ReadbackMethod method, love::graphics::Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset)
+GraphicsReadback::GraphicsReadback(love::graphics::gfx *gfx, ReadbackMethod method, love::graphics::Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset)
 	: love::graphics::GraphicsReadback(gfx, method, buffer, offset, size, dest, destoffset)
 {
 	// Immediate readback of readback-type buffers doesn't need a staging buffer.
@@ -59,7 +59,7 @@ GraphicsReadback::GraphicsReadback(love::graphics::Graphics *gfx, ReadbackMethod
 	}
 }
 
-GraphicsReadback::GraphicsReadback(love::graphics::Graphics *gfx, ReadbackMethod method, love::graphics::Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty)
+GraphicsReadback::GraphicsReadback(love::graphics::gfx *gfx, ReadbackMethod method, love::graphics::Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty)
 	: love::graphics::GraphicsReadback(gfx, method, texture, slice, mipmap, rect, dest, destx, desty)
 {
 	size_t size = getPixelFormatSliceSize(textureFormat, rect.w, rect.h);
@@ -111,9 +111,9 @@ void GraphicsReadback::update()
 
 		if (stagingBuffer.get())
 		{
-			auto gfx = Module::getInstance<love::graphics::Graphics>(Module::M_GRAPHICS);
-			if (gfx != nullptr)
-				gfx->releaseTemporaryBuffer(stagingBuffer);
+			auto graphics = Module::getInstance<love::graphics::gfx>(Module::M_GRAPHICS);
+			if (graphics != nullptr)
+				graphics->releaseTemporaryBuffer(stagingBuffer);
 			stagingBuffer.set(nullptr);
 		}
 	}

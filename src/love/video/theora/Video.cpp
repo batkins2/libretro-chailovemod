@@ -24,7 +24,7 @@
 // LOVE
 #include "Video.h"
 #include "../../common/delay.h"
-#include "timer/Timer.h"
+#include "../../timer/Timer.h"
 
 namespace love
 {

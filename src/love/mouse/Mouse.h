@@ -23,8 +23,8 @@
 
 // LOVE
 #include "Cursor.h"
-#include "common/Module.h"
-#include "image/ImageData.h"
+#include "../common/Module.h"
+#include "../image/ImageData.h"
 
 // C++
 #include <vector>

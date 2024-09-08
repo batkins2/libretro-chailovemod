@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "SDL.h"
+#include "SDL2/SDL.h"
 #include "physfs.h"
 #include "Types/FileSystem/FileInfo.h"
 #include "Types/FileSystem/FileData.h"

@@ -20,8 +20,8 @@
 
 // LOVE
 #include "KTXHandler.h"
-#include "../common/int.h"
-#include "../common/Exception.h"
+#include "../../common/int.h"
+#include "../../common/Exception.h"
 
 // C
 #include <string.h>

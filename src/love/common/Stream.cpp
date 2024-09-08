@@ -21,7 +21,7 @@
 // LOVE
 #include "Stream.h"
 #include "Data.h"
-#include "data/ByteData.h"
+#include "../data/ByteData.h"
 #include "Exception.h"
 
 namespace love

@@ -23,7 +23,7 @@
 
 // LOVE
 #include "../../common/Stream.h"
-#include "sound/Decoder.h"
+#include "../Decoder.h"
 
 #include "libraries/Wuff/wuff.h"
 

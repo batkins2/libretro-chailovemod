@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "image/FormatHandler.h"
+#include "../FormatHandler.h"
 
 namespace love
 {

@@ -26,9 +26,9 @@
 #include "../common/int.h"
 #include "../common/math.h"
 #include "../common/Color.h"
-#include "graphics/Texture.h"
-#include "graphics/vertex.h"
-#include "graphics/renderstate.h"
+#include "../texture.h"
+#include "../vertex.h"
+#include "../renderstate.h"
 #include "../common/Matrix.h"
 
 // GLAD
@@ -243,7 +243,7 @@ public:
 	 * Set up necessary state (LOVE-provided shader uniforms, etc.) for drawing.
 	 * This *MUST* be called directly before OpenGL drawing functions.
 	 **/
-	void prepareDraw(love::graphics::Graphics *gfx);
+	void prepareDraw(love::graphics::gfx *gfx);
 
 	/**
 	 * State-tracked glBindBuffer.

@@ -22,12 +22,12 @@
 #define LOVE_WINDOW_SDL_WINDOW_H
 
 // LOVE
-#include "window/Window.h"
+#include "../Window.h"
 #include "../../common/config.h"
-#include "graphics/Graphics.h"
+#include "../../gfx.h"
 
 // SDL
-#include <SDL.h>
+#include <SDL2/SDL.h>
 
 namespace love
 {
@@ -43,7 +43,7 @@ public:
 	Window();
 	~Window();
 
-	void setGraphics(graphics::Graphics *graphics) override;
+	void setGraphics(graphics::gfx *graphics) override;
 
 	bool setWindow(int width = 800, int height = 600, WindowSettings *settings = nullptr) override;
 	void getWindow(int &width, int &height, WindowSettings &settings) override;
@@ -182,7 +182,7 @@ private:
 	bool displayedWindowError;
 	ContextAttribs contextAttribs;
 
-	StrongRef<graphics::Graphics> graphics;
+	StrongRef<graphics::gfx> graphics;
 
 }; // Window
 

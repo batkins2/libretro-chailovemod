@@ -20,7 +20,7 @@
 
 #include "Channel.h"
 
-#include <timer/Timer.h>
+#include "../timer/Timer.h"
 
 namespace love
 {

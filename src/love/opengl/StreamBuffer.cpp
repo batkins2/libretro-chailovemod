@@ -22,7 +22,7 @@
 #include "StreamBuffer.h"
 #include "OpenGL.h"
 #include "FenceSync.h"
-#include "graphics/Volatile.h"
+#include "../volatile.h"
 #include "../common/Exception.h"
 #include "../common/memory.h"
 

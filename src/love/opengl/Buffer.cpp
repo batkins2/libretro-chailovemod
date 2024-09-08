@@ -21,7 +21,7 @@
 #include "Buffer.h"
 
 #include "../common/Exception.h"
-#include "graphics/vertex.h"
+#include "../vertex.h"
 #include "Graphics.h"
 
 #include <cstdlib>
@@ -66,7 +66,7 @@ static GLenum getGLFormat(DataFormat format)
 	}
 }
 
-Buffer::Buffer(love::graphics::Graphics *gfx, const Settings &settings, const std::vector<DataDeclaration> &format, const void *data, size_t size, size_t arraylength)
+Buffer::Buffer(love::graphics::gfx *gfx, const Settings &settings, const std::vector<DataDeclaration> &format, const void *data, size_t size, size_t arraylength)
 	: love::graphics::Buffer(gfx, settings, format, size, arraylength)
 {
 	size = getSize();
@@ -206,8 +206,8 @@ void *Buffer::map(MapType map, size_t offset, size_t size)
 	}
 	else
 	{
-		auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
-		data = (char *) gfx->getBufferMapMemory(size);
+		auto graphics = Module::getInstance<Graphics>(Module::M_GRAPHICS);
+		data = (char *) graphics->getBufferMapMemory(size);
 	}
 
 	if (data != nullptr)
@@ -253,8 +253,8 @@ void Buffer::unmap(size_t usedoffset, size_t usedsize)
 
 	if (!ownsMemoryMap)
 	{
-		auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
-		gfx->releaseBufferMapMemory(memoryMap);
+		auto graphics = Module::getInstance<Graphics>(Module::M_GRAPHICS);
+		graphics->releaseBufferMapMemory(memoryMap);
 		memoryMap = nullptr;
 	}
 }

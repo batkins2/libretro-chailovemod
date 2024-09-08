@@ -23,7 +23,7 @@
 
 #include "libraries/physfs/physfs.h"
 #include "../../common/int.h"
-#include "filesystem/NativeFile.h"
+#include "../NativeFile.h"
 
 #include <string>
 

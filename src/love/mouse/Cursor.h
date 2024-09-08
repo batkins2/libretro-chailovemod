@@ -22,9 +22,9 @@
 #define LOVE_MOUSE_CURSOR_H
 
 // LOVE
-#include "image/ImageData.h"
-#include "common/Object.h"
-#include "common/StringMap.h"
+#include "../image/ImageData.h"
+#include "../common/Object.h"
+#include "../common/StringMap.h"
 
 namespace love
 {

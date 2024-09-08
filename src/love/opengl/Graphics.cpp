@@ -24,11 +24,11 @@
 #include "../common/Vector.h"
 
 #include "Graphics.h"
-#include "font/Font.h"
+#include "../font/FontMod.h"
 #include "StreamBuffer.h"
 #include "GraphicsReadback.h"
-#include "math/MathModule.h"
-#include "window/Window.h"
+#include "../math/MathModule.h"
+#include "../window/Window.h"
 #include "Buffer.h"
 #include "ShaderStage.h"
 
@@ -89,9 +89,9 @@ static GLenum getGLBlendFactor(BlendFactor factor)
 	return 0;
 }
 
-love::graphics::Graphics *createInstance()
+love::graphics::gfx *createInstance()
 {
-	love::graphics::Graphics *instance = nullptr;
+	love::graphics::gfx *instance = nullptr;
 
 	try
 	{
@@ -106,7 +106,7 @@ love::graphics::Graphics *createInstance()
 }
 
 Graphics::Graphics()
-	: love::graphics::Graphics("love.graphics.opengl")
+	: love::graphics::gfx("love.graphics.opengl")
 	, windowHasStencil(false)
 	, mainVAO(0)
 	, internalBackbufferFBO(0)
@@ -150,7 +150,7 @@ Graphics::~Graphics()
 
 love::graphics::StreamBuffer *Graphics::newStreamBuffer(BufferUsage type, size_t size)
 {
-	return CreateStreamBuffer(type, size);
+	return newStreamBuffer(type, size);
 }
 
 love::graphics::Texture *Graphics::newTexture(const Texture::Settings &settings, const Texture::Slices *data)

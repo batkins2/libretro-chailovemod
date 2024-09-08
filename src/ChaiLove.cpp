@@ -1,7 +1,7 @@
 #include "ChaiLove.h"
 #include "LibretroLog.h"
 #include <libretro.h>
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #include <string>
 
 ChaiLove* ChaiLove::m_instance = NULL;
@@ -149,7 +149,7 @@ void ChaiLove::draw() {
 	console.draw();
 
 	// Flip the buffer.
-	if (SDL_Flip(screen) == -1) {
+	if (SDL_blit(screen)) {
 		std::string out("[ChaiLove] Failed to swap the buffers: ");
 		LibretroLog::log(RETRO_LOG_ERROR) << out << SDL_GetError() << std::endl;
 	}

@@ -20,7 +20,7 @@
 
 #include "Texture.h"
 
-#include "graphics/Graphics.h"
+#include "../gfx.h"
 #include "Graphics.h"
 #include "Buffer.h"
 #include "../common/int.h"
@@ -210,7 +210,7 @@ static GLenum newRenderbuffer(int width, int height, int &samples, PixelFormat p
 	return status;
 }
 
-Texture::Texture(love::graphics::Graphics *gfx, const Settings &settings, const Slices *data)
+Texture::Texture(love::graphics::gfx *gfx, const Settings &settings, const Slices *data)
 	: love::graphics::Texture(gfx, settings, data)
 	, slices(settings.type)
 	, fbo(0)
@@ -236,7 +236,7 @@ Texture::Texture(love::graphics::Graphics *gfx, const Settings &settings, const 
 	slices.clear();
 }
 
-Texture::Texture(love::graphics::Graphics *gfx, love::graphics::Texture *base, const Texture::ViewSettings &viewsettings)
+Texture::Texture(love::graphics::gfx *gfx, love::graphics::Texture *base, const Texture::ViewSettings &viewsettings)
 	: love::graphics::Texture(gfx, base, viewsettings)
 	, slices(viewsettings.type.get(base->getTextureType()))
 	, fbo(0)

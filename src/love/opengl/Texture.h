@@ -21,8 +21,8 @@
 #pragma once
 
 // LOVE
-#include "graphics/Texture.h"
-#include "graphics/Volatile.h"
+#include "../texture.h"
+#include "../volatile.h"
 
 // OpenGL
 #include "OpenGL.h"
@@ -38,8 +38,8 @@ class Texture final : public love::graphics::Texture, public Volatile
 {
 public:
 
-	Texture(love::graphics::Graphics *gfx, const Settings &settings, const Slices *data);
-	Texture(love::graphics::Graphics *gfx, love::graphics::Texture *base, const Texture::ViewSettings &viewsettings);
+	Texture(love::graphics::gfx *gfx, const Settings &settings, const Slices *data);
+	Texture(love::graphics::gfx *gfx, love::graphics::Texture *base, const Texture::ViewSettings &viewsettings);
 
 	virtual ~Texture();
 

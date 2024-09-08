@@ -19,8 +19,8 @@
  **/
 
 #include "ddsHandler.h"
-#include "../common/Exception.h"
-#include "image/ImageData.h"
+#include "../../common/Exception.h"
+#include "../ImageData.h"
 
 // dds parser
 #include "ddsparse/ddsparse.h"

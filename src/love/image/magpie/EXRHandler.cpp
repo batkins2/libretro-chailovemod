@@ -20,8 +20,8 @@
 
 // LOVE
 #include "EXRHandler.h"
-#include "../common/floattypes.h"
-#include "../common/Exception.h"
+#include "../../common/floattypes.h"
+#include "../../common/Exception.h"
 
 // zlib (for tinyexr)
 #include <zlib.h>

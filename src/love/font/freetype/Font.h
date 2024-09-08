@@ -22,7 +22,7 @@
 #define LOVE_FONT_FREETYPE_FONT_H
 
 // LOVE
-#include "font/Font.h"
+#include "../FontMod.h"
 
 // FreeType2
 #include <ft2build.h>
@@ -36,7 +36,7 @@ namespace font
 namespace freetype
 {
 
-class Font : public love::font::Font
+class Font : public love::font::FontMod
 {
 public:
 

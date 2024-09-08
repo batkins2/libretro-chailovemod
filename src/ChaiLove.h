@@ -49,7 +49,7 @@
 #define CHAILOVE_VERSION_PATCH 0
 #define CHAILOVE_VERSION_STRING "1.3.0"
 
-#include "SDL.h"
+#include "SDL2/SDL.h"
 #include "libretro.h"
 #include "love/keyboard.h"
 #include "love/config.h"

@@ -20,8 +20,8 @@
 
 // LOVE
 #include "PKMHandler.h"
-#include "../common/int.h"
-#include "../common/Exception.h"
+#include "../../common/int.h"
+#include "../../common/Exception.h"
 
 namespace love
 {

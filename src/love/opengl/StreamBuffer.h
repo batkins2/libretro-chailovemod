@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "graphics/StreamBuffer.h"
+#include "../streambuffer.h"
 
 namespace love
 {

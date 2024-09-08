@@ -37,7 +37,7 @@ namespace love
 
 namespace graphics
 {
-class Graphics;
+class gfx;
 }
 
 namespace window
@@ -131,7 +131,7 @@ public:
 
 	virtual ~Window();
 
-	virtual void setGraphics(graphics::Graphics *graphics) = 0;
+	virtual void setGraphics(graphics::gfx *graphics) = 0;
 
 	virtual bool setWindow(int width = 800, int height = 600, WindowSettings *settings = nullptr) = 0;
 	virtual void getWindow(int &width, int &height, WindowSettings &settings) = 0;

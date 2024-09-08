@@ -23,7 +23,7 @@
 
 // LOVE
 #include "../../common/config.h"
-#include "filesystem/File.h"
+#include "../File.h"
 
 // PhysFS
 #include "libraries/physfs/physfs.h"

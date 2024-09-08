@@ -21,8 +21,8 @@
 #pragma once
 
 // LOVE
-#include "../common/config.h"
-#include "image/FormatHandler.h"
+#include "../../common/config.h"
+#include "../FormatHandler.h"
 
 namespace love
 {

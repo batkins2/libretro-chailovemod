@@ -20,7 +20,7 @@
 
 #include "RecordingDevice.h"
 #include "Audio.h"
-#include "sound/Sound.h"
+#include "../../sound/Sound.h"
 
 namespace love
 {

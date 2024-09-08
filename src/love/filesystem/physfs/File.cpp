@@ -25,7 +25,7 @@
 
 // LOVE
 #include "Filesystem.h"
-#include "filesystem/FileData.h"
+#include "../FileData.h"
 
 #ifdef LOVE_ANDROID
 #include "../../common/android.h"

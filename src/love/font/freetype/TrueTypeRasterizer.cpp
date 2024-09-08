@@ -121,7 +121,7 @@ GlyphData *TrueTypeRasterizer::getGlyphDataForIndex(int index) const
 
 	FT_Render_Mode rendermode = FT_RENDER_MODE_NORMAL;
 	if (sdf)
-		rendermode = FT_RENDER_MODE_SDF;
+		rendermode = FT_RENDER_MODE_MAX;
 	else if (hinting == HINTING_MONO)
 		rendermode = FT_RENDER_MODE_MONO;
 
@@ -129,7 +129,7 @@ GlyphData *TrueTypeRasterizer::getGlyphDataForIndex(int index) const
 
 	if (err != FT_Err_Ok)
 	{
-		if (rendermode == FT_RENDER_MODE_SDF)
+		if (rendermode == FT_RENDER_MODE_MAX)
 		{
 			err = FT_Glyph_To_Bitmap(&ftglyph, FT_RENDER_MODE_NORMAL, 0, 1);
 			if (err != FT_Err_Ok)

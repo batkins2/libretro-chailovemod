@@ -24,8 +24,8 @@
 #define LOVE_SOUND_LULLABY_SOUND_H
 
 // LOVE
-#include <sound/Sound.h>
-#include "sound/Decoder.h"
+#include "../Sound.h"
+#include "../Decoder.h"
 
 namespace love
 {

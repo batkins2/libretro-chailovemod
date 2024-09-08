@@ -22,8 +22,8 @@
 
 // LOVE
 #include "TrueTypeRasterizer.h"
-#include "font/BMFontRasterizer.h"
-#include "window/Window.h"
+#include "../BMFontRasterizer.h"
+#include "../../window/Window.h"
 
 // C++
 #include <string.h>
@@ -36,7 +36,7 @@ namespace freetype
 {
 
 Font::Font()
-	: love::font::Font("love.font.freetype")
+	: love::font::FontMod("love.font.freetype")
 {
 	if (FT_Init_FreeType(&library))
 		throw love::Exception("TrueTypeFont Loading error: FT_Init_FreeType failed");

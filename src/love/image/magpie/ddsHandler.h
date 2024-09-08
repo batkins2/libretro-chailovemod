@@ -21,7 +21,7 @@
 #pragma once
 
 // LOVE
-#include "image/FormatHandler.h"
+#include "../FormatHandler.h"
 
 // STL
 #include <string>

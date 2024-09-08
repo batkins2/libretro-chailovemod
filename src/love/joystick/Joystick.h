@@ -22,10 +22,10 @@
 #define LOVE_JOYSTICK_JOYSTICK_H
 
 // LOVE
-#include "common/Object.h"
-#include "common/StringMap.h"
-#include "common/int.h"
-#include "sensor/Sensor.h"
+#include "../common/Object.h"
+#include "../common/StringMap.h"
+#include "../common/int.h"
+#include "../sensor/Sensor.h"
 
 // stdlib
 #include <vector>

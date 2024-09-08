@@ -3,8 +3,8 @@
 
 #include <vector>
 
-#include "SDL.h"
-#include "SDL_gfxPrimitives.h"
+#include "SDL2/SDL.h"
+// #include "SDL2/SDL_gfxPrimitives.h"
 #include "Types/Graphics/Image.h"
 #include "Types/Graphics/Quad.h"
 #include "Types/Graphics/Font.h"

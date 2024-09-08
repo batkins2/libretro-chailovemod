@@ -1,7 +1,7 @@
 #ifndef SRC_LOVE_EVENT_H_
 #define SRC_LOVE_EVENT_H_
 
-#include <SDL.h>
+#include <SDL2/SDL.h>
 
 namespace love {
 /**

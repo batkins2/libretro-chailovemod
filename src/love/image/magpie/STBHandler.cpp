@@ -20,8 +20,8 @@
 
 // LOVE
 #include "STBHandler.h"
-#include "../common/Exception.h"
-#include "../common/Color.h"
+#include "../../common/Exception.h"
+#include "../../common/Color.h"
 
 static void loveSTBIAssert(bool test, const char *teststr)
 {
@@ -30,7 +30,7 @@ static void loveSTBIAssert(bool test, const char *teststr)
 }
 
 // Workaround when building for iOS with deployment target=8.0
-#include "../common/config.h"
+#include "../../common/config.h"
 #if defined(LOVE_IOS)
 #define STBI_NO_THREAD_LOCALS
 #endif

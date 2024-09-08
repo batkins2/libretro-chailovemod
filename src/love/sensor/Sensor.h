@@ -22,8 +22,8 @@
 #define LOVE_SENSOR_H
 
  // LOVE
-#include "common/Module.h"
-#include "common/StringMap.h"
+#include "../common/Module.h"
+#include "../common/StringMap.h"
 
 namespace love
 {

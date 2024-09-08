@@ -20,7 +20,7 @@
 
 // LOVE
 #include "Data.h"
-#include "thread/threads.h"
+#include "../thread/threads.h"
 
 namespace love
 {

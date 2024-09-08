@@ -24,7 +24,7 @@
 #include "Shader.h"
 #include "ShaderStage.h"
 #include "Graphics.h"
-#include "graphics/vertex.h"
+#include "../vertex.h"
 
 // C++
 #include <algorithm>
@@ -586,8 +586,8 @@ void Shader::sendTextures(const UniformInfo *info, love::graphics::Texture **tex
 		}
 		else
 		{
-			auto gfx = Module::getInstance<love::graphics::Graphics>(Module::M_GRAPHICS);
-			tex = gfx->getDefaultTexture(info->textureType, info->dataBaseType, info->isDepthSampler);
+			auto graphics = Module::getInstance<love::graphics::gfx>(Module::M_GRAPHICS);
+			tex = graphics->getDefaultTexture(info->textureType, info->dataBaseType, info->isDepthSampler);
 		}
 
 		tex->retain();
@@ -667,11 +667,11 @@ void Shader::sendBuffers(const UniformInfo *info, love::graphics::Buffer **buffe
 		}
 		else
 		{
-			auto gfx = Module::getInstance<love::graphics::Graphics>(Module::M_GRAPHICS);
+			auto graphics = Module::getInstance<love::graphics::gfx>(Module::M_GRAPHICS);
 			if (texelbinding)
-				buffer = gfx->getDefaultTexelBuffer(info->dataBaseType);
+				buffer = graphics->getDefaultTexelBuffer(info->dataBaseType);
 			else
-				buffer = gfx->getDefaultStorageBuffer();
+				buffer = graphics->getDefaultStorageBuffer();
 		}
 
 		buffer->retain();
@@ -755,7 +755,7 @@ void Shader::setVideoTextures(love::graphics::Texture *ytexture, love::graphics:
 	}
 }
 
-void Shader::updateBuiltinUniforms(love::graphics::Graphics *gfx, int viewportW, int viewportH)
+void Shader::updateBuiltinUniforms(love::graphics::gfx *gfx, int viewportW, int viewportH)
 {
 	if (current != this)
 		return;

@@ -21,8 +21,8 @@
 // LOVE
 #include "BMFontRasterizer.h"
 #include "GenericShaper.h"
-#include "filesystem/Filesystem.h"
-#include "image/Image.h"
+#include "../filesystem/Filesystem.h"
+#include "../image/Image.h"
 
 // C++
 #include <sstream>

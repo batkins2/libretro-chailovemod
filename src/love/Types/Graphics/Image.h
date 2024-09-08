@@ -1,7 +1,7 @@
 #ifndef SRC_LOVE_TYPES_GRAPHICS_IMAGE_H_
 #define SRC_LOVE_TYPES_GRAPHICS_IMAGE_H_
 
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #include <string>
 
 namespace love {

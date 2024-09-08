@@ -20,11 +20,7 @@
 
 // LOVE
 #include "../../common/config.h"
-#include "graphics/Graphics.h"
-#ifdef LOVE_GRAPHICS_VULKAN
-#	include "graphics/vulkan/Graphics.h"
-#	include "graphics/vulkan/Vulkan.h"
-#endif
+#include "../../gfx.h"
 #include "Window.h"
 
 #ifdef LOVE_ANDROID
@@ -45,11 +41,7 @@
 
 // SDL
 #if !SDL_VERSION_ATLEAST(3, 0, 0)
-#include <SDL_syswm.h>
-#endif
-
-#ifdef LOVE_GRAPHICS_VULKAN
-#include <SDL_vulkan.h>
+#include <SDL2/SDL_syswm.h>
 #endif
 
 #if defined(LOVE_WINDOWS)
@@ -121,7 +113,7 @@ Window::~Window()
 	SDL_QuitSubSystem(SDL_INIT_VIDEO);
 }
 
-void Window::setGraphics(graphics::Graphics *graphics)
+void Window::setGraphics(graphics::gfx *graphics)
 {
 	this->graphics.set(graphics);
 }
@@ -504,7 +496,7 @@ static SDL_DisplayID GetSDLDisplayIDForIndex(int displayindex)
 bool Window::setWindow(int width, int height, WindowSettings *settings)
 {
 	if (!graphics.get())
-		graphics.set(Module::getInstance<graphics::Graphics>(Module::M_GRAPHICS));
+		graphics.set(Module::getInstance<graphics::gfx>(Module::M_GRAPHICS));
 
 	if (graphics.get() && graphics->isRenderTargetActive())
 		throw love::Exception("love.window.setMode cannot be called while a render target is active in love.graphics.");
@@ -783,10 +775,10 @@ bool Window::onSizeChanged(int width, int height)
 	else if (metalView != nullptr)
 		SDL_Metal_GetDrawableSize(window, &pixelWidth, &pixelHeight);
 #endif
-#ifdef LOVE_GRAPHICS_VULKAN
-	else if (windowRenderer == graphics::RENDERER_VULKAN)
-		SDL_Vulkan_GetDrawableSize(window, &pixelWidth, &pixelHeight);
-#endif
+// #ifdef LOVE_GRAPHICS_VULKAN
+// 	else if (windowRenderer == graphics::RENDERER_VULKAN)
+// 		SDL_Vulkan_GetDrawableSize(window, &pixelWidth, &pixelHeight);
+// #endif
 	else
 #endif
 	{
@@ -828,10 +820,10 @@ void Window::updateSettings(const WindowSettings &newsettings, bool updateGraphi
 	else if ((wflags & SDL_WINDOW_METAL) != 0)
 		SDL_Metal_GetDrawableSize(window, &pixelWidth, &pixelHeight);
 #endif
-#ifdef LOVE_GRAPHICS_VULKAN
-	else if ((wflags & SDL_WINDOW_VULKAN) != 0)
-		SDL_Vulkan_GetDrawableSize(window, &pixelWidth, &pixelHeight);
-#endif
+// #ifdef LOVE_GRAPHICS_VULKAN
+// 	else if ((wflags & SDL_WINDOW_VULKAN) != 0)
+// 		SDL_Vulkan_GetDrawableSize(window, &pixelWidth, &pixelHeight);
+// #endif
 #endif
 
 #if SDL_VERSION_ATLEAST(3, 0, 0)
@@ -1328,13 +1320,13 @@ void Window::setVSync(int vsync)
 #endif
 	}
 
-#ifdef LOVE_GRAPHICS_VULKAN
-	if (windowRenderer == love::graphics::RENDERER_VULKAN)
-	{
-		auto vgfx = dynamic_cast<love::graphics::vulkan::Graphics*>(graphics.get());
-		vgfx->setVsync(vsync);
-	}
-#endif
+// #ifdef LOVE_GRAPHICS_VULKAN
+// 	if (windowRenderer == love::graphics::RENDERER_VULKAN)
+// 	{
+// 		auto vgfx = dynamic_cast<love::graphics::vulkan::Graphics*>(graphics.get());
+// 		vgfx->setVsync(vsync);
+// 	}
+// #endif
 
 #if defined(LOVE_GRAPHICS_METAL) && defined(LOVE_MACOS)
 	if (metalView != nullptr)
@@ -1370,13 +1362,13 @@ int Window::getVSync() const
 	}
 #endif
 
-#ifdef LOVE_GRAPHICS_VULKAN
-	if (windowRenderer == love::graphics::RENDERER_VULKAN)
-	{
-		auto vgfx = dynamic_cast<love::graphics::vulkan::Graphics*>(graphics.get());
-		return vgfx->getVsync();
-	}
-#endif
+// #ifdef LOVE_GRAPHICS_VULKAN
+// 	if (windowRenderer == love::graphics::RENDERER_VULKAN)
+// 	{
+// 		auto vgfx = dynamic_cast<love::graphics::vulkan::Graphics*>(graphics.get());
+// 		return vgfx->getVsync();
+// 	}
+// #endif
 
 	return 0;
 }

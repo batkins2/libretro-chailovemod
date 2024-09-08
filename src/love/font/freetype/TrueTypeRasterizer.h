@@ -22,8 +22,8 @@
 #define LOVE_FONT_FREETYPE_TRUE_TYPE_RASTERIZER_H
 
 // LOVE
-#include "filesystem/FileData.h"
-#include "font/TrueTypeRasterizer.h"
+#include "../../filesystem/FileData.h"
+#include "../TrueTypeRasterizer.h"
 
 // FreeType2
 #include <ft2build.h>

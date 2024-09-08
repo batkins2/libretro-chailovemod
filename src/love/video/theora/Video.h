@@ -25,10 +25,10 @@
 #include <vector>
 
 // LOVE
-#include "filesystem/File.h"
-#include "video/Video.h"
-#include "thread/threads.h"
-#include "video/VideoStream.h"
+#include "../../filesystem/File.h"
+#include "../Video.h"
+#include "../../thread/threads.h"
+#include "../VideoStream.h"
 #include "TheoraVideoStream.h"
 
 namespace love

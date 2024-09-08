@@ -21,8 +21,8 @@
 #include "PNGHandler.h"
 
 // LOVE
-#include "../common/Exception.h"
-#include "../common/math.h"
+#include "../../common/Exception.h"
+#include "../../common/math.h"
 
 // LodePNG
 #include "lodepng/lodepng.h"

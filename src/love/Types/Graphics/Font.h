@@ -1,10 +1,10 @@
 #ifndef SRC_LOVE_TYPES_GRAPHICS_FONT_H_
 #define SRC_LOVE_TYPES_GRAPHICS_FONT_H_
 
-#include "SDL.h"
-#include "SDL_ttf.h"
+#include "SDL2/SDL.h"
+#include "SDL2/SDL_ttf.h"
 #include <string>
-#include <SDL_tty.h>
+// #include <SDL_tty.h>
 #include "Image.h"
 
 namespace love {
@@ -28,7 +28,7 @@ class Font {
 	bool destroy();
 	void print(const std::string& text, int x, int y, int r, int g, int b, int a);
 	TTF_Font* ttfFont = NULL;
-	TTY_Font* ttyFont = NULL;
+	// TTY_Font* ttyFont = NULL;
 	int ttyFontWidth, ttyFontHeight;
 
 	/**
