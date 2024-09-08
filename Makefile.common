@@ -7,6 +7,30 @@ SOURCES_CXX := $(wildcard \
 	$(CORE_DIR)/src/love/Types/FileSystem/*.cpp \
 	$(CORE_DIR)/src/love/Types/Graphics/*.cpp \
 	$(CORE_DIR)/src/love/Types/Input/*.cpp \
+	$(CORE_DIR)/src/love/audio/*.cpp \
+	$(CORE_DIR)/src/love/audio/null/*.cpp \
+	$(CORE_DIR)/src/love/audio/openal/*.cpp \
+	$(CORE_DIR)/src/love/common/*.cpp \
+	$(CORE_DIR)/src/love/data/*.cpp \
+	$(CORE_DIR)/src/love/filesystem/*.cpp \
+	$(CORE_DIR)/src/love/filesystem/physfs/*.cpp \
+	$(CORE_DIR)/src/love/font/*.cpp \
+	$(CORE_DIR)/src/love/font/freetype/*.cpp \
+	$(CORE_DIR)/src/love/font/libraries/*.cpp \
+	$(CORE_DIR)/src/love/font/libraries/utf8/*.cpp \
+	$(CORE_DIR)/src/love/image/*.cpp \
+	$(CORE_DIR)/src/love/image/magpie/*.cpp \
+	$(CORE_DIR)/src/love/math/*.cpp \
+	$(CORE_DIR)/src/love/opengl/*.cpp \
+	$(CORE_DIR)/src/love/sound/*.cpp \
+	$(CORE_DIR)/src/love/sound/lullaby/*.cpp \
+	$(CORE_DIR)/src/love/thread/*.cpp \
+	$(CORE_DIR)/src/love/thread/sdl/*.cpp \
+	$(CORE_DIR)/src/love/timer/*.cpp \
+	$(CORE_DIR)/src/love/video/*.cpp \
+	$(CORE_DIR)/src/love/video/theora/*.cpp \
+	$(CORE_DIR)/src/love/window/*.cpp \
+	$(CORE_DIR)/src/love/window/sdl/*.cpp \
 )
 SOURCES_C = $(CORE_DIR)/src/physfs_platform_libretro.c
 SOURCES_S =
