@@ -32,7 +32,9 @@ SOURCES_CXX := $(wildcard \
 	$(CORE_DIR)/src/love/window/*.cpp \
 	$(CORE_DIR)/src/love/window/sdl/*.cpp \
 	$(CORE_DIR)/src/love/libraries/glslang/glslang/MachineIndependent/*.cpp \
+	$(CORE_DIR)/src/love/libraries/glslang/glslang/MachineIndependent/preprocessor/*.cpp \
 	$(CORE_DIR)/src/love/libraries/glslang/glslang/ResourceLimits/*.cpp \
+	$(CORE_DIR)/src/love/libraries/glslang/glslang/GenericCodeGen/*.cpp \
 )
 SOURCES_C = $(CORE_DIR)/src/physfs_platform_libretro.c
 SOURCES_S =
@@ -147,9 +149,15 @@ SOURCES_C += $(wildcard \
 )
 
 # SDL_gfx
-FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/tests/SDL_gfx-2.0.26
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/bin/include
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/test_sdlgfx
 SOURCES_C += $(wildcard \
-	$(CORE_DIR)/vendor/sdl2-libretro/tests/SDL_gfx-2.0.26/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL2_gfx-1.0.3/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL2_ttf-2.0.14/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL2_image-2.0.2/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/src/render/*.c \
+	$(CORE_DIR)/src/love/data/libraries/lz4/*.c \
+	$(CORE_DIR)/src/love/filesystem/physfs/libraries/physfs/*.c \
 )
 
 # FreeType2

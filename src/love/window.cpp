@@ -3,10 +3,11 @@
 #include "../ChaiLove.h"
 #include "../LibretroLog.h"
 
-#include "SDL.h"
+#include "SDL2/SDL.h"
 #include "config.h"
 #include "libretro.h"
 #include "Types/Graphics/Point.h"
+#include <SDL2/SDL_video.h>
 
 using ::ChaiLove;
 using love::Types::Graphics::Point;
@@ -28,20 +29,20 @@ bool window::load(const config& conf) {
 	}
 
 	// Build the Screen.
-	Uint32 flags;
-	if (conf.window.hwsurface) {
-		flags = SDL_HWSURFACE;
-	} else {
-		flags = SDL_SWSURFACE;
-	}
-	if (conf.window.asyncblit) {
-		flags |= SDL_ASYNCBLIT;
-	}
-	if (conf.window.doublebuffering) {
-		flags |= SDL_DOUBLEBUF;
-	}
-	app->screen = SDL_SetVideoMode(conf.window.width, conf.window.height, conf.window.bbp, flags);
-	if (app->screen == NULL) {
+	// Uint32 flags;
+	// if (conf.window.hwsurface) {
+	// 	flags = SDL_HWSURFACE;
+	// } else {
+	// 	flags = SDL_SWSURFACE;
+	// }
+	// if (conf.window.asyncblit) {
+	// 	flags |= SDL_ASYNCBLIT;
+	// }
+	// if (conf.window.doublebuffering) {
+	// 	// flags |= SDL_DOUBLEBUF;
+	// }
+	app->win = SDL_CreateWindow("ChaiLove", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, conf.window.width, conf.window.height, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_OPENGL);
+	if (app->win == NULL) {
 		const char* errorChar = SDL_GetError();
 		std::string errString("");
 		if (errorChar != NULL) {
@@ -75,13 +76,13 @@ bool window::unload() {
 
 std::string window::getTitle() {
 	char* titleChar;
-	SDL_WM_GetCaption(&titleChar, NULL);
+	// SDL_WM_GetCaption(&titleChar, NULL);
 	return std::string(titleChar);
 }
 
 window& window::setTitle(const std::string& title) {
 	ChaiLove::getInstance()->config.window.title = title;
-	SDL_WM_SetCaption(title.c_str(), 0);
+	// SDL_WM_SetCaption(title.c_str(), 0);
 	return *this;
 }
 

@@ -1,7 +1,7 @@
 #include "Image.h"
-#include "SDL.h"
+#include "SDL2/SDL.h"
 #define SDL_STBIMAGE_IMPLEMENTATION
-#include <SDL_stbimage.h>
+#include <SDL2/SDL_image.h>
 
 #include <string>
 #include "../../../ChaiLove.h"
@@ -21,7 +21,7 @@ bool Image::loaded() {
 }
 
 bool Image::loadFromRW(SDL_RWops* rw) {
-	surface = STBIMG_Load_RW(rw, 1);
+	surface = IMG_Load_RW(rw, 1);
 
 	if (!loaded()) {
 		const char* errorChar = SDL_GetError();
@@ -37,11 +37,11 @@ bool Image::loadFromRW(SDL_RWops* rw) {
 	ChaiLove* game = ChaiLove::getInstance();
 	SDL_Surface* optimizedImage = NULL;
 	if (game->config.options["alphablending"]) {
-		optimizedImage = SDL_DisplayFormatAlpha(surface);
+		optimizedImage = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA8888, 0);
 	} else {
 		Uint32 colorkey = SDL_MapRGBA(surface->format, 0, 0, 0, 0xFF);
-		SDL_SetColorKey(surface, SDL_SRCCOLORKEY | SDL_RLEACCEL, colorkey);
-		optimizedImage = SDL_DisplayFormat(surface);
+		SDL_SetColorKey(surface, SDL_RLEACCEL, colorkey);
+		optimizedImage = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA8888, 0);
 	}
 
 	if (optimizedImage == NULL) {

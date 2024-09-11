@@ -1,0 +1,6 @@
+{
+    "cmake.sourceDirectory": "/home/brian/libretro-chailovemod/vendor/ChaiScript_Extras/cmake",
+    "files.associations": {
+        "audio_defines.h": "c"
+    }
+}

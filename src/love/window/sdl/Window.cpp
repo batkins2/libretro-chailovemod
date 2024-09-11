@@ -1053,18 +1053,18 @@ const char *Window::getDisplayName(int displayindex) const
 
 Window::DisplayOrientation Window::getDisplayOrientation(int displayindex) const
 {
-#if SDL_VERSION_ATLEAST(3, 0, 0)
-	switch (SDL_GetCurrentDisplayOrientation(GetSDLDisplayIDForIndex(displayindex)))
-#else
-	switch (SDL_GetDisplayOrientation(displayindex))
-#endif
-	{
-		case SDL_ORIENTATION_UNKNOWN: return ORIENTATION_UNKNOWN;
-		case SDL_ORIENTATION_LANDSCAPE: return ORIENTATION_LANDSCAPE;
-		case SDL_ORIENTATION_LANDSCAPE_FLIPPED: return ORIENTATION_LANDSCAPE_FLIPPED;
-		case SDL_ORIENTATION_PORTRAIT: return ORIENTATION_PORTRAIT;
-		case SDL_ORIENTATION_PORTRAIT_FLIPPED: return ORIENTATION_PORTRAIT_FLIPPED;
-	}
+// #if SDL_VERSION_ATLEAST(3, 0, 0)
+// 	switch (SDL_GetCurrentDisplayOrientation(GetSDLDisplayIDForIndex(displayindex)))
+// #else
+// 	switch (SDL_GetDisplayOrientation(displayindex))
+// #endif
+// 	{
+// 		case SDL_ORIENTATION_UNKNOWN: return ORIENTATION_UNKNOWN;
+// 		case SDL_ORIENTATION_LANDSCAPE: return ORIENTATION_LANDSCAPE;
+// 		case SDL_ORIENTATION_LANDSCAPE_FLIPPED: return ORIENTATION_LANDSCAPE_FLIPPED;
+// 		case SDL_ORIENTATION_PORTRAIT: return ORIENTATION_PORTRAIT;
+// 		case SDL_ORIENTATION_PORTRAIT_FLIPPED: return ORIENTATION_PORTRAIT_FLIPPED;
+// 	}
 
 	return ORIENTATION_UNKNOWN;
 }

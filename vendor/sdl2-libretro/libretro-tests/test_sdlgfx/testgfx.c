@@ -20,7 +20,7 @@
 #if !defined(__LIBRETRO__) && !defined(NATIVE)
 #include "SDL_test_common.h"
 #endif
-#include "SDL2_gfxPrimitives.h"
+#include "SDL2/SDL2_gfxPrimitives.h"
 #if !defined(__LIBRETRO__) && !defined(NATIVE)
 static SDLTest_CommonState *state;
 #endif
