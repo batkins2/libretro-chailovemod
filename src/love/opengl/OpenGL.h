@@ -21,6 +21,8 @@
 #ifndef LOVE_GRAPHICS_OPENGL_OPENGL_H
 #define LOVE_GRAPHICS_OPENGL_OPENGL_H
 
+// #include "../../pgl.h"
+
 // LOVE
 #include "../common/config.h"
 #include "../common/int.h"

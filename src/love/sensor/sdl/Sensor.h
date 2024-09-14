@@ -22,10 +22,10 @@
 #define LOVE_SENSOR_SDL_SENSOR_H
 
 // LOVE
-#include "sensor/Sensor.h"
+#include "../Sensor.h"
 
 // SDL
-#include <SDL_sensor.h>
+#include <SDL2/SDL_sensor.h>
 
 // std
 #include <map>
