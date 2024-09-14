@@ -647,9 +647,9 @@ SDL_PumpEvents(void)
     }
 #if !SDL_JOYSTICK_DISABLED
     /* Check for joystick state change */
-    if ((!SDL_disabled_events[SDL_JOYAXISMOTION >> 8] || SDL_JoystickEventState(SDL_QUERY))) {
-        SDL_JoystickUpdate();
-    }
+    // if ((!SDL_disabled_events[SDL_JOYAXISMOTION >> 8] || SDL_JoystickEventState(SDL_QUERY))) {
+    //     SDL_JoystickUpdate();
+    // }
 #endif
 
     SDL_SendPendingQuit();  /* in case we had a signal handler fire, etc. */

@@ -1,4 +1,4 @@
-TARGET_NAME := chailove
+TARGET_NAME := chailovemod
 
 ifeq ($(VERBOSE),)
 Q=@

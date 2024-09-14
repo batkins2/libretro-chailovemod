@@ -65,7 +65,7 @@ FNT_Create(SDL_Surface* surface, int glyph_width, int glyph_height, const char* 
   int i;
   TTY_Font* font = (TTY_Font*)malloc(sizeof(TTY_Font));
 
-  font->surface = SDL_DisplayFormatAlpha(surface);
+  font->surface = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA8888, 0);
 
   if (!font->surface)
     {

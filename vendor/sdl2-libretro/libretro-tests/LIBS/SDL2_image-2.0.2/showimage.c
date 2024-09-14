@@ -52,133 +52,133 @@ static void draw_background(SDL_Renderer *renderer, int w, int h)
     }
 }
 
-int main(int argc, char *argv[])
-{
-    SDL_Window *window;
-    SDL_Renderer *renderer;
-    SDL_Texture *texture;
-    Uint32 flags;
-    int i, w, h, done;
-    SDL_Event event;
-    const char *saveFile = NULL;
+// int main(int argc, char *argv[])
+// {
+//     SDL_Window *window;
+//     SDL_Renderer *renderer;
+//     SDL_Texture *texture;
+//     Uint32 flags;
+//     int i, w, h, done;
+//     SDL_Event event;
+//     const char *saveFile = NULL;
 
-    /* Check command line usage */
-    if ( ! argv[1] ) {
-        fprintf(stderr, "Usage: %s [-fullscreen] [-save file.png] <image_file> ...\n", argv[0]);
-        return(1);
-    }
+//     /* Check command line usage */
+//     if ( ! argv[1] ) {
+//         fprintf(stderr, "Usage: %s [-fullscreen] [-save file.png] <image_file> ...\n", argv[0]);
+//         return(1);
+//     }
 
-    flags = SDL_WINDOW_HIDDEN;
-    for ( i=1; argv[i]; ++i ) {
-        if ( strcmp(argv[i], "-fullscreen") == 0 ) {
-            SDL_ShowCursor(0);
-            flags |= SDL_WINDOW_FULLSCREEN;
-        }
-    }
+//     flags = SDL_WINDOW_HIDDEN;
+//     for ( i=1; argv[i]; ++i ) {
+//         if ( strcmp(argv[i], "-fullscreen") == 0 ) {
+//             SDL_ShowCursor(0);
+//             flags |= SDL_WINDOW_FULLSCREEN;
+//         }
+//     }
 
-    if (SDL_Init(SDL_INIT_VIDEO) == -1) {
-        fprintf(stderr, "SDL_Init(SDL_INIT_VIDEO) failed: %s\n", SDL_GetError());
-        return(2);
-    }
+//     if (SDL_Init(SDL_INIT_VIDEO) == -1) {
+//         fprintf(stderr, "SDL_Init(SDL_INIT_VIDEO) failed: %s\n", SDL_GetError());
+//         return(2);
+//     }
 
-    if (SDL_CreateWindowAndRenderer(0, 0, flags, &window, &renderer) < 0) {
-        fprintf(stderr, "SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
-        return(2);
-    }
+//     if (SDL_CreateWindowAndRenderer(0, 0, flags, &window, &renderer) < 0) {
+//         fprintf(stderr, "SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
+//         return(2);
+//     }
 
-    for ( i=1; argv[i]; ++i ) {
-        if ( strcmp(argv[i], "-fullscreen") == 0 ) {
-            continue;
-        }
+//     for ( i=1; argv[i]; ++i ) {
+//         if ( strcmp(argv[i], "-fullscreen") == 0 ) {
+//             continue;
+//         }
 
-        if ( strcmp(argv[i], "-save") == 0 && argv[i+1] ) {
-            ++i;
-            saveFile = argv[i];
-            continue;
-        }
+//         if ( strcmp(argv[i], "-save") == 0 && argv[i+1] ) {
+//             ++i;
+//             saveFile = argv[i];
+//             continue;
+//         }
 
-        /* Open the image file */
-        texture = IMG_LoadTexture(renderer, argv[i]);
-        if (!texture) {
-            fprintf(stderr, "Couldn't load %s: %s\n", argv[i], SDL_GetError());
-            continue;
-        }
-        SDL_QueryTexture(texture, NULL, NULL, &w, &h);
+//         /* Open the image file */
+//         texture = IMG_LoadTexture(renderer, argv[i]);
+//         if (!texture) {
+//             fprintf(stderr, "Couldn't load %s: %s\n", argv[i], SDL_GetError());
+//             continue;
+//         }
+//         SDL_QueryTexture(texture, NULL, NULL, &w, &h);
 
-        /* Save the image file, if desired */
-        if ( saveFile ) {
-            SDL_Surface *surface = IMG_Load(argv[i]);
-            if (surface) {
-                if ( IMG_SavePNG(surface, saveFile) < 0 ) {
-                    fprintf(stderr, "Couldn't save %s: %s\n", saveFile, SDL_GetError());
-                }
-            } else {
-                fprintf(stderr, "Couldn't load %s: %s\n", argv[i], SDL_GetError());
-            }
-        }
+//         /* Save the image file, if desired */
+//         if ( saveFile ) {
+//             SDL_Surface *surface = IMG_Load(argv[i]);
+//             if (surface) {
+//                 if ( IMG_SavePNG(surface, saveFile) < 0 ) {
+//                     fprintf(stderr, "Couldn't save %s: %s\n", saveFile, SDL_GetError());
+//                 }
+//             } else {
+//                 fprintf(stderr, "Couldn't load %s: %s\n", argv[i], SDL_GetError());
+//             }
+//         }
 
-        /* Show the window */
-        SDL_SetWindowTitle(window, argv[i]);
-        SDL_SetWindowSize(window, w, h);
-        SDL_ShowWindow(window);
+//         /* Show the window */
+//         SDL_SetWindowTitle(window, argv[i]);
+//         SDL_SetWindowSize(window, w, h);
+//         SDL_ShowWindow(window);
 
-        done = 0;
-        while ( ! done ) {
-            while ( SDL_PollEvent(&event) ) {
-                switch (event.type) {
-                    case SDL_KEYUP:
-                        switch (event.key.keysym.sym) {
-                            case SDLK_LEFT:
-                                if ( i > 1 ) {
-                                    i -= 2;
-                                    done = 1;
-                                }
-                                break;
-                            case SDLK_RIGHT:
-                                if ( argv[i+1] ) {
-                                    done = 1;
-                                }
-                                break;
-                            case SDLK_ESCAPE:
-                            case SDLK_q:
-                                argv[i+1] = NULL;
-                            /* Drop through to done */
-                            case SDLK_SPACE:
-                            case SDLK_TAB:
-                            done = 1;
-                            break;
-                            default:
-                            break;
-                        }
-                        break;
-                    case SDL_MOUSEBUTTONDOWN:
-                        done = 1;
-                        break;
-                    case SDL_QUIT:
-                        argv[i+1] = NULL;
-                        done = 1;
-                        break;
-                    default:
-                        break;
-                }
-            }
-            /* Draw a background pattern in case the image has transparency */
-            draw_background(renderer, w, h);
+//         done = 0;
+//         while ( ! done ) {
+//             while ( SDL_PollEvent(&event) ) {
+//                 switch (event.type) {
+//                     case SDL_KEYUP:
+//                         switch (event.key.keysym.sym) {
+//                             case SDLK_LEFT:
+//                                 if ( i > 1 ) {
+//                                     i -= 2;
+//                                     done = 1;
+//                                 }
+//                                 break;
+//                             case SDLK_RIGHT:
+//                                 if ( argv[i+1] ) {
+//                                     done = 1;
+//                                 }
+//                                 break;
+//                             case SDLK_ESCAPE:
+//                             case SDLK_q:
+//                                 argv[i+1] = NULL;
+//                             /* Drop through to done */
+//                             case SDLK_SPACE:
+//                             case SDLK_TAB:
+//                             done = 1;
+//                             break;
+//                             default:
+//                             break;
+//                         }
+//                         break;
+//                     case SDL_MOUSEBUTTONDOWN:
+//                         done = 1;
+//                         break;
+//                     case SDL_QUIT:
+//                         argv[i+1] = NULL;
+//                         done = 1;
+//                         break;
+//                     default:
+//                         break;
+//                 }
+//             }
+//             /* Draw a background pattern in case the image has transparency */
+//             draw_background(renderer, w, h);
 
-            /* Display the image */
-            SDL_RenderCopy(renderer, texture, NULL, NULL);
-            SDL_RenderPresent(renderer);
+//             /* Display the image */
+//             SDL_RenderCopy(renderer, texture, NULL, NULL);
+//             SDL_RenderPresent(renderer);
 
-            SDL_Delay(100);
-        }
-        SDL_DestroyTexture(texture);
-    }
+//             SDL_Delay(100);
+//         }
+//         SDL_DestroyTexture(texture);
+//     }
 
 
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
+//     SDL_DestroyRenderer(renderer);
+//     SDL_DestroyWindow(window);
 
-    /* We're done! */
-    SDL_Quit();
-    return(0);
-}
+//     /* We're done! */
+//     SDL_Quit();
+//     return(0);
+// }

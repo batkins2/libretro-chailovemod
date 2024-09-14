@@ -195,9 +195,9 @@ SDL_InitSubSystem(Uint32 flags)
     if ((flags & SDL_INIT_JOYSTICK)){
 #if !SDL_JOYSTICK_DISABLED
         if (SDL_PrivateShouldInitSubsystem(SDL_INIT_JOYSTICK)) {
-           if (SDL_JoystickInit() < 0) {
-               return (-1);
-           }
+        //    if (SDL_JoystickInit() < 0) {
+        //        return (-1);
+        //    }
         }
         SDL_PrivateSubsystemRefCountIncr(SDL_INIT_JOYSTICK);
 #else
@@ -208,9 +208,9 @@ SDL_InitSubSystem(Uint32 flags)
     if ((flags & SDL_INIT_GAMECONTROLLER)){
 #if !SDL_JOYSTICK_DISABLED
         if (SDL_PrivateShouldInitSubsystem(SDL_INIT_GAMECONTROLLER)) {
-            if (SDL_GameControllerInit() < 0) {
-                return (-1);
-            }
+            // if (SDL_GameControllerInit() < 0) {
+            //     return (-1);
+            // }
         }
         SDL_PrivateSubsystemRefCountIncr(SDL_INIT_GAMECONTROLLER);
 #else
@@ -250,9 +250,9 @@ SDL_QuitSubSystem(Uint32 flags)
         /* game controller implies joystick */
         flags |= SDL_INIT_JOYSTICK;
 
-        if (SDL_PrivateShouldQuitSubsystem(SDL_INIT_GAMECONTROLLER)) {
-            SDL_GameControllerQuit();
-        }
+        // if (SDL_PrivateShouldQuitSubsystem(SDL_INIT_GAMECONTROLLER)) {
+        //     SDL_GameControllerQuit();
+        // }
         SDL_PrivateSubsystemRefCountDecr(SDL_INIT_GAMECONTROLLER);
     }
 
@@ -260,9 +260,9 @@ SDL_QuitSubSystem(Uint32 flags)
         /* joystick implies events */
         flags |= SDL_INIT_EVENTS;
 
-        if (SDL_PrivateShouldQuitSubsystem(SDL_INIT_JOYSTICK)) {
-            SDL_JoystickQuit();
-        }
+        // if (SDL_PrivateShouldQuitSubsystem(SDL_INIT_JOYSTICK)) {
+        //     SDL_JoystickQuit();
+        // }
         SDL_PrivateSubsystemRefCountDecr(SDL_INIT_JOYSTICK);
     }
 #endif
