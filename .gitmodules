@@ -74,3 +74,9 @@
 [submodule "SDL2_tty"]
 	path = vendor/SDL2_tty
 	url = https://github.com/batkins2/SDL2_tty.git
+[submodule "vendor/PortableGL"]
+	path = vendor/PortableGL
+	url = https://github.com/rswinkle/PortableGL.git
+[submodule "vendor/GLTools"]
+	path = vendor/GLTools
+	url = https://github.com/HazimGazov/GLTools.git
