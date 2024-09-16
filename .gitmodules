@@ -70,7 +70,7 @@
 	branch = master
 [submodule "sdl2-libretro"]
 	path = vendor/sdl2-libretro
-	url = https://github.com/batkins2/sdl2-libretro.git
+	url = https://github.com/r-type/sdl2-libretro.git
 [submodule "SDL2_tty"]
 	path = vendor/SDL2_tty
 	url = https://github.com/batkins2/SDL2_tty.git
@@ -80,3 +80,6 @@
 [submodule "vendor/GLTools"]
 	path = vendor/GLTools
 	url = https://github.com/HazimGazov/GLTools.git
+[submodule "vendor/sdl2-libretro"]
+	path = vendor/sdl2-libretro
+	url = https://github.com/batkins2/sdl2-libretro
