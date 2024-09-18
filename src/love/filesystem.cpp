@@ -1,7 +1,7 @@
 #include <string>
 
 #include "libretro.h"
-#include "physfs.h"
+#include "filesystem/physfs/libraries/physfs/physfs.h"
 #include "filesystem.h"
 #include "physfsrwops.h"
 #include "../ChaiLove.h"

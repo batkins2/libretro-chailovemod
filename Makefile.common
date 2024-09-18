@@ -115,28 +115,28 @@ FLAGS += -DHAVE_STB_VORBIS
 FLAGS += -I$(CORE_DIR)/vendor/libretro-deps
 
 # zlib
-# SOURCES_C += \
-# 	$(CORE_DIR)/vendor/libretro-deps/libz/adler32.c \
-# 	$(CORE_DIR)/vendor/libretro-deps/libz/compress.c \
-# 	$(CORE_DIR)/vendor/libretro-deps/libz/crc32.c \
-# 	$(CORE_DIR)/vendor/libretro-deps/libz/deflate.c \
-# 	$(CORE_DIR)/vendor/libretro-deps/libz/gzclose.c \
-# 	$(CORE_DIR)/vendor/libretro-deps/libz/gzlib.c \
-# 	$(CORE_DIR)/vendor/libretro-deps/libz/gzread.c \
-# 	$(CORE_DIR)/vendor/libretro-deps/libz/gzwrite.c \
-# 	$(CORE_DIR)/vendor/libretro-deps/libz/infback.c \
-# 	$(CORE_DIR)/vendor/libretro-deps/libz/inffast.c \
-# 	$(CORE_DIR)/vendor/libretro-deps/libz/inflate.c \
-# 	$(CORE_DIR)/vendor/libretro-deps/libz/inftrees.c \
-# 	$(CORE_DIR)/vendor/libretro-deps/libz/trees.c \
-# 	$(CORE_DIR)/vendor/libretro-deps/libz/zutil.c
-# FLAGS += -I$(CORE_DIR)/vendor/libretro-deps/libz
-# FLAGS += -I$(CORE_DIR)/vendor/libretro-common/compat
-# FLAGS += -DWANT_ZLIB
+SOURCES_C += \
+	$(CORE_DIR)/vendor/libretro-deps/libz/adler32.c \
+	$(CORE_DIR)/vendor/libretro-deps/libz/compress.c \
+	$(CORE_DIR)/vendor/libretro-deps/libz/crc32.c \
+	$(CORE_DIR)/vendor/libretro-deps/libz/deflate.c \
+	$(CORE_DIR)/vendor/libretro-deps/libz/gzclose.c \
+	$(CORE_DIR)/vendor/libretro-deps/libz/gzlib.c \
+	$(CORE_DIR)/vendor/libretro-deps/libz/gzread.c \
+	$(CORE_DIR)/vendor/libretro-deps/libz/gzwrite.c \
+	$(CORE_DIR)/vendor/libretro-deps/libz/infback.c \
+	$(CORE_DIR)/vendor/libretro-deps/libz/inffast.c \
+	$(CORE_DIR)/vendor/libretro-deps/libz/inflate.c \
+	$(CORE_DIR)/vendor/libretro-deps/libz/inftrees.c \
+	$(CORE_DIR)/vendor/libretro-deps/libz/trees.c \
+	$(CORE_DIR)/vendor/libretro-deps/libz/zutil.c
+FLAGS += -I$(CORE_DIR)/vendor/libretro-deps/libz
+FLAGS += -I$(CORE_DIR)/vendor/libretro-common/compat
+FLAGS += -DWANT_ZLIB
 
 # # PhysFS
-# FLAGS += -I$(CORE_DIR)/vendor/physfs/src
-# FLAGS += -I$(CORE_DIR)/vendor/physfs/extras
+FLAGS += -I$(CORE_DIR)/vendor/physfs/src
+FLAGS += -I$(CORE_DIR)/vendor/physfs/extras
 # FLAGS += -DPHYSFS_NO_CDROM_SUPPORT=1 \
 # 	-DPHYSFS_SUPPORTS_DEFAULT=0 \
 # 	-DPHYSFS_SUPPORTS_ZIP=1
@@ -160,29 +160,35 @@ SOURCES_C += $(wildcard \
 )
 
 # PortableGL
-FLAGS += -I$(CORE_DIR)/vendor/PortableGL
-FLAGS += -I$(CORE_DIR)/vendor/PortableGL/external/glm/glm
-FLAGS += -I$(CORE_DIR)/vendor/PortableGL/src
-FLAGS += -I$(CORE_DIR)/vendor/PortableGL/glcommon
-FLAGS += -I$(CORE_DIR)/vendor/GLTools/include
-FLAGS += -I/usr/share/R/include
-FLAGS += -I/usr/include/open3d/geometry
-FLAGS += -I/usr/include/eigen3
-FLAGS += -DUSING_PORTABLEGL
+# FLAGS += -I$(CORE_DIR)/vendor/PortableGL
+# FLAGS += -I$(CORE_DIR)/vendor/PortableGL/external/glm/glm
+# FLAGS += -I$(CORE_DIR)/vendor/PortableGL/src
+# FLAGS += -I$(CORE_DIR)/vendor/PortableGL/glcommon
+# FLAGS += -I$(CORE_DIR)/vendor/GLTools/include
+# FLAGS += -I/usr/share/R/include
+# FLAGS += -I/usr/include/open3d/geometry
+# FLAGS += -I/usr/include/eigen3
+# FLAGS += -DUSING_PORTABLEGL
 # SOURCES_C += $(wildcard \
 # 	$(CORE_DIR)/src/pgl.c \
 # )
 
 # SDL_gfx
 FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/bin/include
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/bin/include/SDL2
+# FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/video/libretro
 FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/test_sdlgfx
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/software
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengl
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengles
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengles2
+	
 # FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL2_image-2.0.2/external/zlib-1.2.11	
 # FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/haptic
 SOURCES_C += $(wildcard \
 	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL2_gfx-1.0.3/*.c \
 	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL2_ttf-2.0.14/*.c \
 	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL2_image-2.0.2/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL2_image-2.0.2/external/zlib-1.2.11/*.c \
 	$(CORE_DIR)/vendor/sdl2-libretro/src/render/*.c \
 	$(CORE_DIR)/vendor/sdl2-libretro/src/render/software/*.c \
 	$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengl/*.c \
@@ -191,7 +197,7 @@ SOURCES_C += $(wildcard \
 	$(CORE_DIR)/vendor/sdl2-libretro/src/timer/*.c \
 	$(CORE_DIR)/vendor/sdl2-libretro/src/timer/dummy_libretro/*.c \
 	$(CORE_DIR)/vendor/sdl2-libretro/src/video/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/video/dummy/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/src/video/dummy_libretro/*.c \
 	$(CORE_DIR)/vendor/sdl2-libretro/src/thread/*.c \
 	$(CORE_DIR)/vendor/sdl2-libretro/src/stdlib/*.c \
 	$(CORE_DIR)/vendor/sdl2-libretro/src/audio/*.c \
@@ -292,9 +298,9 @@ endif
 
 # SDL
 ifeq ($(platform), win)
-	SOURCES_C += $(wildcard ./vendor/sdl2-libretro/src/*.c  ./vendor/sdl2-libretro/src/audio/*.c  ./vendor/sdl2-libretro/src/cdrom/dummy/*.c  ./vendor/sdl2-libretro/src/cdrom/*.c  ./vendor/sdl2-libretro/src/cpuinfo/*.c  ./vendor/sdl2-libretro/src/events/*.c  ./vendor/sdl2-libretro/src/file/*.c  ./vendor/sdl2-libretro/src/stdlib/*.c  ./vendor/sdl2-libretro/src/thread/*.c  ./vendor/sdl2-libretro/src/timer/*.c  ./vendor/sdl2-libretro/src/video/*.c  ./vendor/sdl2-libretro/src/nojoystick/*.c  ./vendor/sdl2-libretro/src/video/libretro/*.c  ./vendor/sdl2-libretro/src/nojoystick/libretro/*.c  ./vendor/sdl2-libretro/src/timer/libretro/*.c  ./vendor/sdl2-libretro/src/audio/libretro/*.c  ./vendor/sdl2-libretro/src/thread/win32/SDL_sysmutex.c ./vendor/sdl2-libretro/src/thread/win32/SDL_syssem.c ./vendor/sdl2-libretro/src/thread/win32/SDL_systhread.c ./vendor/sdl2-libretro/src/thread/generic/SDL_syscond.c ./vendor/sdl2-libretro/src/loadso/dummy/*.c)
+	SOURCES_C += $(wildcard ./vendor/sdl2-libretro/src/*.c  ./vendor/sdl2-libretro/src/audio/*.c  ./vendor/sdl2-libretro/src/cdrom/dummy/*.c  ./vendor/sdl2-libretro/src/cdrom/*.c  ./vendor/sdl2-libretro/src/cpuinfo/*.c  ./vendor/sdl2-libretro/src/events/*.c  ./vendor/sdl2-libretro/src/file/*.c  ./vendor/sdl2-libretro/src/stdlib/*.c  ./vendor/sdl2-libretro/src/thread/*.c  ./vendor/sdl2-libretro/src/timer/*.c  ./vendor/sdl2-libretro/src/video/*.c  ./vendor/sdl2-libretro/src/nojoystick/*.c  ./vendor/sdl2-libretro/src/video/dummy_libretro/*.c  ./vendor/sdl2-libretro/src/nojoystick/libretro/*.c  ./vendor/sdl2-libretro/src/timer/libretro/*.c  ./vendor/sdl2-libretro/src/audio/libretro/*.c  ./vendor/sdl2-libretro/src/thread/win32/SDL_sysmutex.c ./vendor/sdl2-libretro/src/thread/win32/SDL_syssem.c ./vendor/sdl2-libretro/src/thread/win32/SDL_systhread.c ./vendor/sdl2-libretro/src/thread/generic/SDL_syscond.c ./vendor/sdl2-libretro/src/loadso/dummy/*.c)
 else
-	SOURCES_C += $(wildcard $(CORE_DIR)/vendor/sdl2-libretro/src/*.c $(CORE_DIR)/vendor/sdl2-libretro/src/audio/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/cdrom/dummy/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/cdrom/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/cpuinfo/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/events/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/file/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/stdlib/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/thread/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/timer/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/video/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/nojoystick/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/video/libretro/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/thread/generic/*.c $(CORE_DIR)/vendor/sdl2-libretro/src/nojoystick/libretro/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/timer/libretro/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/audio/libretro/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/loadso/dummy/*.c)
+	SOURCES_C += $(wildcard $(CORE_DIR)/vendor/sdl2-libretro/src/*.c $(CORE_DIR)/vendor/sdl2-libretro/src/audio/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/cdrom/dummy/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/cdrom/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/cpuinfo/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/events/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/file/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/stdlib/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/thread/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/timer/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/video/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/nojoystick/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/video/dummy_libretro/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/thread/generic/*.c $(CORE_DIR)/vendor/sdl2-libretro/src/nojoystick/libretro/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/timer/libretro/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/audio/libretro/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/loadso/dummy/*.c)
 endif
 FLAGS += -DSDL_THREADS_DISABLED -DSDL_CDROM_DISABLED
 FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/include

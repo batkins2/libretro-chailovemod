@@ -41,7 +41,7 @@ bool window::load(const config& conf) {
 	// if (conf.window.doublebuffering) {
 	// 	// flags |= SDL_DOUBLEBUF;
 	// }
-	app->win = SDL_CreateWindow("ChaiLove", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, conf.window.width, conf.window.height, SDL_WINDOW_FULLSCREEN | SDL_WINDOW_OPENGL);
+	SDL_CreateWindowAndRenderer(conf.window.width, conf.window.height, SDL_WINDOW_FULLSCREEN_DESKTOP, &app->win, &app->renderer);
 	if (app->win == NULL) {
 		const char* errorChar = SDL_GetError();
 		std::string errString("");
@@ -54,7 +54,7 @@ bool window::load(const config& conf) {
 	}
 
 	// Enable video buffering.
-	app->videoBuffer = (uint32_t *)app->screen->pixels;
+	app->videoBuffer = (uint32_t *)app->win;
 
 	// Set the title.
 	setTitle(conf.window.title);

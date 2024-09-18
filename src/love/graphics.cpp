@@ -22,9 +22,9 @@ graphics::graphics() {
 	setFont();
 }
 
-SDL_Surface* graphics::getScreen() {
+SDL_Window* graphics::getScreen() {
 	if (ChaiLove::hasInstance()) {
-		return ChaiLove::getInstance()->screen;
+		return ChaiLove::getInstance()->win;
 	}
 	return NULL;
 }
@@ -39,9 +39,9 @@ SDL_Renderer* graphics::getRenderer() {
 bool graphics::load() {
 	// Enable alpha blending.
 	if (ChaiLove::getInstance()->config.options["alphablending"]) {
-		if (SDL_SetSurfaceAlphaMod(getScreen(), 0) == -1) {
-			LibretroLog::log(RETRO_LOG_ERROR) << "[ChaiLove] Enabling alpha blending failed" << std::endl;
-		}
+		// if (SDL_SetTextureAlphaMod(getScreen(), 0) == -1) {
+		// 	LibretroLog::log(RETRO_LOG_ERROR) << "[ChaiLove] Enabling alpha blending failed: " << SDL_GetError() << std::endl;
+		// }
 	}
 
 	// Set the default font.
@@ -54,9 +54,13 @@ graphics& graphics::clear() {
 }
 
 graphics& graphics::clear(int r, int g, int b, int a) {
-	SDL_Surface* screen = getScreen();
-	Uint32 color = SDL_MapRGBA(screen->format, r, g, b, a);
-	SDL_FillRect(screen, NULL, color);
+	// SDL_Window* screen = getScreen();
+	// Uint32 color = SDL_MapRGBA(screen->format, r, g, b, a);
+	// SDL_FillRect(screen, NULL, color);
+	auto renderer = ChaiLove::getInstance()->renderer;
+	SDL_SetRenderDrawColor(renderer, r, g, b, a);
+	SDL_RenderClear(ChaiLove::getInstance()->renderer);
+	SDL_RenderPresent(ChaiLove::getInstance()->renderer);
 	return *this;
 }
 
@@ -112,7 +116,11 @@ graphics& graphics::draw(Image* image, int x, int y) {
 		SDL_Rect dstrect;
 		dstrect.x = x;
 		dstrect.y = y;
-		SDL_BlitSurface(image->surface, NULL, getScreen(), &dstrect);
+		auto renderer = ChaiLove::getInstance()->renderer;
+		auto texture = SDL_CreateTextureFromSurface(renderer, image->surface);
+		SDL_RenderClear(renderer);
+		SDL_RenderCopy(renderer, texture, NULL, NULL);
+		SDL_RenderPresent(renderer);
 	}
 
 	return *this;
@@ -130,7 +138,11 @@ graphics& graphics::draw(Image* image, Quad quad, int x, int y) {
 		dest.w = x + quad.width;
 		dest.h = y + quad.height;
 		SDL_Rect src = quad.toRect();
-		SDL_BlitSurface(image->surface, &src, getScreen(), &dest);
+		auto renderer = ChaiLove::getInstance()->renderer;
+		auto texture = SDL_CreateTextureFromSurface(renderer, image->surface);
+		SDL_RenderClear(renderer);
+		SDL_RenderCopy(renderer, texture, NULL, NULL);
+		SDL_RenderPresent(renderer);
 	}
 
 	return *this;
@@ -147,8 +159,11 @@ graphics& graphics::draw(Image* image, int x, int y, float r, float sx, float sy
 			SDL_Rect dstrect;
 			dstrect.x = x - aspectX * tempSurface->w;
 			dstrect.y = y - aspectY * tempSurface->h;
-			SDL_BlitSurface(tempSurface, NULL, getScreen(), &dstrect);
-			SDL_FreeSurface(tempSurface);
+			auto renderer = ChaiLove::getInstance()->renderer;
+			auto texture = SDL_CreateTextureFromSurface(renderer, image->surface);
+			SDL_RenderClear(renderer);
+			SDL_RenderCopy(renderer, texture, NULL, NULL);
+			SDL_RenderPresent(renderer);
 		}
 	}
 
@@ -258,10 +273,14 @@ std::string graphics::getDefaultFilter() {
 
 
 int graphics::getWidth() {
-	return getScreen()->w;
+	int w = NULL;
+	SDL_GL_GetDrawableSize(ChaiLove::getInstance()->win, &w, NULL);
+	return w;
 }
 int graphics::getHeight() {
-	return getScreen()->h;
+	int h = NULL;
+	SDL_GL_GetDrawableSize(ChaiLove::getInstance()->win, NULL, &h);
+	return h;
 }
 
 Point graphics::getDimensions() {

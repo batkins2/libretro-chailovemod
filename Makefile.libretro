@@ -1,4 +1,4 @@
-DEBUG=0
+DEBUG=1
 PSS_STYLE=1
 EXTERNAL_ZLIB=0
 HAVE_GRIFFIN=1
@@ -38,7 +38,7 @@ else ifneq ($(findstring MINGW,$(shell uname -a)),)
 	system_platform = win
 endif
 
-TARGET_NAME := chailovemod
+TARGET_NAME := chailove
 GIT_VERSION := " $(shell git rev-parse --short HEAD || echo unknown)"
 ifneq ($(GIT_VERSION)," unknown")
 	CFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"

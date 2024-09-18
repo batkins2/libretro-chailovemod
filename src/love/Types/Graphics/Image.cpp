@@ -1,7 +1,7 @@
 #include "Image.h"
 #include "SDL2/SDL.h"
 #define SDL_STBIMAGE_IMPLEMENTATION
-#include <SDL2/SDL_image.h>
+#include <SDL_stbimage.h>
 
 #include <string>
 #include "../../../ChaiLove.h"
@@ -21,7 +21,7 @@ bool Image::loaded() {
 }
 
 bool Image::loadFromRW(SDL_RWops* rw) {
-	surface = IMG_Load_RW(rw, 1);
+	surface = STBIMG_Load_RW(rw, 1);
 
 	if (!loaded()) {
 		const char* errorChar = SDL_GetError();

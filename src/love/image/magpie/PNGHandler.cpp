@@ -71,7 +71,7 @@ static unsigned zlibDecompress(unsigned char **out, size_t *outsize, const unsig
 			return 83; // "Memory allocation failed" error code for LodePNG.
 
 		// Use zlib to decompress the PNG data.
-		status = uncompress(outdata, &outdatasize, in, insize);
+		// status = uncompress(outdata, &outdatasize, in, insize);
 
 		// If the out buffer was big enough, break out of the loop.
 		if (status != Z_BUF_ERROR)

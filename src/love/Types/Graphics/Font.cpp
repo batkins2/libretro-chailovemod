@@ -2,7 +2,7 @@
 #include "SDL.h"
 #include <string>
 #include "SDL_ttf.h"
-#include <SDL_gfxPrimitives.h>
+#include <SDL2_gfxPrimitives.h>
 #include <SDL_fnt.h>
 #include "../../../ChaiLove.h"
 #include "../../../LibretroLog.h"
@@ -25,7 +25,7 @@ Font::Font(const std::string& filename, int glyphWidth, int glyphHeight, const s
 			return;
 		}
 
-		ttyFont = newFont;
+		// ttyFont = newFont;
 		ttyFontWidth = glyphWidth;
 		ttyFontHeight = glyphHeight;
 	}
@@ -54,7 +54,7 @@ Font::~Font() {
 }
 
 bool Font::loaded() {
-	return ttfFont != NULL || ttyFont != NULL;
+	return ttfFont != NULL; // || ttyFont != NULL;
 }
 
 bool Font::destroy() {
@@ -63,10 +63,10 @@ bool Font::destroy() {
 		ttfFont = NULL;
 	}
 
-	if (ttyFont != NULL) {
-		FNT_Free(ttyFont);
-		ttyFont = NULL;
-	}
+	// if (ttyFont != NULL) {
+	// 	FNT_Free(ttyFont);
+	// 	ttyFont = NULL;
+	// }
 
 	if (m_image != NULL) {
 		delete m_image;
@@ -80,9 +80,9 @@ int Font::getHeight(const std::string& text) {
 	if (ttfFont != NULL) {
 		return TTF_FontHeight(ttfFont);
 	}
-	if (ttyFont != NULL) {
-		return FNT_GetTextHeight(ttyFont, text.c_str());
-	}
+	// if (ttyFont != NULL) {
+	// 	return FNT_GetTextHeight(ttyFont, text.c_str());
+	// }
 
 	return 12;
 }
@@ -91,9 +91,9 @@ int Font::getHeight() {
 	if (ttfFont != NULL) {
 		return TTF_FontHeight(ttfFont);
 	}
-	if (ttyFont != NULL) {
-		return ttyFontHeight;
-	}
+	// if (ttyFont != NULL) {
+	// 	return ttyFontHeight;
+	// }
 
 	return 12;
 }
@@ -106,9 +106,9 @@ int Font::getWidth(const std::string& text) {
 		}
 	}
 
-	if (ttyFont != NULL) {
-		return FNT_GetTextWidth(ttyFont, text.c_str());
-	}
+	// if (ttyFont != NULL) {
+	// 	return FNT_GetTextWidth(ttyFont, text.c_str());
+	// }
 
 	return text.length() * 12;
 }
@@ -141,13 +141,13 @@ void Font::print(const std::string& text, int x, int y, int r, int g, int b, int
 	}
 
 	// Use TTY to print the bitmap font?
-	if (ttyFont != NULL) {
-		FNT_Print(ttyFont, screen, x, y, FNT_ALIGN_LEFT, text.c_str());
-		return;
-	}
+	// if (ttyFont != NULL) {
+	// 	FNT_Print(ttyFont, screen, x, y, FNT_ALIGN_LEFT, text.c_str());
+	// 	return;
+	// }
 
 	// Fall back to SDL_gfx primitives.
-	stringRGBA(screen, x, y, text.c_str(), r, g, b, a);
+	stringRGBA(ChaiLove::getInstance()->renderer, x, y, text.c_str(), r, g, b, a);
 }
 
 }  // namespace Graphics

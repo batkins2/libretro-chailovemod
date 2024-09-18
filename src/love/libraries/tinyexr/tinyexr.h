@@ -7564,7 +7564,7 @@ static bool DecompressZip(unsigned char *dst,
     return false;
   }
 #else
-  int ret = uncompress(&tmpBuf.at(0), uncompressed_size, src, src_size);
+  // int ret = uncompress(&tmpBuf.at(0), uncompressed_size, src, src_size);
   if (Z_OK != ret) {
     return false;
   }
