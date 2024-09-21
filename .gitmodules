@@ -1,8 +1,3 @@
-[submodule "vendor/sdl-libretro"]
-	path = vendor/sdl-libretro
-	url = https://github.com/libretro/sdl-libretro.git
-	ignore = dirty
-	branch = master
 [submodule "vendor/libretro-common"]
 	path = vendor/libretro-common
 	url = https://github.com/libretro/libretro-common.git
@@ -83,3 +78,13 @@
 [submodule "vendor/sdl2-libretro"]
 	path = vendor/sdl2-libretro
 	url = https://github.com/batkins2/sdl2-libretro
+[submodule "vendor/SDL_image"]
+	path = vendor/SDL_image
+	url = https://github.com/libsdl-org/SDL_image
+	branch = SDL2
+[submodule "vendor/libjpeg-turbo"]
+	path = vendor/libjpeg-turbo
+	url = https://github.com/libjpeg-turbo/libjpeg-turbo
+[submodule "vendor/libpng"]
+	path = vendor/libpng
+	url = https://github.com/pnggroup/libpng
