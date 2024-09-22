@@ -149,10 +149,11 @@ void ChaiLove::draw() {
 	console.draw();
 
 	// Flip the buffer.
-	if (SDL_blit(screen)) {
-		std::string out("[ChaiLove] Failed to swap the buffers: ");
-		LibretroLog::log(RETRO_LOG_ERROR) << out << SDL_GetError() << std::endl;
-	}
+	// if (SDL_blit(screen)) {
+	// 	std::string out("[ChaiLove] Failed to swap the buffers: ");
+	// 	LibretroLog::log(RETRO_LOG_ERROR) << out << SDL_GetError() << std::endl;
+	// }
+	SDL_RenderPresent(renderer);
 }
 
 /**

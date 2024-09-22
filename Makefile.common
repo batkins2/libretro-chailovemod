@@ -134,6 +134,14 @@ FLAGS += -I$(CORE_DIR)/vendor/libretro-deps/libz
 FLAGS += -I$(CORE_DIR)/vendor/libretro-common/compat
 FLAGS += -DWANT_ZLIB
 
+# FLAGS += -DPPM_SUPPORTED
+# FLAGS += -DUSE_STBIMAGE
+# FLAGS += -DSDL_IMAGE_SAVE_JPG=0
+# FLAGS += -DFAST_IS_JPEG
+# FLAGS += -DFAST_IS_PNG
+# FLAGS += -DWANT_JPEGLIB
+# FLAGS += -DWANT_PNGLIB
+
 # # PhysFS
 FLAGS += -I$(CORE_DIR)/vendor/physfs/src
 FLAGS += -I$(CORE_DIR)/vendor/physfs/extras
@@ -183,12 +191,16 @@ FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengl
 FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengles
 FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengles2
 	
-# FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL2_image-2.0.2/external/zlib-1.2.11	
+	
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL_image/include
 # FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/haptic
 SOURCES_C += $(wildcard \
 	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL2_gfx-1.0.3/*.c \
 	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL2_ttf-2.0.14/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL2_image-2.0.2/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL_image/src/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL_image/external/jpeg/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL_image/external/libpng/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL_image/external/libpng/arm/*.c \
 	$(CORE_DIR)/vendor/sdl2-libretro/src/render/*.c \
 	$(CORE_DIR)/vendor/sdl2-libretro/src/render/software/*.c \
 	$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengl/*.c \
@@ -207,7 +219,7 @@ SOURCES_C += $(wildcard \
 	$(CORE_DIR)/vendor/sdl2-libretro/src/thread/*.c \
 	$(CORE_DIR)/vendor/physfs/extras/physfsrwops.c \
 	$(CORE_DIR)/src/love/data/libraries/lz4/*.c \
-	$(CORE_DIR)/src/love/filesystem/physfs/libraries/physfs/*.c \
+	$(CORE_DIR)/vendor/physfs/src/*.c \
 	$(CORE_DIR)/src/love/libraries/xxHash/*.c \
 )
 # $(CORE_DIR)/vendor/sdl2-libretro/src/joystick/*.c \

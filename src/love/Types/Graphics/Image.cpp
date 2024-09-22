@@ -1,7 +1,11 @@
 #include "Image.h"
 #include "SDL2/SDL.h"
+#define USE_STBIMAGE
 #define SDL_STBIMAGE_IMPLEMENTATION
-#include <SDL_stbimage.h>
+#define SDL_IMAGE_SAVE_JPG 0
+#define WANT_JPEGLIB
+#define WANT_PNGLIB
+#include "../../../../vendor/sdl2-libretro/libretro-tests/LIBS/SDL_image/include/SDL_image.h"
 
 #include <string>
 #include "../../../ChaiLove.h"
@@ -21,7 +25,7 @@ bool Image::loaded() {
 }
 
 bool Image::loadFromRW(SDL_RWops* rw) {
-	surface = STBIMG_Load_RW(rw, 1);
+	surface = IMG_Load_RW(rw, 1);
 
 	if (!loaded()) {
 		const char* errorChar = SDL_GetError();
@@ -34,22 +38,22 @@ bool Image::loadFromRW(SDL_RWops* rw) {
 	}
 
 	// Optimize the image to the display format.
-	ChaiLove* game = ChaiLove::getInstance();
-	SDL_Surface* optimizedImage = NULL;
-	if (game->config.options["alphablending"]) {
-		optimizedImage = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA8888, 0);
-	} else {
-		Uint32 colorkey = SDL_MapRGBA(surface->format, 0, 0, 0, 0xFF);
-		SDL_SetColorKey(surface, SDL_RLEACCEL, colorkey);
-		optimizedImage = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA8888, 0);
-	}
+	// ChaiLove* game = ChaiLove::getInstance();
+	// SDL_Surface* optimizedImage = NULL;
+	// if (game->config.options["alphablending"]) {
+	// 	optimizedImage = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA8888, 0);
+	// } else {
+	// 	Uint32 colorkey = SDL_MapRGBA(surface->format, 0, 0, 0, 0xFF);
+	// 	SDL_SetColorKey(surface, SDL_RLEACCEL, colorkey);
+	// 	optimizedImage = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA8888, 0);
+	// }
 
-	if (optimizedImage == NULL) {
-		LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] [graphics] Warning: SDL_DisplayFormat failed to optimize the image." << std::endl;
-	} else {
-		SDL_FreeSurface(surface);
-		surface = optimizedImage;
-	}
+	// if (optimizedImage == NULL) {
+	// 	LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] [graphics] Warning: SDL_DisplayFormat failed to optimize the image." << std::endl;
+	// } else {
+	// 	SDL_FreeSurface(surface);
+	// 	surface = optimizedImage;
+	// }
 	return true;
 }
 

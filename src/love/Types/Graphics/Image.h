@@ -16,6 +16,7 @@ namespace Graphics {
 class Image {
 	public:
 	SDL_Surface* surface;
+	SDL_Texture* texture;
 	Image(SDL_RWops* rw);
 	Image(const std::string& filename);
 	~Image();

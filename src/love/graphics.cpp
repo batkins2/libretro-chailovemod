@@ -59,8 +59,8 @@ graphics& graphics::clear(int r, int g, int b, int a) {
 	// SDL_FillRect(screen, NULL, color);
 	auto renderer = ChaiLove::getInstance()->renderer;
 	SDL_SetRenderDrawColor(renderer, r, g, b, a);
-	SDL_RenderClear(ChaiLove::getInstance()->renderer);
-	SDL_RenderPresent(ChaiLove::getInstance()->renderer);
+	SDL_RenderClear(renderer);
+	// SDL_RenderPresent(ChaiLove::getInstance()->renderer);
 	return *this;
 }
 
@@ -116,11 +116,12 @@ graphics& graphics::draw(Image* image, int x, int y) {
 		SDL_Rect dstrect;
 		dstrect.x = x;
 		dstrect.y = y;
+		
 		auto renderer = ChaiLove::getInstance()->renderer;
 		auto texture = SDL_CreateTextureFromSurface(renderer, image->surface);
-		SDL_RenderClear(renderer);
-		SDL_RenderCopy(renderer, texture, NULL, NULL);
-		SDL_RenderPresent(renderer);
+		// SDL_RenderClear(renderer);
+		SDL_RenderCopy(renderer, texture, NULL, &dstrect);
+		// SDL_RenderPresent(renderer);
 	}
 
 	return *this;
@@ -140,9 +141,9 @@ graphics& graphics::draw(Image* image, Quad quad, int x, int y) {
 		SDL_Rect src = quad.toRect();
 		auto renderer = ChaiLove::getInstance()->renderer;
 		auto texture = SDL_CreateTextureFromSurface(renderer, image->surface);
-		SDL_RenderClear(renderer);
-		SDL_RenderCopy(renderer, texture, NULL, NULL);
-		SDL_RenderPresent(renderer);
+		// SDL_RenderClear(renderer);
+		SDL_RenderCopy(renderer, texture, NULL, &dest);
+		// SDL_RenderPresent(renderer);
 	}
 
 	return *this;
@@ -153,7 +154,7 @@ graphics& graphics::draw(Image* image, int x, int y, float r, float sx, float sy
 		ChaiLove* app = ChaiLove::getInstance();
 		float angle = app->math.degrees(r);
 		SDL_Surface* tempSurface = rotozoomSurfaceXY(image->surface, angle, sx, sy, m_smooth);
-		if (tempSurface) {
+		if (true) {
 			float aspectX = ox / image->getWidth();
 			float aspectY = oy / image->getHeight();
 			SDL_Rect dstrect;
@@ -161,9 +162,9 @@ graphics& graphics::draw(Image* image, int x, int y, float r, float sx, float sy
 			dstrect.y = y - aspectY * tempSurface->h;
 			auto renderer = ChaiLove::getInstance()->renderer;
 			auto texture = SDL_CreateTextureFromSurface(renderer, image->surface);
-			SDL_RenderClear(renderer);
-			SDL_RenderCopy(renderer, texture, NULL, NULL);
-			SDL_RenderPresent(renderer);
+			// SDL_RenderClear(renderer);
+			SDL_RenderCopy(renderer, texture, NULL, &dstrect);
+			// SDL_RenderPresent(renderer);
 		}
 	}
 

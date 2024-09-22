@@ -2,6 +2,14 @@
     "cmake.sourceDirectory": "/home/brian/libretro-chailovemod/vendor/ChaiScript_Extras/cmake",
     "files.associations": {
         "audio_defines.h": "c",
-        "sdl_render_sw_c.h": "c"
+        "sdl_render_sw_c.h": "c",
+        "sdl_image.h": "c",
+        "physfsrwops.h": "c",
+        "physfs.h": "c",
+        "stb_image.h": "c",
+        "wrppm.h": "c",
+        "sdl2_gfxprimitives.h": "c",
+        "sdl2_rotozoom.h": "c",
+        "sdl2_gfxprimitives_font.h": "c"
     }
 }

@@ -41,7 +41,7 @@ bool window::load(const config& conf) {
 	// if (conf.window.doublebuffering) {
 	// 	// flags |= SDL_DOUBLEBUF;
 	// }
-	SDL_CreateWindowAndRenderer(conf.window.width, conf.window.height, SDL_WINDOW_FULLSCREEN_DESKTOP, &app->win, &app->renderer);
+	SDL_CreateWindowAndRenderer(conf.window.width, conf.window.height, SDL_WINDOW_FULLSCREEN, &app->win, &app->renderer);
 	if (app->win == NULL) {
 		const char* errorChar = SDL_GetError();
 		std::string errString("");
@@ -53,8 +53,9 @@ bool window::load(const config& conf) {
 		return false;
 	}
 
+	auto surf = SDL_GetWindowSurface(app->win);
 	// Enable video buffering.
-	app->videoBuffer = (uint32_t *)app->win;
+	app->videoBuffer = (uint32_t *)surf->pixels;
 
 	// Set the title.
 	setTitle(conf.window.title);
