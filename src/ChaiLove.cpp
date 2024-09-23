@@ -140,6 +140,10 @@ void ChaiLove::draw() {
 	// Clear the screen.
 	graphics.clear();
 
+	SDL_LockTexture(texture, NULL, &screen->pixels, &screen->pitch);
+	SDL_SetRenderTarget(renderer, texture);
+	SDL_RenderClear(renderer);
+
 	// Render the game.
 	if (script != NULL) {
 		script->draw();
@@ -153,7 +157,11 @@ void ChaiLove::draw() {
 	// 	std::string out("[ChaiLove] Failed to swap the buffers: ");
 	// 	LibretroLog::log(RETRO_LOG_ERROR) << out << SDL_GetError() << std::endl;
 	// }
+	SDL_UnlockTexture(texture);
+	SDL_SetRenderTarget(renderer, NULL);
+	SDL_RenderCopy(renderer, texture, NULL, NULL);
 	SDL_RenderPresent(renderer);
+	// SDL_RenderReadPixels(renderer, NULL, NULL, screen->pixels, screen->pitch);
 }
 
 /**

@@ -116,12 +116,12 @@ graphics& graphics::draw(Image* image, int x, int y) {
 		SDL_Rect dstrect;
 		dstrect.x = x;
 		dstrect.y = y;
+		dstrect.w = image->surface->w;
+		dstrect.h = image->surface->h;
 		
-		auto renderer = ChaiLove::getInstance()->renderer;
-		auto texture = SDL_CreateTextureFromSurface(renderer, image->surface);
-		// SDL_RenderClear(renderer);
-		SDL_RenderCopy(renderer, texture, NULL, &dstrect);
-		// SDL_RenderPresent(renderer);
+		auto app = ChaiLove::getInstance();
+		auto texture = SDL_CreateTextureFromSurface(app->renderer, image->surface);
+		SDL_RenderCopy(app->renderer, texture, NULL, &dstrect);
 	}
 
 	return *this;
@@ -139,11 +139,9 @@ graphics& graphics::draw(Image* image, Quad quad, int x, int y) {
 		dest.w = x + quad.width;
 		dest.h = y + quad.height;
 		SDL_Rect src = quad.toRect();
-		auto renderer = ChaiLove::getInstance()->renderer;
-		auto texture = SDL_CreateTextureFromSurface(renderer, image->surface);
-		// SDL_RenderClear(renderer);
-		SDL_RenderCopy(renderer, texture, NULL, &dest);
-		// SDL_RenderPresent(renderer);
+		auto app = ChaiLove::getInstance();
+		auto texture = SDL_CreateTextureFromSurface(app->renderer, image->surface);
+		SDL_RenderCopy(app->renderer, texture, NULL, &dest);
 	}
 
 	return *this;
@@ -154,17 +152,17 @@ graphics& graphics::draw(Image* image, int x, int y, float r, float sx, float sy
 		ChaiLove* app = ChaiLove::getInstance();
 		float angle = app->math.degrees(r);
 		SDL_Surface* tempSurface = rotozoomSurfaceXY(image->surface, angle, sx, sy, m_smooth);
-		if (true) {
+		if (tempSurface) {
 			float aspectX = ox / image->getWidth();
 			float aspectY = oy / image->getHeight();
 			SDL_Rect dstrect;
 			dstrect.x = x - aspectX * tempSurface->w;
 			dstrect.y = y - aspectY * tempSurface->h;
-			auto renderer = ChaiLove::getInstance()->renderer;
-			auto texture = SDL_CreateTextureFromSurface(renderer, image->surface);
-			// SDL_RenderClear(renderer);
-			SDL_RenderCopy(renderer, texture, NULL, &dstrect);
-			// SDL_RenderPresent(renderer);
+			dstrect.w = tempSurface->w;
+			dstrect.h = tempSurface->h;
+			auto texture = SDL_CreateTextureFromSurface(app->renderer, tempSurface);
+			SDL_RenderCopy(app->renderer, texture, NULL, &dstrect);
+			SDL_FreeSurface(tempSurface);
 		}
 	}
 

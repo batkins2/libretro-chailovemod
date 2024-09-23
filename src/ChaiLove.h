@@ -116,6 +116,7 @@ class ChaiLove {
 	SDL_Surface* screen = NULL;
 	SDL_Renderer* renderer = NULL;
 	SDL_Window* win = NULL;
+	SDL_Texture* texture = NULL;
 };
 
 #endif  // SRC_CHAILOVE_H_

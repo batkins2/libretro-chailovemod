@@ -53,9 +53,16 @@ bool window::load(const config& conf) {
 		return false;
 	}
 
-	auto surf = SDL_GetWindowSurface(app->win);
+	// SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+	// SDL_RenderSetLogicalSize(app->renderer, conf.window.width, conf.window.height);
+
+	app->texture = SDL_CreateTexture(app->renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, conf.window.width, conf.window.height);
+
+	app->screen = SDL_GetWindowSurface(app->win);
+	// app->screen = SDL_CreateRGBSurface(0, conf.window.width, conf.window.height, 32, 0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF);
+
 	// Enable video buffering.
-	app->videoBuffer = (uint32_t *)surf->pixels;
+	app->videoBuffer = (uint32_t *)app->screen->pixels;
 
 	// Set the title.
 	setTitle(conf.window.title);
