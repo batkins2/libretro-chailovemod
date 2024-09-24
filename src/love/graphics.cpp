@@ -116,12 +116,13 @@ graphics& graphics::draw(Image* image, int x, int y) {
 		SDL_Rect dstrect;
 		dstrect.x = x;
 		dstrect.y = y;
-		dstrect.w = image->surface->w;
-		dstrect.h = image->surface->h;
+		// dstrect.w = image->surface->w;
+		// dstrect.h = image->surface->h;
 		
 		auto app = ChaiLove::getInstance();
-		auto texture = SDL_CreateTextureFromSurface(app->renderer, image->surface);
-		SDL_RenderCopy(app->renderer, texture, NULL, &dstrect);
+		// auto texture = SDL_CreateTextureFromSurface(app->renderer, image->surface);
+		// SDL_RenderCopy(app->renderer, texture, NULL, &dstrect);
+		SDL_BlitSurface(image->surface, NULL, app->screen, &dstrect);
 	}
 
 	return *this;
@@ -140,8 +141,9 @@ graphics& graphics::draw(Image* image, Quad quad, int x, int y) {
 		dest.h = y + quad.height;
 		SDL_Rect src = quad.toRect();
 		auto app = ChaiLove::getInstance();
-		auto texture = SDL_CreateTextureFromSurface(app->renderer, image->surface);
-		SDL_RenderCopy(app->renderer, texture, NULL, &dest);
+		// auto texture = SDL_CreateTextureFromSurface(app->renderer, image->surface);
+		// SDL_RenderCopy(app->renderer, texture, NULL, &dest);
+		SDL_BlitSurface(image->surface, &src, app->screen, &dest);
 	}
 
 	return *this;
@@ -158,10 +160,11 @@ graphics& graphics::draw(Image* image, int x, int y, float r, float sx, float sy
 			SDL_Rect dstrect;
 			dstrect.x = x - aspectX * tempSurface->w;
 			dstrect.y = y - aspectY * tempSurface->h;
-			dstrect.w = tempSurface->w;
-			dstrect.h = tempSurface->h;
-			auto texture = SDL_CreateTextureFromSurface(app->renderer, tempSurface);
-			SDL_RenderCopy(app->renderer, texture, NULL, &dstrect);
+			// dstrect.w = tempSurface->w;
+			// dstrect.h = tempSurface->h;
+			// auto texture = SDL_CreateTextureFromSurface(app->renderer, tempSurface);
+			// SDL_RenderCopy(app->renderer, texture, NULL, &dstrect);
+			SDL_BlitSurface(tempSurface, NULL, app->screen, &dstrect);
 			SDL_FreeSurface(tempSurface);
 		}
 	}
