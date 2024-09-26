@@ -35,10 +35,10 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
-class gfx;
+class graphics;
 
 /**
  * A block of GPU-owned memory.
@@ -103,7 +103,7 @@ public:
 		{}
 	};
 
-	Buffer(gfx *gfx, const Settings &settings, const std::vector<DataDeclaration> &format, size_t size, size_t arraylength);
+	Buffer(graphics *gfx, const Settings &settings, const std::vector<DataDeclaration> &format, size_t size, size_t arraylength);
 	virtual ~Buffer();
 
 	size_t getSize() const { return size; }

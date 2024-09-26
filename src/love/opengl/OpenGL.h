@@ -45,7 +45,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 class Resource;
@@ -245,7 +245,7 @@ public:
 	 * Set up necessary state (LOVE-provided shader uniforms, etc.) for drawing.
 	 * This *MUST* be called directly before OpenGL drawing functions.
 	 **/
-	void prepareDraw(love::graphics::gfx *gfx);
+	void prepareDraw(love::graphics::graphics *gfx);
 
 	/**
 	 * State-tracked glBindBuffer.

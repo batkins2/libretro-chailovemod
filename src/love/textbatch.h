@@ -29,10 +29,10 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
-class Graphics;
+class graphics;
 
 class TextBatch : public Drawable
 {
@@ -65,7 +65,7 @@ public:
 	int getHeight(int index = 0) const;
 
 	// Implements Drawable.
-	void draw(love::graphics::gfx *gfx, const Matrix4 &m) override;
+	void draw(graphics *gfx, const Matrix4 &m) override;
 
 private:
 

@@ -41,12 +41,12 @@ class ByteData;
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 class Buffer;
 class Texture;
-class gfx;
+class graphics;
 
 enum ReadbackMethod
 {
@@ -68,8 +68,8 @@ public:
 
 	static love::Type type;
 
-	GraphicsReadback(gfx *gfx, ReadbackMethod method, Buffer *buffer, size_t offset, size_t size, love::data::ByteData *dest, size_t destoffset);
-	GraphicsReadback(gfx *gfx, ReadbackMethod method, Texture *texture, int slice, int mipmap, const Rect &rect, love::image::ImageData *dest, int destx, int desty);
+	GraphicsReadback(graphics *gfx, ReadbackMethod method, Buffer *buffer, size_t offset, size_t size, love::data::ByteData *dest, size_t destoffset);
+	GraphicsReadback(graphics *gfx, ReadbackMethod method, Texture *texture, int slice, int mipmap, const Rect &rect, love::image::ImageData *dest, int destx, int desty);
 	virtual ~GraphicsReadback();
 
 	virtual void wait() = 0;

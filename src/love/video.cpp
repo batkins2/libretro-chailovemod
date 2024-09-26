@@ -31,7 +31,7 @@ namespace graphics
 
 love::Type Video::type("Video", &Drawable::type);
 
-Video::Video(gfx *gfx, love::video::VideoStream *stream, float dpiscale)
+Video::Video(graphics *gfx, love::video::VideoStream *stream, float dpiscale)
 	: stream(stream)
 	, width(stream->getWidth() / dpiscale)
 	, height(stream->getHeight() / dpiscale)
@@ -111,7 +111,7 @@ love::video::VideoStream *Video::getStream()
 	return stream;
 }
 
-void Video::draw(gfx *gfx, const Matrix4 &m)
+void Video::draw(graphics *gfx, const Matrix4 &m)
 {
 	update();
 

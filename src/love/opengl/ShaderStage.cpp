@@ -22,13 +22,13 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 namespace opengl
 {
 
-ShaderStage::ShaderStage(love::graphics::gfx *gfx, ShaderStageType stage, const std::string &source, bool gles, const std::string &cachekey)
-	: love::graphics::ShaderStage(gfx, stage, source, gles, cachekey)
+ShaderStage::ShaderStage(graphics *gfx, ShaderStageType stage, const std::string &source, bool gles, const std::string &cachekey)
+	: love::gfx::ShaderStage(gfx, stage, source, gles, cachekey)
 	, glShader(0)
 {
 	loadVolatile();

@@ -43,10 +43,10 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
-class gfx;
+class graphics;
 class Buffer;
 
 enum TextureType
@@ -252,15 +252,15 @@ public:
 	static int64 totalGraphicsMemory;
 
 	// Drawable.
-	void draw(gfx *gfx, const Matrix4 &m) override;
+	void draw(graphics *gfx, const Matrix4 &m) override;
 
 	/**
 	 * Draws the texture using the specified transformation with a Quad applied.
 	 **/
-	void draw(gfx *gfx, Quad *quad, const Matrix4 &m);
+	void draw(graphics *gfx, Quad *quad, const Matrix4 &m);
 
-	void drawLayer(gfx *gfx, int layer, const Matrix4 &m);
-	void drawLayer(gfx *gfx, int layer, Quad *quad, const Matrix4 &m);
+	void drawLayer(graphics *gfx, int layer, const Matrix4 &m);
+	void drawLayer(graphics *gfx, int layer, Quad *quad, const Matrix4 &m);
 
 	void replacePixels(love::image::ImageDataBase *d, int slice, int mipmap, int x, int y, bool reloadmipmaps);
 	void replacePixels(const void *data, size_t size, int slice, int mipmap, const Rect &rect, bool reloadmipmaps);
@@ -333,8 +333,8 @@ public:
 
 protected:
 
-	Texture(gfx *gfx, const Settings &settings, const Slices *slices);
-	Texture(gfx *gfx, Texture *base, const ViewSettings &viewsettings);
+	Texture(graphics *gfx, const Settings &settings, const Slices *slices);
+	Texture(graphics *gfx, Texture *base, const ViewSettings &viewsettings);
 	virtual ~Texture();
 
 	void updateGraphicsMemorySize(bool loaded);
@@ -348,7 +348,7 @@ protected:
 	SamplerState validateSamplerState(SamplerState s) const;
 
 	bool validateDimensions(bool throwException) const;
-	void validatePixelFormat(gfx *gfx) const;
+	void validatePixelFormat(graphics *gfx) const;
 
 	TextureType texType;
 

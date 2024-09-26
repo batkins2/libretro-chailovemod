@@ -23,7 +23,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 StreamBuffer::StreamBuffer(BufferUsage mode, size_t size)

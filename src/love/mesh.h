@@ -37,10 +37,10 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
-class gfx;
+class graphics;
 
 /**
  * Holds and draws arbitrary vertex geometry.
@@ -66,8 +66,8 @@ public:
 
 	static love::Type type;
 
-	Mesh(gfx *gfx, const std::vector<Buffer::DataDeclaration> &vertexformat, const void *data, size_t datasize, PrimitiveType drawmode, BufferDataUsage usage);
-	Mesh(gfx *gfx, const std::vector<Buffer::DataDeclaration> &vertexformat, int vertexcount, PrimitiveType drawmode, BufferDataUsage usage);
+	Mesh(graphics *gfx, const std::vector<Buffer::DataDeclaration> &vertexformat, const void *data, size_t datasize, PrimitiveType drawmode, BufferDataUsage usage);
+	Mesh(graphics *gfx, const std::vector<Buffer::DataDeclaration> &vertexformat, int vertexcount, PrimitiveType drawmode, BufferDataUsage usage);
 	Mesh(const std::vector<BufferAttribute> &attributes, PrimitiveType drawmode);
 
 	virtual ~Mesh();
@@ -175,10 +175,10 @@ public:
 	bool getDrawRange(int &start, int &count) const;
 
 	// Implements Drawable.
-	void draw(gfx *gfx, const Matrix4 &m) override;
+	void draw(graphics *gfx, const Matrix4 &m) override;
 
-	void drawInstanced(gfx *gfx, const Matrix4 &m, int instancecount);
-	void drawIndirect(gfx *gfx, const Matrix4 &m, Buffer *indirectargs, int argsindex);
+	void drawInstanced(graphics *gfx, const Matrix4 &m, int instancecount);
+	void drawIndirect(graphics *gfx, const Matrix4 &m, Buffer *indirectargs, int argsindex);
 
 	static std::vector<Buffer::DataDeclaration> getDefaultVertexFormat();
 
@@ -190,7 +190,7 @@ private:
 	int getAttachedAttributeIndex(const std::string &name) const;
 	void finalizeAttribute(BufferAttribute &attrib) const;
 
-	void drawInternal(gfx *gfx, const Matrix4 &m, int instancecount, Buffer *indirectargs, int argsindex);
+	void drawInternal(graphics *gfx, const Matrix4 &m, int instancecount, Buffer *indirectargs, int argsindex);
 
 	std::vector<Buffer::DataMember> vertexFormat;
 

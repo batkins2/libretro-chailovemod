@@ -31,10 +31,10 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
-class gfx;
+class graphics;
 
 /**
  * Abstract base class for a chain of segments.
@@ -67,7 +67,7 @@ public:
 
 	/** Draws the line on the screen
 	 */
-	void draw(love::graphics::gfx *gfx);
+	void draw(love::gfx::graphics *gfx);
 
 protected:
 

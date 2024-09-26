@@ -32,7 +32,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 static inline uint16 normToUint16(double n)
@@ -88,8 +88,8 @@ FontMod::FontMod(love::font::Rasterizer *r, const SamplerState &s)
 	pixelFormat = gd->getFormat();
 	gd->release();
 
-	auto graphics = Module::getInstance<gfx>(Module::M_GRAPHICS);
-	if (pixelFormat == PIXELFORMAT_LA8_UNORM && !graphics->isPixelFormatSupported(pixelFormat, PIXELFORMATUSAGEFLAGS_SAMPLE))
+	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+	if (pixelFormat == PIXELFORMAT_LA8_UNORM && !gfx->isPixelFormatSupported(pixelFormat, PIXELFORMATUSAGEFLAGS_SAMPLE))
 		pixelFormat = PIXELFORMAT_RGBA8_UNORM;
 
 	loadVolatile();
@@ -106,11 +106,11 @@ FontMod::TextureSize FontMod::getNextTextureSize() const
 	TextureSize size = {textureWidth, textureHeight};
 
 	int maxsize = 2048;
-	auto graphics = Module::getInstance<gfx>(Module::M_GRAPHICS);
-	if (graphics != nullptr)
+	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+	if (gfx != nullptr)
 	{
-		const auto &caps = graphics->getCapabilities();
-		maxsize = (int) caps.limits[gfx::LIMIT_TEXTURE_SIZE];
+		const auto &caps = gfx->getCapabilities();
+		maxsize = (int) caps.limits[graphics::LIMIT_TEXTURE_SIZE];
 	}
 
 	int maxwidth  = std::min(8192, maxsize);
@@ -139,8 +139,8 @@ bool FontMod::loadVolatile()
 
 void FontMod::createTexture()
 {
-	auto graphics = Module::getInstance<graphics::gfx>(Module::M_GRAPHICS);
-	graphics->flushBatchedDraws();
+	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+	gfx->flushBatchedDraws();
 
 	Texture *texture = nullptr;
 	TextureSize size = {textureWidth, textureHeight};
@@ -161,7 +161,7 @@ void FontMod::createTexture()
 	settings.format = pixelFormat;
 	settings.width = size.width;
 	settings.height = size.height;
-	texture = graphics->newTexture(settings, nullptr);
+	texture = gfx->newTexture(settings, nullptr);
 	texture->setSamplerState(samplerState);
 
 	{
@@ -557,7 +557,7 @@ std::vector<FontMod::DrawCommand> FontMod::generateVerticesFormatted(const love:
 	return drawcommands;
 }
 
-void FontMod::printv(graphics::gfx *gfx, const Matrix4 &t, const std::vector<DrawCommand> &drawcommands, const std::vector<GlyphVertex> &vertices)
+void FontMod::printv(graphics *gfx, const Matrix4 &t, const std::vector<DrawCommand> &drawcommands, const std::vector<GlyphVertex> &vertices)
 {
 	if (vertices.empty() || drawcommands.empty())
 		return;
@@ -566,13 +566,13 @@ void FontMod::printv(graphics::gfx *gfx, const Matrix4 &t, const std::vector<Dra
 
 	for (const DrawCommand &cmd : drawcommands)
 	{
-		gfx::BatchedDrawCommand streamcmd;
+		graphics::BatchedDrawCommand streamcmd;
 		streamcmd.formats[0] = vertexFormat;
 		streamcmd.indexMode = TRIANGLEINDEX_QUADS;
 		streamcmd.vertexCount = cmd.vertexcount;
 		streamcmd.texture = cmd.texture;
 
-		gfx::BatchedVertexData data = gfx->requestBatchedDraw(streamcmd);
+		graphics::BatchedVertexData data = gfx->requestBatchedDraw(streamcmd);
 		GlyphVertex *vertexdata = (GlyphVertex *) data.stream[0];
 
 		memcpy(vertexdata, &vertices[cmd.startvertex], sizeof(GlyphVertex) * cmd.vertexcount);
@@ -580,7 +580,7 @@ void FontMod::printv(graphics::gfx *gfx, const Matrix4 &t, const std::vector<Dra
 	}
 }
 
-void FontMod::print(graphics::gfx *gfx, const std::vector<love::font::ColoredString> &text, const Matrix4 &m, const Colorf &constantcolor)
+void FontMod::print(graphics *gfx, const std::vector<love::font::ColoredString> &text, const Matrix4 &m, const Colorf &constantcolor)
 {
 	love::font::ColoredCodepoints codepoints;
 	love::font::getCodepointsFromString(text, codepoints);
@@ -591,7 +591,7 @@ void FontMod::print(graphics::gfx *gfx, const std::vector<love::font::ColoredStr
 	printv(gfx, m, drawcommands, vertices);
 }
 
-void FontMod::printf(graphics::gfx *gfx, const std::vector<love::font::ColoredString> &text, float wrap, AlignMode align, const Matrix4 &m, const Colorf &constantcolor)
+void FontMod::printf(graphics *gfx, const std::vector<love::font::ColoredString> &text, float wrap, AlignMode align, const Matrix4 &m, const Colorf &constantcolor)
 {
 	love::font::ColoredCodepoints codepoints;
 	love::font::getCodepointsFromString(text, codepoints);

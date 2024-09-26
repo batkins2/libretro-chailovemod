@@ -24,10 +24,10 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
-class gfx;
+class graphics;
 class FontMod;
 
 class Deprecations
@@ -37,7 +37,7 @@ public:
 	Deprecations();
 	~Deprecations();
 
-	void draw(gfx *gfx);
+	void draw(graphics *gfx);
 
 private:
 

@@ -24,7 +24,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 love::Type Buffer::type("GraphicsBuffer", &Object::type);
@@ -32,7 +32,7 @@ love::Type Buffer::type("GraphicsBuffer", &Object::type);
 int Buffer::bufferCount = 0;
 int64 Buffer::totalGraphicsMemory = 0;
 
-Buffer::Buffer(gfx *gfx, const Settings &settings, const std::vector<DataDeclaration> &bufferformat, size_t size, size_t arraylength)
+Buffer::Buffer(graphics *gfx, const Settings &settings, const std::vector<DataDeclaration> &bufferformat, size_t size, size_t arraylength)
 	: arrayLength(0)
 	, arrayStride(0)
 	, size(size)

@@ -40,10 +40,10 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
-class gfx;
+class graphics;
 
 class FontMod : public Object, public Volatile
 {
@@ -86,8 +86,8 @@ public:
 	/**
 	 * Draws the specified text.
 	 **/
-	void print(graphics::gfx *gfx, const std::vector<love::font::ColoredString> &text, const Matrix4 &m, const Colorf &constantColor);
-	void printf(graphics::gfx *gfx, const std::vector<love::font::ColoredString> &text, float wrap, AlignMode align, const Matrix4 &m, const Colorf &constantColor);
+	void print(graphics *gfx, const std::vector<love::font::ColoredString> &text, const Matrix4 &m, const Colorf &constantColor);
+	void printf(graphics *gfx, const std::vector<love::font::ColoredString> &text, float wrap, AlignMode align, const Matrix4 &m, const Colorf &constantColor);
 
 	/**
 	 * Returns the height of the font.
@@ -180,7 +180,7 @@ private:
 	love::font::GlyphData *getRasterizerGlyphData(love::font::TextShaper::GlyphIndex glyphindex, float &dpiscale);
 	const Glyph &addGlyph(love::font::TextShaper::GlyphIndex glyphindex);
 	const Glyph &findGlyph(love::font::TextShaper::GlyphIndex glyphindex);
-	void printv(gfx *gfx, const Matrix4 &t, const std::vector<DrawCommand> &drawcommands, const std::vector<GlyphVertex> &vertices);
+	void printv(graphics *gfx, const Matrix4 &t, const std::vector<DrawCommand> &drawcommands, const std::vector<GlyphVertex> &vertices);
 
 	StrongRef<love::font::TextShaper> shaper;
 

@@ -34,10 +34,10 @@ class TShader;
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
-class gfx;
+class graphics;
 
 // Order is used for stages array in ShaderStage.cpp
 enum ShaderStageType
@@ -60,7 +60,7 @@ class ShaderStage : public love::Object
 {
 public:
 
-	ShaderStage(gfx *gfx, ShaderStageType stage, const std::string &glsl, bool gles, const std::string &cachekey);
+	ShaderStage(graphics *gfx, ShaderStageType stage, const std::string &glsl, bool gles, const std::string &cachekey);
 	virtual ~ShaderStage();
 
 	virtual ptrdiff_t getHandle() const = 0;
@@ -94,7 +94,7 @@ class ShaderStageForValidation final : public ShaderStage
 {
 public:
 
-	ShaderStageForValidation(gfx *gfx, ShaderStageType stage, const std::string &glsl, bool gles)
+	ShaderStageForValidation(graphics *gfx, ShaderStageType stage, const std::string &glsl, bool gles)
 		: ShaderStage(gfx, stage, glsl, gles, "")
 	{}
 	virtual ~ShaderStageForValidation() {}

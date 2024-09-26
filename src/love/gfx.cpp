@@ -40,7 +40,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 static bool gammaCorrect = false;
@@ -103,14 +103,14 @@ bool isDebugEnabled()
 	return debugMode;
 }
 
-love::Type gfx::type("graphics", &Module::type);
+love::Type type("graphics", &Module::type);
 
-namespace opengl { extern love::graphics::gfx *createInstance(); }
+namespace opengl { extern love::gfx::graphics *createInstance(); }
 #ifdef LOVE_GRAPHICS_METAL
-namespace metal { extern love::graphics::gfx *createInstance(); }
+namespace metal { extern love::gfx::graphics *createInstance(); }
 #endif
 // #ifdef LOVE_GRAPHICS_VULKAN
-// namespace vulkan { extern love::graphics::gfx* createInstance(); }
+// namespace vulkan { extern love::gfx::graphics* createInstance(); }
 // #endif
 
 static const Renderer rendererOrder[] = {
@@ -143,9 +143,9 @@ void setRenderers(const std::vector<Renderer> &renderers)
 	_renderers = renderers;
 }
 
-gfx *gfx::createInstance()
+graphics *createInstance()
 {
-	gfx *instance = Module::getInstance<gfx>(M_GRAPHICS);
+	graphics *instance = Module::getInstance<graphics>(Module::M_GRAPHICS);
 
 	if (instance != nullptr)
 		instance->retain();
@@ -175,12 +175,12 @@ gfx *gfx::createInstance()
 	return instance;
 }
 
-gfx::DisplayState::DisplayState()
+graphics::DisplayState::DisplayState()
 {
 	defaultSamplerState.mipmapFilter = SamplerState::MIPMAP_FILTER_LINEAR;
 }
 
-gfx::gfx(const char *name)
+graphics::graphics(const char *name)
 	: Module(M_GRAPHICS, name)
 	, width(0)
 	, height(0)
@@ -216,7 +216,7 @@ gfx::gfx(const char *name)
 		throw love::Exception("Shader support failed to initialize!");
 }
 
-gfx::~gfx()
+graphics::~graphics()
 {
 	if (quadIndexBuffer != nullptr)
 		quadIndexBuffer->release();
@@ -258,7 +258,7 @@ gfx::~gfx()
 	Shader::deinitialize();
 }
 
-void gfx::createQuadIndexBuffer()
+void graphics::createQuadIndexBuffer()
 {
 	if (quadIndexBuffer != nullptr)
 		return;
@@ -276,7 +276,7 @@ void gfx::createQuadIndexBuffer()
 	quadIndexBuffer->setImmutable(true);
 }
 
-void gfx::createFanIndexBuffer()
+void graphics::createFanIndexBuffer()
 {
 	if (fanIndexBuffer != nullptr)
 		return;
@@ -292,17 +292,17 @@ void gfx::createFanIndexBuffer()
 	fanIndexBuffer->setImmutable(true);
 }
 
-Quad *gfx::newQuad(Quad::Viewport v, double sw, double sh)
+Quad *graphics::newQuad(Quad::Viewport v, double sw, double sh)
 {
 	return new Quad(v, sw, sh);
 }
 
-FontMod *gfx::newFont(love::font::Rasterizer *data)
+FontMod *graphics::newFont(love::font::Rasterizer *data)
 {
 	return new FontMod(data, states.back().defaultSamplerState);
 }
 
-FontMod *gfx::newDefaultFont(int size, const font::TrueTypeRasterizer::Settings &settings)
+FontMod *graphics::newDefaultFont(int size, const font::TrueTypeRasterizer::Settings &settings)
 {
 	auto fontmodule = Module::getInstance<font::FontMod>(M_FONT);
 	if (!fontmodule)
@@ -312,22 +312,22 @@ FontMod *gfx::newDefaultFont(int size, const font::TrueTypeRasterizer::Settings 
 	return newFont(r.get());
 }
 
-Video *gfx::newVideo(love::video::VideoStream *stream, float dpiscale)
+Video *graphics::newVideo(love::video::VideoStream *stream, float dpiscale)
 {
 	return new Video(this, stream, dpiscale);
 }
 
-love::graphics::SpriteBatch *gfx::newSpriteBatch(Texture *texture, int size, BufferDataUsage usage)
+love::gfx::SpriteBatch *graphics::newSpriteBatch(Texture *texture, int size, BufferDataUsage usage)
 {
 	return new SpriteBatch(this, texture, size, usage);
 }
 
-love::graphics::ParticleSystem *gfx::newParticleSystem(Texture *texture, int size)
+love::gfx::ParticleSystem *graphics::newParticleSystem(Texture *texture, int size)
 {
 	return new ParticleSystem(texture, size);
 }
 
-ShaderStage *gfx::newShaderStage(ShaderStageType stage, const std::string &source, const Shader::CompileOptions &options, const Shader::SourceInfo &info, bool cache)
+ShaderStage *graphics::newShaderStage(ShaderStageType stage, const std::string &source, const Shader::CompileOptions &options, const Shader::SourceInfo &info, bool cache)
 {
 	ShaderStage *s = nullptr;
 	std::string cachekey;
@@ -365,7 +365,7 @@ ShaderStage *gfx::newShaderStage(ShaderStageType stage, const std::string &sourc
 	return s;
 }
 
-Shader *gfx::newShader(const std::vector<std::string> &stagessource, const Shader::CompileOptions &options)
+Shader *graphics::newShader(const std::vector<std::string> &stagessource, const Shader::CompileOptions &options)
 {
 	StrongRef<ShaderStage> stages[SHADERSTAGE_MAX_ENUM] = {};
 
@@ -410,7 +410,7 @@ Shader *gfx::newShader(const std::vector<std::string> &stagessource, const Shade
 	return newShaderInternal(stages, options);
 }
 
-Shader *gfx::newComputeShader(const std::string &source, const Shader::CompileOptions &options)
+Shader *graphics::newComputeShader(const std::string &source, const Shader::CompileOptions &options)
 {
 	Shader::SourceInfo info = Shader::getSourceInfo(source);
 
@@ -426,33 +426,33 @@ Shader *gfx::newComputeShader(const std::string &source, const Shader::CompileOp
 	return newShaderInternal(stages, options);
 }
 
-Buffer *gfx::newBuffer(const Buffer::Settings &settings, DataFormat format, const void *data, size_t size, size_t arraylength)
+Buffer *graphics::newBuffer(const Buffer::Settings &settings, DataFormat format, const void *data, size_t size, size_t arraylength)
 {
 	std::vector<Buffer::DataDeclaration> dataformat = {{"", format, 0}};
 	return newBuffer(settings, dataformat, data, size, arraylength);
 }
 
-Mesh *gfx::newMesh(const std::vector<Buffer::DataDeclaration> &vertexformat, int vertexcount, PrimitiveType drawmode, BufferDataUsage usage)
+Mesh *graphics::newMesh(const std::vector<Buffer::DataDeclaration> &vertexformat, int vertexcount, PrimitiveType drawmode, BufferDataUsage usage)
 {
 	return new Mesh(this, vertexformat, vertexcount, drawmode, usage);
 }
 
-Mesh *gfx::newMesh(const std::vector<Buffer::DataDeclaration> &vertexformat, const void *data, size_t datasize, PrimitiveType drawmode, BufferDataUsage usage)
+Mesh *graphics::newMesh(const std::vector<Buffer::DataDeclaration> &vertexformat, const void *data, size_t datasize, PrimitiveType drawmode, BufferDataUsage usage)
 {
 	return new Mesh(this, vertexformat, data, datasize, drawmode, usage);
 }
 
-Mesh *gfx::newMesh(const std::vector<Mesh::BufferAttribute> &attributes, PrimitiveType drawmode)
+Mesh *graphics::newMesh(const std::vector<Mesh::BufferAttribute> &attributes, PrimitiveType drawmode)
 {
 	return new Mesh(attributes, drawmode);
 }
 
-love::graphics::TextBatch *gfx::newTextBatch(graphics::FontMod *font, const std::vector<love::font::ColoredString> &text)
+love::gfx::TextBatch *graphics::newTextBatch(gfx::FontMod *font, const std::vector<love::font::ColoredString> &text)
 {
 	return new TextBatch(font, text);
 }
 
-love::data::ByteData *gfx::readbackBuffer(Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset)
+love::data::ByteData *graphics::readbackBuffer(Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset)
 {
 	StrongRef<GraphicsReadback> readback;
 	readback.set(newReadbackInternal(READBACK_IMMEDIATE, buffer, offset, size, dest, destoffset), Acquire::NORETAIN);
@@ -465,14 +465,14 @@ love::data::ByteData *gfx::readbackBuffer(Buffer *buffer, size_t offset, size_t 
 	return data;
 }
 
-GraphicsReadback *gfx::readbackBufferAsync(Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset)
+GraphicsReadback *graphics::readbackBufferAsync(Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset)
 {
 	auto readback = newReadbackInternal(READBACK_ASYNC, buffer, offset, size, dest, destoffset);
 	pendingReadbacks.push_back(readback);
 	return readback;
 }
 
-image::ImageData *gfx::readbackTexture(Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty)
+image::ImageData *graphics::readbackTexture(Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty)
 {
 	StrongRef<GraphicsReadback> readback;
 	readback.set(newReadbackInternal(READBACK_IMMEDIATE, texture, slice, mipmap, rect, dest, destx, desty), Acquire::NORETAIN);
@@ -485,19 +485,19 @@ image::ImageData *gfx::readbackTexture(Texture *texture, int slice, int mipmap, 
 	return imagedata;
 }
 
-GraphicsReadback *gfx::readbackTextureAsync(Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty)
+GraphicsReadback *graphics::readbackTextureAsync(Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty)
 {
 	auto readback = newReadbackInternal(READBACK_ASYNC, texture, slice, mipmap, rect, dest, destx, desty);
 	pendingReadbacks.push_back(readback);
 	return readback;
 }
 
-void gfx::cleanupCachedShaderStage(ShaderStageType type, const std::string &hashkey)
+void graphics::cleanupCachedShaderStage(ShaderStageType type, const std::string &hashkey)
 {
 	cachedShaderStages[type].erase(hashkey);
 }
 
-bool gfx::validateShader(bool gles, const std::vector<std::string> &stagessource, const Shader::CompileOptions &options, std::string &err)
+bool graphics::validateShader(bool gles, const std::vector<std::string> &stagessource, const Shader::CompileOptions &options, std::string &err)
 {
 	StrongRef<ShaderStage> stages[SHADERSTAGE_MAX_ENUM] = {};
 
@@ -538,7 +538,7 @@ bool gfx::validateShader(bool gles, const std::vector<std::string> &stagessource
 	return Shader::validate(stages, err);
 }
 
-Texture *gfx::getDefaultTexture(TextureType type, DataBaseType dataType, bool depthSample)
+Texture *graphics::getDefaultTexture(TextureType type, DataBaseType dataType, bool depthSample)
 {
 	uint32 depthsampleindex = depthSample ? 1 : 0;
 	Texture *tex = defaultTextures[type][dataType][depthsampleindex];
@@ -615,7 +615,7 @@ Texture *gfx::getDefaultTexture(TextureType type, DataBaseType dataType, bool de
 	return tex;
 }
 
-Buffer *gfx::getDefaultTexelBuffer(DataBaseType dataType)
+Buffer *graphics::getDefaultTexelBuffer(DataBaseType dataType)
 {
 	Buffer *buffer = defaultTexelBuffers[dataType];
 	if (buffer != nullptr)
@@ -650,7 +650,7 @@ Buffer *gfx::getDefaultTexelBuffer(DataBaseType dataType)
 	return buffer;
 }
 
-Buffer *gfx::getDefaultStorageBuffer()
+Buffer *graphics::getDefaultStorageBuffer()
 {
 	if (defaultStorageBuffer != nullptr)
 		return defaultStorageBuffer;
@@ -664,7 +664,7 @@ Buffer *gfx::getDefaultStorageBuffer()
 	return defaultStorageBuffer;
 }
 
-void gfx::releaseDefaultResources()
+void graphics::releaseDefaultResources()
 {
 	for (int type = 0; type < TEXTURE_MAX_ENUM; type++)
 	{
@@ -691,7 +691,7 @@ void gfx::releaseDefaultResources()
 	defaultStorageBuffer = nullptr;
 }
 
-Texture *gfx::getTextureOrDefaultForActiveShader(Texture *tex)
+Texture *graphics::getTextureOrDefaultForActiveShader(Texture *tex)
 {
 	if (tex != nullptr)
 		return tex;
@@ -708,12 +708,12 @@ Texture *gfx::getTextureOrDefaultForActiveShader(Texture *tex)
 	return getDefaultTexture(TEXTURE_2D, DATA_BASETYPE_FLOAT, false);
 }
 
-void gfx::validateStencilState(const StencilState &s) const
+void graphics::validateStencilState(const StencilState &s) const
 {
 	if (s.action != STENCIL_KEEP)
 	{
 		const auto &rts = states.back().renderTargets;
-		love::graphics::Texture *dstexture = rts.depthStencil.texture.get();
+		love::gfx::Texture *dstexture = rts.depthStencil.texture.get();
 
 		if (!isRenderTargetActive() && !backbufferHasStencil)
 			throw love::Exception("The window must have stenciling enabled to draw to the main screen's stencil buffer.");
@@ -722,12 +722,12 @@ void gfx::validateStencilState(const StencilState &s) const
 	}
 }
 
-void gfx::validateDepthState(bool depthwrite) const
+void graphics::validateDepthState(bool depthwrite) const
 {
 	if (depthwrite)
 	{
 		const auto &rts = states.back().renderTargets;
-		love::graphics::Texture *dstexture = rts.depthStencil.texture.get();
+		love::gfx::Texture *dstexture = rts.depthStencil.texture.get();
 
 		if (!isRenderTargetActive() && !backbufferHasDepth)
 			throw love::Exception("The window must have depth enabled to draw to the main screen's depth buffer.");
@@ -736,27 +736,27 @@ void gfx::validateDepthState(bool depthwrite) const
 	}
 }
 
-int gfx::getWidth() const
+int graphics::getWidth() const
 {
 	return width;
 }
 
-int gfx::getHeight() const
+int graphics::getHeight() const
 {
 	return height;
 }
 
-int gfx::getPixelWidth() const
+int graphics::getPixelWidth() const
 {
 	return pixelWidth;
 }
 
-int gfx::getPixelHeight() const
+int graphics::getPixelHeight() const
 {
 	return pixelHeight;
 }
 
-double gfx::getCurrentDPIScale() const
+double graphics::getCurrentDPIScale() const
 {
 	const auto &rt = states.back().renderTargets.getFirstTarget();
 	if (rt.texture.get())
@@ -765,17 +765,17 @@ double gfx::getCurrentDPIScale() const
 	return getScreenDPIScale();
 }
 
-double gfx::getScreenDPIScale() const
+double graphics::getScreenDPIScale() const
 {
 	return (double) getPixelHeight() / (double) getHeight();
 }
 
-bool gfx::isCreated() const
+bool graphics::isCreated() const
 {
 	return created;
 }
 
-bool gfx::isActive() const
+bool graphics::isActive() const
 {
 	// The graphics module is only completely 'active' if there's a window, a
 	// context, and the active variable is set.
@@ -783,14 +783,14 @@ bool gfx::isActive() const
 	return active && isCreated() && window != nullptr && window->isOpen();
 }
 
-void gfx::reset()
+void graphics::reset()
 {
 	DisplayState s;
 	restoreState(s);
 	origin();
 }
 
-void gfx::backbufferChanged(int width, int height, int pixelwidth, int pixelheight)
+void graphics::backbufferChanged(int width, int height, int pixelwidth, int pixelheight)
 {
 	backbufferChanged(width, height, pixelwidth, pixelheight, backbufferHasStencil, backbufferHasDepth, getRequestedBackbufferMSAA());
 }
@@ -799,7 +799,7 @@ void gfx::backbufferChanged(int width, int height, int pixelwidth, int pixelheig
  * State functions.
  **/
 
-void gfx::restoreState(const DisplayState &s)
+void graphics::restoreState(const DisplayState &s)
 {
 	setColor(s.color);
 	setBackgroundColor(s.backgroundColor);
@@ -838,7 +838,7 @@ void gfx::restoreState(const DisplayState &s)
 		resetProjection();
 }
 
-void gfx::restoreStateChecked(const DisplayState &s)
+void graphics::restoreStateChecked(const DisplayState &s)
 {
 	const DisplayState &cur = states.back();
 
@@ -919,22 +919,22 @@ void gfx::restoreStateChecked(const DisplayState &s)
 		resetProjection();
 }
 
-Colorf gfx::getColor() const
+Colorf graphics::getColor() const
 {
 	return states.back().color;
 }
 
-void gfx::setBackgroundColor(Colorf c)
+void graphics::setBackgroundColor(Colorf c)
 {
 	states.back().backgroundColor = c;
 }
 
-Colorf gfx::getBackgroundColor() const
+Colorf graphics::getBackgroundColor() const
 {
 	return states.back().backgroundColor;
 }
 
-void gfx::checkSetDefaultFont()
+void graphics::checkSetDefaultFont()
 {
 	// We don't create or set the default Font if an existing font is in use.
 	if (states.back().font.get() != nullptr)
@@ -950,7 +950,7 @@ void gfx::checkSetDefaultFont()
 	states.back().font.set(defaultFont.get());
 }
 
-void gfx::setFont(love::graphics::FontMod *font)
+void graphics::setFont(love::gfx::FontMod *font)
 {
 	// We don't need to set a default font here if null is passed in, since we
 	// only care about the default font in getFont and print.
@@ -958,13 +958,13 @@ void gfx::setFont(love::graphics::FontMod *font)
 	state.font.set(font);
 }
 
-love::graphics::FontMod *gfx::getFont()
+love::gfx::FontMod *graphics::getFont()
 {
 	checkSetDefaultFont();
 	return states.back().font.get();
 }
 
-void gfx::setShader(love::graphics::Shader *shader)
+void graphics::setShader(love::gfx::Shader *shader)
 {
 	if (shader == nullptr)
 		return setShader();
@@ -973,18 +973,18 @@ void gfx::setShader(love::graphics::Shader *shader)
 	states.back().shader.set(shader);
 }
 
-void gfx::setShader()
+void graphics::setShader()
 {
 	Shader::attachDefault(Shader::STANDARD_DEFAULT);
 	states.back().shader.set(nullptr);
 }
 
-love::graphics::Shader *gfx::getShader() const
+love::gfx::Shader *graphics::getShader() const
 {
 	return states.back().shader.get();
 }
 
-void gfx::setRenderTarget(RenderTarget rt, uint32 temporaryRTFlags)
+void graphics::setRenderTarget(RenderTarget rt, uint32 temporaryRTFlags)
 {
 	if (rt.texture == nullptr)
 		return setRenderTarget();
@@ -996,7 +996,7 @@ void gfx::setRenderTarget(RenderTarget rt, uint32 temporaryRTFlags)
 	setRenderTargets(rts);
 }
 
-void gfx::setRenderTargets(const RenderTargetsStrongRef &rts)
+void graphics::setRenderTargets(const RenderTargetsStrongRef &rts)
 {
 	RenderTargets targets;
 	targets.colors.reserve(rts.colors.size());
@@ -1010,7 +1010,7 @@ void gfx::setRenderTargets(const RenderTargetsStrongRef &rts)
 	return setRenderTargets(targets);
 }
 
-void gfx::setRenderTargets(const RenderTargets &rts)
+void graphics::setRenderTargets(const RenderTargets &rts)
 {
 	DisplayState &state = states.back();
 	int rtcount = (int) rts.colors.size();
@@ -1177,7 +1177,7 @@ void gfx::setRenderTargets(const RenderTargets &rts)
 	}
 }
 
-void gfx::setRenderTarget()
+void graphics::setRenderTarget()
 {
 	DisplayState &state = states.back();
 
@@ -1202,7 +1202,7 @@ void gfx::setRenderTarget()
 	}
 }
 
-gfx::RenderTargets gfx::getRenderTargets() const
+graphics::RenderTargets graphics::getRenderTargets() const
 {
 	const auto &curRTs = states.back().renderTargets;
 
@@ -1218,13 +1218,13 @@ gfx::RenderTargets gfx::getRenderTargets() const
 	return rts;
 }
 
-bool gfx::isRenderTargetActive() const
+bool graphics::isRenderTargetActive() const
 {
 	const auto &rts = states.back().renderTargets;
 	return !rts.colors.empty() || rts.depthStencil.texture != nullptr;
 }
 
-bool gfx::isRenderTargetActive(Texture *texture) const
+bool graphics::isRenderTargetActive(Texture *texture) const
 {
 	Texture *roottexture = texture->getRootViewInfo().texture;
 	const auto &rts = states.back().renderTargets;
@@ -1241,7 +1241,7 @@ bool gfx::isRenderTargetActive(Texture *texture) const
 	return false;
 }
 
-bool gfx::isRenderTargetActive(Texture *texture, int slice) const
+bool graphics::isRenderTargetActive(Texture *texture, int slice) const
 {
 	const auto &rootinfo = texture->getRootViewInfo();
 	slice += rootinfo.startLayer;
@@ -1268,7 +1268,7 @@ bool gfx::isRenderTargetActive(Texture *texture, int slice) const
 	return false;
 }
 
-Texture *gfx::getTemporaryTexture(PixelFormat format, int w, int h, int samples)
+Texture *graphics::getTemporaryTexture(PixelFormat format, int w, int h, int samples)
 {
 	Texture *texture = nullptr;
 
@@ -1304,7 +1304,7 @@ Texture *gfx::getTemporaryTexture(PixelFormat format, int w, int h, int samples)
 	return texture;
 }
 
-void gfx::releaseTemporaryTexture(Texture *texture)
+void graphics::releaseTemporaryTexture(Texture *texture)
 {
 	for (TemporaryTexture &temp : temporaryTextures)
 	{
@@ -1316,7 +1316,7 @@ void gfx::releaseTemporaryTexture(Texture *texture)
 	}
 }
 
-Buffer *gfx::getTemporaryBuffer(size_t size, DataFormat format, uint32 usageflags, BufferDataUsage datausage)
+Buffer *graphics::getTemporaryBuffer(size_t size, DataFormat format, uint32 usageflags, BufferDataUsage datausage)
 {
 	Buffer *buffer = nullptr;
 
@@ -1347,7 +1347,7 @@ Buffer *gfx::getTemporaryBuffer(size_t size, DataFormat format, uint32 usageflag
 	return buffer;
 }
 
-void gfx::releaseTemporaryBuffer(Buffer *buffer)
+void graphics::releaseTemporaryBuffer(Buffer *buffer)
 {
 	for (TemporaryBuffer &temp : temporaryBuffers)
 	{
@@ -1359,7 +1359,7 @@ void gfx::releaseTemporaryBuffer(Buffer *buffer)
 	}
 }
 
-void gfx::updateTemporaryResources()
+void graphics::updateTemporaryResources()
 {
 	for (int i = (int) temporaryTextures.size() - 1; i >= 0; i--)
 	{
@@ -1388,7 +1388,7 @@ void gfx::updateTemporaryResources()
 	}
 }
 
-void gfx::clearTemporaryResources()
+void graphics::clearTemporaryResources()
 {
 	for (auto temp :temporaryBuffers)
 		temp.buffer->release();
@@ -1400,7 +1400,7 @@ void gfx::clearTemporaryResources()
 	temporaryTextures.clear();
 }
 
-void gfx::updatePendingReadbacks()
+void graphics::updatePendingReadbacks()
 {
 	for (int i = (int)pendingReadbacks.size() - 1; i >= 0; i--)
 	{
@@ -1413,7 +1413,7 @@ void gfx::updatePendingReadbacks()
 	}
 }
 
-void gfx::intersectScissor(const Rect &rect)
+void graphics::intersectScissor(const Rect &rect)
 {
 	Rect currect = states.back().scissorRect;
 
@@ -1435,14 +1435,14 @@ void gfx::intersectScissor(const Rect &rect)
 	setScissor(newrect);
 }
 
-bool gfx::getScissor(Rect &rect) const
+bool graphics::getScissor(Rect &rect) const
 {
 	const DisplayState &state = states.back();
 	rect = state.scissorRect;
 	return state.scissor;
 }
 
-void gfx::setStencilMode(StencilMode mode, int value)
+void graphics::setStencilMode(StencilMode mode, int value)
 {
 	setStencilState(computeStencilState(mode, value));
 	if (mode == STENCIL_MODE_DRAW)
@@ -1451,13 +1451,13 @@ void gfx::setStencilMode(StencilMode mode, int value)
 		setColorMask({ true, true, true, true });
 }
 
-void gfx::setStencilMode()
+void graphics::setStencilMode()
 {
 	setStencilState(computeStencilState(STENCIL_MODE_OFF, 0));
 	setColorMask({ true, true, true, true });
 }
 
-StencilMode gfx::getStencilMode(int &value) const
+StencilMode graphics::getStencilMode(int &value) const
 {
 	const DisplayState& state = states.back();
 	StencilMode mode = computeStencilMode(state.stencil);
@@ -1465,129 +1465,129 @@ StencilMode gfx::getStencilMode(int &value) const
 	return mode;
 }
 
-void gfx::setStencilState()
+void graphics::setStencilState()
 {
 	StencilState s;
 	setStencilState(s);
 }
 
-const StencilState &gfx::getStencilState() const
+const StencilState &graphics::getStencilState() const
 {
 	const DisplayState &state = states.back();
 	return state.stencil;
 }
 
-void gfx::setDepthMode()
+void graphics::setDepthMode()
 {
 	setDepthMode(COMPARE_ALWAYS, false);
 }
 
-void gfx::getDepthMode(CompareMode &compare, bool &write) const
+void graphics::getDepthMode(CompareMode &compare, bool &write) const
 {
 	const DisplayState &state = states.back();
 	compare = state.depthTest;
 	write = state.depthWrite;
 }
 
-void gfx::setMeshCullMode(CullMode cull)
+void graphics::setMeshCullMode(CullMode cull)
 {
 	// Handled inside the draw() graphics API implementations.
 	states.back().meshCullMode = cull;
 }
 
-CullMode gfx::getMeshCullMode() const
+CullMode graphics::getMeshCullMode() const
 {
 	return states.back().meshCullMode;
 }
 
-Winding gfx::getFrontFaceWinding() const
+Winding graphics::getFrontFaceWinding() const
 {
 	return states.back().winding;
 }
 
-ColorChannelMask gfx::getColorMask() const
+ColorChannelMask graphics::getColorMask() const
 {
 	return states.back().colorMask;
 }
 
-void gfx::setBlendMode(BlendMode mode, BlendAlpha alphamode)
+void graphics::setBlendMode(BlendMode mode, BlendAlpha alphamode)
 {
 	if (alphamode == BLENDALPHA_MULTIPLY && !isAlphaMultiplyBlendSupported(mode))
 	{
 		const char *modestr = "unknown";
-		love::graphics::getConstant(mode, modestr);
+		love::gfx::getConstant(mode, modestr);
 		throw love::Exception("The '%s' blend mode must be used with premultiplied alpha.", modestr);
 	}
 
 	setBlendState(computeBlendState(mode, alphamode));
 }
 
-BlendMode gfx::getBlendMode(BlendAlpha &alphamode) const
+BlendMode graphics::getBlendMode(BlendAlpha &alphamode) const
 {
 	return computeBlendMode(states.back().blend, alphamode);
 }
 
-const BlendState &gfx::getBlendState() const
+const BlendState &graphics::getBlendState() const
 {
 	return states.back().blend;
 }
 
-void gfx::setDefaultSamplerState(const SamplerState &s)
+void graphics::setDefaultSamplerState(const SamplerState &s)
 {
 	states.back().defaultSamplerState = s;
 }
 
-const SamplerState &gfx::getDefaultSamplerState() const
+const SamplerState &graphics::getDefaultSamplerState() const
 {
 	return states.back().defaultSamplerState;
 }
 
-void gfx::setLineWidth(float width)
+void graphics::setLineWidth(float width)
 {
 	states.back().lineWidth = width;
 }
 
-void gfx::setLineStyle(gfx::LineStyle style)
+void graphics::setLineStyle(graphics::LineStyle style)
 {
 	states.back().lineStyle = style;
 }
 
-void gfx::setLineJoin(gfx::LineJoin join)
+void graphics::setLineJoin(graphics::LineJoin join)
 {
 	states.back().lineJoin = join;
 }
 
-float gfx::getLineWidth() const
+float graphics::getLineWidth() const
 {
 	return states.back().lineWidth;
 }
 
-gfx::LineStyle gfx::getLineStyle() const
+graphics::LineStyle graphics::getLineStyle() const
 {
 	return states.back().lineStyle;
 }
 
-gfx::LineJoin gfx::getLineJoin() const
+graphics::LineJoin graphics::getLineJoin() const
 {
 	return states.back().lineJoin;
 }
 
-float gfx::getPointSize() const
+float graphics::getPointSize() const
 {
 	return states.back().pointSize;
 }
 
-bool gfx::isWireframe() const
+bool graphics::isWireframe() const
 {
 	return states.back().wireframe;
 }
 
-void gfx::captureScreenshot(const ScreenshotInfo &info)
+void graphics::captureScreenshot(const ScreenshotInfo &info)
 {
 	pendingScreenshotCallbacks.push_back(info);
 }
 
-void gfx::copyBuffer(Buffer *source, Buffer *dest, size_t sourceoffset, size_t destoffset, size_t size)
+void graphics::copyBuffer(Buffer *source, Buffer *dest, size_t sourceoffset, size_t destoffset, size_t size)
 {
 	Range sourcerange(sourceoffset, size);
 	Range destrange(destoffset, size);
@@ -1616,7 +1616,7 @@ void gfx::copyBuffer(Buffer *source, Buffer *dest, size_t sourceoffset, size_t d
 	source->copyTo(dest, sourceoffset, destoffset, size);
 }
 
-void gfx::copyTextureToBuffer(Texture *source, Buffer *dest, int slice, int mipmap, const Rect &rect, size_t destoffset, int destwidth)
+void graphics::copyTextureToBuffer(Texture *source, Buffer *dest, int slice, int mipmap, const Rect &rect, size_t destoffset, int destwidth)
 {
 	if (!capabilities.features[FEATURE_COPY_TEXTURE_TO_BUFFER])
 	{
@@ -1705,7 +1705,7 @@ void gfx::copyTextureToBuffer(Texture *source, Buffer *dest, int slice, int mipm
 	source->copyToBuffer(dest, slice, mipmap, rect, destoffset, destwidth, size);
 }
 
-void gfx::copyBufferToTexture(Buffer *source, Texture *dest, size_t sourceoffset, int sourcewidth, int slice, int mipmap, const Rect &rect)
+void graphics::copyBufferToTexture(Buffer *source, Texture *dest, size_t sourceoffset, int sourcewidth, int slice, int mipmap, const Rect &rect)
 {
 	if (source->getDataUsage() == BUFFERDATAUSAGE_READBACK)
 		throw love::Exception("Buffers created with 'readback' data usage cannot be used as a copy source.");
@@ -1785,19 +1785,19 @@ void gfx::copyBufferToTexture(Buffer *source, Texture *dest, size_t sourceoffset
 	dest->copyFromBuffer(source, sourceoffset, sourcewidth, size, slice, mipmap, rect);
 }
 
-static const char *getIndirectArgsTypeName(gfx::IndirectArgsType argstype)
+static const char *getIndirectArgsTypeName(graphics::IndirectArgsType argstype)
 {
 	switch (argstype)
 	{
-		case gfx::INDIRECT_ARGS_DISPATCH: return "Compute shader threadgroup argument data";
-		case gfx::INDIRECT_ARGS_DRAW_VERTICES: return "Draw vertices argument data";
-		case gfx::INDIRECT_ARGS_DRAW_INDICES: return "Draw indices argument data";
+		case graphics::INDIRECT_ARGS_DISPATCH: return "Compute shader threadgroup argument data";
+		case graphics::INDIRECT_ARGS_DRAW_VERTICES: return "Draw vertices argument data";
+		case graphics::INDIRECT_ARGS_DRAW_INDICES: return "Draw indices argument data";
 	}
 
 	return "(Unknown argument data)";
 }
 
-void gfx::validateIndirectArgsBuffer(IndirectArgsType argstype, Buffer *indirectargs, int argsindex)
+void graphics::validateIndirectArgsBuffer(IndirectArgsType argstype, Buffer *indirectargs, int argsindex)
 {
 	if (!capabilities.features[FEATURE_INDIRECT_DRAW])
 		throw love::Exception("Indirect draws and compute dispatches are not supported on this system.");
@@ -1827,7 +1827,7 @@ void gfx::validateIndirectArgsBuffer(IndirectArgsType argstype, Buffer *indirect
 		throw love::Exception("The given index into the indirect argument Buffer does not fit within the Buffer's size.");
 }
 
-void gfx::dispatchThreadgroups(Shader *shader, int x, int y, int z)
+void graphics::dispatchThreadgroups(Shader *shader, int x, int y, int z)
 {
 	if (!shader->hasStage(SHADERSTAGE_COMPUTE))
 		throw love::Exception("Only compute shaders can have threads dispatched.");
@@ -1856,7 +1856,7 @@ void gfx::dispatchThreadgroups(Shader *shader, int x, int y, int z)
 		throw love::Exception("Compute shader must have resources bound to all writable texture and buffer variables.");
 }
 
-void gfx::dispatchIndirect(Shader *shader, Buffer *indirectargs, int argsindex)
+void graphics::dispatchIndirect(Shader *shader, Buffer *indirectargs, int argsindex)
 {
 	if (!shader->hasStage(SHADERSTAGE_COMPUTE))
 		throw love::Exception("Only compute shaders can have threads dispatched.");
@@ -1877,7 +1877,7 @@ void gfx::dispatchIndirect(Shader *shader, Buffer *indirectargs, int argsindex)
 		throw love::Exception("Compute shader must have resources bound to all writable texture and buffer variables.");
 }
 
-gfx::BatchedVertexData gfx::requestBatchedDraw(const BatchedDrawCommand &cmd)
+graphics::BatchedVertexData graphics::requestBatchedDraw(const BatchedDrawCommand &cmd)
 {
 	BatchedDrawState &state = batchedDrawState;
 
@@ -2012,7 +2012,7 @@ gfx::BatchedVertexData gfx::requestBatchedDraw(const BatchedDrawCommand &cmd)
 	return d;
 }
 
-void gfx::flushBatchedDraws()
+void graphics::flushBatchedDraws()
 {
 	auto &sbstate = batchedDrawState;
 
@@ -2092,9 +2092,9 @@ void gfx::flushBatchedDraws()
 	sbstate.flushing = false;
 }
 
-void gfx::flushBatchedDrawsGlobal()
+void graphics::flushBatchedDrawsGlobal()
 {
-	gfx *instance = getInstance<gfx>(M_GRAPHICS);
+	graphics *instance = getInstance<graphics>(M_GRAPHICS);
 	if (instance != nullptr)
 		instance->flushBatchedDraws();
 }
@@ -2103,37 +2103,37 @@ void gfx::flushBatchedDrawsGlobal()
  * Drawing
  **/
 
-void gfx::draw(Drawable *drawable, const Matrix4 &m)
+void graphics::draw(Drawable *drawable, const Matrix4 &m)
 {
 	drawable->draw(this, m);
 }
 
-void gfx::draw(Texture *texture, Quad *quad, const Matrix4 &m)
+void graphics::draw(Texture *texture, Quad *quad, const Matrix4 &m)
 {
 	texture->draw(this, quad, m);
 }
 
-void gfx::drawLayer(Texture *texture, int layer, const Matrix4 &m)
+void graphics::drawLayer(Texture *texture, int layer, const Matrix4 &m)
 {
 	texture->drawLayer(this, layer, m);
 }
 
-void gfx::drawLayer(Texture *texture, int layer, Quad *quad, const Matrix4 &m)
+void graphics::drawLayer(Texture *texture, int layer, Quad *quad, const Matrix4 &m)
 {
 	texture->drawLayer(this, layer, quad, m);
 }
 
-void gfx::drawInstanced(Mesh *mesh, const Matrix4 &m, int instancecount)
+void graphics::drawInstanced(Mesh *mesh, const Matrix4 &m, int instancecount)
 {
 	mesh->drawInstanced(this, m, instancecount);
 }
 
-void gfx::drawIndirect(Mesh *mesh, const Matrix4 &m, Buffer *indirectargs, int argsindex)
+void graphics::drawIndirect(Mesh *mesh, const Matrix4 &m, Buffer *indirectargs, int argsindex)
 {
 	mesh->drawIndirect(this, m, indirectargs, argsindex);
 }
 
-void gfx::drawFromShader(PrimitiveType primtype, int vertexcount, int instancecount, Texture *maintexture)
+void graphics::drawFromShader(PrimitiveType primtype, int vertexcount, int instancecount, Texture *maintexture)
 {
 	if (primtype == PRIMITIVE_TRIANGLE_FAN && vertexcount > LOVE_UINT16_MAX)
 		throw love::Exception("drawFromShader cannot draw more than %d vertices when the 'fan' draw mode is used.", LOVE_UINT16_MAX);
@@ -2169,7 +2169,7 @@ void gfx::drawFromShader(PrimitiveType primtype, int vertexcount, int instanceco
 	draw(cmd);
 }
 
-void gfx::drawFromShader(Buffer *indexbuffer, int indexcount, int instancecount, int startindex, Texture *maintexture)
+void graphics::drawFromShader(Buffer *indexbuffer, int indexcount, int instancecount, int startindex, Texture *maintexture)
 {
 	flushBatchedDraws();
 
@@ -2207,7 +2207,7 @@ void gfx::drawFromShader(Buffer *indexbuffer, int indexcount, int instancecount,
 	draw(cmd);
 }
 
-void gfx::drawFromShaderIndirect(PrimitiveType primtype, Buffer *indirectargs, int argsindex, Texture *maintexture)
+void graphics::drawFromShaderIndirect(PrimitiveType primtype, Buffer *indirectargs, int argsindex, Texture *maintexture)
 {
 	flushBatchedDraws();
 
@@ -2234,7 +2234,7 @@ void gfx::drawFromShaderIndirect(PrimitiveType primtype, Buffer *indirectargs, i
 	draw(cmd);
 }
 
-void gfx::drawFromShaderIndirect(Buffer *indexbuffer, Buffer *indirectargs, int argsindex, Texture *maintexture)
+void graphics::drawFromShaderIndirect(Buffer *indexbuffer, Buffer *indirectargs, int argsindex, Texture *maintexture)
 {
 	flushBatchedDraws();
 
@@ -2262,7 +2262,7 @@ void gfx::drawFromShaderIndirect(Buffer *indexbuffer, Buffer *indirectargs, int 
 	draw(cmd);
 }
 
-void gfx::print(const std::vector<love::font::ColoredString> &str, const Matrix4 &m)
+void graphics::print(const std::vector<love::font::ColoredString> &str, const Matrix4 &m)
 {
 	checkSetDefaultFont();
 
@@ -2270,12 +2270,12 @@ void gfx::print(const std::vector<love::font::ColoredString> &str, const Matrix4
 		print(str, states.back().font.get(), m);
 }
 
-void gfx::print(const std::vector<love::font::ColoredString> &str, FontMod *font, const Matrix4 &m)
+void graphics::print(const std::vector<love::font::ColoredString> &str, FontMod *font, const Matrix4 &m)
 {
 	font->print(this, str, m, states.back().color);
 }
 
-void gfx::printf(const std::vector<love::font::ColoredString> &str, float wrap, FontMod::AlignMode align, const Matrix4 &m)
+void graphics::printf(const std::vector<love::font::ColoredString> &str, float wrap, FontMod::AlignMode align, const Matrix4 &m)
 {
 	checkSetDefaultFont();
 
@@ -2283,7 +2283,7 @@ void gfx::printf(const std::vector<love::font::ColoredString> &str, float wrap, 
 		printf(str, states.back().font.get(), wrap, align, m);
 }
 
-void gfx::printf(const std::vector<love::font::ColoredString> &str, FontMod *font, float wrap, FontMod::AlignMode align, const Matrix4 &m)
+void graphics::printf(const std::vector<love::font::ColoredString> &str, FontMod *font, float wrap, FontMod::AlignMode align, const Matrix4 &m)
 {
 	font->printf(this, str, wrap, align, m, states.back().color);
 }
@@ -2292,7 +2292,7 @@ void gfx::printf(const std::vector<love::font::ColoredString> &str, FontMod *fon
  * Primitives (points, shapes, lines).
  **/
 
-void gfx::points(const Vector2 *positions, const Colorf *colors, size_t numpoints)
+void graphics::points(const Vector2 *positions, const Colorf *colors, size_t numpoints)
 {
 	const Matrix4 &t = getTransform();
 	bool is2D = t.isAffine2DTransform();
@@ -2344,13 +2344,13 @@ void gfx::points(const Vector2 *positions, const Colorf *colors, size_t numpoint
 	}
 }
 
-int gfx::calculateEllipsePoints(float rx, float ry) const
+int graphics::calculateEllipsePoints(float rx, float ry) const
 {
 	int points = (int) sqrtf(((rx + ry) / 2.0f) * 20.0f * (float) pixelScaleStack.back());
 	return std::max(points, 8);
 }
 
-void gfx::polyline(const Vector2 *vertices, size_t count)
+void graphics::polyline(const Vector2 *vertices, size_t count)
 {
 	float halfwidth = getLineWidth() * 0.5f;
 	LineJoin linejoin = getLineJoin();
@@ -2378,13 +2378,13 @@ void gfx::polyline(const Vector2 *vertices, size_t count)
 	}
 }
 
-void gfx::rectangle(DrawMode mode, float x, float y, float w, float h)
+void graphics::rectangle(DrawMode mode, float x, float y, float w, float h)
 {
 	Vector2 coords[] = {Vector2(x,y), Vector2(x,y+h), Vector2(x+w,y+h), Vector2(x+w,y), Vector2(x,y)};
 	polygon(mode, coords, 5);
 }
 
-void gfx::rectangle(DrawMode mode, float x, float y, float w, float h, float rx, float ry, int points)
+void graphics::rectangle(DrawMode mode, float x, float y, float w, float h, float rx, float ry, int points)
 {
 	if (rx <= 0 || ry <= 0)
 	{
@@ -2443,23 +2443,23 @@ void gfx::rectangle(DrawMode mode, float x, float y, float w, float h, float rx,
 	polygon(mode, coords, num_coords + 1);
 }
 
-void gfx::rectangle(DrawMode mode, float x, float y, float w, float h, float rx, float ry)
+void graphics::rectangle(DrawMode mode, float x, float y, float w, float h, float rx, float ry)
 {
 	int points = calculateEllipsePoints(std::min(rx, std::abs(w/2)), std::min(ry, std::abs(h/2)));
 	rectangle(mode, x, y, w, h, rx, ry, points);
 }
 
-void gfx::circle(DrawMode mode, float x, float y, float radius, int points)
+void graphics::circle(DrawMode mode, float x, float y, float radius, int points)
 {
 	ellipse(mode, x, y, radius, radius, points);
 }
 
-void gfx::circle(DrawMode mode, float x, float y, float radius)
+void graphics::circle(DrawMode mode, float x, float y, float radius)
 {
 	ellipse(mode, x, y, radius, radius);
 }
 
-void gfx::ellipse(DrawMode mode, float x, float y, float a, float b, int points)
+void graphics::ellipse(DrawMode mode, float x, float y, float a, float b, int points)
 {
 	float two_pi = (float) (LOVE_M_PI * 2);
 	if (points <= 0) points = 1;
@@ -2492,12 +2492,12 @@ void gfx::ellipse(DrawMode mode, float x, float y, float a, float b, int points)
 	polygon(mode, polygoncoords, points + extrapoints, false);
 }
 
-void gfx::ellipse(DrawMode mode, float x, float y, float a, float b)
+void graphics::ellipse(DrawMode mode, float x, float y, float a, float b)
 {
 	ellipse(mode, x, y, a, b, calculateEllipsePoints(a, b));
 }
 
-void gfx::arc(DrawMode drawmode, ArcMode arcmode, float x, float y, float radius, float angle1, float angle2, int points)
+void graphics::arc(DrawMode drawmode, ArcMode arcmode, float x, float y, float radius, float angle1, float angle2, int points)
 {
 	// Nothing to display with no points or equal angles. (Or is there with line mode?)
 	if (points <= 0 || angle1 == angle2)
@@ -2570,7 +2570,7 @@ void gfx::arc(DrawMode drawmode, ArcMode arcmode, float x, float y, float radius
 	polygon(drawmode, coords, num_coords);
 }
 
-void gfx::arc(DrawMode drawmode, ArcMode arcmode, float x, float y, float radius, float angle1, float angle2)
+void graphics::arc(DrawMode drawmode, ArcMode arcmode, float x, float y, float radius, float angle1, float angle2)
 {
 	float points = (float) calculateEllipsePoints(radius, radius);
 
@@ -2582,7 +2582,7 @@ void gfx::arc(DrawMode drawmode, ArcMode arcmode, float x, float y, float radius
 	arc(drawmode, arcmode, x, y, radius, angle1, angle2, (int) (points + 0.5f));
 }
 
-void gfx::polygon(DrawMode mode, const Vector2 *coords, size_t count, bool skipLastFilledVertex)
+void graphics::polygon(DrawMode mode, const Vector2 *coords, size_t count, bool skipLastFilledVertex)
 {
 	// coords is an array of a closed loop of vertices, i.e.
 	// coords[count-1] == coords[0]
@@ -2636,12 +2636,12 @@ void gfx::polygon(DrawMode mode, const Vector2 *coords, size_t count, bool skipL
 	}
 }
 
-const gfx::Capabilities &gfx::getCapabilities() const
+const graphics::Capabilities &graphics::getCapabilities() const
 {
 	return capabilities;
 }
 
-PixelFormat gfx::getSizedFormat(PixelFormat format) const
+PixelFormat graphics::getSizedFormat(PixelFormat format) const
 {
 	switch (format)
 	{
@@ -2657,7 +2657,7 @@ PixelFormat gfx::getSizedFormat(PixelFormat format) const
 	}
 }
 
-gfx::Stats gfx::getStats() const
+graphics::Stats graphics::getStats() const
 {
 	Stats stats;
 
@@ -2678,12 +2678,12 @@ gfx::Stats gfx::getStats() const
 	return stats;
 }
 
-size_t gfx::getStackDepth() const
+size_t graphics::getStackDepth() const
 {
 	return stackTypeStack.size();
 }
 
-void gfx::push(StackType type)
+void graphics::push(StackType type)
 {
 	if (stackTypeStack.size() == MAX_USER_STACK_DEPTH)
 		throw Exception("Maximum stack depth reached (more pushes than pops?)");
@@ -2698,7 +2698,7 @@ void gfx::push(StackType type)
 	stackTypeStack.push_back(type);
 }
 
-void gfx::pop()
+void graphics::pop()
 {
 	if (stackTypeStack.size() < 1)
 		throw Exception("Minimum stack depth reached (more pops than pushes?)");
@@ -2723,59 +2723,59 @@ void gfx::pop()
  * Transform and stack functions.
  **/
 
-const Matrix4 &gfx::getTransform() const
+const Matrix4 &graphics::getTransform() const
 {
 	return transformStack.back();
 }
 
-const Matrix4 &gfx::getDeviceProjection() const
+const Matrix4 &graphics::getDeviceProjection() const
 {
 	return deviceProjectionMatrix;
 }
 
-void gfx::pushTransform()
+void graphics::pushTransform()
 {
 	transformStack.push_back(transformStack.back());
 }
 
-void gfx::pushIdentityTransform()
+void graphics::pushIdentityTransform()
 {
 	transformStack.push_back(Matrix4());
 }
 
-void gfx::popTransform()
+void graphics::popTransform()
 {
 	transformStack.pop_back();
 }
 
-void gfx::rotate(float r)
+void graphics::rotate(float r)
 {
 	transformStack.back().rotate(r);
 }
 
-void gfx::scale(float x, float y)
+void graphics::scale(float x, float y)
 {
 	transformStack.back().scale(x, y);
 	pixelScaleStack.back() *= (fabs(x) + fabs(y)) / 2.0;
 }
 
-void gfx::translate(float x, float y)
+void graphics::translate(float x, float y)
 {
 	transformStack.back().translate(x, y);
 }
 
-void gfx::shear(float kx, float ky)
+void graphics::shear(float kx, float ky)
 {
 	transformStack.back().shear(kx, ky);
 }
 
-void gfx::origin()
+void graphics::origin()
 {
 	transformStack.back().setIdentity();
 	pixelScaleStack.back() = 1;
 }
 
-void gfx::applyTransform(const Matrix4 &m)
+void graphics::applyTransform(const Matrix4 &m)
 {
 	Matrix4 &current = transformStack.back();
 	current *= m;
@@ -2785,7 +2785,7 @@ void gfx::applyTransform(const Matrix4 &m)
 	pixelScaleStack.back() = (sx + sy) / 2.0;
 }
 
-void gfx::replaceTransform(const Matrix4 &m)
+void graphics::replaceTransform(const Matrix4 &m)
 {
 	transformStack.back() = m;
 
@@ -2794,14 +2794,14 @@ void gfx::replaceTransform(const Matrix4 &m)
 	pixelScaleStack.back() = (sx + sy) / 2.0;
 }
 
-Vector2 gfx::transformPoint(Vector2 point)
+Vector2 graphics::transformPoint(Vector2 point)
 {
 	Vector2 p;
 	transformStack.back().transformXY(&p, &point, 1);
 	return p;
 }
 
-Vector2 gfx::inverseTransformPoint(Vector2 point)
+Vector2 graphics::inverseTransformPoint(Vector2 point)
 {
 	Vector2 p;
 	// TODO: We should probably cache the inverse transform so we don't have to
@@ -2810,7 +2810,7 @@ Vector2 gfx::inverseTransformPoint(Vector2 point)
 	return p;
 }
 
-void gfx::setProjection(const Matrix4 &m)
+void graphics::setProjection(const Matrix4 &m)
 {
 	flushBatchedDraws();
 
@@ -2822,7 +2822,7 @@ void gfx::setProjection(const Matrix4 &m)
 	updateDeviceProjection(m);
 }
 
-void gfx::resetProjection()
+void graphics::resetProjection()
 {
 	flushBatchedDraws();
 
@@ -2844,83 +2844,83 @@ void gfx::resetProjection()
 	updateDeviceProjection(Matrix4::ortho(0.0f, w, h, 0.0f, -10.0f, 10.0f));
 }
 
-void gfx::updateDeviceProjection(const Matrix4 &projection)
+void graphics::updateDeviceProjection(const Matrix4 &projection)
 {
 	deviceProjectionMatrix = projection;
 }
 
-STRINGMAP_CLASS_BEGIN(gfx, gfx::DrawMode, gfx::DRAW_MAX_ENUM, drawMode)
+STRINGMAP_CLASS_BEGIN(graphics, graphics::DrawMode, graphics::DRAW_MAX_ENUM, drawMode)
 {
-	{ "line", gfx::DRAW_LINE },
-	{ "fill", gfx::DRAW_FILL },
+	{ "line", graphics::DRAW_LINE },
+	{ "fill", graphics::DRAW_FILL },
 }
-STRINGMAP_CLASS_END(gfx, gfx::DrawMode, gfx::DRAW_MAX_ENUM, drawMode)
+STRINGMAP_CLASS_END(graphics, graphics::DrawMode, graphics::DRAW_MAX_ENUM, drawMode)
 
-STRINGMAP_CLASS_BEGIN(gfx, gfx::ArcMode, gfx::ARC_MAX_ENUM, arcMode)
+STRINGMAP_CLASS_BEGIN(graphics, graphics::ArcMode, graphics::ARC_MAX_ENUM, arcMode)
 {
-	{ "open",   gfx::ARC_OPEN   },
-	{ "closed", gfx::ARC_CLOSED },
-	{ "pie",    gfx::ARC_PIE    },
+	{ "open",   graphics::ARC_OPEN   },
+	{ "closed", graphics::ARC_CLOSED },
+	{ "pie",    graphics::ARC_PIE    },
 }
-STRINGMAP_CLASS_END(gfx, gfx::ArcMode, gfx::ARC_MAX_ENUM, arcMode)
+STRINGMAP_CLASS_END(graphics, graphics::ArcMode, graphics::ARC_MAX_ENUM, arcMode)
 
-STRINGMAP_CLASS_BEGIN(gfx, gfx::LineStyle, gfx::LINE_MAX_ENUM, lineStyle)
+STRINGMAP_CLASS_BEGIN(graphics, graphics::LineStyle, graphics::LINE_MAX_ENUM, lineStyle)
 {
-	{ "smooth", gfx::LINE_SMOOTH },
-	{ "rough",  gfx::LINE_ROUGH  }
+	{ "smooth", graphics::LINE_SMOOTH },
+	{ "rough",  graphics::LINE_ROUGH  }
 }
-STRINGMAP_CLASS_END(gfx, gfx::LineStyle, gfx::LINE_MAX_ENUM, lineStyle)
+STRINGMAP_CLASS_END(graphics, graphics::LineStyle, graphics::LINE_MAX_ENUM, lineStyle)
 
-STRINGMAP_CLASS_BEGIN(gfx, gfx::LineJoin, gfx::LINE_JOIN_MAX_ENUM, lineJoin)
+STRINGMAP_CLASS_BEGIN(graphics, graphics::LineJoin, graphics::LINE_JOIN_MAX_ENUM, lineJoin)
 {
-	{ "none",  gfx::LINE_JOIN_NONE  },
-	{ "miter", gfx::LINE_JOIN_MITER },
-	{ "bevel", gfx::LINE_JOIN_BEVEL }
+	{ "none",  graphics::LINE_JOIN_NONE  },
+	{ "miter", graphics::LINE_JOIN_MITER },
+	{ "bevel", graphics::LINE_JOIN_BEVEL }
 }
-STRINGMAP_CLASS_END(gfx, gfx::LineJoin, gfx::LINE_JOIN_MAX_ENUM, lineJoin)
+STRINGMAP_CLASS_END(graphics, graphics::LineJoin, graphics::LINE_JOIN_MAX_ENUM, lineJoin)
 
-STRINGMAP_CLASS_BEGIN(gfx, gfx::Feature, gfx::FEATURE_MAX_ENUM, feature)
+STRINGMAP_CLASS_BEGIN(graphics, graphics::Feature, graphics::FEATURE_MAX_ENUM, feature)
 {
-	{ "multirendertargetformats", gfx::FEATURE_MULTI_RENDER_TARGET_FORMATS },
-	{ "clampzero",                gfx::FEATURE_CLAMP_ZERO           },
-	{ "clampone",                 gfx::FEATURE_CLAMP_ONE            },
-	{ "lighten",                  gfx::FEATURE_LIGHTEN              },
-	{ "fullnpot",                 gfx::FEATURE_FULL_NPOT            },
-	{ "pixelshaderhighp",         gfx::FEATURE_PIXEL_SHADER_HIGHP   },
-	{ "shaderderivatives",        gfx::FEATURE_SHADER_DERIVATIVES   },
-	{ "glsl3",                    gfx::FEATURE_GLSL3                },
-	{ "glsl4",                    gfx::FEATURE_GLSL4                },
-	{ "instancing",               gfx::FEATURE_INSTANCING           },
-	{ "texelbuffer",              gfx::FEATURE_TEXEL_BUFFER         },
-	{ "copytexturetobuffer",      gfx::FEATURE_COPY_TEXTURE_TO_BUFFER },
-	{ "indirectdraw",             gfx::FEATURE_INDIRECT_DRAW        },
+	{ "multirendertargetformats", graphics::FEATURE_MULTI_RENDER_TARGET_FORMATS },
+	{ "clampzero",                graphics::FEATURE_CLAMP_ZERO           },
+	{ "clampone",                 graphics::FEATURE_CLAMP_ONE            },
+	{ "lighten",                  graphics::FEATURE_LIGHTEN              },
+	{ "fullnpot",                 graphics::FEATURE_FULL_NPOT            },
+	{ "pixelshaderhighp",         graphics::FEATURE_PIXEL_SHADER_HIGHP   },
+	{ "shaderderivatives",        graphics::FEATURE_SHADER_DERIVATIVES   },
+	{ "glsl3",                    graphics::FEATURE_GLSL3                },
+	{ "glsl4",                    graphics::FEATURE_GLSL4                },
+	{ "instancing",               graphics::FEATURE_INSTANCING           },
+	{ "texelbuffer",              graphics::FEATURE_TEXEL_BUFFER         },
+	{ "copytexturetobuffer",      graphics::FEATURE_COPY_TEXTURE_TO_BUFFER },
+	{ "indirectdraw",             graphics::FEATURE_INDIRECT_DRAW        },
 }
-STRINGMAP_CLASS_END(gfx, gfx::Feature, gfx::FEATURE_MAX_ENUM, feature)
+STRINGMAP_CLASS_END(graphics, graphics::Feature, graphics::FEATURE_MAX_ENUM, feature)
 
-STRINGMAP_CLASS_BEGIN(gfx, gfx::SystemLimit, gfx::LIMIT_MAX_ENUM, systemLimit)
+STRINGMAP_CLASS_BEGIN(graphics, graphics::SystemLimit, graphics::LIMIT_MAX_ENUM, systemLimit)
 {
-	{ "pointsize",               gfx::LIMIT_POINT_SIZE                 },
-	{ "texturesize",             gfx::LIMIT_TEXTURE_SIZE               },
-	{ "texturelayers",           gfx::LIMIT_TEXTURE_LAYERS             },
-	{ "volumetexturesize",       gfx::LIMIT_VOLUME_TEXTURE_SIZE        },
-	{ "cubetexturesize",         gfx::LIMIT_CUBE_TEXTURE_SIZE          },
-	{ "texelbuffersize",         gfx::LIMIT_TEXEL_BUFFER_SIZE          },
-	{ "shaderstoragebuffersize", gfx::LIMIT_SHADER_STORAGE_BUFFER_SIZE },
-	{ "threadgroupsx",           gfx::LIMIT_THREADGROUPS_X             },
-	{ "threadgroupsy",           gfx::LIMIT_THREADGROUPS_Y             },
-	{ "threadgroupsz",           gfx::LIMIT_THREADGROUPS_Z             },
-	{ "rendertargets",           gfx::LIMIT_RENDER_TARGETS             },
-	{ "texturemsaa",             gfx::LIMIT_TEXTURE_MSAA               },
-	{ "anisotropy",              gfx::LIMIT_ANISOTROPY                 },
+	{ "pointsize",               graphics::LIMIT_POINT_SIZE                 },
+	{ "texturesize",             graphics::LIMIT_TEXTURE_SIZE               },
+	{ "texturelayers",           graphics::LIMIT_TEXTURE_LAYERS             },
+	{ "volumetexturesize",       graphics::LIMIT_VOLUME_TEXTURE_SIZE        },
+	{ "cubetexturesize",         graphics::LIMIT_CUBE_TEXTURE_SIZE          },
+	{ "texelbuffersize",         graphics::LIMIT_TEXEL_BUFFER_SIZE          },
+	{ "shaderstoragebuffersize", graphics::LIMIT_SHADER_STORAGE_BUFFER_SIZE },
+	{ "threadgroupsx",           graphics::LIMIT_THREADGROUPS_X             },
+	{ "threadgroupsy",           graphics::LIMIT_THREADGROUPS_Y             },
+	{ "threadgroupsz",           graphics::LIMIT_THREADGROUPS_Z             },
+	{ "rendertargets",           graphics::LIMIT_RENDER_TARGETS             },
+	{ "texturemsaa",             graphics::LIMIT_TEXTURE_MSAA               },
+	{ "anisotropy",              graphics::LIMIT_ANISOTROPY                 },
 }
-STRINGMAP_CLASS_END(gfx, gfx::SystemLimit, gfx::LIMIT_MAX_ENUM, systemLimit)
+STRINGMAP_CLASS_END(graphics, graphics::SystemLimit, graphics::LIMIT_MAX_ENUM, systemLimit)
 
-STRINGMAP_CLASS_BEGIN(gfx, gfx::StackType, gfx::STACK_MAX_ENUM, stackType)
+STRINGMAP_CLASS_BEGIN(graphics, graphics::StackType, graphics::STACK_MAX_ENUM, stackType)
 {
-	{ "all",       gfx::STACK_ALL       },
-	{ "transform", gfx::STACK_TRANSFORM },
+	{ "all",       graphics::STACK_ALL       },
+	{ "transform", graphics::STACK_TRANSFORM },
 }
-STRINGMAP_CLASS_END(gfx, gfx::StackType, gfx::STACK_MAX_ENUM, stackType)
+STRINGMAP_CLASS_END(graphics, graphics::StackType, graphics::STACK_MAX_ENUM, stackType)
 
 STRINGMAP_BEGIN(Renderer, RENDERER_MAX_ENUM, renderer)
 {
@@ -2930,5 +2930,5 @@ STRINGMAP_BEGIN(Renderer, RENDERER_MAX_ENUM, renderer)
 }
 STRINGMAP_END(Renderer, RENDERER_MAX_ENUM, renderer)
 
-} // graphics
+} // gfx
 } // love

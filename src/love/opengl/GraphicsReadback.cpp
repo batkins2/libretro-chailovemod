@@ -31,7 +31,7 @@ namespace graphics
 namespace opengl
 {
 
-GraphicsReadback::GraphicsReadback(love::graphics::gfx *gfx, ReadbackMethod method, love::graphics::Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset)
+GraphicsReadback::GraphicsReadback(love::graphics::graphics *gfx, ReadbackMethod method, love::graphics::Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset)
 	: love::graphics::GraphicsReadback(gfx, method, buffer, offset, size, dest, destoffset)
 {
 	// Immediate readback of readback-type buffers doesn't need a staging buffer.
@@ -59,7 +59,7 @@ GraphicsReadback::GraphicsReadback(love::graphics::gfx *gfx, ReadbackMethod meth
 	}
 }
 
-GraphicsReadback::GraphicsReadback(love::graphics::gfx *gfx, ReadbackMethod method, love::graphics::Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty)
+GraphicsReadback::GraphicsReadback(love::graphics::graphics *gfx, ReadbackMethod method, love::graphics::Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty)
 	: love::graphics::GraphicsReadback(gfx, method, texture, slice, mipmap, rect, dest, destx, desty)
 {
 	size_t size = getPixelFormatSliceSize(textureFormat, rect.w, rect.h);

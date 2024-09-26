@@ -397,7 +397,7 @@ Polyline::~Polyline()
 		delete[] vertices;
 }
 
-void Polyline::draw(love::graphics::gfx *gfx)
+void Polyline::draw(love::graphics::graphics *gfx)
 {
 	const Matrix4 &t = gfx->getTransform();
 	bool is2D = t.isAffine2DTransform();

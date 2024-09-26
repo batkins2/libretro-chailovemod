@@ -43,7 +43,7 @@ class Buffer final : public love::graphics::Buffer, public Volatile
 {
 public:
 
-	Buffer(love::graphics::gfx *gfx, const Settings &settings, const std::vector<DataDeclaration> &format, const void *data, size_t size, size_t arraylength);
+	Buffer(love::graphics::graphics *gfx, const Settings &settings, const std::vector<DataDeclaration> &format, const void *data, size_t size, size_t arraylength);
 	virtual ~Buffer();
 
 	// Implements Volatile.

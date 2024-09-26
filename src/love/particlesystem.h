@@ -36,10 +36,10 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
-class Graphics;
+class graphics;
 
 /**
  * A class for creating, moving and drawing particles.
@@ -511,7 +511,7 @@ public:
 	void update(float dt);
 
 	// Implements Drawable.
-	void draw(gfx *gfx, const Matrix4 &m) override;
+	void draw(graphics *gfx, const Matrix4 &m) override;
 
 	static bool getConstant(const char *in, AreaSpreadDistribution &out);
 	static bool getConstant(AreaSpreadDistribution in, const char *&out);

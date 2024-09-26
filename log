@@ -1,0 +1,7 @@
+CXX src/love/particlesystem.cpp
+CXX src/love/polyline.cpp
+src/love/polyline.cpp:36:6: error: ‘Polyline’ has not been declared
+   36 | void Polyline::render(const Vector2 *coords, size_t count, size_t size_hint, float halfwidth, float pixel_size, bool draw_overdraw)
+      |      ^~~~~~~~
+compilation terminated due to -Wfatal-errors.
+make: *** [Makefile:31: src/love/polyline.o] Error 1

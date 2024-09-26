@@ -248,7 +248,7 @@ int TextBatch::getHeight(int index) const
 	return textData[index].textInfo.height;
 }
 
-void TextBatch::draw(gfx *gfx, const Matrix4 &m)
+void TextBatch::draw(graphics *gfx, const Matrix4 &m)
 {
 	if (vertexBuffer == nullptr || vertexData == nullptr || drawCommands.empty())
 		return;

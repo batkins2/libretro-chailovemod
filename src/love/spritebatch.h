@@ -37,11 +37,11 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 // Forward declarations.
-class gfx;
+class graphics;
 class Texture;
 class Quad;
 class Buffer;
@@ -52,7 +52,7 @@ public:
 
 	static love::Type type;
 
-	SpriteBatch(gfx *gfx, Texture *texture, int size, BufferDataUsage usage);
+	SpriteBatch(graphics *gfx, Texture *texture, int size, BufferDataUsage usage);
 	virtual ~SpriteBatch();
 
 	int add(const Matrix4 &m, int index = -1);
@@ -104,7 +104,7 @@ public:
 	bool getDrawRange(int &start, int &count) const;
 
 	// Implements Drawable.
-	void draw(gfx *gfx, const Matrix4 &m) override;
+	void draw(graphics *gfx, const Matrix4 &m) override;
 
 private:
 
@@ -137,7 +137,7 @@ private:
 	CommonFormat vertex_format;
 	size_t vertex_stride;
 
-	StrongRef<love::graphics::Buffer> array_buf;
+	StrongRef<love::gfx::Buffer> array_buf;
 	uint8 *vertex_data;
 
 	Range modified_sprites;

@@ -30,7 +30,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 class Shader;

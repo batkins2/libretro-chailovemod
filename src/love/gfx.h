@@ -18,8 +18,8 @@
  * 3. This notice may not be removed or altered from any source distribution.
  **/
 
-#ifndef LOVE_GRAPHICS_GFX_H
-#define LOVE_GRAPHICS_GFX_H
+#ifndef LOVE_GFX_H
+#define LOVE_GFX_H
 
 // LOVE
 #include "common/config.h"
@@ -53,7 +53,7 @@
 namespace love
 {
 
-namespace graphics
+namespace gfx
 {
 
 class SpriteBatch;
@@ -109,7 +109,7 @@ const std::vector<Renderer> &getDefaultRenderers();
 const std::vector<Renderer> &getRenderers();
 void setRenderers(const std::vector<Renderer> &renderers);
 
-class gfx : public Module
+class graphics : public Module
 {
 public:
 
@@ -308,26 +308,26 @@ public:
 	{
 	public:
 
-		TempTransform(gfx *graphics)
-			: graphics(graphics)
+		TempTransform(graphics *gfx)
+			: gfx(gfx)
 		{
-			graphics->pushTransform();
+			gfx->pushTransform();
 		}
 
-		TempTransform(gfx *graphics, const Matrix4 &t)
-			: graphics(graphics)
+		TempTransform(graphics *gfx, const Matrix4 &t)
+			: gfx(gfx)
 		{
-			graphics->pushTransform();
-			graphics->transformStack.back() *= t;
+			gfx->pushTransform();
+			gfx->transformStack.back() *= t;
 		}
 
 		~TempTransform()
 		{
-			graphics->popTransform();
+			gfx->popTransform();
 		}
 
 	private:
-		gfx *graphics;
+		graphics *gfx;
 	};
 
 	struct ScreenshotInfo;
@@ -445,8 +445,8 @@ public:
 		}
 	};
 
-	gfx(const char *name);
-	virtual ~gfx();
+	graphics(const char *name);
+	virtual ~graphics();
 
 	virtual Texture *newTexture(const Texture::Settings &settings, const Texture::Slices *data = nullptr) = 0;
 	virtual Texture *newTextureView(Texture *base, const Texture::ViewSettings &viewsettings) = 0;
@@ -908,7 +908,7 @@ public:
 	// Workaround for some very old nvidia drivers that aren't compliant with the GLSL 3.30 spec.
 	bool isUsingNoTextureCubeShadowBiasHack() const { return usingNoTextureCubeShadowBiasHack; }
 
-	static gfx *createInstance();
+	static graphics *createInstance();
 
 	STRINGMAP_CLASS_DECLARE(DrawMode);
 	STRINGMAP_CLASS_DECLARE(ArcMode);
@@ -1060,7 +1060,7 @@ protected:
 	bool created;
 	bool active;
 
-	StrongRef<love::graphics::FontMod> defaultFont;
+	StrongRef<love::gfx::FontMod> defaultFont;
 
 	std::vector<ScreenshotInfo> pendingScreenshotCallbacks;
 	std::vector<StrongRef<GraphicsReadback>> pendingReadbacks;
@@ -1114,4 +1114,4 @@ STRINGMAP_DECLARE(Renderer);
 } // graphics
 } // love
 
-#endif // LOVE_GRAPHICS_GFX_H
+#endif // LOVE_GFX_H

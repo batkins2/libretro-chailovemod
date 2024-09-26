@@ -755,7 +755,7 @@ void Shader::setVideoTextures(love::graphics::Texture *ytexture, love::graphics:
 	}
 }
 
-void Shader::updateBuiltinUniforms(love::graphics::gfx *gfx, int viewportW, int viewportH)
+void Shader::updateBuiltinUniforms(love::graphics::graphics *gfx, int viewportW, int viewportH)
 {
 	if (current != this)
 		return;

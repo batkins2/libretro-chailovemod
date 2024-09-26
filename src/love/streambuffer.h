@@ -31,7 +31,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 class StreamBuffer : public love::Object, public Resource

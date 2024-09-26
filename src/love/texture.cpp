@@ -161,7 +161,7 @@ love::Type Texture::type("Texture", &Drawable::type);
 int Texture::textureCount = 0;
 int64 Texture::totalGraphicsMemory = 0;
 
-Texture::Texture(gfx *gfx, const Settings &settings, const Slices *slices)
+Texture::Texture(graphics *gfx, const Settings &settings, const Slices *slices)
 	: texType(settings.type)
 	, format(settings.format)
 	, renderTarget(settings.renderTarget)
@@ -334,7 +334,7 @@ Texture::Texture(gfx *gfx, const Settings &settings, const Slices *slices)
 	++textureCount;
 }
 
-Texture::Texture(gfx *gfx, Texture *base, const ViewSettings &viewsettings)
+Texture::Texture(graphics *gfx, Texture *base, const ViewSettings &viewsettings)
 	: texType(viewsettings.type.get(base->getTextureType()))
 	, format(viewsettings.format.get(base->getPixelFormat()))
 	, renderTarget(base->renderTarget)
@@ -491,12 +491,12 @@ void Texture::updateGraphicsMemorySize(bool loaded)
 	totalGraphicsMemory += memsize;
 }
 
-void Texture::draw(gfx *gfx, const Matrix4 &m)
+void Texture::draw(graphics *gfx, const Matrix4 &m)
 {
 	draw(gfx, quad, m);
 }
 
-void Texture::draw(gfx *gfx, Quad *q, const Matrix4 &localTransform)
+void Texture::draw(graphics *gfx, Quad *q, const Matrix4 &localTransform)
 {
 	if (texType == TEXTURE_2D_ARRAY)
 	{
@@ -542,12 +542,12 @@ void Texture::draw(gfx *gfx, Quad *q, const Matrix4 &localTransform)
 	}
 }
 
-void Texture::drawLayer(gfx *gfx, int layer, const Matrix4 &m)
+void Texture::drawLayer(graphics *gfx, int layer, const Matrix4 &m)
 {
 	drawLayer(gfx, layer, quad, m);
 }
 
-void Texture::drawLayer(gfx *gfx, int layer, Quad *q, const Matrix4 &m)
+void Texture::drawLayer(graphics *gfx, int layer, Quad *q, const Matrix4 &m)
 {
 	if (!readable)
 		throw love::Exception("Textures with non-readable formats cannot be drawn.");
@@ -915,7 +915,7 @@ bool Texture::validateDimensions(bool throwException) const
 	return success;
 }
 
-void Texture::validatePixelFormat(gfx *gfx) const
+void Texture::validatePixelFormat(graphics *gfx) const
 {
 	uint32 usage = PIXELFORMATUSAGEFLAGS_NONE;
 	if (renderTarget)

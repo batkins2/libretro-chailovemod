@@ -29,7 +29,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 Deprecations::Deprecations()
@@ -42,7 +42,7 @@ Deprecations::~Deprecations()
 {
 }
 
-void Deprecations::draw(gfx *gfx)
+void Deprecations::draw(graphics *gfx)
 {
 	if (!isDeprecationOutputEnabled())
 		return;
@@ -84,7 +84,7 @@ void Deprecations::draw(gfx *gfx)
 
 	gfx->flushBatchedDraws();
 
-	gfx->push(gfx::STACK_ALL);
+	gfx->push(graphics::STACK_ALL);
 	gfx->reset();
 
 	int maxcount = 4;
@@ -124,7 +124,7 @@ void Deprecations::draw(gfx *gfx)
 	int y = std::max(gfx->getHeight() - height, 0);
 
 	gfx->setColor(Colorf(0, 0, 0, 0.85 * alpha));
-	gfx->rectangle(gfx::DRAW_FILL, x, y, width, height);
+	gfx->rectangle(graphics::DRAW_FILL, x, y, width, height);
 
 	gfx->setColor(Colorf(1, 0.9, 0.8, 1 * alpha));
 	gfx->setScissor({x, y, width, height});

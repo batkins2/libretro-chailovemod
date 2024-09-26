@@ -35,7 +35,7 @@ class ShaderStage final : public love::graphics::ShaderStage, public Volatile
 {
 public:
 
-	ShaderStage(love::graphics::gfx *gfx, ShaderStageType stage, const std::string &source, bool gles, const std::string &cachekey);
+	ShaderStage(love::graphics::graphics *gfx, ShaderStageType stage, const std::string &source, bool gles, const std::string &cachekey);
 	virtual ~ShaderStage();
 
 	ptrdiff_t getHandle() const override { return glShader; }

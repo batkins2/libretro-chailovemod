@@ -23,7 +23,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 love::Type Drawable::type("Drawable", &Object::type);

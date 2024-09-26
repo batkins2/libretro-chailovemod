@@ -28,7 +28,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 class Quad : public Object

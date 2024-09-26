@@ -39,7 +39,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 namespace glsl
@@ -580,7 +580,7 @@ Shader::SourceInfo Shader::getSourceInfo(const std::string &src)
 	return info;
 }
 
-std::string Shader::createShaderStageCode(gfx *gfx, ShaderStageType stage, const std::string &code, const CompileOptions &options, const Shader::SourceInfo &info, bool gles, bool checksystemfeatures)
+std::string Shader::createShaderStageCode(graphics *gfx, ShaderStageType stage, const std::string &code, const CompileOptions &options, const Shader::SourceInfo &info, bool gles, bool checksystemfeatures)
 {
 	if (info.language == Shader::LANGUAGE_MAX_ENUM)
 		throw love::Exception("Invalid shader language");

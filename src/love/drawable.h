@@ -27,10 +27,10 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
-class gfx;
+class graphics;
 
 /**
  * A Drawable is anything that can be drawn on screen with a
@@ -50,7 +50,7 @@ public:
 	/**
 	 * Draws the object with the specified transformation matrix.
 	 **/
-	virtual void draw(gfx *gfx, const Matrix4 &m) = 0;
+	virtual void draw(graphics *gfx, const Matrix4 &m) = 0;
 };
 
 } // graphics

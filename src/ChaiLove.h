@@ -58,6 +58,7 @@
 #include "love/script.h"
 #include "love/filesystem.h"
 #include "love/graphics.h"
+#include "love/gfx.h"
 #include "love/image.h"
 #include "love/system.h"
 #include "love/sound.h"
@@ -89,6 +90,7 @@ class ChaiLove {
 	love::data data;
 	love::filesystem filesystem;
 	love::graphics graphics;
+	love::gfx gfx;
 	love::image image;
 	love::system system;
 	love::sound sound;

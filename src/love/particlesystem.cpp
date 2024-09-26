@@ -33,7 +33,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 namespace
@@ -188,12 +188,12 @@ void ParticleSystem::createBuffers(size_t size)
 		pFree = pMem = new Particle[size];
 		maxParticles = (uint32) size;
 
-		auto graphics = Module::getInstance<gfx>(Module::M_GRAPHICS);
+		auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
 
 		size_t bytes = sizeof(Vertex) * size * 4;
 		Buffer::Settings settings(BUFFERUSAGEFLAG_VERTEX, BUFFERDATAUSAGE_STREAM);
 		auto decl = Buffer::getCommonFormatDeclaration(CommonFormat::XYf_STf_RGBAub);
-		buffer = graphics->newBuffer(settings, decl, nullptr, bytes, 0);
+		buffer = gfx->newBuffer(settings, decl, nullptr, bytes, 0);
 	}
 	catch (std::bad_alloc &)
 	{
@@ -1025,7 +1025,7 @@ void ParticleSystem::update(float dt)
 	prevPosition = position;
 }
 
-void ParticleSystem::draw(gfx *gfx, const Matrix4 &m)
+void ParticleSystem::draw(graphics *gfx, const Matrix4 &m)
 {
 	uint32 pCount = getCount();
 
@@ -1081,7 +1081,7 @@ void ParticleSystem::draw(gfx *gfx, const Matrix4 &m)
 
 	buffer->unmap(0, pCount * sizeof(Vertex) * 4);
 
-	gfx::TempTransform transform(gfx, m);
+	graphics::TempTransform transform(gfx, m);
 
 	BufferBindings vertexbuffers;
 	vertexbuffers.set(0, buffer, 0);

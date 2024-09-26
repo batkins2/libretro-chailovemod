@@ -44,21 +44,21 @@
 namespace love
 {
 
-namespace graphics
+namespace gfx
 {
 namespace opengl
 {
 
-class Graphics final : public love::graphics::gfx
+class graphics final : public love::gfx::graphics
 {
 public:
 
-	Graphics();
-	virtual ~Graphics();
+	graphics();
+	virtual ~graphics();
 
-	love::graphics::Texture *newTexture(const Texture::Settings &settings, const Texture::Slices *data = nullptr) override;
-	love::graphics::Texture *newTextureView(love::graphics::Texture *base, const Texture::ViewSettings &viewsettings) override;
-	love::graphics::Buffer *newBuffer(const Buffer::Settings &settings, const std::vector<Buffer::DataDeclaration> &format, const void *data, size_t size, size_t arraylength) override;
+	love::gfx::Texture *newTexture(const Texture::Settings &settings, const Texture::Slices *data = nullptr) override;
+	love::gfx::Texture *newTextureView(love::gfx::Texture *base, const Texture::ViewSettings &viewsettings) override;
+	love::gfx::Buffer *newBuffer(const Buffer::Settings &settings, const std::vector<Buffer::DataDeclaration> &format, const void *data, size_t size, size_t arraylength) override;
 
 	void backbufferChanged(int width, int height, int pixelwidth, int pixelheight, bool backbufferstencil, bool backbufferdepth, int msaa) override;
 	bool setMode(void *context, int width, int height, int pixelwidth, int pixelheight, bool backbufferstencil, bool backbufferdepth, int msaa) override;
@@ -66,12 +66,12 @@ public:
 
 	void setActive(bool active) override;
 
-	bool dispatch(love::graphics::Shader *shader, int x, int y, int z) override;
-	bool dispatch(love::graphics::Shader *shader, love::graphics::Buffer *indirectargs, size_t argsoffset) override;
+	bool dispatch(love::gfx::Shader *shader, int x, int y, int z) override;
+	bool dispatch(love::gfx::Shader *shader, love::gfx::Buffer *indirectargs, size_t argsoffset) override;
 
 	void draw(const DrawCommand &cmd) override;
 	void draw(const DrawIndexedCommand &cmd) override;
-	void drawQuads(int start, int count, const VertexAttributes &attributes, const BufferBindings &buffers, love::graphics::Texture *texture) override;
+	void drawQuads(int start, int count, const VertexAttributes &attributes, const BufferBindings &buffers, love::gfx::Texture *texture) override;
 
 	void clear(OptionalColorD color, OptionalInt stencil, OptionalDouble depth) override;
 	void clear(const std::vector<OptionalColorD> &colors, OptionalInt stencil, OptionalDouble depth) override;
@@ -108,7 +108,7 @@ public:
 	RendererInfo getRendererInfo() const override;
 
 	// Internal use.
-	void cleanupRenderTexture(love::graphics::Texture *texture);
+	void cleanupRenderTexture(love::gfx::Texture *texture);
 
 	void *getBufferMapMemory(size_t size);
 	void releaseBufferMapMemory(void *mem);
@@ -134,12 +134,12 @@ private:
 		}
 	};
 
-	love::graphics::ShaderStage *newShaderStageInternal(ShaderStageType stage, const std::string &cachekey, const std::string &source, bool gles) override;
-	love::graphics::Shader *newShaderInternal(StrongRef<love::graphics::ShaderStage> stages[SHADERSTAGE_MAX_ENUM], const Shader::CompileOptions &options) override;
-	love::graphics::StreamBuffer *newStreamBuffer(BufferUsage type, size_t size) override;
+	love::gfx::ShaderStage *newShaderStageInternal(ShaderStageType stage, const std::string &cachekey, const std::string &source, bool gles) override;
+	love::gfx::Shader *newShaderInternal(StrongRef<love::gfx::ShaderStage> stages[SHADERSTAGE_MAX_ENUM], const Shader::CompileOptions &options) override;
+	love::gfx::StreamBuffer *newStreamBuffer(BufferUsage type, size_t size) override;
 
-	love::graphics::GraphicsReadback *newReadbackInternal(ReadbackMethod method, love::graphics::Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset) override;
-	love::graphics::GraphicsReadback *newReadbackInternal(ReadbackMethod method, love::graphics::Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty) override;
+	love::gfx::GraphicsReadback *newReadbackInternal(ReadbackMethod method, love::gfx::Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset) override;
+	love::gfx::GraphicsReadback *newReadbackInternal(ReadbackMethod method, love::gfx::Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty) override;
 
 	void setRenderTargetsInternal(const RenderTargets &rts, int pixelw, int pixelh, bool hasSRGBtexture) override;
 	void initCapabilities() override;
@@ -161,8 +161,8 @@ private:
 	bool windowHasStencil;
 	GLuint mainVAO;
 
-	StrongRef<love::graphics::Texture> internalBackbuffer;
-	StrongRef<love::graphics::Texture> internalBackbufferDepthStencil;
+	StrongRef<love::gfx::Texture> internalBackbuffer;
+	StrongRef<love::gfx::Texture> internalBackbufferDepthStencil;
 	GLuint internalBackbufferFBO;
 	int requestedBackbufferMSAA;
 

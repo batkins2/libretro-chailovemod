@@ -40,7 +40,7 @@ namespace graphics
 
 love::Type SpriteBatch::type("SpriteBatch", &Drawable::type);
 
-SpriteBatch::SpriteBatch(gfx *gfx, Texture *texture, int size, BufferDataUsage usage)
+SpriteBatch::SpriteBatch(graphics *gfx, Texture *texture, int size, BufferDataUsage usage)
 	: texture(texture)
 	, size(size)
 	, next(0)
@@ -318,7 +318,7 @@ bool SpriteBatch::getDrawRange(int &start, int &count) const
 	return true;
 }
 
-void SpriteBatch::draw(gfx *gfx, const Matrix4 &m)
+void SpriteBatch::draw(graphics *gfx, const Matrix4 &m)
 {
 	if (next == 0)
 		return;
