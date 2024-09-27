@@ -26,16 +26,16 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 namespace opengl
 {
 
-class ShaderStage final : public love::graphics::ShaderStage, public Volatile
+class ShaderStage final : public love::gfx::ShaderStage, public Volatile
 {
 public:
 
-	ShaderStage(love::graphics::graphics *gfx, ShaderStageType stage, const std::string &source, bool gles, const std::string &cachekey);
+	ShaderStage(love::gfx::graphics *gfx, ShaderStageType stage, const std::string &source, bool gles, const std::string &cachekey);
 	virtual ~ShaderStage();
 
 	ptrdiff_t getHandle() const override { return glShader; }

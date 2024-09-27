@@ -29,17 +29,17 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 namespace opengl
 {
 
-class Texture final : public love::graphics::Texture, public Volatile
+class Texture final : public love::gfx::Texture, public Volatile
 {
 public:
 
-	Texture(love::graphics::graphics *gfx, const Settings &settings, const Slices *data);
-	Texture(love::graphics::graphics *gfx, love::graphics::Texture *base, const Texture::ViewSettings &viewsettings);
+	Texture(gfx::graphics *gfx, const Settings &settings, const Slices *data);
+	Texture(gfx::graphics *gfx, love::gfx::Texture *base, const Texture::ViewSettings &viewsettings);
 
 	virtual ~Texture();
 
@@ -47,8 +47,8 @@ public:
 	bool loadVolatile() override;
 	void unloadVolatile() override;
 
-	void copyFromBuffer(love::graphics::Buffer *source, size_t sourceoffset, int sourcewidth, size_t size, int slice, int mipmap, const Rect &rect) override;
-	void copyToBuffer(love::graphics::Buffer *dest, int slice, int mipmap, const Rect &rect, size_t destoffset, int destwidth, size_t size) override;
+	void copyFromBuffer(love::gfx::Buffer *source, size_t sourceoffset, int sourcewidth, size_t size, int slice, int mipmap, const Rect &rect) override;
+	void copyToBuffer(love::gfx::Buffer *dest, int slice, int mipmap, const Rect &rect, size_t destoffset, int destwidth, size_t size) override;
 
 	void setSamplerState(const SamplerState &s) override;
 

@@ -26,7 +26,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 love::Type Video::type("Video", &Drawable::type);
@@ -129,14 +129,14 @@ void Video::draw(graphics *gfx, const Matrix4 &m)
 
 	Matrix4 t(tm, m);
 
-	gfx::BatchedDrawCommand cmd;
+	graphics::BatchedDrawCommand cmd;
 	cmd.formats[0] = getSinglePositionFormat(is2D);
 	cmd.formats[1] = CommonFormat::STf_RGBAub;
 	cmd.indexMode = TRIANGLEINDEX_QUADS;
 	cmd.vertexCount = 4;
 	cmd.standardShaderType = Shader::STANDARD_VIDEO;
 
-	gfx::BatchedVertexData data = gfx->requestBatchedDraw(cmd);
+	graphics::BatchedVertexData data = gfx->requestBatchedDraw(cmd);
 
 	if (is2D)
 		t.transformXY((Vector2 *) data.stream[0], vertices, 4);

@@ -595,10 +595,10 @@ std::string Shader::createShaderStageCode(graphics *gfx, ShaderStageType stage, 
 	{
 		const auto &features = gfx->getCapabilities().features;
 
-		if (stage == SHADERSTAGE_COMPUTE && !features[gfx::FEATURE_GLSL4])
+		if (stage == SHADERSTAGE_COMPUTE && !features[graphics::FEATURE_GLSL4])
 			throw love::Exception("Compute shaders require GLSL 4 which is not supported on this system.");
 
-		if (info.language == LANGUAGE_GLSL4 && !features[gfx::FEATURE_GLSL4])
+		if (info.language == LANGUAGE_GLSL4 && !features[graphics::FEATURE_GLSL4])
 			throw love::Exception("GLSL 4 shaders are not supported on this system.");
 	}
 
@@ -653,7 +653,7 @@ Shader::Shader(StrongRef<ShaderStage> _stages[], const CompileOptions &options)
 	activeTextures.resize(reflection.textureCount);
 	activeBuffers.resize(reflection.bufferCount);
 
-	auto graphics = Module::getInstance<gfx>(Module::M_GRAPHICS);
+	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
 
 	// Default bindings for read-only resources.
 	for (const auto &kvp : reflection.allUniforms)
@@ -668,7 +668,7 @@ Shader::Shader(StrongRef<ShaderStage> _stages[], const CompileOptions &options)
 
 		if (u.baseType == UNIFORM_SAMPLER || u.baseType == UNIFORM_STORAGETEXTURE)
 		{
-			auto tex = graphics->getDefaultTexture(u.textureType, u.dataBaseType, u.isDepthSampler);
+			auto tex = gfx->getDefaultTexture(u.textureType, u.dataBaseType, u.isDepthSampler);
 			for (int i = 0; i < u.count; i++)
 			{
 				tex->retain();
@@ -678,8 +678,8 @@ Shader::Shader(StrongRef<ShaderStage> _stages[], const CompileOptions &options)
 		else if (u.baseType == UNIFORM_TEXELBUFFER || u.baseType == UNIFORM_STORAGEBUFFER)
 		{
 			auto buffer = u.baseType == UNIFORM_TEXELBUFFER
-				? graphics->getDefaultTexelBuffer(u.dataBaseType)
-				: graphics->getDefaultStorageBuffer();
+				? gfx->getDefaultTexelBuffer(u.dataBaseType)
+				: gfx->getDefaultStorageBuffer();
 
 			for (int i = 0; i < u.count; i++)
 			{

@@ -49,12 +49,12 @@ namespace gfx
 namespace opengl
 {
 
-class graphics final : public love::gfx::graphics
+class Graphics final : public love::gfx::graphics
 {
 public:
 
-	graphics();
-	virtual ~graphics();
+	Graphics();
+	virtual ~Graphics();
 
 	love::gfx::Texture *newTexture(const Texture::Settings &settings, const Texture::Slices *data = nullptr) override;
 	love::gfx::Texture *newTextureView(love::gfx::Texture *base, const Texture::ViewSettings &viewsettings) override;

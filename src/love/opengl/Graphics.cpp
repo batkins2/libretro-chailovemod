@@ -50,7 +50,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 namespace opengl
 {
@@ -89,9 +89,9 @@ static GLenum getGLBlendFactor(BlendFactor factor)
 	return 0;
 }
 
-love::graphics::gfx *createInstance()
+love::gfx::graphics *createInstance()
 {
-	love::graphics::gfx *instance = nullptr;
+	love::gfx::graphics *instance = nullptr;
 
 	try
 	{
@@ -106,7 +106,7 @@ love::graphics::gfx *createInstance()
 }
 
 Graphics::Graphics()
-	: love::graphics::gfx("love.graphics.opengl")
+	: love::gfx::graphics("love.graphics.opengl")
 	, windowHasStencil(false)
 	, mainVAO(0)
 	, internalBackbufferFBO(0)
@@ -148,42 +148,42 @@ Graphics::~Graphics()
 	delete[] bufferMapMemory;
 }
 
-love::graphics::StreamBuffer *Graphics::newStreamBuffer(BufferUsage type, size_t size)
+love::gfx::StreamBuffer *Graphics::newStreamBuffer(BufferUsage type, size_t size)
 {
 	return newStreamBuffer(type, size);
 }
 
-love::graphics::Texture *Graphics::newTexture(const Texture::Settings &settings, const Texture::Slices *data)
+love::gfx::Texture *Graphics::newTexture(const Texture::Settings &settings, const Texture::Slices *data)
 {
 	return new Texture(this, settings, data);
 }
 
-love::graphics::Texture *Graphics::newTextureView(love::graphics::Texture *base, const Texture::ViewSettings &viewsettings)
+love::gfx::Texture *Graphics::newTextureView(love::gfx::Texture *base, const Texture::ViewSettings &viewsettings)
 {
 	return new Texture(this, base, viewsettings);
 }
 
-love::graphics::ShaderStage *Graphics::newShaderStageInternal(ShaderStageType stage, const std::string &cachekey, const std::string &source, bool gles)
+love::gfx::ShaderStage *Graphics::newShaderStageInternal(ShaderStageType stage, const std::string &cachekey, const std::string &source, bool gles)
 {
 	return new ShaderStage(this, stage, source, gles, cachekey);
 }
 
-love::graphics::Shader *Graphics::newShaderInternal(StrongRef<love::graphics::ShaderStage> stages[SHADERSTAGE_MAX_ENUM], const Shader::CompileOptions &options)
+love::gfx::Shader *Graphics::newShaderInternal(StrongRef<love::gfx::ShaderStage> stages[SHADERSTAGE_MAX_ENUM], const Shader::CompileOptions &options)
 {
 	return new Shader(stages, options);
 }
 
-love::graphics::Buffer *Graphics::newBuffer(const Buffer::Settings &settings, const std::vector<Buffer::DataDeclaration> &format, const void *data, size_t size, size_t arraylength)
+love::gfx::Buffer *Graphics::newBuffer(const Buffer::Settings &settings, const std::vector<Buffer::DataDeclaration> &format, const void *data, size_t size, size_t arraylength)
 {
 	return new Buffer(this, settings, format, data, size, arraylength);
 }
 
-love::graphics::GraphicsReadback *Graphics::newReadbackInternal(ReadbackMethod method, love::graphics::Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset)
+love::gfx::GraphicsReadback *Graphics::newReadbackInternal(ReadbackMethod method, love::gfx::Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset)
 {
 	return new GraphicsReadback(this, method, buffer, offset, size, dest, destoffset);
 }
 
-love::graphics::GraphicsReadback *Graphics::newReadbackInternal(ReadbackMethod method, love::graphics::Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty)
+love::gfx::GraphicsReadback *Graphics::newReadbackInternal(ReadbackMethod method, love::gfx::Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty)
 {
 	return new GraphicsReadback(this, method, texture, slice, mipmap, rect, dest, destx, desty);
 }
@@ -511,7 +511,7 @@ static bool computeDispatchBarriers(Shader *shader, GLbitfield &preDispatchBarri
 	return true;
 }
 
-bool Graphics::dispatch(love::graphics::Shader *s, int x, int y, int z)
+bool Graphics::dispatch(love::gfx::Shader *s, int x, int y, int z)
 {
 	auto shader = (Shader *) s;
 
@@ -540,7 +540,7 @@ bool Graphics::dispatch(love::graphics::Shader *s, int x, int y, int z)
 	return true;
 }
 
-bool Graphics::dispatch(love::graphics::Shader *s, love::graphics::Buffer *indirectargs, size_t argsoffset)
+bool Graphics::dispatch(love::gfx::Shader *s, love::gfx::Buffer *indirectargs, size_t argsoffset)
 {
 	auto shader = (Shader *) s;
 
@@ -640,7 +640,7 @@ static inline void advanceVertexOffsets(const VertexAttributes &attributes, Buff
 	}
 }
 
-void Graphics::drawQuads(int start, int count, const VertexAttributes &attributes, const BufferBindings &buffers, love::graphics::Texture *texture)
+void Graphics::drawQuads(int start, int count, const VertexAttributes &attributes, const BufferBindings &buffers, love::gfx::Texture *texture)
 {
 	const int MAX_VERTICES_PER_DRAW = LOVE_UINT16_MAX;
 	const int MAX_QUADS_PER_DRAW    = MAX_VERTICES_PER_DRAW / 4;
@@ -795,7 +795,7 @@ void Graphics::setRenderTargetsInternal(const RenderTargets &rts, int pixelw, in
 void Graphics::endPass(bool presenting)
 {
 	auto &rts = states.back().renderTargets;
-	love::graphics::Texture *depthstencil = rts.depthStencil.texture.get();
+	love::gfx::Texture *depthstencil = rts.depthStencil.texture.get();
 
 	// Discard the depth/stencil buffer if we're using an internal cached one,
 	// or if we're presenting the backbuffer to the display.
@@ -1058,7 +1058,7 @@ void Graphics::discard(OpenGL::FramebufferTarget target, const std::vector<bool>
 		glDiscardFramebufferEXT(gltarget, (GLint) attachments.size(), &attachments[0]);
 }
 
-void Graphics::cleanupRenderTexture(love::graphics::Texture *texture)
+void Graphics::cleanupRenderTexture(love::gfx::Texture *texture)
 {
 	if (!texture->isRenderTarget())
 		return;
@@ -1670,7 +1670,7 @@ uint32 Graphics::computePixelFormatUsage(PixelFormat format, bool readable)
 		// this is required on ES2 but I'm not positive.
 		if (isPixelFormatDepthStencil(format))
 		{
-			love::graphics::Texture *tex = getDefaultTexture(TEXTURE_2D, DATA_BASETYPE_FLOAT, false);
+			love::gfx::Texture *tex = getDefaultTexture(TEXTURE_2D, DATA_BASETYPE_FLOAT, false);
 			gl.framebufferTexture(GL_COLOR_ATTACHMENT0, TEXTURE_2D, (GLuint) tex->getHandle(), 0, 0, 0);
 		}
 

@@ -43,7 +43,7 @@ public:
 	Window();
 	~Window();
 
-	void setGraphics(graphics::gfx *graphics) override;
+	void setGraphics(gfx::graphics *graphics) override;
 
 	bool setWindow(int width = 800, int height = 600, WindowSettings *settings = nullptr) override;
 	void getWindow(int &width, int &height, WindowSettings &settings) override;
@@ -146,7 +146,7 @@ private:
 	void setGLContextAttributes(const ContextAttribs &attribs);
 	bool checkGLVersion(const ContextAttribs &attribs, std::string &outversion);
 	std::vector<ContextAttribs> getContextAttribsList() const;
-	bool createWindowAndContext(int x, int y, int w, int h, Uint32 windowflags, graphics::Renderer renderer);
+	bool createWindowAndContext(int x, int y, int w, int h, Uint32 windowflags, gfx::Renderer renderer);
 
 	// Update the saved window settings based on the window's actual state.
 	void updateSettings(const WindowSettings &newsettings, bool updateGraphicsViewport);
@@ -177,12 +177,12 @@ private:
 	SDL_MetalView metalView;
 #endif
 
-	graphics::Renderer windowRenderer = graphics::RENDERER_NONE;
+	gfx::Renderer windowRenderer = gfx::RENDERER_NONE;
 
 	bool displayedWindowError;
 	ContextAttribs contextAttribs;
 
-	StrongRef<graphics::gfx> graphics;
+	StrongRef<gfx::graphics> graphics;
 
 }; // Window
 

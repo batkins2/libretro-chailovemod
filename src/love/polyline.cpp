@@ -30,7 +30,7 @@ static const float LINES_PARALLEL_EPS = 0.05f;
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 void Polyline::render(const Vector2 *coords, size_t count, size_t size_hint, float halfwidth, float pixel_size, bool draw_overdraw)
@@ -397,7 +397,7 @@ Polyline::~Polyline()
 		delete[] vertices;
 }
 
-void Polyline::draw(love::graphics::graphics *gfx)
+void Polyline::draw(graphics *gfx)
 {
 	const Matrix4 &t = gfx->getTransform();
 	bool is2D = t.isAffine2DTransform();
@@ -422,13 +422,13 @@ void Polyline::draw(love::graphics::graphics *gfx)
 	{
 		const Vector2 *verts = vertices + vertex_start;
 
-		gfx::BatchedDrawCommand cmd;
+		graphics::BatchedDrawCommand cmd;
 		cmd.formats[0] = getSinglePositionFormat(is2D);
 		cmd.formats[1] = CommonFormat::STf_RGBAub;
 		cmd.indexMode = triangle_mode;
 		cmd.vertexCount = std::min(maxvertices, total_vertex_count - vertex_start);
 
-		gfx::BatchedVertexData data = gfx->requestBatchedDraw(cmd);
+		graphics::BatchedVertexData data = gfx->requestBatchedDraw(cmd);
 
 		if (is2D)
 			t.transformXY((Vector2 *) data.stream[0], verts, cmd.vertexCount);

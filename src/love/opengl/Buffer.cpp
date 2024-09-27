@@ -206,8 +206,8 @@ void *Buffer::map(MapType map, size_t offset, size_t size)
 	}
 	else
 	{
-		auto graphics = Module::getInstance<Graphics>(Module::M_GRAPHICS);
-		data = (char *) graphics->getBufferMapMemory(size);
+		auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+		data = (char *) gfx->getBufferMapMemory(size);
 	}
 
 	if (data != nullptr)
@@ -253,8 +253,8 @@ void Buffer::unmap(size_t usedoffset, size_t usedsize)
 
 	if (!ownsMemoryMap)
 	{
-		auto graphics = Module::getInstance<Graphics>(Module::M_GRAPHICS);
-		graphics->releaseBufferMapMemory(memoryMap);
+		auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+		gfx->releaseBufferMapMemory(memoryMap);
 		memoryMap = nullptr;
 	}
 }
@@ -316,7 +316,7 @@ void Buffer::clearInternal(size_t offset, size_t size)
 	}
 }
 
-void Buffer::copyTo(love::graphics::Buffer *dest, size_t sourceoffset, size_t destoffset, size_t size)
+void Buffer::copyTo(love::gfx::Buffer *dest, size_t sourceoffset, size_t destoffset, size_t size)
 {
 	// TODO: tracked state for these bind types?
 	glBindBuffer(GL_COPY_READ_BUFFER, buffer);

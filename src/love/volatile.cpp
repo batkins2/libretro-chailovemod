@@ -22,7 +22,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 // Static members.

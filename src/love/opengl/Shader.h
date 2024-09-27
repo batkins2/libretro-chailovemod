@@ -33,26 +33,26 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 namespace opengl
 {
 
 // A GLSL shader
-class Shader final : public love::graphics::Shader, public Volatile
+class Shader final : public love::gfx::Shader, public Volatile
 {
 public:
 
 	struct StorageTextureBinding
 	{
-		love::graphics::Texture *texture = nullptr;
+		love::gfx::Texture *texture = nullptr;
 		GLuint gltexture = 0;
 		TextureType type = TEXTURE_2D;
 		GLenum access = GL_READ_ONLY;
 		GLenum internalFormat;
 	};
 
-	Shader(StrongRef<love::graphics::ShaderStage> stages[SHADERSTAGE_MAX_ENUM], const CompileOptions &options);
+	Shader(StrongRef<love::gfx::ShaderStage> stages[SHADERSTAGE_MAX_ENUM], const CompileOptions &options);
 	virtual ~Shader();
 
 	// Implements Volatile
@@ -65,12 +65,12 @@ public:
 	int getVertexAttributeIndex(const std::string &name) override;
 	const UniformInfo *getUniformInfo(BuiltinUniform builtin) const override;
 	void updateUniform(const UniformInfo *info, int count) override;
-	void sendTextures(const UniformInfo *info, love::graphics::Texture **textures, int count) override;
-	void sendBuffers(const UniformInfo *info, love::graphics::Buffer **buffers, int count) override;
+	void sendTextures(const UniformInfo *info, love::gfx::Texture **textures, int count) override;
+	void sendBuffers(const UniformInfo *info, love::gfx::Buffer **buffers, int count) override;
 	ptrdiff_t getHandle() const override;
-	void setVideoTextures(love::graphics::Texture *ytexture, love::graphics::Texture *cbtexture, love::graphics::Texture *crtexture) override;
+	void setVideoTextures(love::gfx::Texture *ytexture, love::gfx::Texture *cbtexture, love::gfx::Texture *crtexture) override;
 
-	void updateBuiltinUniforms(love::graphics::graphics *gfx, int viewportW, int viewportH);
+	void updateBuiltinUniforms(graphics *gfx, int viewportW, int viewportH);
 
 	const std::vector<Buffer *> &getActiveWritableStorageBuffers() const { return activeWritableStorageBuffers; }
 	const std::vector<StorageTextureBinding> &getStorageTextureBindings() const { return storageTextureBindings; }
@@ -95,8 +95,8 @@ private:
 	void mapActiveUniforms();
 
 	void updateUniform(const UniformInfo *info, int count, bool internalupdate);
-	void sendTextures(const UniformInfo *info, love::graphics::Texture **textures, int count, bool internalupdate);
-	void sendBuffers(const UniformInfo *info, love::graphics::Buffer **buffers, int count, bool internalupdate);
+	void sendTextures(const UniformInfo *info, love::gfx::Texture **textures, int count, bool internalupdate);
+	void sendBuffers(const UniformInfo *info, love::gfx::Buffer **buffers, int count, bool internalupdate);
 
 	void flushBatchedDraws() const;
 

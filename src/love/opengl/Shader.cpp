@@ -33,13 +33,13 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 namespace opengl
 {
 
-Shader::Shader(StrongRef<love::graphics::ShaderStage> stages[SHADERSTAGE_MAX_ENUM], const CompileOptions &options)
-	: love::graphics::Shader(stages, options)
+Shader::Shader(StrongRef<love::gfx::ShaderStage> stages[SHADERSTAGE_MAX_ENUM], const CompileOptions &options)
+	: love::gfx::Shader(stages, options)
 	, program(0)
 	, builtinUniforms()
 	, builtinUniformInfo()
@@ -71,7 +71,7 @@ void Shader::mapActiveUniforms()
 
 	// Make sure all stored resources have their Volatiles loaded before
 	// the sendTextures/sendBuffers calls below, since they call getHandle().
-	for (love::graphics::Texture *tex : activeTextures)
+	for (love::gfx::Texture *tex : activeTextures)
 	{
 		if (tex == nullptr)
 			continue;
@@ -80,7 +80,7 @@ void Shader::mapActiveUniforms()
 			v->loadVolatile();
 	}
 
-	for (love::graphics::Buffer *buffer : activeBuffers)
+	for (love::gfx::Buffer *buffer : activeBuffers)
 	{
 		if (buffer == nullptr)
 			continue;
@@ -316,7 +316,7 @@ bool Shader::loadVolatile()
 	for (int i = 0; i < int(ATTRIB_MAX_ENUM); i++)
 	{
 		const char *name = nullptr;
-		if (graphics::getConstant((BuiltinVertexAttribute) i, name))
+		if (love::gfx::getConstant((BuiltinVertexAttribute) i, name))
 			glBindAttribLocation(program, i, (const GLchar *) name);
 	}
 
@@ -413,7 +413,7 @@ void Shader::attach()
 {
 	if (current != this)
 	{
-		Graphics::flushBatchedDrawsGlobal();
+		graphics::flushBatchedDrawsGlobal();
 
 		gl.useProgram(program);
 		current = this;
@@ -553,12 +553,12 @@ void Shader::updateUniform(const UniformInfo *info, int count, bool internalupda
 	}
 }
 
-void Shader::sendTextures(const UniformInfo *info, love::graphics::Texture **textures, int count)
+void Shader::sendTextures(const UniformInfo *info, love::gfx::Texture **textures, int count)
 {
 	Shader::sendTextures(info, textures, count, false);
 }
 
-void Shader::sendTextures(const UniformInfo *info, love::graphics::Texture **textures, int count, bool internalUpdate)
+void Shader::sendTextures(const UniformInfo *info, love::gfx::Texture **textures, int count, bool internalUpdate)
 {
 	bool issampler = info->baseType == UNIFORM_SAMPLER;
 	bool isstoragetex = info->baseType == UNIFORM_STORAGETEXTURE;
@@ -576,7 +576,7 @@ void Shader::sendTextures(const UniformInfo *info, love::graphics::Texture **tex
 	// Bind the textures to the texture units.
 	for (int i = 0; i < count; i++)
 	{
-		love::graphics::Texture *tex = textures[i];
+		love::gfx::Texture *tex = textures[i];
 		bool isdefault = tex == nullptr;
 
 		if (tex != nullptr)
@@ -586,7 +586,7 @@ void Shader::sendTextures(const UniformInfo *info, love::graphics::Texture **tex
 		}
 		else
 		{
-			auto graphics = Module::getInstance<love::graphics::gfx>(Module::M_GRAPHICS);
+			auto graphics = Module::getInstance<love::gfx::graphics>(Module::M_GRAPHICS);
 			tex = graphics->getDefaultTexture(info->textureType, info->dataBaseType, info->isDepthSampler);
 		}
 
@@ -635,12 +635,12 @@ void Shader::sendTextures(const UniformInfo *info, love::graphics::Texture **tex
 	}
 }
 
-void Shader::sendBuffers(const UniformInfo *info, love::graphics::Buffer **buffers, int count)
+void Shader::sendBuffers(const UniformInfo *info, love::gfx::Buffer **buffers, int count)
 {
 	Shader::sendBuffers(info, buffers, count, false);
 }
 
-void Shader::sendBuffers(const UniformInfo *info, love::graphics::Buffer **buffers, int count, bool internalUpdate)
+void Shader::sendBuffers(const UniformInfo *info, love::gfx::Buffer **buffers, int count, bool internalUpdate)
 {
 	bool texelbinding = info->baseType == UNIFORM_TEXELBUFFER;
 	bool storagebinding = info->baseType == UNIFORM_STORAGEBUFFER;
@@ -657,7 +657,7 @@ void Shader::sendBuffers(const UniformInfo *info, love::graphics::Buffer **buffe
 
 	for (int i = 0; i < count; i++)
 	{
-		love::graphics::Buffer *buffer = buffers[i];
+		love::gfx::Buffer *buffer = buffers[i];
 		bool isdefault = buffer == nullptr;
 
 		if (buffer != nullptr)
@@ -667,7 +667,7 @@ void Shader::sendBuffers(const UniformInfo *info, love::graphics::Buffer **buffe
 		}
 		else
 		{
-			auto graphics = Module::getInstance<love::graphics::gfx>(Module::M_GRAPHICS);
+			auto graphics = Module::getInstance<love::gfx::graphics>(Module::M_GRAPHICS);
 			if (texelbinding)
 				buffer = graphics->getDefaultTexelBuffer(info->dataBaseType);
 			else
@@ -716,7 +716,7 @@ void Shader::sendBuffers(const UniformInfo *info, love::graphics::Buffer **buffe
 void Shader::flushBatchedDraws() const
 {
 	if (current == this)
-		Graphics::flushBatchedDrawsGlobal();
+		graphics::flushBatchedDrawsGlobal();
 }
 
 ptrdiff_t Shader::getHandle() const
@@ -736,7 +736,7 @@ int Shader::getVertexAttributeIndex(const std::string &name)
 	return location;
 }
 
-void Shader::setVideoTextures(love::graphics::Texture *ytexture, love::graphics::Texture *cbtexture, love::graphics::Texture *crtexture)
+void Shader::setVideoTextures(love::gfx::Texture *ytexture, love::gfx::Texture *cbtexture, love::gfx::Texture *crtexture)
 {
 	const BuiltinUniform builtins[3] = {
 		BUILTIN_TEXTURE_VIDEO_Y,
@@ -744,7 +744,7 @@ void Shader::setVideoTextures(love::graphics::Texture *ytexture, love::graphics:
 		BUILTIN_TEXTURE_VIDEO_CR,
 	};
 
-	love::graphics::Texture *textures[3] = {ytexture, cbtexture, crtexture};
+	love::gfx::Texture *textures[3] = {ytexture, cbtexture, crtexture};
 
 	for (int i = 0; i < 3; i++)
 	{
@@ -755,7 +755,7 @@ void Shader::setVideoTextures(love::graphics::Texture *ytexture, love::graphics:
 	}
 }
 
-void Shader::updateBuiltinUniforms(love::graphics::graphics *gfx, int viewportW, int viewportH)
+void Shader::updateBuiltinUniforms(love::gfx::graphics *gfx, int viewportW, int viewportH)
 {
 	if (current != this)
 		return;

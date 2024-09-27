@@ -49,7 +49,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 namespace opengl
 {
@@ -449,7 +449,7 @@ void OpenGL::initMaxValues()
 		maxLODBias = 0.0f;
 }
 
-void OpenGL::prepareDraw(love::graphics::graphics *gfx)
+void OpenGL::prepareDraw(love::gfx::graphics *gfx)
 {
 	TempDebugGroup debuggroup("Prepare OpenGL draw");
 

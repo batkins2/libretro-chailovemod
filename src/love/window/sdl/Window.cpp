@@ -113,7 +113,7 @@ Window::~Window()
 	SDL_QuitSubSystem(SDL_INIT_VIDEO);
 }
 
-void Window::setGraphics(graphics::gfx *graphics)
+void Window::setGraphics(gfx::graphics *graphics)
 {
 	this->graphics.set(graphics);
 }
@@ -249,7 +249,7 @@ std::vector<Window::ContextAttribs> Window::getContextAttribsList() const
 		preferGLES = (gleshint != nullptr && gleshint[0] != '0');
 
 	// Do we want a debug context?
-	bool debug = love::graphics::isDebugEnabled();
+	bool debug = love::gfx::isDebugEnabled();
 
 	const char *preferGL3hint = SDL_GetHint("LOVE_GRAPHICS_USE_GL3");
 	bool preferGL3 = (preferGL3hint != nullptr && preferGL3hint[0] != '0');
@@ -288,7 +288,7 @@ std::vector<Window::ContextAttribs> Window::getContextAttribsList() const
 	return attribslist;
 }
 
-bool Window::createWindowAndContext(int x, int y, int w, int h, Uint32 windowflags, graphics::Renderer renderer)
+bool Window::createWindowAndContext(int x, int y, int w, int h, Uint32 windowflags, gfx::Renderer renderer)
 {
 	bool needsglcontext = (windowflags & SDL_WINDOW_OPENGL) != 0;
 #ifdef LOVE_GRAPHICS_METAL
@@ -348,7 +348,7 @@ bool Window::createWindowAndContext(int x, int y, int w, int h, Uint32 windowfla
 		SDL_SetWindowPosition(window, x, y);
 #endif
 
-		if (attribs != nullptr && renderer == love::graphics::Renderer::RENDERER_OPENGL)
+		if (attribs != nullptr && renderer == love::gfx::Renderer::RENDERER_OPENGL)
 		{
 #ifdef LOVE_MACOS
 			love::macos::setWindowSRGBColorSpace(window);
@@ -377,14 +377,14 @@ bool Window::createWindowAndContext(int x, int y, int w, int h, Uint32 windowfla
 		return true;
 	};
 
-	if (renderer == graphics::RENDERER_OPENGL)
+	if (renderer == gfx::RENDERER_OPENGL)
 	{
 		std::vector<ContextAttribs> attribslist = getContextAttribsList();
 
 		// Try each context profile in order.
 		for (ContextAttribs attribs : attribslist)
 		{
-			bool curSRGB = love::graphics::isGammaCorrect();
+			bool curSRGB = love::gfx::isGammaCorrect();
 
 			setGLFramebufferAttributes(curSRGB);
 			setGLContextAttributes(attribs);
@@ -407,13 +407,13 @@ bool Window::createWindowAndContext(int x, int y, int w, int h, Uint32 windowfla
 				// Store the successful context attributes so we can re-use them in
 				// subsequent calls to createWindowAndContext.
 				contextAttribs = attribs;
-				love::graphics::setGammaCorrect(curSRGB);
+				love::gfx::setGammaCorrect(curSRGB);
 				break;
 			}
 		}
 	}
 #ifdef LOVE_GRAPHICS_METAL
-	else if (renderer == graphics::RENDERER_METAL)
+	else if (renderer == gfx::RENDERER_METAL)
 	{
 		if (create(nullptr) && window != nullptr)
 			metalView = SDL_Metal_CreateView(window);
@@ -496,12 +496,12 @@ static SDL_DisplayID GetSDLDisplayIDForIndex(int displayindex)
 bool Window::setWindow(int width, int height, WindowSettings *settings)
 {
 	if (!graphics.get())
-		graphics.set(Module::getInstance<graphics::gfx>(Module::M_GRAPHICS));
+		graphics.set(Module::getInstance<gfx::graphics>(Module::M_GRAPHICS));
 
 	if (graphics.get() && graphics->isRenderTargetActive())
 		throw love::Exception("love.window.setMode cannot be called while a render target is active in love.graphics.");
 
-	auto renderer = graphics != nullptr ? graphics->getRenderer() : graphics::RENDERER_NONE;
+	auto renderer = graphics != nullptr ? graphics->getRenderer() : gfx::RENDERER_NONE;
 
 	if (isOpen())
 		updateSettings(this->settings, false);
@@ -632,11 +632,11 @@ bool Window::setWindow(int width, int height, WindowSettings *settings)
 	{
 #if SDL_VERSION_ATLEAST(3, 0, 0)
 		SDL_SetWindowFullscreenMode(window, fsmode);
-		if (SDL_SetWindowFullscreen(window, (sdlflags & SDL_WINDOW_FULLSCREEN) != 0) == 0 && renderer == graphics::RENDERER_OPENGL)
+		if (SDL_SetWindowFullscreen(window, (sdlflags & SDL_WINDOW_FULLSCREEN) != 0) == 0 && renderer == gfx::RENDERER_OPENGL)
 #else
 		if (f.fullscreen && f.fstype == FULLSCREEN_EXCLUSIVE)
 			SDL_SetWindowDisplayMode(window, &fsmode);
-		if (SDL_SetWindowFullscreen(window, sdlflags) == 0 && renderer == graphics::RENDERER_OPENGL)
+		if (SDL_SetWindowFullscreen(window, sdlflags) == 0 && renderer == gfx::RENDERER_OPENGL)
 #endif
 			SDL_GL_MakeCurrent(window, glcontext);
 
@@ -650,14 +650,14 @@ bool Window::setWindow(int width, int height, WindowSettings *settings)
 	}
 	else
 	{
-		if (renderer == graphics::RENDERER_OPENGL)
+		if (renderer == gfx::RENDERER_OPENGL)
 			sdlflags |= SDL_WINDOW_OPENGL;
 	#ifdef LOVE_GRAPHICS_METAL
 		if (renderer == graphics::RENDERER_METAL)
 			sdlflags |= SDL_WINDOW_METAL;
 	#endif
 
-		if (renderer == graphics::RENDERER_VULKAN)
+		if (renderer == gfx::RENDERER_VULKAN)
 			sdlflags |= SDL_WINDOW_VULKAN;
 
 		if (f.resizable)
@@ -722,10 +722,10 @@ bool Window::setWindow(int width, int height, WindowSettings *settings)
 		if (needsetmode)
 		{
 			void *context = nullptr;
-			if (renderer == graphics::RENDERER_OPENGL)
+			if (renderer == gfx::RENDERER_OPENGL)
 				context = (void *) glcontext;
 #ifdef LOVE_GRAPHICS_METAL
-			if (renderer == graphics::RENDERER_METAL && metalView)
+			if (renderer == gfx::RENDERER_METAL && metalView)
 				context = (void *) SDL_Metal_GetLayer(metalView);
 #endif
 
@@ -776,7 +776,7 @@ bool Window::onSizeChanged(int width, int height)
 		SDL_Metal_GetDrawableSize(window, &pixelWidth, &pixelHeight);
 #endif
 // #ifdef LOVE_GRAPHICS_VULKAN
-// 	else if (windowRenderer == graphics::RENDERER_VULKAN)
+// 	else if (windowRenderer == gfx::RENDERER_VULKAN)
 // 		SDL_Vulkan_GetDrawableSize(window, &pixelWidth, &pixelHeight);
 // #endif
 	else
@@ -1321,9 +1321,9 @@ void Window::setVSync(int vsync)
 	}
 
 // #ifdef LOVE_GRAPHICS_VULKAN
-// 	if (windowRenderer == love::graphics::RENDERER_VULKAN)
+// 	if (windowRenderer == love::gfx::RENDERER_VULKAN)
 // 	{
-// 		auto vgfx = dynamic_cast<love::graphics::vulkan::Graphics*>(graphics.get());
+// 		auto vgfx = dynamic_cast<love::gfx::vulkan::Graphics*>(graphics.get());
 // 		vgfx->setVsync(vsync);
 // 	}
 // #endif
@@ -1363,9 +1363,9 @@ int Window::getVSync() const
 #endif
 
 // #ifdef LOVE_GRAPHICS_VULKAN
-// 	if (windowRenderer == love::graphics::RENDERER_VULKAN)
+// 	if (windowRenderer == love::gfx::RENDERER_VULKAN)
 // 	{
-// 		auto vgfx = dynamic_cast<love::graphics::vulkan::Graphics*>(graphics.get());
+// 		auto vgfx = dynamic_cast<love::gfx::vulkan::Graphics*>(graphics.get());
 // 		return vgfx->getVsync();
 // 	}
 // #endif

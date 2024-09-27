@@ -30,7 +30,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 namespace opengl
 {
@@ -210,8 +210,8 @@ static GLenum newRenderbuffer(int width, int height, int &samples, PixelFormat p
 	return status;
 }
 
-Texture::Texture(love::graphics::graphics *gfx, const Settings &settings, const Slices *data)
-	: love::graphics::Texture(gfx, settings, data)
+Texture::Texture(love::gfx::graphics *gfx, const Settings &settings, const Slices *data)
+	: love::gfx::Texture(gfx, settings, data)
 	, slices(settings.type)
 	, fbo(0)
 	, texture(0)
@@ -236,8 +236,8 @@ Texture::Texture(love::graphics::graphics *gfx, const Settings &settings, const 
 	slices.clear();
 }
 
-Texture::Texture(love::graphics::graphics *gfx, love::graphics::Texture *base, const Texture::ViewSettings &viewsettings)
-	: love::graphics::Texture(gfx, base, viewsettings)
+Texture::Texture(love::gfx::graphics *gfx, love::gfx::Texture *base, const Texture::ViewSettings &viewsettings)
+	: love::gfx::Texture(gfx, base, viewsettings)
 	, slices(viewsettings.type.get(base->getTextureType()))
 	, fbo(0)
 	, texture(0)
@@ -451,7 +451,7 @@ void Texture::unloadVolatile()
 	{
 		// This is a bit ugly, but we need some way to destroy the cached FBO
 		// when this texture's GL object is destroyed.
-		auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
+		auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
 		if (gfx != nullptr)
 			gfx->cleanupRenderTexture(this);
 	}
@@ -559,7 +559,7 @@ void Texture::readbackInternal(int slice, int mipmap, const Rect &rect, int dest
 		glPixelStorei(GL_PACK_ROW_LENGTH, 0);
 }
 
-void Texture::copyFromBuffer(love::graphics::Buffer *source, size_t sourceoffset, int sourcewidth, size_t size, int slice, int mipmap, const Rect &rect)
+void Texture::copyFromBuffer(love::gfx::Buffer *source, size_t sourceoffset, int sourcewidth, size_t size, int slice, int mipmap, const Rect &rect)
 {
 	// Higher level code does validation.
 
@@ -578,7 +578,7 @@ void Texture::copyFromBuffer(love::graphics::Buffer *source, size_t sourceoffset
 	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 }
 
-void Texture::copyToBuffer(love::graphics::Buffer *dest, int slice, int mipmap, const Rect &rect, size_t destoffset, int destwidth, size_t size)
+void Texture::copyToBuffer(love::gfx::Buffer *dest, int slice, int mipmap, const Rect &rect, size_t destoffset, int destwidth, size_t size)
 {
 	// Higher level code does validation.
 

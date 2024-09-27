@@ -27,17 +27,17 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 namespace opengl
 {
 
-class GraphicsReadback final : public love::graphics::GraphicsReadback
+class GraphicsReadback final : public love::gfx::GraphicsReadback
 {
 public:
 
-	GraphicsReadback(love::graphics::graphics *gfx, ReadbackMethod method, love::graphics::Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset);
-	GraphicsReadback(love::graphics::graphics *gfx, ReadbackMethod method, love::graphics::Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty);
+	GraphicsReadback(love::gfx::graphics *gfx, ReadbackMethod method, love::gfx::Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset);
+	GraphicsReadback(love::gfx::graphics *gfx, ReadbackMethod method, love::gfx::Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty);
 	virtual ~GraphicsReadback();
 
 	void wait() override;
@@ -47,7 +47,7 @@ private:
 
 	FenceSync sync;
 
-	StrongRef<love::graphics::Buffer> stagingBuffer;
+	StrongRef<love::gfx::Buffer> stagingBuffer;
 
 }; // GraphicsReadback
 

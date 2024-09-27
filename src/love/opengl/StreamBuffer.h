@@ -24,12 +24,12 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 namespace opengl
 {
 
-love::graphics::StreamBuffer *CreateStreamBuffer(BufferUsage mode, size_t size);
+love::gfx::StreamBuffer *CreateStreamBuffer(BufferUsage mode, size_t size);
 
 } // opengl
 } // graphics

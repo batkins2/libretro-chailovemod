@@ -31,7 +31,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 namespace opengl
 {
@@ -40,12 +40,12 @@ namespace opengl
 // so we add an extra frame to reduce the (small) chance of stalls.
 static const int BUFFER_FRAMES = 4;
 
-class StreamBufferClientMemory final : public love::graphics::StreamBuffer
+class StreamBufferClientMemory final : public love::gfx::StreamBuffer
 {
 public:
 
 	StreamBufferClientMemory(BufferUsage mode, size_t size)
-		: love::graphics::StreamBuffer(mode, size)
+		: love::gfx::StreamBuffer(mode, size)
 		, data(nullptr)
 	{
 		try
@@ -87,12 +87,12 @@ private:
 
 }; // StreamBufferClientMemory
 
-class StreamBufferSubDataOrphan final : public love::graphics::StreamBuffer, public Volatile
+class StreamBufferSubDataOrphan final : public love::gfx::StreamBuffer, public Volatile
 {
 public:
 
 	StreamBufferSubDataOrphan(BufferUsage mode, size_t size)
-		: love::graphics::StreamBuffer(mode, size)
+		: love::gfx::StreamBuffer(mode, size)
 		, vbo(0)
 		, glMode(OpenGL::getGLBufferType(mode))
 		, data(nullptr)
@@ -190,12 +190,12 @@ protected:
 
 }; // StreamBufferSubDataOrphan
 
-class StreamBufferSync : public love::graphics::StreamBuffer
+class StreamBufferSync : public love::gfx::StreamBuffer
 {
 public:
 
 	StreamBufferSync(BufferUsage type, size_t size)
-		: love::graphics::StreamBuffer(type, size)
+		: love::gfx::StreamBuffer(type, size)
 		, frameIndex(0)
 		, syncs()
 	{}
@@ -506,7 +506,7 @@ private:
 
 }; // StreamBufferPinnedMemory
 
-love::graphics::StreamBuffer *CreateStreamBuffer(BufferUsage mode, size_t size)
+love::gfx::StreamBuffer *CreateStreamBuffer(BufferUsage mode, size_t size)
 {
 	if (gl.isCoreProfile())
 	{

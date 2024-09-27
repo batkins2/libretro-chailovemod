@@ -35,7 +35,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 love::Type SpriteBatch::type("SpriteBatch", &Drawable::type);
@@ -243,7 +243,7 @@ void SpriteBatch::setBufferSize(int newsize)
 	if (new_vertex_data == nullptr)
 		throw love::Exception("Out of memory.");
 
-	auto gfx = Module::getInstance<graphics::gfx>(Module::M_GRAPHICS);
+	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
 	Buffer::Settings settings(array_buf->getUsageFlags(), array_buf->getDataUsage());
 	auto decl = Buffer::getCommonFormatDeclaration(vertex_format);
 
@@ -387,7 +387,7 @@ void SpriteBatch::draw(graphics *gfx, const Matrix4 &m)
 		}
 	}
 
-	gfx::TempTransform transform(gfx, m);
+	graphics::TempTransform transform(gfx, m);
 
 	int start = std::min(std::max(0, range_start), next - 1);
 

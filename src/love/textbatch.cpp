@@ -25,7 +25,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 love::Type TextBatch::type("TextBatch", &Drawable::type);
@@ -61,11 +61,11 @@ void TextBatch::uploadVertices(const std::vector<FontMod::GlyphVertex> &vertices
 		if (vertexBuffer != nullptr)
 			newsize = std::max(size_t(vertexBuffer->getSize() * 1.5), newsize);
 
-		auto graphics = Module::getInstance<gfx>(Module::M_GRAPHICS);
+		auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
 
 		Buffer::Settings settings(BUFFERUSAGEFLAG_VERTEX, BUFFERDATAUSAGE_DYNAMIC);
 		auto decl = Buffer::getCommonFormatDeclaration(FontMod::vertexFormat);
-		Buffer *newbuffer = graphics->newBuffer(settings, decl, nullptr, newsize, 0);
+		Buffer *newbuffer = gfx->newBuffer(settings, decl, nullptr, newsize, 0);
 
 		void *newdata = nullptr;
 		if (vertexData != nullptr)
@@ -287,7 +287,7 @@ void TextBatch::draw(graphics *gfx, const Matrix4 &m)
 		modifiedVertices.invalidate();
 	}
 
-	gfx::TempTransform transform(gfx, m);
+	graphics::TempTransform transform(gfx, m);
 
 	for (const FontMod::DrawCommand &cmd : drawCommands)
 	{

@@ -27,7 +27,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 ShaderStage::ShaderStage(graphics */*gfx*/, ShaderStageType stage, const std::string &glsl, bool gles, const std::string &cachekey)
@@ -78,9 +78,9 @@ ShaderStage::~ShaderStage()
 {
 	if (!cacheKey.empty())
 	{
-		auto graphics = Module::getInstance<gfx>(Module::M_GRAPHICS);
-		if (graphics != nullptr)
-			graphics->cleanupCachedShaderStage(stageType, cacheKey);
+		auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+		if (gfx != nullptr)
+			gfx->cleanupCachedShaderStage(stageType, cacheKey);
 	}
 
 	delete glslangValidationShader;

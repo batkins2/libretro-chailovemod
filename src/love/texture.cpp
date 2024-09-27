@@ -30,7 +30,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 uint64 SamplerState::toKey() const
@@ -399,7 +399,7 @@ Texture::Texture(graphics *gfx, Texture *base, const ViewSettings &viewsettings)
 	}
 
 	const auto &caps = gfx->getCapabilities();
-	if (!caps.features[gfx::FEATURE_GLSL4])
+	if (!caps.features[graphics::FEATURE_GLSL4])
 		throw love::Exception("Texture views are not supported on this system (GLSL 4 support is necessary.)");
 
 	validatePixelFormat(gfx);
@@ -513,14 +513,14 @@ void Texture::draw(graphics *gfx, Quad *q, const Matrix4 &localTransform)
 	const Matrix4 &tm = gfx->getTransform();
 	bool is2D = tm.isAffine2DTransform();
 
-	gfx::BatchedDrawCommand cmd;
+	graphics::BatchedDrawCommand cmd;
 	cmd.formats[0] = getSinglePositionFormat(is2D);
 	cmd.formats[1] = CommonFormat::STf_RGBAub;
 	cmd.indexMode = TRIANGLEINDEX_QUADS;
 	cmd.vertexCount = 4;
 	cmd.texture = this;
 
-	gfx::BatchedVertexData data = gfx->requestBatchedDraw(cmd);
+	graphics::BatchedVertexData data = gfx->requestBatchedDraw(cmd);
 
 	Matrix4 t(tm, localTransform);
 
@@ -568,7 +568,7 @@ void Texture::drawLayer(graphics *gfx, int layer, Quad *q, const Matrix4 &m)
 
 	Matrix4 t(tm, m);
 
-	gfx::BatchedDrawCommand cmd;
+	graphics::BatchedDrawCommand cmd;
 	cmd.formats[0] = getSinglePositionFormat(is2D);
 	cmd.formats[1] = CommonFormat::STPf_RGBAub;
 	cmd.indexMode = TRIANGLEINDEX_QUADS;
@@ -576,7 +576,7 @@ void Texture::drawLayer(graphics *gfx, int layer, Quad *q, const Matrix4 &m)
 	cmd.texture = this;
 	cmd.standardShaderType = Shader::STANDARD_ARRAY;
 
-	gfx::BatchedVertexData data = gfx->requestBatchedDraw(cmd);
+	graphics::BatchedVertexData data = gfx->requestBatchedDraw(cmd);
 
 	if (is2D)
 		t.transformXY((Vector2 *) data.stream[0], q->getVertexPositions(), 4);
@@ -612,8 +612,8 @@ void Texture::replacePixels(love::image::ImageDataBase *d, int slice, int mipmap
 	if (isPixelFormatDepthStencil(format))
 		throw love::Exception("replacePixels cannot be called on depth or stencil Textures.");
 
-	auto graphics = Module::getInstance<gfx>(Module::M_GRAPHICS);
-	if (graphics != nullptr && graphics->isRenderTargetActive(this))
+	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+	if (gfx != nullptr && gfx->isRenderTargetActive(this))
 		throw love::Exception("replacePixels cannot be called on this Texture while it's an active render target.");
 
 	// No effect if the texture hasn't been created yet.
@@ -659,7 +659,7 @@ void Texture::replacePixels(love::image::ImageDataBase *d, int slice, int mipmap
 		}
 	}
 
-	gfx::flushBatchedDrawsGlobal();
+	graphics::flushBatchedDrawsGlobal();
 
 	uploadImageData(d, mipmap, slice, x, y);
 
@@ -672,11 +672,11 @@ void Texture::replacePixels(const void *data, size_t size, int slice, int mipmap
 	if (!isReadable() || getMSAA() > 1)
 		return;
 
-	auto graphics = Module::getInstance<gfx>(Module::M_GRAPHICS);
-	if (graphics != nullptr && graphics->isRenderTargetActive(this))
+	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+	if (gfx != nullptr && gfx->isRenderTargetActive(this))
 		return;
 
-	gfx::flushBatchedDrawsGlobal();
+	graphics::flushBatchedDrawsGlobal();
 
 	uploadByteData(data, size, mipmap, slice, rect);
 
@@ -712,8 +712,8 @@ bool Texture::supportsGenerateMipmaps(const char *&outReason) const
 
 	// This should be linear | rt because that's what metal needs, but the above
 	// code handles textures can't be used as RTs in metal.
-	auto graphics = Module::getInstance<gfx>(Module::M_GRAPHICS);
-	if (graphics != nullptr && !graphics->isPixelFormatSupported(format, PIXELFORMATUSAGEFLAGS_LINEAR))
+	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+	if (gfx != nullptr && !gfx->isPixelFormatSupported(format, PIXELFORMATUSAGEFLAGS_LINEAR))
 	{
 		outReason = "generateMipmaps cannot be called on textures with formats that don't support linear filtering on this system.";
 		return false;
@@ -728,8 +728,8 @@ void Texture::generateMipmaps()
 	if (!supportsGenerateMipmaps(err))
 		throw love::Exception("%s", err);
 
-	auto graphics = Module::getInstance<gfx>(Module::M_GRAPHICS);
-	if (graphics != nullptr && graphics->isRenderTargetActive(this))
+	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+	if (gfx != nullptr && gfx->isRenderTargetActive(this))
 		throw love::Exception("generateMipmaps cannot be called on this Texture while it's an active render target.");
 
 	generateMipmapsInternal();
@@ -829,8 +829,8 @@ SamplerState Texture::validateSamplerState(SamplerState s) const
 
 	if (s.minFilter == SamplerState::FILTER_LINEAR || s.magFilter == SamplerState::FILTER_LINEAR || s.mipmapFilter == SamplerState::MIPMAP_FILTER_LINEAR)
 	{
-		auto graphics = Module::getInstance<gfx>(Module::M_GRAPHICS);
-		if (!graphics->isPixelFormatSupported(format, PIXELFORMATUSAGEFLAGS_LINEAR))
+		auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+		if (!gfx->isPixelFormatSupported(format, PIXELFORMATUSAGEFLAGS_LINEAR))
 		{
 			s.minFilter = s.magFilter = SamplerState::FILTER_NEAREST;
 			if (s.mipmapFilter == SamplerState::MIPMAP_FILTER_LINEAR)
@@ -838,7 +838,7 @@ SamplerState Texture::validateSamplerState(SamplerState s) const
 		}
 	}
 
-	gfx::flushBatchedDrawsGlobal();
+	graphics::flushBatchedDrawsGlobal();
 
 	return s;
 }
@@ -862,16 +862,16 @@ bool Texture::validateDimensions(bool throwException) const
 {
 	bool success = true;
 
-	auto graphics = Module::getInstance<gfx>(Module::M_GRAPHICS);
-	if (graphics == nullptr)
+	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+	if (gfx == nullptr)
 		return false;
 
-	const gfx::Capabilities &caps = graphics->getCapabilities();
+	const graphics::Capabilities &caps = gfx->getCapabilities();
 
-	int max2Dsize   = (int) caps.limits[gfx::LIMIT_TEXTURE_SIZE];
-	int max3Dsize   = (int) caps.limits[gfx::LIMIT_VOLUME_TEXTURE_SIZE];
-	int maxcubesize = (int) caps.limits[gfx::LIMIT_CUBE_TEXTURE_SIZE];
-	int maxlayers   = (int) caps.limits[gfx::LIMIT_TEXTURE_LAYERS];
+	int max2Dsize   = (int) caps.limits[graphics::LIMIT_TEXTURE_SIZE];
+	int max3Dsize   = (int) caps.limits[graphics::LIMIT_VOLUME_TEXTURE_SIZE];
+	int maxcubesize = (int) caps.limits[graphics::LIMIT_CUBE_TEXTURE_SIZE];
+	int maxlayers   = (int) caps.limits[graphics::LIMIT_TEXTURE_LAYERS];
 
 	int largestdim = 0;
 	const char *largestname = nullptr;
