@@ -23,7 +23,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 static_assert(sizeof(VertexAttributeInfo) == 4, "Unexpected sizeof(VertexAttributeInfo)");
