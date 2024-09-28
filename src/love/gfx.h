@@ -452,8 +452,8 @@ public:
 	virtual Texture *newTextureView(Texture *base, const Texture::ViewSettings &viewsettings) = 0;
 
 	Quad *newQuad(Quad::Viewport v, double sw, double sh);
-	FontMod *newFont(love::font::Rasterizer *data);
-	FontMod *newDefaultFont(int size, const font::TrueTypeRasterizer::Settings &settings);
+	FontMod *newFont(love::fontmod::Rasterizer *data);
+	FontMod *newDefaultFont(int size, const fontmod::TrueTypeRasterizer::Settings &settings);
 	Video *newVideo(love::video::VideoStream *stream, float dpiscale);
 
 	SpriteBatch *newSpriteBatch(Texture *texture, int size, BufferDataUsage usage);
@@ -469,7 +469,7 @@ public:
 	Mesh *newMesh(const std::vector<Buffer::DataDeclaration> &vertexformat, const void *data, size_t datasize, PrimitiveType drawmode, BufferDataUsage usage);
 	Mesh *newMesh(const std::vector<Mesh::BufferAttribute> &attributes, PrimitiveType drawmode);
 
-	TextBatch *newTextBatch(FontMod *font, const std::vector<love::font::ColoredString> &text = {});
+	TextBatch *newTextBatch(FontMod *font, const std::vector<love::fontmod::ColoredString> &text = {});
 
 	datamod::ByteData *readbackBuffer(Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset);
 	GraphicsReadback *readbackBufferAsync(Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset);
@@ -726,14 +726,14 @@ public:
 	/**
 	 * Draws text at the specified coordinates
 	 **/
-	void print(const std::vector<love::font::ColoredString> &str, const Matrix4 &m);
-	void print(const std::vector<love::font::ColoredString> &str, FontMod *font, const Matrix4 &m);
+	void print(const std::vector<love::fontmod::ColoredString> &str, const Matrix4 &m);
+	void print(const std::vector<love::fontmod::ColoredString> &str, FontMod *font, const Matrix4 &m);
 
 	/**
 	 * Draws formatted text on screen at the specified coordinates.
 	 **/
-	void printf(const std::vector<love::font::ColoredString> &str, float wrap, FontMod::AlignMode align, const Matrix4 &m);
-	void printf(const std::vector<love::font::ColoredString> &str, FontMod *font, float wrap, FontMod::AlignMode align, const Matrix4 &m);
+	void printf(const std::vector<love::fontmod::ColoredString> &str, float wrap, FontMod::AlignMode align, const Matrix4 &m);
+	void printf(const std::vector<love::fontmod::ColoredString> &str, FontMod *font, float wrap, FontMod::AlignMode align, const Matrix4 &m);
 
 	/**
 	 * Draws a series of points at the specified positions.

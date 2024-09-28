@@ -28,7 +28,7 @@
 
 namespace love
 {
-namespace font
+namespace fontmod
 {
 
 // Default TrueType font, gzip-compressed.

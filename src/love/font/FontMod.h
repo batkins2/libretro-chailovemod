@@ -35,7 +35,7 @@
 
 namespace love
 {
-namespace font
+namespace fontmod
 {
 
 class FontMod : public Module

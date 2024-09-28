@@ -297,18 +297,18 @@ Quad *graphics::newQuad(Quad::Viewport v, double sw, double sh)
 	return new Quad(v, sw, sh);
 }
 
-FontMod *graphics::newFont(love::font::Rasterizer *data)
+FontMod *graphics::newFont(love::fontmod::Rasterizer *data)
 {
 	return new FontMod(data, states.back().defaultSamplerState);
 }
 
-FontMod *graphics::newDefaultFont(int size, const font::TrueTypeRasterizer::Settings &settings)
+FontMod *graphics::newDefaultFont(int size, const fontmod::TrueTypeRasterizer::Settings &settings)
 {
-	auto fontmodule = Module::getInstance<font::FontMod>(M_FONT);
+	auto fontmodule = Module::getInstance<fontmod::FontMod>(M_FONT);
 	if (!fontmodule)
 		throw love::Exception("Font module has not been loaded.");
 
-	StrongRef<font::Rasterizer> r(fontmodule->newTrueTypeRasterizer(size, settings), Acquire::NORETAIN);
+	StrongRef<fontmod::Rasterizer> r(fontmodule->newTrueTypeRasterizer(size, settings), Acquire::NORETAIN);
 	return newFont(r.get());
 }
 
@@ -447,7 +447,7 @@ Mesh *graphics::newMesh(const std::vector<Mesh::BufferAttribute> &attributes, Pr
 	return new Mesh(attributes, drawmode);
 }
 
-love::gfx::TextBatch *graphics::newTextBatch(gfx::FontMod *font, const std::vector<love::font::ColoredString> &text)
+love::gfx::TextBatch *graphics::newTextBatch(gfx::FontMod *font, const std::vector<love::fontmod::ColoredString> &text)
 {
 	return new TextBatch(font, text);
 }
@@ -943,7 +943,7 @@ void graphics::checkSetDefaultFont()
 	// Create a new default font if we don't have one yet.
 	if (!defaultFont.get())
 	{
-		font::TrueTypeRasterizer::Settings settings;
+		fontmod::TrueTypeRasterizer::Settings settings;
 		defaultFont.set(newDefaultFont(13, settings), Acquire::NORETAIN);
 	}
 
@@ -2262,7 +2262,7 @@ void graphics::drawFromShaderIndirect(Buffer *indexbuffer, Buffer *indirectargs,
 	draw(cmd);
 }
 
-void graphics::print(const std::vector<love::font::ColoredString> &str, const Matrix4 &m)
+void graphics::print(const std::vector<love::fontmod::ColoredString> &str, const Matrix4 &m)
 {
 	checkSetDefaultFont();
 
@@ -2270,12 +2270,12 @@ void graphics::print(const std::vector<love::font::ColoredString> &str, const Ma
 		print(str, states.back().font.get(), m);
 }
 
-void graphics::print(const std::vector<love::font::ColoredString> &str, FontMod *font, const Matrix4 &m)
+void graphics::print(const std::vector<love::fontmod::ColoredString> &str, FontMod *font, const Matrix4 &m)
 {
 	font->print(this, str, m, states.back().color);
 }
 
-void graphics::printf(const std::vector<love::font::ColoredString> &str, float wrap, FontMod::AlignMode align, const Matrix4 &m)
+void graphics::printf(const std::vector<love::fontmod::ColoredString> &str, float wrap, FontMod::AlignMode align, const Matrix4 &m)
 {
 	checkSetDefaultFont();
 
@@ -2283,7 +2283,7 @@ void graphics::printf(const std::vector<love::font::ColoredString> &str, float w
 		printf(str, states.back().font.get(), wrap, align, m);
 }
 
-void graphics::printf(const std::vector<love::font::ColoredString> &str, FontMod *font, float wrap, FontMod::AlignMode align, const Matrix4 &m)
+void graphics::printf(const std::vector<love::fontmod::ColoredString> &str, FontMod *font, float wrap, FontMod::AlignMode align, const Matrix4 &m)
 {
 	font->printf(this, str, wrap, align, m, states.back().color);
 }

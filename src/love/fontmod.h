@@ -73,21 +73,21 @@ public:
 		int vertexcount;
 	};
 
-	FontMod(love::font::Rasterizer *r, const SamplerState &samplerState);
+	FontMod(love::fontmod::Rasterizer *r, const SamplerState &samplerState);
 
 	virtual ~FontMod();
 
-	std::vector<DrawCommand> generateVertices(const love::font::ColoredCodepoints &codepoints, Range range, const Colorf &constantColor, std::vector<GlyphVertex> &vertices,
-	                                          float extra_spacing = 0.0f, Vector2 offset = {}, love::font::TextShaper::TextInfo *info = nullptr);
+	std::vector<DrawCommand> generateVertices(const love::fontmod::ColoredCodepoints &codepoints, Range range, const Colorf &constantColor, std::vector<GlyphVertex> &vertices,
+	                                          float extra_spacing = 0.0f, Vector2 offset = {}, love::fontmod::TextShaper::TextInfo *info = nullptr);
 
-	std::vector<DrawCommand> generateVerticesFormatted(const love::font::ColoredCodepoints &text, const Colorf &constantColor, float wrap, AlignMode align,
-	                                                   std::vector<GlyphVertex> &vertices, love::font::TextShaper::TextInfo *info = nullptr);
+	std::vector<DrawCommand> generateVerticesFormatted(const love::fontmod::ColoredCodepoints &text, const Colorf &constantColor, float wrap, AlignMode align,
+	                                                   std::vector<GlyphVertex> &vertices, love::fontmod::TextShaper::TextInfo *info = nullptr);
 
 	/**
 	 * Draws the specified text.
 	 **/
-	void print(graphics *gfx, const std::vector<love::font::ColoredString> &text, const Matrix4 &m, const Colorf &constantColor);
-	void printf(graphics *gfx, const std::vector<love::font::ColoredString> &text, float wrap, AlignMode align, const Matrix4 &m, const Colorf &constantColor);
+	void print(graphics *gfx, const std::vector<love::fontmod::ColoredString> &text, const Matrix4 &m, const Colorf &constantColor);
+	void printf(graphics *gfx, const std::vector<love::fontmod::ColoredString> &text, float wrap, AlignMode align, const Matrix4 &m, const Colorf &constantColor);
 
 	/**
 	 * Returns the height of the font.
@@ -115,8 +115,8 @@ public:
 	 * @param max_width Optional output of the maximum width
 	 * Returns a vector with the lines.
 	 **/
-	void getWrap(const std::vector<love::font::ColoredString> &text, float wraplimit, std::vector<std::string> &lines, std::vector<float> *line_widths = nullptr);
-	void getWrap(const love::font::ColoredCodepoints &codepoints, float wraplimit, std::vector<Range> &ranges, std::vector<float> *line_widths = nullptr);
+	void getWrap(const std::vector<love::fontmod::ColoredString> &text, float wraplimit, std::vector<std::string> &lines, std::vector<float> *line_widths = nullptr);
+	void getWrap(const love::fontmod::ColoredCodepoints &codepoints, float wraplimit, std::vector<Range> &ranges, std::vector<float> *line_widths = nullptr);
 
 	/**
 	 * Sets the line height (which should be a number to multiply the font size by,
@@ -177,12 +177,12 @@ private:
 	void createTexture();
 
 	TextureSize getNextTextureSize() const;
-	love::font::GlyphData *getRasterizerGlyphData(love::font::TextShaper::GlyphIndex glyphindex, float &dpiscale);
-	const Glyph &addGlyph(love::font::TextShaper::GlyphIndex glyphindex);
-	const Glyph &findGlyph(love::font::TextShaper::GlyphIndex glyphindex);
+	love::fontmod::GlyphData *getRasterizerGlyphData(love::fontmod::TextShaper::GlyphIndex glyphindex, float &dpiscale);
+	const Glyph &addGlyph(love::fontmod::TextShaper::GlyphIndex glyphindex);
+	const Glyph &findGlyph(love::fontmod::TextShaper::GlyphIndex glyphindex);
 	void printv(graphics *gfx, const Matrix4 &t, const std::vector<DrawCommand> &drawcommands, const std::vector<GlyphVertex> &vertices);
 
-	StrongRef<love::font::TextShaper> shaper;
+	StrongRef<love::fontmod::TextShaper> shaper;
 
 	int textureWidth;
 	int textureHeight;
@@ -211,7 +211,7 @@ private:
 
 	static StringMap<AlignMode, ALIGN_MAX_ENUM>::Entry alignModeEntries[];
 	static StringMap<AlignMode, ALIGN_MAX_ENUM> alignModes;
-	
+
 }; // Font
 
 } // graphics

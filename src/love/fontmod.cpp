@@ -40,12 +40,12 @@ static inline uint16 normToUint16(double n)
 	return (uint16) (n * LOVE_UINT16_MAX);
 }
 
-static inline uint64 packGlyphIndex(love::font::TextShaper::GlyphIndex glyphindex)
+static inline uint64 packGlyphIndex(love::fontmod::TextShaper::GlyphIndex glyphindex)
 {
 	return ((uint64)glyphindex.rasterizerIndex << 32) | (uint64)glyphindex.index;
 }
 
-static inline love::font::TextShaper::GlyphIndex unpackGlyphIndex(uint64 packedindex)
+static inline love::fontmod::TextShaper::GlyphIndex unpackGlyphIndex(uint64 packedindex)
 {
 	return {(int) (packedindex & 0xFFFFFFFF), (int) (packedindex >> 32)};
 }
@@ -55,7 +55,7 @@ int FontMod::fontCount = 0;
 
 const CommonFormat FontMod::vertexFormat = CommonFormat::XYf_STus_RGBAub;
 
-FontMod::FontMod(love::font::Rasterizer *r, const SamplerState &s)
+FontMod::FontMod(love::fontmod::Rasterizer *r, const SamplerState &s)
 	: shaper(r->newTextShaper(), Acquire::NORETAIN)
 	, textureWidth(128)
 	, textureHeight(128)
@@ -84,7 +84,7 @@ FontMod::FontMod(love::font::Rasterizer *r, const SamplerState &s)
 		textureHeight = nextsize.height;
 	}
 
-	love::font::GlyphData *gd = r->getGlyphData(32); // Space character.
+	love::fontmod::GlyphData *gd = r->getGlyphData(32); // Space character.
 	pixelFormat = gd->getFormat();
 	gd->release();
 
@@ -173,7 +173,7 @@ void FontMod::createTexture()
 		// and transparent black otherwise.
 		std::vector<uint8> emptydata(datasize, 0);
 
-		if (shaper->getRasterizers()[0]->getDataType() == font::Rasterizer::DATA_TRUETYPE)
+		if (shaper->getRasterizers()[0]->getDataType() == fontmod::Rasterizer::DATA_TRUETYPE)
 		{
 			if (pixelFormat == PIXELFORMAT_LA8_UNORM)
 			{
@@ -207,13 +207,13 @@ void FontMod::createTexture()
 	{
 		textureCacheID++;
 
-		std::vector<love::font::TextShaper::GlyphIndex> glyphstoadd;
+		std::vector<love::fontmod::TextShaper::GlyphIndex> glyphstoadd;
 
 		for (const auto &glyphpair : glyphs)
 			glyphstoadd.push_back(unpackGlyphIndex(glyphpair.first));
 
 		glyphs.clear();
-		
+
 		for (auto glyphindex : glyphstoadd)
 			addGlyph(glyphindex);
 	}
@@ -225,17 +225,17 @@ void FontMod::unloadVolatile()
 	textures.clear();
 }
 
-love::font::GlyphData *FontMod::getRasterizerGlyphData(love::font::TextShaper::GlyphIndex glyphindex, float &dpiscale)
+love::fontmod::GlyphData *FontMod::getRasterizerGlyphData(love::fontmod::TextShaper::GlyphIndex glyphindex, float &dpiscale)
 {
 	const auto &r = shaper->getRasterizers()[glyphindex.rasterizerIndex];
 	dpiscale = r->getDPIScale();
 	return r->getGlyphDataForIndex(glyphindex.index);
 }
 
-const FontMod::Glyph &FontMod::addGlyph(love::font::TextShaper::GlyphIndex glyphindex)
+const FontMod::Glyph &FontMod::addGlyph(love::fontmod::TextShaper::GlyphIndex glyphindex)
 {
 	float glyphdpiscale = getDPIScale();
-	StrongRef<love::font::GlyphData> gd(getRasterizerGlyphData(glyphindex, glyphdpiscale), Acquire::NORETAIN);
+	StrongRef<love::fontmod::GlyphData> gd(getRasterizerGlyphData(glyphindex, glyphdpiscale), Acquire::NORETAIN);
 
 	int w = gd->getWidth();
 	int h = gd->getHeight();
@@ -340,7 +340,7 @@ const FontMod::Glyph &FontMod::addGlyph(love::font::TextShaper::GlyphIndex glyph
 	return glyphs[packedindex];
 }
 
-const FontMod::Glyph &FontMod::findGlyph(love::font::TextShaper::GlyphIndex glyphindex)
+const FontMod::Glyph &FontMod::findGlyph(love::fontmod::TextShaper::GlyphIndex glyphindex)
 {
 	uint64 packedindex = packGlyphIndex(glyphindex);
 	const auto it = glyphs.find(packedindex);
@@ -366,10 +366,10 @@ float FontMod::getHeight() const
 	return shaper->getHeight();
 }
 
-std::vector<FontMod::DrawCommand> FontMod::generateVertices(const love::font::ColoredCodepoints &codepoints, Range range, const Colorf &constantcolor, std::vector<GlyphVertex> &vertices, float extra_spacing, Vector2 offset, love::font::TextShaper::TextInfo *info)
+std::vector<FontMod::DrawCommand> FontMod::generateVertices(const love::fontmod::ColoredCodepoints &codepoints, Range range, const Colorf &constantcolor, std::vector<GlyphVertex> &vertices, float extra_spacing, Vector2 offset, love::fontmod::TextShaper::TextInfo *info)
 {
-	std::vector<love::font::TextShaper::GlyphPosition> glyphpositions;
-	std::vector<love::font::IndexedColor> colors;
+	std::vector<love::fontmod::TextShaper::GlyphPosition> glyphpositions;
+	std::vector<love::fontmod::IndexedColor> colors;
 	shaper->computeGlyphPositions(codepoints, range, offset, extra_spacing, &glyphpositions, &colors, info);
 
 	size_t vertstartsize = vertices.size();
@@ -460,7 +460,7 @@ std::vector<FontMod::DrawCommand> FontMod::generateVertices(const love::font::Co
 	return commands;
 }
 
-std::vector<FontMod::DrawCommand> FontMod::generateVerticesFormatted(const love::font::ColoredCodepoints &text, const Colorf &constantcolor, float wrap, AlignMode align, std::vector<GlyphVertex> &vertices, love::font::TextShaper::TextInfo *info)
+std::vector<FontMod::DrawCommand> FontMod::generateVerticesFormatted(const love::fontmod::ColoredCodepoints &text, const Colorf &constantcolor, float wrap, AlignMode align, std::vector<GlyphVertex> &vertices, love::fontmod::TextShaper::TextInfo *info)
 {
 	wrap = std::max(wrap, 0.0f);
 
@@ -580,10 +580,10 @@ void FontMod::printv(graphics *gfx, const Matrix4 &t, const std::vector<DrawComm
 	}
 }
 
-void FontMod::print(graphics *gfx, const std::vector<love::font::ColoredString> &text, const Matrix4 &m, const Colorf &constantcolor)
+void FontMod::print(graphics *gfx, const std::vector<love::fontmod::ColoredString> &text, const Matrix4 &m, const Colorf &constantcolor)
 {
-	love::font::ColoredCodepoints codepoints;
-	love::font::getCodepointsFromString(text, codepoints);
+	love::fontmod::ColoredCodepoints codepoints;
+	love::fontmod::getCodepointsFromString(text, codepoints);
 
 	std::vector<GlyphVertex> vertices;
 	std::vector<DrawCommand> drawcommands = generateVertices(codepoints, Range(), constantcolor, vertices);
@@ -591,10 +591,10 @@ void FontMod::print(graphics *gfx, const std::vector<love::font::ColoredString> 
 	printv(gfx, m, drawcommands, vertices);
 }
 
-void FontMod::printf(graphics *gfx, const std::vector<love::font::ColoredString> &text, float wrap, AlignMode align, const Matrix4 &m, const Colorf &constantcolor)
+void FontMod::printf(graphics *gfx, const std::vector<love::fontmod::ColoredString> &text, float wrap, AlignMode align, const Matrix4 &m, const Colorf &constantcolor)
 {
-	love::font::ColoredCodepoints codepoints;
-	love::font::getCodepointsFromString(text, codepoints);
+	love::fontmod::ColoredCodepoints codepoints;
+	love::fontmod::getCodepointsFromString(text, codepoints);
 
 	std::vector<GlyphVertex> vertices;
 	std::vector<DrawCommand> drawcommands = generateVerticesFormatted(codepoints, constantcolor, wrap, align, vertices);
@@ -612,12 +612,12 @@ int FontMod::getWidth(uint32 glyph)
 	return shaper->getGlyphAdvance(glyph);
 }
 
-void FontMod::getWrap(const love::font::ColoredCodepoints &codepoints, float wraplimit, std::vector<Range> &ranges, std::vector<float> *linewidths)
+void FontMod::getWrap(const love::fontmod::ColoredCodepoints &codepoints, float wraplimit, std::vector<Range> &ranges, std::vector<float> *linewidths)
 {
 	shaper->getWrap(codepoints, wraplimit, ranges, linewidths);
 }
 
-void FontMod::getWrap(const std::vector<love::font::ColoredString> &text, float wraplimit, std::vector<std::string> &lines, std::vector<float> *linewidths)
+void FontMod::getWrap(const std::vector<love::fontmod::ColoredString> &text, float wraplimit, std::vector<std::string> &lines, std::vector<float> *linewidths)
 {
 	shaper->getWrap(text, wraplimit, lines, linewidths);
 }
@@ -674,7 +674,7 @@ bool FontMod::hasGlyphs(const std::string &text) const
 
 void FontMod::setFallbacks(const std::vector<FontMod *> &fallbacks)
 {
-	std::vector<love::font::Rasterizer*> rasterizerfallbacks;
+	std::vector<love::fontmod::Rasterizer*> rasterizerfallbacks;
 	for (const FontMod* f : fallbacks)
 		rasterizerfallbacks.push_back(f->shaper->getRasterizers()[0]);
 

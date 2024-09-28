@@ -138,7 +138,7 @@ float TextShaper::getBaseline() const
 	float ascent = getAscent();
 	if (ascent != 0.0f)
 		return ascent;
-	else if (rasterizers[0]->getDataType() == font::Rasterizer::DATA_TRUETYPE)
+	else if (rasterizers[0]->getDataType() == fontmod::Rasterizer::DATA_TRUETYPE)
 		return floorf(getPixelHeight() / 1.25f + 0.5f) / rasterizers[0]->getDPIScale(); // 1.25 is magic line height for true type fonts
 	else
 		return 0.0f;

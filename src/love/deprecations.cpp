@@ -74,10 +74,10 @@ void Deprecations::draw(graphics *gfx)
 
 	if (font.get() == nullptr)
 	{
-		font::TrueTypeRasterizer::Settings settings;
+		fontmod::TrueTypeRasterizer::Settings settings;
 
 		if (!isGammaCorrect() && gfx->getScreenDPIScale() <= 1.0)
-			settings.hinting = font::TrueTypeRasterizer::HINTING_LIGHT;
+			settings.hinting = fontmod::TrueTypeRasterizer::HINTING_LIGHT;
 
 		font.set(gfx->newDefaultFont(9, settings), Acquire::NORETAIN);
 	}
@@ -90,7 +90,7 @@ void Deprecations::draw(graphics *gfx)
 	int maxcount = 4;
 	int remaining = std::max(0, total - maxcount);
 
-	std::vector<font::ColoredString> strings;
+	std::vector<fontmod::ColoredString> strings;
 	Colorf white(1, 1, 1, 1);
 
 	// Grab the newest deprecation notices first.

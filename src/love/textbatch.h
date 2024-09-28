@@ -40,14 +40,14 @@ public:
 
 	static love::Type type;
 
-	TextBatch(FontMod *font, const std::vector<love::font::ColoredString> &text = {});
+	TextBatch(FontMod *font, const std::vector<love::fontmod::ColoredString> &text = {});
 	virtual ~TextBatch();
 
-	void set(const std::vector<love::font::ColoredString> &text);
-	void set(const std::vector<love::font::ColoredString> &text, float wrap, FontMod::AlignMode align);
+	void set(const std::vector<love::fontmod::ColoredString> &text);
+	void set(const std::vector<love::fontmod::ColoredString> &text, float wrap, FontMod::AlignMode align);
 
-	int add(const std::vector<love::font::ColoredString> &text, const Matrix4 &m);
-	int addf(const std::vector<love::font::ColoredString> &text, float wrap, FontMod::AlignMode align, const Matrix4 &m);
+	int add(const std::vector<love::fontmod::ColoredString> &text, const Matrix4 &m);
+	int addf(const std::vector<love::fontmod::ColoredString> &text, float wrap, FontMod::AlignMode align, const Matrix4 &m);
 
 	void clear();
 
@@ -71,10 +71,10 @@ private:
 
 	struct TextData
 	{
-		love::font::ColoredCodepoints codepoints;
+		love::fontmod::ColoredCodepoints codepoints;
 		float wrap;
 		FontMod::AlignMode align;
-		love::font::TextShaper::TextInfo textInfo;
+		love::fontmod::TextShaper::TextInfo textInfo;
 		bool useMatrix;
 		bool appendVertices;
 		Matrix4 matrix;
@@ -99,10 +99,10 @@ private:
 	std::vector<TextData> textData;
 
 	size_t vertOffset;
-	
+
 	// Used so we know when the font's texture cache is invalidated.
 	uint32 textureCacheID;
-	
+
 }; // Text
 
 } // graphics

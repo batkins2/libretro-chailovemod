@@ -28,7 +28,7 @@ namespace love
 namespace font
 {
 
-class GenericShaper : public love::font::TextShaper
+class GenericShaper : public love::fontmod::TextShaper
 {
 public:
 

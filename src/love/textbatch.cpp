@@ -30,7 +30,7 @@ namespace gfx
 
 love::Type TextBatch::type("TextBatch", &Drawable::type);
 
-TextBatch::TextBatch(FontMod *font, const std::vector<love::font::ColoredString> &text)
+TextBatch::TextBatch(FontMod *font, const std::vector<love::fontmod::ColoredString> &text)
 	: font(font)
 	, vertexAttributes(FontMod::vertexFormat, 0)
 	, vertexData(nullptr)
@@ -112,7 +112,7 @@ void TextBatch::addTextData(const TextData &t)
 	std::vector<FontMod::GlyphVertex> vertices;
 	std::vector<FontMod::DrawCommand> newcommands;
 
-	love::font::TextShaper::TextInfo textinfo;
+	love::fontmod::TextShaper::TextInfo textinfo;
 
 	Colorf constantcolor = Colorf(1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -167,36 +167,36 @@ void TextBatch::addTextData(const TextData &t)
 	textData.push_back(t);
 	textData.back().textInfo = textinfo;
 
-	// Font::generateVertices can invalidate the font's texture cache.
+	// fontmod::generateVertices can invalidate the font's texture cache.
 	if (font->getTextureCacheID() != textureCacheID)
 		regenerateVertices();
 }
 
-void TextBatch::set(const std::vector<love::font::ColoredString> &text)
+void TextBatch::set(const std::vector<love::fontmod::ColoredString> &text)
 {
 	return set(text, -1.0f, FontMod::ALIGN_MAX_ENUM);
 }
 
-void TextBatch::set(const std::vector<love::font::ColoredString> &text, float wrap, FontMod::AlignMode align)
+void TextBatch::set(const std::vector<love::fontmod::ColoredString> &text, float wrap, FontMod::AlignMode align)
 {
 	if (text.empty() || (text.size() == 1 && text[0].str.empty()))
 		return clear();
 
-	love::font::ColoredCodepoints codepoints;
-	love::font::getCodepointsFromString(text, codepoints);
+	love::fontmod::ColoredCodepoints codepoints;
+	love::fontmod::getCodepointsFromString(text, codepoints);
 
 	addTextData({codepoints, wrap, align, {}, false, false, Matrix4()});
 }
 
-int TextBatch::add(const std::vector<love::font::ColoredString> &text, const Matrix4 &m)
+int TextBatch::add(const std::vector<love::fontmod::ColoredString> &text, const Matrix4 &m)
 {
 	return addf(text, -1.0f, FontMod::ALIGN_MAX_ENUM, m);
 }
 
-int TextBatch::addf(const std::vector<love::font::ColoredString> &text, float wrap, FontMod::AlignMode align, const Matrix4 &m)
+int TextBatch::addf(const std::vector<love::fontmod::ColoredString> &text, float wrap, FontMod::AlignMode align, const Matrix4 &m)
 {
-	love::font::ColoredCodepoints codepoints;
-	love::font::getCodepointsFromString(text, codepoints);
+	love::fontmod::ColoredCodepoints codepoints;
+	love::fontmod::getCodepointsFromString(text, codepoints);
 
 	addTextData({codepoints, wrap, align, {}, true, true, m});
 
@@ -214,7 +214,7 @@ void TextBatch::clear()
 void TextBatch::setFont(FontMod *f)
 {
 	font.set(f);
-	
+
 	// Invalidate the texture cache ID since the font is different. We also have
 	// to re-upload all the vertices based on the new font's textures.
 	textureCacheID = (uint32) -1;
