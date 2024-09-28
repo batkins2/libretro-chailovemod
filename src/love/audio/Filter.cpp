@@ -22,7 +22,7 @@
 
 namespace love
 {
-namespace audio
+namespace audiomod
 {
 
 Filter::Filter()
