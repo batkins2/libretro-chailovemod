@@ -71,7 +71,7 @@ private:
 
 namespace love
 {
-namespace audio
+namespace audiomod
 {
 
 class Effect
