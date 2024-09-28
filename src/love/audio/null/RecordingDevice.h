@@ -31,7 +31,7 @@ namespace audiomod
 namespace null
 {
 
-class RecordingDevice : public love::audio::RecordingDevice
+class RecordingDevice : public love::audiomod::RecordingDevice
 {
 public:
 	RecordingDevice(const char *name);
