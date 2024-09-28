@@ -42,7 +42,7 @@ class SoundData;
 
 } // sound
 
-namespace audio
+namespace audiomod
 {
 
 /*
