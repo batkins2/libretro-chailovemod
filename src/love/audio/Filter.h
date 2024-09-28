@@ -70,7 +70,7 @@ private:
 
 namespace love
 {
-namespace audio
+namespace audiomod
 {
 
 class Filter
