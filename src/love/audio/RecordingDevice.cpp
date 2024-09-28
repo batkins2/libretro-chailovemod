@@ -22,7 +22,7 @@
 
 namespace love
 {
-namespace audio
+namespace audiomod
 {
 
 love::Type RecordingDevice::type("RecordingDevice", &Object::type);
