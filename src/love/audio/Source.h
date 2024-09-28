@@ -30,7 +30,7 @@
 
 namespace love
 {
-namespace audio
+namespace audiomod
 {
 
 class Source : public Object
