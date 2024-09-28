@@ -28,7 +28,7 @@
 
 namespace love
 {
-namespace audio
+namespace audiomod
 {
 
 class RecordingDevice : public love::Object
