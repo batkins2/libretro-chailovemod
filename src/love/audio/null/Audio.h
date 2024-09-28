@@ -34,7 +34,7 @@ namespace audiomod
 namespace null
 {
 
-class Audio : public love::audio::Audio
+class Audio : public love::audiomod::Audio
 {
 public:
 
