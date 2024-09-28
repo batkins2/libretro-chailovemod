@@ -22,7 +22,7 @@
 
 namespace love
 {
-namespace audio
+namespace audiomod
 {
 
 love::Type Source::type("Source", &Object::type);
