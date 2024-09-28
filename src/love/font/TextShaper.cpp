@@ -27,7 +27,7 @@
 
 namespace love
 {
-namespace font
+namespace fontmod
 {
 
 void getCodepointsFromString(const std::string &text, std::vector<uint32> &codepoints)

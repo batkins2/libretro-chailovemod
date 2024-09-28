@@ -22,7 +22,7 @@
 
 namespace love
 {
-namespace font
+namespace fontmod
 {
 
 bool TrueTypeRasterizer::getConstant(const char *in, Hinting &out)

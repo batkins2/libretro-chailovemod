@@ -1,8 +1,8 @@
 CXX src/ChaiLove.cpp
-In file included from src/ChaiLove.h:62,
+In file included from src/ChaiLove.h:67,
                  from src/ChaiLove.cpp:1:
-src/love/image.h:15:7: error: ‘struct love::image’ redeclared as different kind of entity
-   15 | class image {
+src/love/audio.h:16:7: error: ‘struct love::audio’ redeclared as different kind of entity
+   16 | class audio {
       |       ^~~~~
 compilation terminated due to -Wfatal-errors.
 make: *** [Makefile:31: src/ChaiLove.o] Error 1

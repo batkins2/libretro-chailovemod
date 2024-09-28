@@ -26,7 +26,7 @@
 
 namespace love
 {
-namespace font
+namespace fontmod
 {
 
 love::Type GlyphData::type("GlyphData", &Data::type);

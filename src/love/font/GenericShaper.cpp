@@ -27,7 +27,7 @@
 
 namespace love
 {
-namespace font
+namespace fontmod
 {
 
 GenericShaper::GenericShaper(Rasterizer *rasterizer)

@@ -27,7 +27,7 @@
 
 namespace love
 {
-namespace font
+namespace fontmod
 {
 
 static_assert(sizeof(Color32) == 4, "sizeof(Color32) must equal 4 bytes!");

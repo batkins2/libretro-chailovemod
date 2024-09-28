@@ -30,7 +30,7 @@
 
 namespace love
 {
-namespace font
+namespace fontmod
 {
 
 /**

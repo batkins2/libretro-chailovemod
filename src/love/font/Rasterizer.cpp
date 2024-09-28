@@ -26,7 +26,7 @@
 
 namespace love
 {
-namespace font
+namespace fontmod
 {
 
 love::Type Rasterizer::type("Rasterizer", &Object::type);

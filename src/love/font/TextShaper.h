@@ -33,7 +33,7 @@
 
 namespace love
 {
-namespace font
+namespace fontmod
 {
 
 class Rasterizer;
