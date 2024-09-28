@@ -29,7 +29,7 @@
 
 namespace love
 {
-namespace audio
+namespace audiomod
 {
 
 static bool requestRecPermission = false;
