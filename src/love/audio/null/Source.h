@@ -28,12 +28,12 @@
 
 namespace love
 {
-namespace audio
+namespace audiomod
 {
 namespace null
 {
 
-class Source : public love::audio::Source
+class Source : public love::audiomod::Source
 {
 public:
 	Source();
