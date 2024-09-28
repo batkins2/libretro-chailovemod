@@ -43,7 +43,7 @@
 
 namespace love
 {
-namespace filesystem
+namespace filesystemmod
 {
 
 love::Type Filesystem::type("filesystem", &Module::type);
@@ -58,12 +58,12 @@ Filesystem::~Filesystem()
 }
 
 void Filesystem::setAndroidSaveExternal(bool useExternal)
-{	
+{
 	this->useExternal = useExternal;
 }
 
 bool Filesystem::isAndroidSaveExternal() const
-{ 
+{
 	return useExternal;
 }
 
@@ -189,7 +189,7 @@ std::string Filesystem::canonicalizeRealPath(const std::string &p) const
 {
 	try
 	{
-		return std::filesystem::weakly_canonical(p).string();
+		return std::filesystemmod::weakly_canonical(p).string();
 	}
 	catch (std::exception &)
 	{

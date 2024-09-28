@@ -77,7 +77,7 @@ ImageData::~ImageData()
 		delete[] data;
 }
 
-love::image::ImageData *ImageData::clone() const
+love::imagemod::ImageData *ImageData::clone() const
 {
 	return new ImageData(*this);
 }
@@ -129,7 +129,7 @@ void ImageData::decode(Data *data)
 
 	if (decodedimage.data == nullptr)
 	{
-		auto filedata = dynamic_cast<filesystem::FileData *>(data);
+		auto filedata = dynamic_cast<filesystemmod::FileData *>(data);
 
 		if (filedata != nullptr)
 		{
@@ -167,7 +167,7 @@ void ImageData::decode(Data *data)
 	pixelGetFunction = getPixelGetFunction(format);
 }
 
-love::filesystem::FileData *ImageData::encode(FormatHandler::EncodedFormat encodedFormat, const char *filename, bool writefile) const
+love::filesystemmod::FileData *ImageData::encode(FormatHandler::EncodedFormat encodedFormat, const char *filename, bool writefile) const
 {
 	FormatHandler *encoder = nullptr;
 	FormatHandler::EncodedImage encodedimage;
@@ -199,11 +199,11 @@ love::filesystem::FileData *ImageData::encode(FormatHandler::EncodedFormat encod
 	if (encoder == nullptr || encodedimage.data == nullptr)
 		throw love::Exception("No suitable image encoder for the %s pixel format.", getPixelFormatName(format));
 
-	love::filesystem::FileData *filedata = nullptr;
+	love::filesystemmod::FileData *filedata = nullptr;
 
 	try
 	{
-		filedata = new love::filesystem::FileData(encodedimage.size, filename);
+		filedata = new love::filesystemmod::FileData(encodedimage.size, filename);
 	}
 	catch (love::Exception &)
 	{
@@ -216,7 +216,7 @@ love::filesystem::FileData *ImageData::encode(FormatHandler::EncodedFormat encod
 
 	if (writefile)
 	{
-		auto fs = Module::getInstance<filesystem::Filesystem>(Module::M_FILESYSTEM);
+		auto fs = Module::getInstance<filesystemmod::Filesystem>(Module::M_FILESYSTEM);
 
 		if (fs == nullptr)
 		{

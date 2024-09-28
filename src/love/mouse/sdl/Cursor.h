@@ -39,7 +39,7 @@ class Cursor : public love::mouse::Cursor
 {
 public:
 
-	Cursor(image::ImageData *imageData, int hotx, int hoty);
+	Cursor(imagemod::ImageData *imageData, int hotx, int hoty);
 	Cursor(SystemCursor cursortype);
 	~Cursor();
 

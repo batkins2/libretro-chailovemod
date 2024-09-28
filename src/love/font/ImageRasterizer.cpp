@@ -32,7 +32,7 @@ namespace font
 
 static_assert(sizeof(Color32) == 4, "sizeof(Color32) must equal 4 bytes!");
 
-ImageRasterizer::ImageRasterizer(love::image::ImageData *data, const uint32 *glyphs, int numglyphs, int extraspacing, float dpiscale)
+ImageRasterizer::ImageRasterizer(love::imagemod::ImageData *data, const uint32 *glyphs, int numglyphs, int extraspacing, float dpiscale)
 	: imageData(data)
 	, numglyphs(numglyphs + 1) // Always have a null glyph at the start of the array.
 	, extraSpacing(extraspacing)

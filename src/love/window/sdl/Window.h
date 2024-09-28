@@ -75,8 +75,8 @@ public:
 	void setWindowTitle(const std::string &title) override;
 	const std::string &getWindowTitle() const override;
 
-	bool setIcon(love::image::ImageData *imgd) override;
-	love::image::ImageData *getIcon() override;
+	bool setIcon(love::imagemod::ImageData *imgd) override;
+	love::imagemod::ImageData *getIcon() override;
 
 	void setVSync(int vsync) override;
 	int getVSync() const override;
@@ -160,7 +160,7 @@ private:
 	int pixelWidth   = 800;
 	int pixelHeight  = 600;
 	WindowSettings settings;
-	StrongRef<love::image::ImageData> icon;
+	StrongRef<love::imagemod::ImageData> icon;
 
 #ifdef LOVE_WINDOWS
 	bool canUseDwmFlush = false;

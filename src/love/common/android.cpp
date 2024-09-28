@@ -382,7 +382,7 @@ static AAssetManager *getAssetManager()
 namespace aasset
 {
 
-struct AssetInfo: public love::filesystem::physfs::PhysfsIo<AssetInfo>
+struct AssetInfo: public love::filesystemmod::physfs::PhysfsIo<AssetInfo>
 {
 	static const uint32_t version = 0;
 

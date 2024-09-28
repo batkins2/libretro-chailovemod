@@ -1241,7 +1241,7 @@ const std::string &Window::getWindowTitle() const
 	return title;
 }
 
-bool Window::setIcon(love::image::ImageData *imgd)
+bool Window::setIcon(love::imagemod::ImageData *imgd)
 {
 	if (!imgd)
 		return false;
@@ -1293,7 +1293,7 @@ bool Window::setIcon(love::image::ImageData *imgd)
 	return true;
 }
 
-love::image::ImageData *Window::getIcon()
+love::imagemod::ImageData *Window::getIcon()
 {
 	return icon.get();
 }
@@ -1768,9 +1768,9 @@ void Window::requestAttention(bool continuous)
 #else
 
 	LOVE_UNUSED(continuous);
-	
+
 #endif
-	
+
 	// TODO: Linux?
 }
 

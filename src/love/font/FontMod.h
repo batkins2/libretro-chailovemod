@@ -50,9 +50,9 @@ public:
 	Rasterizer *newTrueTypeRasterizer(int size, const TrueTypeRasterizer::Settings &settings);
 	virtual Rasterizer *newTrueTypeRasterizer(love::Data *data, int size, const TrueTypeRasterizer::Settings &settings) = 0;
 
-	virtual Rasterizer *newBMFontRasterizer(love::filesystemmod::FileData *fontdef, const std::vector<image::ImageData *> &images, float dpiscale);
+	virtual Rasterizer *newBMFontRasterizer(love::filesystemmod::FileData *fontdef, const std::vector<imagemod::ImageData *> &images, float dpiscale);
 
-	virtual Rasterizer *newImageRasterizer(love::image::ImageData *data, const std::string &glyphs, int extraspacing, float dpiscale);
+	virtual Rasterizer *newImageRasterizer(love::imagemod::ImageData *data, const std::string &glyphs, int extraspacing, float dpiscale);
 
 	virtual GlyphData *newGlyphData(Rasterizer *r, const std::string &glyph);
 	virtual GlyphData *newGlyphData(Rasterizer *r, uint32 glyph);

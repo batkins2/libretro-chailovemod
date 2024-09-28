@@ -51,12 +51,12 @@ Rasterizer *FontMod::newTrueTypeRasterizer(int size, const TrueTypeRasterizer::S
 	return newTrueTypeRasterizer(defaultFontData.get(), size, settings);
 }
 
-Rasterizer *FontMod::newBMFontRasterizer(love::filesystemmod::FileData *fontdef, const std::vector<image::ImageData *> &images, float dpiscale)
+Rasterizer *FontMod::newBMFontRasterizer(love::filesystemmod::FileData *fontdef, const std::vector<imagemod::ImageData *> &images, float dpiscale)
 {
 	return new BMFontRasterizer(fontdef, images, dpiscale);
 }
 
-Rasterizer *FontMod::newImageRasterizer(love::image::ImageData *data, const std::string &text, int extraspacing, float dpiscale)
+Rasterizer *FontMod::newImageRasterizer(love::imagemod::ImageData *data, const std::string &text, int extraspacing, float dpiscale)
 {
 	std::vector<uint32> glyphs;
 	glyphs.reserve(text.size());

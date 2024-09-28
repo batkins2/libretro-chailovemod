@@ -338,7 +338,7 @@ void Texture::createTexture()
 
 		for (int slice = 0; slice < slicecount; slice++)
 		{
-			love::image::ImageDataBase *id = slices.get(slice, mip);
+			love::imagemod::ImageDataBase *id = slices.get(slice, mip);
 			if (id != nullptr)
 				uploadImageData(id, mip, slice, 0, 0);
 		}

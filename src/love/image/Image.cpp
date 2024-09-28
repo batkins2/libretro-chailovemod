@@ -66,22 +66,22 @@ Image::~Image()
 		handler->release();
 }
 
-love::image::ImageData *Image::newImageData(Data *data)
+love::imagemod::ImageData *Image::newImageData(Data *data)
 {
 	return new ImageData(data);
 }
 
-love::image::ImageData *Image::newImageData(int width, int height, PixelFormat format)
+love::imagemod::ImageData *Image::newImageData(int width, int height, PixelFormat format)
 {
 	return new ImageData(width, height, format);
 }
 
-love::image::ImageData *Image::newImageData(int width, int height, PixelFormat format, void *data, bool own)
+love::imagemod::ImageData *Image::newImageData(int width, int height, PixelFormat format, void *data, bool own)
 {
 	return new ImageData(width, height, format, data, own);
 }
 
-love::image::CompressedImageData *Image::newCompressedData(Data *data)
+love::imagemod::CompressedImageData *Image::newCompressedData(Data *data)
 {
 	return new CompressedImageData(formatHandlers, data);
 }
@@ -117,7 +117,7 @@ ImageData *Image::newPastedImageData(ImageData *src, int sx, int sy, int w, int 
 	return res;
 }
 
-std::vector<StrongRef<ImageData>> Image::newCubeFaces(love::image::ImageData *src)
+std::vector<StrongRef<ImageData>> Image::newCubeFaces(love::imagemod::ImageData *src)
 {
 	// The faces array is always ordered +x, -x, +y, -y, +z, -z.
 	std::vector<StrongRef<ImageData>> faces;

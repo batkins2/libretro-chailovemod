@@ -183,7 +183,7 @@ love::gfx::GraphicsReadback *Graphics::newReadbackInternal(ReadbackMethod method
 	return new GraphicsReadback(this, method, buffer, offset, size, dest, destoffset);
 }
 
-love::gfx::GraphicsReadback *Graphics::newReadbackInternal(ReadbackMethod method, love::gfx::Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty)
+love::gfx::GraphicsReadback *Graphics::newReadbackInternal(ReadbackMethod method, love::gfx::Texture *texture, int slice, int mipmap, const Rect &rect, imagemod::ImageData *dest, int destx, int desty)
 {
 	return new GraphicsReadback(this, method, texture, slice, mipmap, rect, dest, destx, desty);
 }
@@ -1248,12 +1248,12 @@ void Graphics::present(void *screenshotCallbackData)
 
 		delete[] pixels;
 
-		auto imagemodule = Module::getInstance<love::image::Image>(M_IMAGE);
+		auto imagemodule = Module::getInstance<love::imagemod::Image>(M_IMAGE);
 
 		for (int i = 0; i < (int) pendingScreenshotCallbacks.size(); i++)
 		{
 			const auto &info = pendingScreenshotCallbacks[i];
-			image::ImageData *img = nullptr;
+			imagemod::ImageData *img = nullptr;
 
 			try
 			{

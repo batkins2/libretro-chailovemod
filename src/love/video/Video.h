@@ -41,7 +41,7 @@ public:
 	/**
 	 * Create a VideoStream representing video frames
 	 **/
-	virtual VideoStream *newVideoStream(love::filesystem::File *file) = 0;
+	virtual VideoStream *newVideoStream(love::filesystemmod::File *file) = 0;
 
 protected:
 

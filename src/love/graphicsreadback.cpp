@@ -47,7 +47,7 @@ GraphicsReadback::GraphicsReadback(graphics */*gfx*/, ReadbackMethod method, Buf
 	bufferDataOffset = dest != nullptr ? destoffset : 0;
 }
 
-GraphicsReadback::GraphicsReadback(graphics *gfx, ReadbackMethod method, Texture *texture, int slice, int mipmap, const Rect &rect, love::image::ImageData *dest, int destx, int desty)
+GraphicsReadback::GraphicsReadback(graphics *gfx, ReadbackMethod method, Texture *texture, int slice, int mipmap, const Rect &rect, love::imagemod::ImageData *dest, int destx, int desty)
 	: dataType(DATA_TEXTURE)
 	, method(method)
 	, imageData(dest)
@@ -78,7 +78,7 @@ GraphicsReadback::GraphicsReadback(graphics *gfx, ReadbackMethod method, Texture
 	textureFormat = getLinearPixelFormat(texture->getPixelFormat());
 	isFormatLinear = isGammaCorrect() && !isPixelFormatSRGB(texture->getPixelFormat());
 
-	if (!image::ImageData::validPixelFormat(textureFormat))
+	if (!imagemod::ImageData::validPixelFormat(textureFormat))
 	{
 		const char *formatname = "unknown";
 		love::getConstant(textureFormat, formatname);
@@ -125,7 +125,7 @@ love::datamod::ByteData *GraphicsReadback::getBufferData() const
 	return bufferData;
 }
 
-love::image::ImageData *GraphicsReadback::getImageData() const
+love::imagemod::ImageData *GraphicsReadback::getImageData() const
 {
 	if (!isComplete())
 		return nullptr;
@@ -147,7 +147,7 @@ void *GraphicsReadback::prepareReadbackDest(size_t size)
 		}
 		else
 		{
-			auto module = Module::getInstance<image::Image>(Module::M_IMAGE);
+			auto module = Module::getInstance<imagemod::Image>(Module::M_IMAGE);
 			if (module == nullptr)
 				throw love::Exception("The love.image module must be loaded for readbackTexture.");
 

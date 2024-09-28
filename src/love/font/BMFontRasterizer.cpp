@@ -132,7 +132,7 @@ std::string BMFontLine::getAttributeString(const char *name) const
 } // anonymous namespace
 
 
-BMFontRasterizer::BMFontRasterizer(love::filesystem::FileData *fontdef, const std::vector<image::ImageData *> &imagelist, float dpiscale)
+BMFontRasterizer::BMFontRasterizer(love::filesystemmod::FileData *fontdef, const std::vector<imagemod::ImageData *> &imagelist, float dpiscale)
 	: fontSize(0)
 	, unicode(false)
 	, lineHeight(0)
@@ -208,7 +208,7 @@ void BMFontRasterizer::parseConfig(const std::string &configtext)
 				using namespace love::imagemod;
 
 				auto filesystem  = Module::getInstance<Filesystem>(Module::M_FILESYSTEM);
-				auto imagemodule = Module::getInstance<image::Image>(Module::M_IMAGE);
+				auto imagemodule = Module::getInstance<imagemod::Image>(Module::M_IMAGE);
 
 				if (!filesystem)
 					throw love::Exception("Filesystem module not loaded!");
@@ -283,7 +283,7 @@ void BMFontRasterizer::parseConfig(const std::string &configtext)
 		if (c.page < 0 || images[c.page].get() == nullptr)
 			throw love::Exception("Invalid BMFont character page id: %d", c.page);
 
-		const image::ImageData *id = images[c.page].get();
+		const imagemod::ImageData *id = images[c.page].get();
 
 		if (!id->inside(c.x, c.y))
 			throw love::Exception("Invalid coordinates for BMFont character %u.", c.glyph);
@@ -335,7 +335,7 @@ GlyphData *BMFontRasterizer::getGlyphDataForIndex(int index) const
 	if (imagepair == images.end())
 		return new GlyphData(c.glyph, GlyphMetrics(), PIXELFORMAT_RGBA8_UNORM);
 
-	image::ImageData *imagedata = imagepair->second.get();
+	imagemod::ImageData *imagedata = imagepair->second.get();
 	GlyphData *g = new GlyphData(c.glyph, c.metrics, PIXELFORMAT_RGBA8_UNORM);
 
 	size_t pixelsize = imagedata->getPixelSize();
@@ -387,7 +387,7 @@ TextShaper *BMFontRasterizer::newTextShaper()
 	return new GenericShaper(this);
 }
 
-bool BMFontRasterizer::accepts(love::filesystem::FileData *fontdef)
+bool BMFontRasterizer::accepts(love::filesystemmod::FileData *fontdef)
 {
 	const char *data = (const char *) fontdef->getData();
 

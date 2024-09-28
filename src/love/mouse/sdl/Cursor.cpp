@@ -31,7 +31,7 @@ namespace mouse
 namespace sdl
 {
 
-Cursor::Cursor(image::ImageData *data, int hotx, int hoty)
+Cursor::Cursor(imagemod::ImageData *data, int hotx, int hoty)
 	: cursor(nullptr)
 	, type(CURSORTYPE_IMAGE)
 	, systemType(CURSOR_MAX_ENUM)

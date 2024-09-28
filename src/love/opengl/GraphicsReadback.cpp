@@ -59,7 +59,7 @@ GraphicsReadback::GraphicsReadback(love::gfx::graphics *gfx, ReadbackMethod meth
 	}
 }
 
-GraphicsReadback::GraphicsReadback(love::gfx::graphics *gfx, ReadbackMethod method, love::gfx::Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty)
+GraphicsReadback::GraphicsReadback(love::gfx::graphics *gfx, ReadbackMethod method, love::gfx::Texture *texture, int slice, int mipmap, const Rect &rect, imagemod::ImageData *dest, int destx, int desty)
 	: love::gfx::GraphicsReadback(gfx, method, texture, slice, mipmap, rect, dest, destx, desty)
 {
 	size_t size = getPixelFormatSliceSize(textureFormat, rect.w, rect.h);

@@ -42,7 +42,7 @@ class BMFontRasterizer : public Rasterizer
 {
 public:
 
-	BMFontRasterizer(love::filesystem::FileData *fontdef, const std::vector<image::ImageData *> &imagelist, float dpiscale);
+	BMFontRasterizer(love::filesystemmod::FileData *fontdef, const std::vector<imagemod::ImageData *> &imagelist, float dpiscale);
 	virtual ~BMFontRasterizer();
 
 	// Implements Rasterizer.
@@ -56,7 +56,7 @@ public:
 	DataType getDataType() const override;
 	TextShaper *newTextShaper() override;
 
-	static bool accepts(love::filesystem::FileData *fontdef);
+	static bool accepts(love::filesystemmod::FileData *fontdef);
 
 private:
 
@@ -74,7 +74,7 @@ private:
 	std::string fontFolder;
 
 	// Image pages, indexed by their page id.
-	std::unordered_map<int, StrongRef<image::ImageData>> images;
+	std::unordered_map<int, StrongRef<imagemod::ImageData>> images;
 
 	std::vector<BMFontCharacter> characters;
 

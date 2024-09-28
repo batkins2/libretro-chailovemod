@@ -39,7 +39,7 @@ namespace font
 class ImageRasterizer : public Rasterizer
 {
 public:
-	ImageRasterizer(love::image::ImageData *imageData, const uint32 *glyphs, int numglyphs, int extraspacing, float dpiscale);
+	ImageRasterizer(love::imagemod::ImageData *imageData, const uint32 *glyphs, int numglyphs, int extraspacing, float dpiscale);
 	virtual ~ImageRasterizer();
 
 	// Implement Rasterizer
@@ -67,7 +67,7 @@ private:
 	void load(const uint32 *glyphs, int glyphcount);
 
 	// The image data
-	StrongRef<love::image::ImageData> imageData;
+	StrongRef<love::imagemod::ImageData> imageData;
 
 	// Number of glyphs in the font
 	int numglyphs;
