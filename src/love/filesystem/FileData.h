@@ -29,7 +29,7 @@
 
 namespace love
 {
-namespace filesystem
+namespace filesystemmod
 {
 
 class FileData : public Data

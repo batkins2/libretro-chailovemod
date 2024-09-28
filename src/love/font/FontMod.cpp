@@ -41,9 +41,9 @@ FontMod::FontMod(const char *name)
 	size_t compressedsize = NotoSans_Regular_ttf_gzip_len;
 
 	size_t rawsize = 0;
-	char *fontdata = data::decompress(data::Compressor::FORMAT_GZIP, compressedbytes, compressedsize, rawsize);
+	char *fontdata = datamod::decompress(datamod::Compressor::FORMAT_GZIP, compressedbytes, compressedsize, rawsize);
 
-	defaultFontData.set(new data::ByteData(fontdata, rawsize, true), Acquire::NORETAIN);
+	defaultFontData.set(new datamod::ByteData(fontdata, rawsize, true), Acquire::NORETAIN);
 }
 
 Rasterizer *FontMod::newTrueTypeRasterizer(int size, const TrueTypeRasterizer::Settings &settings)
@@ -51,7 +51,7 @@ Rasterizer *FontMod::newTrueTypeRasterizer(int size, const TrueTypeRasterizer::S
 	return newTrueTypeRasterizer(defaultFontData.get(), size, settings);
 }
 
-Rasterizer *FontMod::newBMFontRasterizer(love::filesystem::FileData *fontdef, const std::vector<image::ImageData *> &images, float dpiscale)
+Rasterizer *FontMod::newBMFontRasterizer(love::filesystemmod::FileData *fontdef, const std::vector<image::ImageData *> &images, float dpiscale)
 {
 	return new BMFontRasterizer(fontdef, images, dpiscale);
 }

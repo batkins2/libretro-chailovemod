@@ -471,8 +471,8 @@ public:
 
 	TextBatch *newTextBatch(FontMod *font, const std::vector<love::font::ColoredString> &text = {});
 
-	data::ByteData *readbackBuffer(Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset);
-	GraphicsReadback *readbackBufferAsync(Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset);
+	datamod::ByteData *readbackBuffer(Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset);
+	GraphicsReadback *readbackBufferAsync(Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset);
 
 	image::ImageData *readbackTexture(Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty);
 	GraphicsReadback *readbackTextureAsync(Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty);
@@ -1016,7 +1016,7 @@ protected:
 	virtual Shader *newShaderInternal(StrongRef<ShaderStage> stages[SHADERSTAGE_MAX_ENUM], const Shader::CompileOptions &options) = 0;
 	virtual StreamBuffer *newStreamBuffer(BufferUsage type, size_t size) = 0;
 
-	virtual GraphicsReadback *newReadbackInternal(ReadbackMethod method, Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset) = 0;
+	virtual GraphicsReadback *newReadbackInternal(ReadbackMethod method, Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset) = 0;
 	virtual GraphicsReadback *newReadbackInternal(ReadbackMethod method, Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty) = 0;
 
 	virtual bool dispatch(Shader *shader, int x, int y, int z) = 0;

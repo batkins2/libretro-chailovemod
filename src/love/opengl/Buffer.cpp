@@ -206,8 +206,8 @@ void *Buffer::map(MapType map, size_t offset, size_t size)
 	}
 	else
 	{
-		auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
-		data = (char *) gfx->getBufferMapMemory(size);
+		auto graphics = Module::getInstance<Graphics>(Module::M_GRAPHICS);
+		data = (char *) graphics->getBufferMapMemory(size);
 	}
 
 	if (data != nullptr)
@@ -253,8 +253,8 @@ void Buffer::unmap(size_t usedoffset, size_t usedsize)
 
 	if (!ownsMemoryMap)
 	{
-		auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
-		gfx->releaseBufferMapMemory(memoryMap);
+		auto graphics = Module::getInstance<Graphics>(Module::M_GRAPHICS);
+		graphics->releaseBufferMapMemory(memoryMap);
 		memoryMap = nullptr;
 	}
 }

@@ -26,7 +26,7 @@
 
 namespace love
 {
-namespace data
+namespace datamod
 {
 
 class ByteData : public love::Data

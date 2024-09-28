@@ -219,10 +219,10 @@ public:
 		Slices(TextureType textype);
 
 		void clear();
-		void set(int slice, int mipmap, love::image::ImageDataBase *data);
-		love::image::ImageDataBase *get(int slice, int mipmap) const;
+		void set(int slice, int mipmap, love::imagemod::ImageDataBase *data);
+		love::imagemod::ImageDataBase *get(int slice, int mipmap) const;
 
-		void add(love::image::CompressedImageData *cdata, int startslice, int startmip, bool addallslices, bool addallmips);
+		void add(love::imagemod::CompressedImageData *cdata, int startslice, int startmip, bool addallslices, bool addallmips);
 
 		int getSliceCount(int mip = 0) const;
 		int getMipmapCount(int slice = 0) const;
@@ -238,7 +238,7 @@ public:
 		// For 2D/Cube/2DArray texture types, each element in the data array has
 		// an array of mipmap levels. For 3D texture types, each mipmap level
 		// has an array of layers.
-		std::vector<std::vector<StrongRef<love::image::ImageDataBase>>> data;
+		std::vector<std::vector<StrongRef<love::imagemod::ImageDataBase>>> data;
 
 	}; // Slices
 
@@ -262,7 +262,7 @@ public:
 	void drawLayer(graphics *gfx, int layer, const Matrix4 &m);
 	void drawLayer(graphics *gfx, int layer, Quad *quad, const Matrix4 &m);
 
-	void replacePixels(love::image::ImageDataBase *d, int slice, int mipmap, int x, int y, bool reloadmipmaps);
+	void replacePixels(love::imagemod::ImageDataBase *d, int slice, int mipmap, int x, int y, bool reloadmipmaps);
 	void replacePixels(const void *data, size_t size, int slice, int mipmap, const Rect &rect, bool reloadmipmaps);
 
 	void generateMipmaps();
@@ -339,7 +339,7 @@ protected:
 
 	void updateGraphicsMemorySize(bool loaded);
 
-	void uploadImageData(love::image::ImageDataBase *d, int level, int slice, int x, int y);
+	void uploadImageData(love::imagemod::ImageDataBase *d, int level, int slice, int x, int y);
 	virtual void uploadByteData(const void *data, size_t size, int level, int slice, const Rect &r) = 0;
 
 	bool supportsGenerateMipmaps(const char *&outReason) const;

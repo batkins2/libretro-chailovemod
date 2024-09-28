@@ -204,7 +204,7 @@ Texture::Texture(graphics *gfx, const Settings &settings, const Slices *slices)
 				requestedMipmapCount = dataMipmaps;
 		}
 
-		love::image::ImageDataBase *slice = slices->get(0, 0);
+		love::imagemod::ImageDataBase *slice = slices->get(0, 0);
 
 		format = slice->getFormat();
 		if (isGammaCorrect() && !slice->isLinear())
@@ -595,13 +595,13 @@ void Texture::drawLayer(graphics *gfx, int layer, Quad *q, const Matrix4 &m)
 	}
 }
 
-void Texture::uploadImageData(love::image::ImageDataBase *d, int level, int slice, int x, int y)
+void Texture::uploadImageData(love::imagemod::ImageDataBase *d, int level, int slice, int x, int y)
 {
 	Rect rect = {x, y, d->getWidth(), d->getHeight()};
 	uploadByteData(d->getData(), d->getSize(), level, slice, rect);
 }
 
-void Texture::replacePixels(love::image::ImageDataBase *d, int slice, int mipmap, int x, int y, bool reloadmipmaps)
+void Texture::replacePixels(love::imagemod::ImageDataBase *d, int slice, int mipmap, int x, int y, bool reloadmipmaps)
 {
 	if (!isReadable())
 		throw love::Exception("replacePixels can only be called on readable Textures.");
@@ -954,7 +954,7 @@ void Texture::Slices::clear()
 	data.clear();
 }
 
-void Texture::Slices::set(int slice, int mipmap, love::image::ImageDataBase *d)
+void Texture::Slices::set(int slice, int mipmap, love::imagemod::ImageDataBase *d)
 {
 	if (textureType == TEXTURE_VOLUME)
 	{
@@ -978,7 +978,7 @@ void Texture::Slices::set(int slice, int mipmap, love::image::ImageDataBase *d)
 	}
 }
 
-love::image::ImageDataBase *Texture::Slices::get(int slice, int mipmap) const
+love::imagemod::ImageDataBase *Texture::Slices::get(int slice, int mipmap) const
 {
 	if (slice < 0 || slice >= getSliceCount(mipmap))
 		return nullptr;
@@ -992,7 +992,7 @@ love::image::ImageDataBase *Texture::Slices::get(int slice, int mipmap) const
 		return data[slice][mipmap].get();
 }
 
-void Texture::Slices::add(love::image::CompressedImageData *cdata, int startslice, int startmip, bool addallslices, bool addallmips)
+void Texture::Slices::add(love::imagemod::CompressedImageData *cdata, int startslice, int startmip, bool addallslices, bool addallmips)
 {
 	int slicecount = addallslices ? cdata->getSliceCount() : 1;
 	int mipcount = addallmips ? cdata->getMipmapCount() : 1;
@@ -1041,7 +1041,7 @@ bool Texture::Slices::validate() const
 	if (textureType == TEXTURE_CUBE && slicecount != 6)
 		throw love::Exception("Cube textures must have exactly 6 sides.");
 
-	image::ImageDataBase *firstdata = get(0, 0);
+	imagemod::ImageDataBase *firstdata = get(0, 0);
 
 	int w = firstdata->getWidth();
 	int h = firstdata->getHeight();

@@ -22,7 +22,7 @@
 
 namespace love
 {
-namespace filesystem
+namespace filesystemmod
 {
 
 love::Type File::type("File", &Stream::type);

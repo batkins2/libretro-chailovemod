@@ -23,7 +23,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 // These are all with premultiplied alpha. computeBlendState adjusts for

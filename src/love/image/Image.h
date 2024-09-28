@@ -33,7 +33,7 @@
 
 namespace love
 {
-namespace image
+namespace imagemod
 {
 
 /**

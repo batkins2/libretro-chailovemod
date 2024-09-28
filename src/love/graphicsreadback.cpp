@@ -33,7 +33,7 @@ namespace gfx
 
 love::Type GraphicsReadback::type("GraphicsReadback", &Object::type);
 
-GraphicsReadback::GraphicsReadback(graphics */*gfx*/, ReadbackMethod method, Buffer *buffer, size_t offset, size_t size, love::data::ByteData *dest, size_t destoffset)
+GraphicsReadback::GraphicsReadback(graphics */*gfx*/, ReadbackMethod method, Buffer *buffer, size_t offset, size_t size, love::datamod::ByteData *dest, size_t destoffset)
 	: dataType(DATA_BUFFER)
 	, method(method)
 	, bufferData(dest)
@@ -118,7 +118,7 @@ GraphicsReadback::~GraphicsReadback()
 {
 }
 
-love::data::ByteData *GraphicsReadback::getBufferData() const
+love::datamod::ByteData *GraphicsReadback::getBufferData() const
 {
 	if (!isComplete())
 		return nullptr;
@@ -159,7 +159,7 @@ void *GraphicsReadback::prepareReadbackDest(size_t size)
 	else
 	{
 		if (!bufferData.get())
-			bufferData.set(new love::data::ByteData(size, false), Acquire::NORETAIN);
+			bufferData.set(new love::datamod::ByteData(size, false), Acquire::NORETAIN);
 
 		return (uint8 *) bufferData->getData() + bufferDataOffset;
 	}

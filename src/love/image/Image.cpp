@@ -34,7 +34,7 @@
 
 namespace love
 {
-namespace image
+namespace imagemod
 {
 
 love::Type Image::type("image", &Module::type);

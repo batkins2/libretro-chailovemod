@@ -451,9 +451,9 @@ void Texture::unloadVolatile()
 	{
 		// This is a bit ugly, but we need some way to destroy the cached FBO
 		// when this texture's GL object is destroyed.
-		auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
-		if (gfx != nullptr)
-			gfx->cleanupRenderTexture(this);
+		auto graphics = Module::getInstance<Graphics>(Module::M_GRAPHICS);
+		if (graphics != nullptr)
+			graphics->cleanupRenderTexture(this);
 	}
 
 	if (fbo != 0)

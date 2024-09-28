@@ -45,12 +45,12 @@ public:
 
 	virtual ~FontMod() {}
 
-	virtual Rasterizer *newRasterizer(love::filesystem::FileData *data) = 0;
+	virtual Rasterizer *newRasterizer(love::filesystemmod::FileData *data) = 0;
 
 	Rasterizer *newTrueTypeRasterizer(int size, const TrueTypeRasterizer::Settings &settings);
 	virtual Rasterizer *newTrueTypeRasterizer(love::Data *data, int size, const TrueTypeRasterizer::Settings &settings) = 0;
 
-	virtual Rasterizer *newBMFontRasterizer(love::filesystem::FileData *fontdef, const std::vector<image::ImageData *> &images, float dpiscale);
+	virtual Rasterizer *newBMFontRasterizer(love::filesystemmod::FileData *fontdef, const std::vector<image::ImageData *> &images, float dpiscale);
 
 	virtual Rasterizer *newImageRasterizer(love::image::ImageData *data, const std::string &glyphs, int extraspacing, float dpiscale);
 

@@ -26,7 +26,7 @@
 
 namespace love
 {
-namespace data
+namespace datamod
 {
 
 love::Type ByteData::type("ByteData", &Data::type);

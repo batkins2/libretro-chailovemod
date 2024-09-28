@@ -36,7 +36,7 @@ using love::thread::Mutex;
 
 namespace love
 {
-namespace image
+namespace imagemod
 {
 
 /**
@@ -108,7 +108,7 @@ public:
 	 * @param f The file to save the encoded image data to.
 	 * @param format The format of the encoded data.
 	 **/
-	love::filesystem::FileData *encode(FormatHandler::EncodedFormat format, const char *filename, bool writefile) const;
+	love::filesystemmod::FileData *encode(FormatHandler::EncodedFormat format, const char *filename, bool writefile) const;
 
 	// Implements ImageDataBase.
 	ImageData *clone() const override;

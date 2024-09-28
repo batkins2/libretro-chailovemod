@@ -24,7 +24,7 @@
 
 namespace love
 {
-namespace image
+namespace imagemod
 {
 
 FormatHandler::FormatHandler()

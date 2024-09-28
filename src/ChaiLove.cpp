@@ -90,6 +90,7 @@ bool ChaiLove::load(const std::string& file, const void* data) {
 
 	console.load(config);
 	graphics.load();
+	gfx.load();
 	image.load();
 	keyboard.load();
 	joystick.load();

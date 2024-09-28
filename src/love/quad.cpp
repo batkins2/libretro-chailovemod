@@ -26,7 +26,7 @@
 
 namespace love
 {
-namespace graphics
+namespace gfx
 {
 
 love::Type Quad::type("Quad", &Object::type);

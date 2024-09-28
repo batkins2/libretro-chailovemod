@@ -26,7 +26,7 @@
 
 namespace love
 {
-namespace image
+namespace imagemod
 {
 
 class ImageDataBase : public Data

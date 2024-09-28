@@ -23,7 +23,7 @@
 
 namespace love
 {
-namespace image
+namespace imagemod
 {
 
 love::Type CompressedImageData::type("CompressedImageData", &Data::type);

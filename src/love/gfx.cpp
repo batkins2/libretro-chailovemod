@@ -340,8 +340,8 @@ ShaderStage *graphics::newShaderStage(ShaderStageType stage, const std::string &
 
 	if (cache && !source.empty())
 	{
-		data::HashFunction::Value hashvalue;
-		data::hash(data::HashFunction::FUNCTION_SHA1, source.c_str(), source.size(), hashvalue);
+		datamod::HashFunction::Value hashvalue;
+		datamod::hash(datamod::HashFunction::FUNCTION_SHA1, source.c_str(), source.size(), hashvalue);
 
 		cachekey = std::string(hashvalue.data, hashvalue.size);
 
@@ -452,7 +452,7 @@ love::gfx::TextBatch *graphics::newTextBatch(gfx::FontMod *font, const std::vect
 	return new TextBatch(font, text);
 }
 
-love::data::ByteData *graphics::readbackBuffer(Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset)
+love::datamod::ByteData *graphics::readbackBuffer(Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset)
 {
 	StrongRef<GraphicsReadback> readback;
 	readback.set(newReadbackInternal(READBACK_IMMEDIATE, buffer, offset, size, dest, destoffset), Acquire::NORETAIN);
@@ -465,7 +465,7 @@ love::data::ByteData *graphics::readbackBuffer(Buffer *buffer, size_t offset, si
 	return data;
 }
 
-GraphicsReadback *graphics::readbackBufferAsync(Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset)
+GraphicsReadback *graphics::readbackBufferAsync(Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset)
 {
 	auto readback = newReadbackInternal(READBACK_ASYNC, buffer, offset, size, dest, destoffset);
 	pendingReadbacks.push_back(readback);

@@ -34,7 +34,7 @@ class ImageData;
 class CompressedImageData;
 }
 
-namespace love::data
+namespace love::datamod
 {
 class ByteData;
 }
@@ -68,7 +68,7 @@ public:
 
 	static love::Type type;
 
-	GraphicsReadback(graphics *gfx, ReadbackMethod method, Buffer *buffer, size_t offset, size_t size, love::data::ByteData *dest, size_t destoffset);
+	GraphicsReadback(graphics *gfx, ReadbackMethod method, Buffer *buffer, size_t offset, size_t size, love::datamod::ByteData *dest, size_t destoffset);
 	GraphicsReadback(graphics *gfx, ReadbackMethod method, Texture *texture, int slice, int mipmap, const Rect &rect, love::image::ImageData *dest, int destx, int desty);
 	virtual ~GraphicsReadback();
 
@@ -79,7 +79,7 @@ public:
 	ReadbackMethod getMethod() const { return method; }
 	bool hasError() const { return status == STATUS_ERROR; }
 
-	love::data::ByteData *getBufferData() const;
+	love::datamod::ByteData *getBufferData() const;
 	love::image::ImageData *getImageData() const;
 
 protected:
@@ -97,7 +97,7 @@ protected:
 	ReadbackMethod method;
 	Status status = STATUS_WAITING;
 
-	StrongRef<love::data::ByteData> bufferData;
+	StrongRef<love::datamod::ByteData> bufferData;
 	size_t bufferDataOffset = 0;
 
 	StrongRef<love::image::ImageData> imageData;

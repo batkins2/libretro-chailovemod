@@ -22,7 +22,7 @@
 
 namespace love
 {
-namespace image
+namespace imagemod
 {
 
 ImageDataBase::ImageDataBase(PixelFormat format, int width, int height)

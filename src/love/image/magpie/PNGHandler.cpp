@@ -38,7 +38,7 @@
 
 namespace love
 {
-namespace image
+namespace imagemod
 {
 namespace magpie
 {

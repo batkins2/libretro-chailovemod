@@ -28,7 +28,7 @@ using love::thread::Lock;
 
 namespace love
 {
-namespace image
+namespace imagemod
 {
 
 love::Type ImageData::type("ImageData", &Data::type);

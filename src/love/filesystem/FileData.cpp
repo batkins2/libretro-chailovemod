@@ -26,7 +26,7 @@
 
 namespace love
 {
-namespace filesystem
+namespace filesystemmod
 {
 
 love::Type FileData::type("FileData", &Data::type);

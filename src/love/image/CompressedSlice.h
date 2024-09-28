@@ -28,10 +28,10 @@
 
 namespace love
 {
-namespace image
+namespace imagemod
 {
 
-using ByteData = love::data::ByteData;
+using ByteData = love::datamod::ByteData;
 
 // Compressed image data can have multiple mipmap levels, each represented by a
 // sub-image.

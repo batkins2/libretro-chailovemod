@@ -23,7 +23,7 @@
 
 namespace love
 {
-namespace image
+namespace imagemod
 {
 
 CompressedSlice::CompressedSlice(PixelFormat format, int width, int height, ByteData *memory, size_t offset, size_t size)

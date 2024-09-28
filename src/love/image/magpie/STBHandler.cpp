@@ -52,7 +52,7 @@ static void loveSTBIAssert(bool test, const char *teststr)
 
 namespace love
 {
-namespace image
+namespace imagemod
 {
 namespace magpie
 {
