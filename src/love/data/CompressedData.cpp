@@ -24,7 +24,7 @@
 
 namespace love
 {
-namespace data
+namespace datamod
 {
 
 love::Type CompressedData::type("CompressedData", &Data::type);

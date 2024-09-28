@@ -114,7 +114,7 @@ love::uint8 *hexToBytes(const char *src, size_t srclen, size_t &dstlen)
 
 namespace love
 {
-namespace data
+namespace datamod
 {
 
 CompressedData *compress(Compressor::Format format, const char *rawbytes, size_t rawsize, int level)

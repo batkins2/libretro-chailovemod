@@ -331,7 +331,7 @@ public:
 	};
 
 	struct ScreenshotInfo;
-	typedef void (*ScreenshotCallback)(const ScreenshotInfo *info, love::image::ImageData *i, void *ud);
+	typedef void (*ScreenshotCallback)(const ScreenshotInfo *info, love::imagemod::ImageData *i, void *ud);
 
 	struct ScreenshotInfo
 	{
@@ -474,8 +474,8 @@ public:
 	datamod::ByteData *readbackBuffer(Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset);
 	GraphicsReadback *readbackBufferAsync(Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset);
 
-	image::ImageData *readbackTexture(Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty);
-	GraphicsReadback *readbackTextureAsync(Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty);
+	imagemod::ImageData *readbackTexture(Texture *texture, int slice, int mipmap, const Rect &rect, imagemod::ImageData *dest, int destx, int desty);
+	GraphicsReadback *readbackTextureAsync(Texture *texture, int slice, int mipmap, const Rect &rect, imagemod::ImageData *dest, int destx, int desty);
 
 	bool validateShader(bool gles, const std::vector<std::string> &stages, const Shader::CompileOptions &options, std::string &err);
 
@@ -1017,7 +1017,7 @@ protected:
 	virtual StreamBuffer *newStreamBuffer(BufferUsage type, size_t size) = 0;
 
 	virtual GraphicsReadback *newReadbackInternal(ReadbackMethod method, Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset) = 0;
-	virtual GraphicsReadback *newReadbackInternal(ReadbackMethod method, Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty) = 0;
+	virtual GraphicsReadback *newReadbackInternal(ReadbackMethod method, Texture *texture, int slice, int mipmap, const Rect &rect, imagemod::ImageData *dest, int destx, int desty) = 0;
 
 	virtual bool dispatch(Shader *shader, int x, int y, int z) = 0;
 	virtual bool dispatch(Shader *shader, Buffer *indirectargs, size_t argsoffset) = 0;

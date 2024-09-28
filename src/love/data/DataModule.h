@@ -32,7 +32,7 @@
 
 namespace love
 {
-namespace data
+namespace datamod
 {
 
 enum EncodeFormat

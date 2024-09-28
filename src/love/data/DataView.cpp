@@ -24,7 +24,7 @@
 
 namespace love
 {
-namespace data
+namespace datamod
 {
 
 love::Type DataView::type("DataView", &Data::type);

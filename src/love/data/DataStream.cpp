@@ -27,7 +27,7 @@
 
 namespace love
 {
-namespace data
+namespace datamod
 {
 
 love::Type DataStream::type("DataStream", &Stream::type);

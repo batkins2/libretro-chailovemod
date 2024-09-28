@@ -28,7 +28,7 @@
 #include "common/StringMap.h"
 #include "common/pixelformat.h"
 
-namespace love::image
+namespace love::imagemod
 {
 class ImageData;
 class CompressedImageData;
@@ -69,7 +69,7 @@ public:
 	static love::Type type;
 
 	GraphicsReadback(graphics *gfx, ReadbackMethod method, Buffer *buffer, size_t offset, size_t size, love::datamod::ByteData *dest, size_t destoffset);
-	GraphicsReadback(graphics *gfx, ReadbackMethod method, Texture *texture, int slice, int mipmap, const Rect &rect, love::image::ImageData *dest, int destx, int desty);
+	GraphicsReadback(graphics *gfx, ReadbackMethod method, Texture *texture, int slice, int mipmap, const Rect &rect, love::imagemod::ImageData *dest, int destx, int desty);
 	virtual ~GraphicsReadback();
 
 	virtual void wait() = 0;
@@ -80,7 +80,7 @@ public:
 	bool hasError() const { return status == STATUS_ERROR; }
 
 	love::datamod::ByteData *getBufferData() const;
-	love::image::ImageData *getImageData() const;
+	love::imagemod::ImageData *getImageData() const;
 
 protected:
 
@@ -100,7 +100,7 @@ protected:
 	StrongRef<love::datamod::ByteData> bufferData;
 	size_t bufferDataOffset = 0;
 
-	StrongRef<love::image::ImageData> imageData;
+	StrongRef<love::imagemod::ImageData> imageData;
 	Rect rect = {};
 	PixelFormat textureFormat = PIXELFORMAT_UNKNOWN;
 	bool isFormatLinear = false;

@@ -472,7 +472,7 @@ GraphicsReadback *graphics::readbackBufferAsync(Buffer *buffer, size_t offset, s
 	return readback;
 }
 
-image::ImageData *graphics::readbackTexture(Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty)
+imagemod::ImageData *graphics::readbackTexture(Texture *texture, int slice, int mipmap, const Rect &rect, imagemod::ImageData *dest, int destx, int desty)
 {
 	StrongRef<GraphicsReadback> readback;
 	readback.set(newReadbackInternal(READBACK_IMMEDIATE, texture, slice, mipmap, rect, dest, destx, desty), Acquire::NORETAIN);
@@ -485,7 +485,7 @@ image::ImageData *graphics::readbackTexture(Texture *texture, int slice, int mip
 	return imagedata;
 }
 
-GraphicsReadback *graphics::readbackTextureAsync(Texture *texture, int slice, int mipmap, const Rect &rect, image::ImageData *dest, int destx, int desty)
+GraphicsReadback *graphics::readbackTextureAsync(Texture *texture, int slice, int mipmap, const Rect &rect, imagemod::ImageData *dest, int destx, int desty)
 {
 	auto readback = newReadbackInternal(READBACK_ASYNC, texture, slice, mipmap, rect, dest, destx, desty);
 	pendingReadbacks.push_back(readback);

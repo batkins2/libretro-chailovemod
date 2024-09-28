@@ -24,7 +24,7 @@
 
 namespace love
 {
-namespace data
+namespace datamod
 {
 
 class DataStream : public love::Stream

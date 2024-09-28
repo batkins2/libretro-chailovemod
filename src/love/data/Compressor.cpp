@@ -31,7 +31,7 @@
 
 namespace love
 {
-namespace data
+namespace datamod
 {
 
 class LZ4Compressor : public Compressor

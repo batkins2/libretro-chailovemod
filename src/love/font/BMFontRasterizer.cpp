@@ -204,8 +204,8 @@ void BMFontRasterizer::parseConfig(const std::string &configtext)
 			// Load the page file from disk into an ImageData, if necessary.
 			if (images[pageindex].get() == nullptr)
 			{
-				using namespace love::filesystem;
-				using namespace love::image;
+				using namespace love::filesystemmod;
+				using namespace love::imagemod;
 
 				auto filesystem  = Module::getInstance<Filesystem>(Module::M_FILESYSTEM);
 				auto imagemodule = Module::getInstance<image::Image>(Module::M_IMAGE);
