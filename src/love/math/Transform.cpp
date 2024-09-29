@@ -22,7 +22,7 @@
 
 namespace love
 {
-namespace math
+namespace mathmod
 {
 
 love::Type Transform::type("Transform", &Object::type);
