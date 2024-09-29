@@ -224,7 +224,7 @@ static int dropFileEventFilter(void *userdata, SDL_Event *event)
 {
 	@synchronized (self)
 	{
-		auto audio = love::Module::getInstance<love::audio::Audio>(love::Module::M_AUDIO);
+		auto audio = love::Module::getInstance<love::audiomod::Audio>(love::Module::M_AUDIO);
 		if (!audio)
 		{
 			NSLog(@"LoveAudioInterruptionListener could not get love audio module");
@@ -242,7 +242,7 @@ static int dropFileEventFilter(void *userdata, SDL_Event *event)
 {
 	@synchronized (self)
 	{
-		auto audio = love::Module::getInstance<love::audio::Audio>(love::Module::M_AUDIO);
+		auto audio = love::Module::getInstance<love::audiomod::Audio>(love::Module::M_AUDIO);
 		if (!audio)
 		{
 			NSLog(@"ERROR:could not get love audio module");

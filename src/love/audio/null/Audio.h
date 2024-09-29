@@ -42,19 +42,19 @@ public:
 	virtual ~Audio();
 
 	// Implements Audio.
-	love::audio::Source *newSource(love::sound::Decoder *decoder);
-	love::audio::Source *newSource(love::sound::SoundData *soundData);
-	love::audio::Source *newSource(int sampleRate, int bitDepth, int channels, int buffers);
+	love::audiomod::Source *newSource(love::sound::Decoder *decoder);
+	love::audiomod::Source *newSource(love::sound::SoundData *soundData);
+	love::audiomod::Source *newSource(int sampleRate, int bitDepth, int channels, int buffers);
 	int getActiveSourceCount() const;
 	int getMaxSources() const;
-	bool play(love::audio::Source *source);
-	bool play(const std::vector<love::audio::Source*> &sources);
-	void stop(love::audio::Source *source);
-	void stop(const std::vector<love::audio::Source*> &sources);
+	bool play(love::audiomod::Source *source);
+	bool play(const std::vector<love::audiomod::Source*> &sources);
+	void stop(love::audiomod::Source *source);
+	void stop(const std::vector<love::audiomod::Source*> &sources);
 	void stop();
-	void pause(love::audio::Source *source);
-	void pause(const std::vector<love::audio::Source*> &sources);
-	std::vector<love::audio::Source*> pause();
+	void pause(love::audiomod::Source *source);
+	void pause(const std::vector<love::audiomod::Source*> &sources);
+	std::vector<love::audiomod::Source*> pause();
 	void setVolume(float volume);
 	float getVolume() const;
 
@@ -70,7 +70,7 @@ public:
 	//void setMeter(float scale);
 	//float getMeter() const;
 
-	const std::vector<love::audio::RecordingDevice*> &getRecordingDevices();
+	const std::vector<love::audiomod::RecordingDevice*> &getRecordingDevices();
 
 	DistanceModel getDistanceModel() const;
 	void setDistanceModel(DistanceModel distanceModel);
@@ -92,7 +92,7 @@ public:
 private:
 	float volume;
 	DistanceModel distanceModel;
-	std::vector<love::audio::RecordingDevice*> capture;
+	std::vector<love::audiomod::RecordingDevice*> capture;
 
 }; // Audio
 

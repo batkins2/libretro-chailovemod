@@ -28,7 +28,7 @@ namespace null
 {
 
 Source::Source()
-	: love::audio::Source(Source::TYPE_STATIC)
+	: love::audiomod::Source(Source::TYPE_STATIC)
 {
 }
 
@@ -36,7 +36,7 @@ Source::~Source()
 {
 }
 
-love::audio::Source *Source::clone()
+love::audiomod::Source *Source::clone()
 {
 	this->retain();
 	return this;

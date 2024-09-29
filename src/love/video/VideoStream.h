@@ -134,7 +134,7 @@ public:
 	class SourceSync : public FrameSync
 	{
 	public:
-		SourceSync(love::audio::Source *source);
+		SourceSync(love::audiomod::Source *source);
 
 		virtual double getPosition() const override;
 		virtual void play() override;
@@ -143,7 +143,7 @@ public:
 		virtual bool isPlaying() const override;
 
 	private:
-		StrongRef<love::audio::Source> source;
+		StrongRef<love::audiomod::Source> source;
 	};
 
 protected:

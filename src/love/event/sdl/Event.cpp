@@ -821,7 +821,7 @@ Message *Event::convertWindowEvent(const SDL_Event &e)
 	case SDL_EVENT_WINDOW_MINIMIZED:
 	case SDL_EVENT_WINDOW_RESTORED:
 #ifdef LOVE_ANDROID
-		if (auto audio = Module::getInstance<audio::Audio>(Module::M_AUDIO))
+		if (auto audio = Module::getInstance<audiomod::Audio>(Module::M_AUDIO))
 		{
 			if (event == SDL_EVENT_WINDOW_MINIMIZED)
 				audio->pauseContext();

@@ -182,12 +182,12 @@ void Video::update()
 	}
 }
 
-love::audio::Source *Video::getSource()
+love::audiomod::Source *Video::getSource()
 {
 	return source;
 }
 
-void Video::setSource(love::audio::Source *source)
+void Video::setSource(love::audiomod::Source *source)
 {
 	this->source = source;
 }

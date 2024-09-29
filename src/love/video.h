@@ -49,8 +49,8 @@ public:
 
 	love::video::VideoStream *getStream();
 
-	love::audio::Source *getSource();
-	void setSource(love::audio::Source *source);
+	love::audiomod::Source *getSource();
+	void setSource(love::audiomod::Source *source);
 
 	int getWidth() const;
 	int getHeight() const;
@@ -75,8 +75,8 @@ private:
 	Vertex vertices[4];
 
 	StrongRef<Texture> textures[3];
-	StrongRef<love::audio::Source> source;
-	
+	StrongRef<love::audiomod::Source> source;
+
 }; // Video
 
 } // graphics

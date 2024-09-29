@@ -28,7 +28,7 @@ namespace null
 {
 
 Audio::Audio()
-	: love::audio::Audio("love.audio.null")
+	: love::audiomod::Audio("love.audiomod.null")
 	, distanceModel(DISTANCE_NONE)
 {
 }
@@ -37,17 +37,17 @@ Audio::~Audio()
 {
 }
 
-love::audio::Source *Audio::newSource(love::sound::Decoder *)
+love::audiomod::Source *Audio::newSource(love::sound::Decoder *)
 {
 	return new Source();
 }
 
-love::audio::Source *Audio::newSource(love::sound::SoundData *)
+love::audiomod::Source *Audio::newSource(love::sound::SoundData *)
 {
 	return new Source();
 }
 
-love::audio::Source *Audio::newSource(int, int, int, int)
+love::audiomod::Source *Audio::newSource(int, int, int, int)
 {
 	return new Source();
 }
@@ -62,21 +62,21 @@ int Audio::getMaxSources() const
 	return 0;
 }
 
-bool Audio::play(love::audio::Source *)
+bool Audio::play(love::audiomod::Source *)
 {
 	return false;
 }
 
-bool Audio::play(const std::vector<love::audio::Source*>&)
+bool Audio::play(const std::vector<love::audiomod::Source*>&)
 {
 	return false;
 }
 
-void Audio::stop(love::audio::Source *)
+void Audio::stop(love::audiomod::Source *)
 {
 }
 
-void Audio::stop(const std::vector<love::audio::Source*>&)
+void Audio::stop(const std::vector<love::audiomod::Source*>&)
 {
 }
 
@@ -84,15 +84,15 @@ void Audio::stop()
 {
 }
 
-void Audio::pause(love::audio::Source *)
+void Audio::pause(love::audiomod::Source *)
 {
 }
 
-void Audio::pause(const std::vector<love::audio::Source*>&)
+void Audio::pause(const std::vector<love::audiomod::Source*>&)
 {
 }
 
-std::vector<love::audio::Source*> Audio::pause()
+std::vector<love::audiomod::Source*> Audio::pause()
 {
 	return {};
 }
@@ -149,7 +149,7 @@ float getMeter() const
 	return 1.0f;
 }
 */
-const std::vector<love::audio::RecordingDevice*> &Audio::getRecordingDevices()
+const std::vector<love::audiomod::RecordingDevice*> &Audio::getRecordingDevices()
 {
 	return capture;
 }

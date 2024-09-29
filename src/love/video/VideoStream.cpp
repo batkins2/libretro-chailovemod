@@ -136,14 +136,14 @@ bool VideoStream::DeltaSync::isPlaying() const
 	return playing;
 }
 
-VideoStream::SourceSync::SourceSync(love::audio::Source *source)
+VideoStream::SourceSync::SourceSync(love::audiomod::Source *source)
 	: source(source)
 {
 }
 
 double VideoStream::SourceSync::getPosition() const
 {
-	return source->tell(love::audio::Source::UNIT_SECONDS);
+	return source->tell(love::audiomod::Source::UNIT_SECONDS);
 }
 
 void VideoStream::SourceSync::play()
@@ -158,7 +158,7 @@ void VideoStream::SourceSync::pause()
 
 void VideoStream::SourceSync::seek(double time)
 {
-	source->seek(time, love::audio::Source::UNIT_SECONDS);
+	source->seek(time, love::audiomod::Source::UNIT_SECONDS);
 }
 
 bool VideoStream::SourceSync::isPlaying() const
