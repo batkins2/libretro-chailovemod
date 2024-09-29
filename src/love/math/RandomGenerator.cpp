@@ -30,7 +30,7 @@
 
 namespace love
 {
-namespace math
+namespace mathmod
 {
 
 // Thomas Wang's 64-bit integer hashing function:
