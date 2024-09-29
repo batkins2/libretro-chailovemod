@@ -34,7 +34,7 @@
 
 namespace love
 {
-namespace math
+namespace mathmod
 {
 
 class RandomGenerator : public Object
