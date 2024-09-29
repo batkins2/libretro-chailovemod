@@ -28,7 +28,7 @@
 
 namespace love
 {
-namespace math
+namespace mathmod
 {
 
 class Transform : public Object
