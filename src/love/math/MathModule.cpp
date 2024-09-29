@@ -84,7 +84,7 @@ inline bool is_ear(const Vector2 &a, const Vector2 &b, const Vector2 &c, const s
 
 namespace love
 {
-namespace math
+namespace mathmod
 {
 
 std::vector<Triangle> triangulate(const std::vector<love::Vector2> &polygon)
