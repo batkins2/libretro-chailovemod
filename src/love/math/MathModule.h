@@ -38,7 +38,7 @@
 
 namespace love
 {
-namespace math
+namespace mathmod
 {
 
 class BezierCurve;
