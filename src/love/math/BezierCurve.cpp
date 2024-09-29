@@ -83,7 +83,7 @@ void subdivide(vector<love::Vector2> &points, int k)
 
 namespace love
 {
-namespace math
+namespace mathmod
 {
 
 love::Type BezierCurve::type("BezierCurve", &Object::type);
