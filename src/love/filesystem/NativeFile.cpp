@@ -38,7 +38,7 @@
 
 namespace love
 {
-namespace filesystem
+namespace filesystemmod
 {
 
 love::Type NativeFile::type("NativeFile", &File::type);

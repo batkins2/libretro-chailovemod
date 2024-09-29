@@ -48,7 +48,7 @@ Data *Stream::read(int64 size)
 	if (cur + size > max)
 		size = max - cur;
 
-	StrongRef<data::ByteData> dst(new data::ByteData(size, false), Acquire::NORETAIN);
+	StrongRef<datamod::ByteData> dst(new datamod::ByteData(size, false), Acquire::NORETAIN);
 
 	int64 bytesRead = read(dst->getData(), size);
 
@@ -56,7 +56,7 @@ Data *Stream::read(int64 size)
 		throw love::Exception("Could not read from stream.");
 
 	if (bytesRead < size)
-		dst.set(new data::ByteData(dst->getData(), (size_t) bytesRead), Acquire::NORETAIN);
+		dst.set(new datamod::ByteData(dst->getData(), (size_t) bytesRead), Acquire::NORETAIN);
 
 	dst->retain();
 	return dst;

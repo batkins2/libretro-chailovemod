@@ -55,7 +55,7 @@
 
 namespace love
 {
-namespace filesystem
+namespace filesystemmod
 {
 
 class Filesystem : public Module

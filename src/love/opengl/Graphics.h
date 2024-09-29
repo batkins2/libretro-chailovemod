@@ -138,7 +138,7 @@ private:
 	love::gfx::Shader *newShaderInternal(StrongRef<love::gfx::ShaderStage> stages[SHADERSTAGE_MAX_ENUM], const Shader::CompileOptions &options) override;
 	love::gfx::StreamBuffer *newStreamBuffer(BufferUsage type, size_t size) override;
 
-	love::gfx::GraphicsReadback *newReadbackInternal(ReadbackMethod method, love::gfx::Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset) override;
+	love::gfx::GraphicsReadback *newReadbackInternal(ReadbackMethod method, love::gfx::Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset) override;
 	love::gfx::GraphicsReadback *newReadbackInternal(ReadbackMethod method, love::gfx::Texture *texture, int slice, int mipmap, const Rect &rect, imagemod::ImageData *dest, int destx, int desty) override;
 
 	void setRenderTargetsInternal(const RenderTargets &rts, int pixelw, int pixelh, bool hasSRGBtexture) override;

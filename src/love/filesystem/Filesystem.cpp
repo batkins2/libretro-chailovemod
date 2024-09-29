@@ -189,7 +189,7 @@ std::string Filesystem::canonicalizeRealPath(const std::string &p) const
 {
 	try
 	{
-		return std::filesystemmod::weakly_canonical(p).string();
+		return std::filesystem::weakly_canonical(p).string();
 	}
 	catch (std::exception &)
 	{

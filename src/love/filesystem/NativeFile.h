@@ -27,7 +27,7 @@
 
 namespace love
 {
-namespace filesystem
+namespace filesystemmod
 {
 
 /**

@@ -31,7 +31,7 @@ namespace gfx
 namespace opengl
 {
 
-GraphicsReadback::GraphicsReadback(love::gfx::graphics *gfx, ReadbackMethod method, love::gfx::Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset)
+GraphicsReadback::GraphicsReadback(love::gfx::graphics *gfx, ReadbackMethod method, love::gfx::Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset)
 	: love::gfx::GraphicsReadback(gfx, method, buffer, offset, size, dest, destoffset)
 {
 	// Immediate readback of readback-type buffers doesn't need a staging buffer.

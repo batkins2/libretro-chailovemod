@@ -142,6 +142,7 @@ script::script(const std::string& file) {
 		love["filesystem"] = var(std::ref(app->filesystem));
 		love["font"] = var(std::ref(app->font));
 		love["graphics"] = var(std::ref(app->graphics));
+		love["gfx"] = var(std::ref(app->gfx));
 		love["image"] = var(std::ref(app->image));
 		love["joystick"] = var(std::ref(app->joystick));
 		love["keyboard"] = var(std::ref(app->keyboard));
@@ -301,6 +302,9 @@ script::script(const std::string& file) {
 	chai.add(fun<love::graphics&, graphics, int, int, int, int>(&graphics::clear), "clear");
 	chai.add(fun<love::graphics&, graphics, int, int, int>(&graphics::clear), "clear");
 	chai.add(fun<love::graphics&, graphics>(&graphics::clear), "clear");
+
+	// Gfx
+	chai.add(fun(&gfx::graphics::newShader), "newShader");
 
 	// Font
 	chai.add(fun(&font::isOpen), "isOpen");

@@ -178,7 +178,7 @@ love::gfx::Buffer *Graphics::newBuffer(const Buffer::Settings &settings, const s
 	return new Buffer(this, settings, format, data, size, arraylength);
 }
 
-love::gfx::GraphicsReadback *Graphics::newReadbackInternal(ReadbackMethod method, love::gfx::Buffer *buffer, size_t offset, size_t size, data::ByteData *dest, size_t destoffset)
+love::gfx::GraphicsReadback *Graphics::newReadbackInternal(ReadbackMethod method, love::gfx::Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset)
 {
 	return new GraphicsReadback(this, method, buffer, offset, size, dest, destoffset);
 }

@@ -51,7 +51,7 @@
 
 #include "SDL2/SDL.h"
 #include "libretro.h"
-// #include "pgl.h"
+#include "love/common/Module.h"
 #include "love/keyboard.h"
 #include "love/config.h"
 #include "love/data.h"
@@ -90,7 +90,6 @@ class ChaiLove {
 	love::data data;
 	love::filesystem filesystem;
 	love::graphics graphics;
-	love::gfx gfx;
 	love::image image;
 	love::system system;
 	love::sound sound;
@@ -102,6 +101,8 @@ class ChaiLove {
 	love::math math;
 	love::window window;
 	love::event event;
+
+	love::gfx::graphics *gfx = (love::Module::getInstance<love::gfx::graphics>(love::Module::M_GRAPHICS));
 
 	~ChaiLove();
 	void quit(void);
