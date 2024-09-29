@@ -39,7 +39,7 @@ namespace gfx
 namespace
 {
 
-love::math::RandomGenerator rng;
+love::mathmod::RandomGenerator rng;
 
 float calculate_variation(float inner, float outer, float var)
 {

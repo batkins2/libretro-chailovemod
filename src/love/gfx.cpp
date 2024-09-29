@@ -61,9 +61,9 @@ void gammaCorrectColor(Colorf &c)
 {
 	if (isGammaCorrect())
 	{
-		c.r = math::gammaToLinear(c.r);
-		c.g = math::gammaToLinear(c.g);
-		c.b = math::gammaToLinear(c.b);
+		c.r = mathmod::gammaToLinear(c.r);
+		c.g = mathmod::gammaToLinear(c.g);
+		c.b = mathmod::gammaToLinear(c.b);
 	}
 }
 
@@ -78,9 +78,9 @@ void unGammaCorrectColor(Colorf &c)
 {
 	if (isGammaCorrect())
 	{
-		c.r = math::linearToGamma(c.r);
-		c.g = math::linearToGamma(c.g);
-		c.b = math::linearToGamma(c.b);
+		c.r = mathmod::linearToGamma(c.r);
+		c.g = mathmod::linearToGamma(c.g);
+		c.b = mathmod::linearToGamma(c.b);
 	}
 }
 
