@@ -102,7 +102,7 @@ class ChaiLove {
 	love::math math;
 	love::window window;
 	love::event event;
-	love::chai_gfx chai_gfx;
+	love::graphics::chai_gfx chai_gfx;
 
 	~ChaiLove();
 	void quit(void);

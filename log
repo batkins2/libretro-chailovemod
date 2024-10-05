@@ -1,7 +1,7 @@
-CXX src/love/chai_gfx.cpp
-src/love/chai_gfx.cpp: In constructor ‘love::chai_gfx::chai_gfx()’:
-src/love/chai_gfx.cpp:10:16: error: ‘opengl’ has not been declared
-   10 |     instance = opengl::createInstance();
-      |                ^~~~~~
+CXX src/love/gfx.cpp
+In file included from src/love/gfx.cpp:32:
+src/love/video.h:39:1: error: expected class-name before ‘{’ token
+   39 | {
+      | ^
 compilation terminated due to -Wfatal-errors.
-make: *** [Makefile:31: src/love/chai_gfx.o] Error 1
+make: *** [Makefile:31: src/love/gfx.o] Error 1

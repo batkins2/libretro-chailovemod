@@ -33,7 +33,7 @@ namespace love
 namespace gfx
 {
 
-class graphics;
+class Graphics;
 
 class Video : public Drawable
 {
@@ -41,11 +41,11 @@ public:
 
 	static love::Type type;
 
-	Video(graphics *gfx, love::video::VideoStream *stream, float dpiscale = 1.0f);
+	Video(Graphics *gfx, love::video::VideoStream *stream, float dpiscale = 1.0f);
 	virtual ~Video();
 
 	// Drawable
-	void draw(graphics *gfx, const Matrix4 &m) override;
+	void draw(Graphics *gfx, const Matrix4 &m) override;
 
 	love::video::VideoStream *getStream();
 

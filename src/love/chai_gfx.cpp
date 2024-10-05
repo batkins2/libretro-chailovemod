@@ -4,14 +4,15 @@
 #include "opengl/Graphics.h"
 namespace love
 {
+namespace gfx
+{
 // #define instance() (Module::getInstance<gfx::opengl::Graphics>(Module::M_GRAPHICS))
 
 chai_gfx::chai_gfx() {
-    instance = gfx::graphics::createInstance();
+    instance = Graphics::createInstance();
 }
 
 chai_gfx& chai_gfx::wrap_newShader(const std::string *FileName) {
-    using love::chai_gfx;
     if (instance->isCreated()) {
         auto file = Module::getInstance<filesystemmod::Filesystem>(Module::M_FILESYSTEM);
         std::string data = (const char *) file->read(FileName->c_str())->getData();
@@ -30,4 +31,5 @@ chai_gfx& chai_gfx::wrap_newShader(const std::string *FileName) {
 void load() {
 }
 
+}
 }

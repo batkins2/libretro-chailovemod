@@ -105,12 +105,12 @@ bool isDebugEnabled()
 
 love::Type type("Graphics", &Module::type);
 
-namespace opengl { extern love::gfx::graphics *createInstance(); }
+namespace opengl { extern love::gfx::Graphics *createInstance(); }
 // #ifdef LOVE_GRAPHICS_METAL
-// namespace metal { extern love::gfx::graphics *createInstance(); }
+// namespace metal { extern love::gfx::Graphics *createInstance(); }
 // #endif
 // #ifdef LOVE_GRAPHICS_VULKAN
-// namespace vulkan { extern love::gfx::graphics* createInstance(); }
+// namespace vulkan { extern love::gfx::Graphics* createInstance(); }
 // #endif
 
 static const Renderer rendererOrder[] = {
@@ -143,9 +143,9 @@ void setRenderers(const std::vector<Renderer> &renderers)
 	_renderers = renderers;
 }
 
-graphics *createInstance()
+love::gfx::Graphics *createInstance()
 {
-	graphics *instance = Module::getInstance<graphics>(Module::M_GRAPHICS);
+	love::gfx::Graphics *instance = Module::getInstance<Graphics>(Module::M_GRAPHICS);
 
 	if (instance != nullptr)
 		instance->retain();
@@ -175,12 +175,12 @@ graphics *createInstance()
 	return instance;
 }
 
-graphics::DisplayState::DisplayState()
+Graphics::DisplayState::DisplayState()
 {
 	defaultSamplerState.mipmapFilter = SamplerState::MIPMAP_FILTER_LINEAR;
 }
 
-graphics::graphics(const char *name)
+Graphics::Graphics(const char *name)
 	: Module(M_GRAPHICS, name)
 	, width(0)
 	, height(0)
@@ -216,7 +216,7 @@ graphics::graphics(const char *name)
 		throw love::Exception("Shader support failed to initialize!");
 }
 
-graphics::~graphics()
+Graphics::~Graphics()
 {
 	if (quadIndexBuffer != nullptr)
 		quadIndexBuffer->release();
@@ -258,7 +258,7 @@ graphics::~graphics()
 	Shader::deinitialize();
 }
 
-void graphics::createQuadIndexBuffer()
+void Graphics::createQuadIndexBuffer()
 {
 	if (quadIndexBuffer != nullptr)
 		return;
@@ -276,7 +276,7 @@ void graphics::createQuadIndexBuffer()
 	quadIndexBuffer->setImmutable(true);
 }
 
-void graphics::createFanIndexBuffer()
+void Graphics::createFanIndexBuffer()
 {
 	if (fanIndexBuffer != nullptr)
 		return;
@@ -292,17 +292,17 @@ void graphics::createFanIndexBuffer()
 	fanIndexBuffer->setImmutable(true);
 }
 
-Quad *graphics::newQuad(Quad::Viewport v, double sw, double sh)
+Quad *Graphics::newQuad(Quad::Viewport v, double sw, double sh)
 {
 	return new Quad(v, sw, sh);
 }
 
-FontMod *graphics::newFont(love::fontmod::Rasterizer *data)
+FontMod *Graphics::newFont(love::fontmod::Rasterizer *data)
 {
 	return new FontMod(data, states.back().defaultSamplerState);
 }
 
-FontMod *graphics::newDefaultFont(int size, const fontmod::TrueTypeRasterizer::Settings &settings)
+FontMod *Graphics::newDefaultFont(int size, const fontmod::TrueTypeRasterizer::Settings &settings)
 {
 	auto fontmodule = Module::getInstance<fontmod::FontMod>(M_FONT);
 	if (!fontmodule)
@@ -312,22 +312,22 @@ FontMod *graphics::newDefaultFont(int size, const fontmod::TrueTypeRasterizer::S
 	return newFont(r.get());
 }
 
-Video *graphics::newVideo(love::video::VideoStream *stream, float dpiscale)
+Video *Graphics::newVideo(love::video::VideoStream *stream, float dpiscale)
 {
 	return new Video(this, stream, dpiscale);
 }
 
-love::gfx::SpriteBatch *graphics::newSpriteBatch(Texture *texture, int size, BufferDataUsage usage)
+love::gfx::SpriteBatch *Graphics::newSpriteBatch(Texture *texture, int size, BufferDataUsage usage)
 {
 	return new SpriteBatch(this, texture, size, usage);
 }
 
-love::gfx::ParticleSystem *graphics::newParticleSystem(Texture *texture, int size)
+love::gfx::ParticleSystem *Graphics::newParticleSystem(Texture *texture, int size)
 {
 	return new ParticleSystem(texture, size);
 }
 
-ShaderStage *graphics::newShaderStage(ShaderStageType stage, const std::string &source, const Shader::CompileOptions &options, const Shader::SourceInfo &info, bool cache)
+ShaderStage *Graphics::newShaderStage(ShaderStageType stage, const std::string &source, const Shader::CompileOptions &options, const Shader::SourceInfo &info, bool cache)
 {
 	ShaderStage *s = nullptr;
 	std::string cachekey;
@@ -365,7 +365,7 @@ ShaderStage *graphics::newShaderStage(ShaderStageType stage, const std::string &
 	return s;
 }
 
-Shader *graphics::newShader(const std::vector<std::string> &stagessource, const Shader::CompileOptions &options)
+Shader *Graphics::newShader(const std::vector<std::string> &stagessource, const Shader::CompileOptions &options)
 {
 	StrongRef<ShaderStage> stages[SHADERSTAGE_MAX_ENUM] = {};
 
@@ -410,7 +410,7 @@ Shader *graphics::newShader(const std::vector<std::string> &stagessource, const 
 	return newShaderInternal(stages, options);
 }
 
-Shader *graphics::newComputeShader(const std::string &source, const Shader::CompileOptions &options)
+Shader *Graphics::newComputeShader(const std::string &source, const Shader::CompileOptions &options)
 {
 	Shader::SourceInfo info = Shader::getSourceInfo(source);
 
@@ -426,33 +426,33 @@ Shader *graphics::newComputeShader(const std::string &source, const Shader::Comp
 	return newShaderInternal(stages, options);
 }
 
-Buffer *graphics::newBuffer(const Buffer::Settings &settings, DataFormat format, const void *data, size_t size, size_t arraylength)
+Buffer *Graphics::newBuffer(const Buffer::Settings &settings, DataFormat format, const void *data, size_t size, size_t arraylength)
 {
 	std::vector<Buffer::DataDeclaration> dataformat = {{"", format, 0}};
 	return newBuffer(settings, dataformat, data, size, arraylength);
 }
 
-Mesh *graphics::newMesh(const std::vector<Buffer::DataDeclaration> &vertexformat, int vertexcount, PrimitiveType drawmode, BufferDataUsage usage)
+Mesh *Graphics::newMesh(const std::vector<Buffer::DataDeclaration> &vertexformat, int vertexcount, PrimitiveType drawmode, BufferDataUsage usage)
 {
 	return new Mesh(this, vertexformat, vertexcount, drawmode, usage);
 }
 
-Mesh *graphics::newMesh(const std::vector<Buffer::DataDeclaration> &vertexformat, const void *data, size_t datasize, PrimitiveType drawmode, BufferDataUsage usage)
+Mesh *Graphics::newMesh(const std::vector<Buffer::DataDeclaration> &vertexformat, const void *data, size_t datasize, PrimitiveType drawmode, BufferDataUsage usage)
 {
 	return new Mesh(this, vertexformat, data, datasize, drawmode, usage);
 }
 
-Mesh *graphics::newMesh(const std::vector<Mesh::BufferAttribute> &attributes, PrimitiveType drawmode)
+Mesh *Graphics::newMesh(const std::vector<Mesh::BufferAttribute> &attributes, PrimitiveType drawmode)
 {
 	return new Mesh(attributes, drawmode);
 }
 
-love::gfx::TextBatch *graphics::newTextBatch(gfx::FontMod *font, const std::vector<love::fontmod::ColoredString> &text)
+love::gfx::TextBatch *Graphics::newTextBatch(gfx::FontMod *font, const std::vector<love::fontmod::ColoredString> &text)
 {
 	return new TextBatch(font, text);
 }
 
-love::datamod::ByteData *graphics::readbackBuffer(Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset)
+love::datamod::ByteData *Graphics::readbackBuffer(Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset)
 {
 	StrongRef<GraphicsReadback> readback;
 	readback.set(newReadbackInternal(READBACK_IMMEDIATE, buffer, offset, size, dest, destoffset), Acquire::NORETAIN);
@@ -465,14 +465,14 @@ love::datamod::ByteData *graphics::readbackBuffer(Buffer *buffer, size_t offset,
 	return data;
 }
 
-GraphicsReadback *graphics::readbackBufferAsync(Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset)
+GraphicsReadback *Graphics::readbackBufferAsync(Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset)
 {
 	auto readback = newReadbackInternal(READBACK_ASYNC, buffer, offset, size, dest, destoffset);
 	pendingReadbacks.push_back(readback);
 	return readback;
 }
 
-imagemod::ImageData *graphics::readbackTexture(Texture *texture, int slice, int mipmap, const Rect &rect, imagemod::ImageData *dest, int destx, int desty)
+imagemod::ImageData *Graphics::readbackTexture(Texture *texture, int slice, int mipmap, const Rect &rect, imagemod::ImageData *dest, int destx, int desty)
 {
 	StrongRef<GraphicsReadback> readback;
 	readback.set(newReadbackInternal(READBACK_IMMEDIATE, texture, slice, mipmap, rect, dest, destx, desty), Acquire::NORETAIN);
@@ -485,19 +485,19 @@ imagemod::ImageData *graphics::readbackTexture(Texture *texture, int slice, int 
 	return imagedata;
 }
 
-GraphicsReadback *graphics::readbackTextureAsync(Texture *texture, int slice, int mipmap, const Rect &rect, imagemod::ImageData *dest, int destx, int desty)
+GraphicsReadback *Graphics::readbackTextureAsync(Texture *texture, int slice, int mipmap, const Rect &rect, imagemod::ImageData *dest, int destx, int desty)
 {
 	auto readback = newReadbackInternal(READBACK_ASYNC, texture, slice, mipmap, rect, dest, destx, desty);
 	pendingReadbacks.push_back(readback);
 	return readback;
 }
 
-void graphics::cleanupCachedShaderStage(ShaderStageType type, const std::string &hashkey)
+void Graphics::cleanupCachedShaderStage(ShaderStageType type, const std::string &hashkey)
 {
 	cachedShaderStages[type].erase(hashkey);
 }
 
-bool graphics::validateShader(bool gles, const std::vector<std::string> &stagessource, const Shader::CompileOptions &options, std::string &err)
+bool Graphics::validateShader(bool gles, const std::vector<std::string> &stagessource, const Shader::CompileOptions &options, std::string &err)
 {
 	StrongRef<ShaderStage> stages[SHADERSTAGE_MAX_ENUM] = {};
 
@@ -538,7 +538,7 @@ bool graphics::validateShader(bool gles, const std::vector<std::string> &stagess
 	return Shader::validate(stages, err);
 }
 
-Texture *graphics::getDefaultTexture(TextureType type, DataBaseType dataType, bool depthSample)
+Texture *Graphics::getDefaultTexture(TextureType type, DataBaseType dataType, bool depthSample)
 {
 	uint32 depthsampleindex = depthSample ? 1 : 0;
 	Texture *tex = defaultTextures[type][dataType][depthsampleindex];
@@ -615,7 +615,7 @@ Texture *graphics::getDefaultTexture(TextureType type, DataBaseType dataType, bo
 	return tex;
 }
 
-Buffer *graphics::getDefaultTexelBuffer(DataBaseType dataType)
+Buffer *Graphics::getDefaultTexelBuffer(DataBaseType dataType)
 {
 	Buffer *buffer = defaultTexelBuffers[dataType];
 	if (buffer != nullptr)
@@ -650,7 +650,7 @@ Buffer *graphics::getDefaultTexelBuffer(DataBaseType dataType)
 	return buffer;
 }
 
-Buffer *graphics::getDefaultStorageBuffer()
+Buffer *Graphics::getDefaultStorageBuffer()
 {
 	if (defaultStorageBuffer != nullptr)
 		return defaultStorageBuffer;
@@ -664,7 +664,7 @@ Buffer *graphics::getDefaultStorageBuffer()
 	return defaultStorageBuffer;
 }
 
-void graphics::releaseDefaultResources()
+void Graphics::releaseDefaultResources()
 {
 	for (int type = 0; type < TEXTURE_MAX_ENUM; type++)
 	{
@@ -691,7 +691,7 @@ void graphics::releaseDefaultResources()
 	defaultStorageBuffer = nullptr;
 }
 
-Texture *graphics::getTextureOrDefaultForActiveShader(Texture *tex)
+Texture *Graphics::getTextureOrDefaultForActiveShader(Texture *tex)
 {
 	if (tex != nullptr)
 		return tex;
@@ -708,7 +708,7 @@ Texture *graphics::getTextureOrDefaultForActiveShader(Texture *tex)
 	return getDefaultTexture(TEXTURE_2D, DATA_BASETYPE_FLOAT, false);
 }
 
-void graphics::validateStencilState(const StencilState &s) const
+void Graphics::validateStencilState(const StencilState &s) const
 {
 	if (s.action != STENCIL_KEEP)
 	{
@@ -722,7 +722,7 @@ void graphics::validateStencilState(const StencilState &s) const
 	}
 }
 
-void graphics::validateDepthState(bool depthwrite) const
+void Graphics::validateDepthState(bool depthwrite) const
 {
 	if (depthwrite)
 	{
@@ -736,27 +736,27 @@ void graphics::validateDepthState(bool depthwrite) const
 	}
 }
 
-int graphics::getWidth() const
+int Graphics::getWidth() const
 {
 	return width;
 }
 
-int graphics::getHeight() const
+int Graphics::getHeight() const
 {
 	return height;
 }
 
-int graphics::getPixelWidth() const
+int Graphics::getPixelWidth() const
 {
 	return pixelWidth;
 }
 
-int graphics::getPixelHeight() const
+int Graphics::getPixelHeight() const
 {
 	return pixelHeight;
 }
 
-double graphics::getCurrentDPIScale() const
+double Graphics::getCurrentDPIScale() const
 {
 	const auto &rt = states.back().renderTargets.getFirstTarget();
 	if (rt.texture.get())
@@ -765,17 +765,17 @@ double graphics::getCurrentDPIScale() const
 	return getScreenDPIScale();
 }
 
-double graphics::getScreenDPIScale() const
+double Graphics::getScreenDPIScale() const
 {
 	return (double) getPixelHeight() / (double) getHeight();
 }
 
-bool graphics::isCreated() const
+bool Graphics::isCreated() const
 {
 	return created;
 }
 
-bool graphics::isActive() const
+bool Graphics::isActive() const
 {
 	// The graphics module is only completely 'active' if there's a window, a
 	// context, and the active variable is set.
@@ -783,14 +783,14 @@ bool graphics::isActive() const
 	return active && isCreated() && window != nullptr && window->isOpen();
 }
 
-void graphics::reset()
+void Graphics::reset()
 {
 	DisplayState s;
 	restoreState(s);
 	origin();
 }
 
-void graphics::backbufferChanged(int width, int height, int pixelwidth, int pixelheight)
+void Graphics::backbufferChanged(int width, int height, int pixelwidth, int pixelheight)
 {
 	backbufferChanged(width, height, pixelwidth, pixelheight, backbufferHasStencil, backbufferHasDepth, getRequestedBackbufferMSAA());
 }
@@ -799,7 +799,7 @@ void graphics::backbufferChanged(int width, int height, int pixelwidth, int pixe
  * State functions.
  **/
 
-void graphics::restoreState(const DisplayState &s)
+void Graphics::restoreState(const DisplayState &s)
 {
 	setColor(s.color);
 	setBackgroundColor(s.backgroundColor);
@@ -838,7 +838,7 @@ void graphics::restoreState(const DisplayState &s)
 		resetProjection();
 }
 
-void graphics::restoreStateChecked(const DisplayState &s)
+void Graphics::restoreStateChecked(const DisplayState &s)
 {
 	const DisplayState &cur = states.back();
 
@@ -919,22 +919,22 @@ void graphics::restoreStateChecked(const DisplayState &s)
 		resetProjection();
 }
 
-Colorf graphics::getColor() const
+Colorf Graphics::getColor() const
 {
 	return states.back().color;
 }
 
-void graphics::setBackgroundColor(Colorf c)
+void Graphics::setBackgroundColor(Colorf c)
 {
 	states.back().backgroundColor = c;
 }
 
-Colorf graphics::getBackgroundColor() const
+Colorf Graphics::getBackgroundColor() const
 {
 	return states.back().backgroundColor;
 }
 
-void graphics::checkSetDefaultFont()
+void Graphics::checkSetDefaultFont()
 {
 	// We don't create or set the default Font if an existing font is in use.
 	if (states.back().font.get() != nullptr)
@@ -950,7 +950,7 @@ void graphics::checkSetDefaultFont()
 	states.back().font.set(defaultFont.get());
 }
 
-void graphics::setFont(love::gfx::FontMod *font)
+void Graphics::setFont(love::gfx::FontMod *font)
 {
 	// We don't need to set a default font here if null is passed in, since we
 	// only care about the default font in getFont and print.
@@ -958,13 +958,13 @@ void graphics::setFont(love::gfx::FontMod *font)
 	state.font.set(font);
 }
 
-love::gfx::FontMod *graphics::getFont()
+love::gfx::FontMod *Graphics::getFont()
 {
 	checkSetDefaultFont();
 	return states.back().font.get();
 }
 
-void graphics::setShader(love::gfx::Shader *shader)
+void Graphics::setShader(love::gfx::Shader *shader)
 {
 	if (shader == nullptr)
 		return setShader();
@@ -973,18 +973,18 @@ void graphics::setShader(love::gfx::Shader *shader)
 	states.back().shader.set(shader);
 }
 
-void graphics::setShader()
+void Graphics::setShader()
 {
 	Shader::attachDefault(Shader::STANDARD_DEFAULT);
 	states.back().shader.set(nullptr);
 }
 
-love::gfx::Shader *graphics::getShader() const
+love::gfx::Shader *Graphics::getShader() const
 {
 	return states.back().shader.get();
 }
 
-void graphics::setRenderTarget(RenderTarget rt, uint32 temporaryRTFlags)
+void Graphics::setRenderTarget(RenderTarget rt, uint32 temporaryRTFlags)
 {
 	if (rt.texture == nullptr)
 		return setRenderTarget();
@@ -996,7 +996,7 @@ void graphics::setRenderTarget(RenderTarget rt, uint32 temporaryRTFlags)
 	setRenderTargets(rts);
 }
 
-void graphics::setRenderTargets(const RenderTargetsStrongRef &rts)
+void Graphics::setRenderTargets(const RenderTargetsStrongRef &rts)
 {
 	RenderTargets targets;
 	targets.colors.reserve(rts.colors.size());
@@ -1010,7 +1010,7 @@ void graphics::setRenderTargets(const RenderTargetsStrongRef &rts)
 	return setRenderTargets(targets);
 }
 
-void graphics::setRenderTargets(const RenderTargets &rts)
+void Graphics::setRenderTargets(const RenderTargets &rts)
 {
 	DisplayState &state = states.back();
 	int rtcount = (int) rts.colors.size();
@@ -1177,7 +1177,7 @@ void graphics::setRenderTargets(const RenderTargets &rts)
 	}
 }
 
-void graphics::setRenderTarget()
+void Graphics::setRenderTarget()
 {
 	DisplayState &state = states.back();
 
@@ -1202,7 +1202,7 @@ void graphics::setRenderTarget()
 	}
 }
 
-graphics::RenderTargets graphics::getRenderTargets() const
+Graphics::RenderTargets Graphics::getRenderTargets() const
 {
 	const auto &curRTs = states.back().renderTargets;
 
@@ -1218,13 +1218,13 @@ graphics::RenderTargets graphics::getRenderTargets() const
 	return rts;
 }
 
-bool graphics::isRenderTargetActive() const
+bool Graphics::isRenderTargetActive() const
 {
 	const auto &rts = states.back().renderTargets;
 	return !rts.colors.empty() || rts.depthStencil.texture != nullptr;
 }
 
-bool graphics::isRenderTargetActive(Texture *texture) const
+bool Graphics::isRenderTargetActive(Texture *texture) const
 {
 	Texture *roottexture = texture->getRootViewInfo().texture;
 	const auto &rts = states.back().renderTargets;
@@ -1241,7 +1241,7 @@ bool graphics::isRenderTargetActive(Texture *texture) const
 	return false;
 }
 
-bool graphics::isRenderTargetActive(Texture *texture, int slice) const
+bool Graphics::isRenderTargetActive(Texture *texture, int slice) const
 {
 	const auto &rootinfo = texture->getRootViewInfo();
 	slice += rootinfo.startLayer;
@@ -1268,7 +1268,7 @@ bool graphics::isRenderTargetActive(Texture *texture, int slice) const
 	return false;
 }
 
-Texture *graphics::getTemporaryTexture(PixelFormat format, int w, int h, int samples)
+Texture *Graphics::getTemporaryTexture(PixelFormat format, int w, int h, int samples)
 {
 	Texture *texture = nullptr;
 
@@ -1304,7 +1304,7 @@ Texture *graphics::getTemporaryTexture(PixelFormat format, int w, int h, int sam
 	return texture;
 }
 
-void graphics::releaseTemporaryTexture(Texture *texture)
+void Graphics::releaseTemporaryTexture(Texture *texture)
 {
 	for (TemporaryTexture &temp : temporaryTextures)
 	{
@@ -1316,7 +1316,7 @@ void graphics::releaseTemporaryTexture(Texture *texture)
 	}
 }
 
-Buffer *graphics::getTemporaryBuffer(size_t size, DataFormat format, uint32 usageflags, BufferDataUsage datausage)
+Buffer *Graphics::getTemporaryBuffer(size_t size, DataFormat format, uint32 usageflags, BufferDataUsage datausage)
 {
 	Buffer *buffer = nullptr;
 
@@ -1347,7 +1347,7 @@ Buffer *graphics::getTemporaryBuffer(size_t size, DataFormat format, uint32 usag
 	return buffer;
 }
 
-void graphics::releaseTemporaryBuffer(Buffer *buffer)
+void Graphics::releaseTemporaryBuffer(Buffer *buffer)
 {
 	for (TemporaryBuffer &temp : temporaryBuffers)
 	{
@@ -1359,7 +1359,7 @@ void graphics::releaseTemporaryBuffer(Buffer *buffer)
 	}
 }
 
-void graphics::updateTemporaryResources()
+void Graphics::updateTemporaryResources()
 {
 	for (int i = (int) temporaryTextures.size() - 1; i >= 0; i--)
 	{
@@ -1388,7 +1388,7 @@ void graphics::updateTemporaryResources()
 	}
 }
 
-void graphics::clearTemporaryResources()
+void Graphics::clearTemporaryResources()
 {
 	for (auto temp :temporaryBuffers)
 		temp.buffer->release();
@@ -1400,7 +1400,7 @@ void graphics::clearTemporaryResources()
 	temporaryTextures.clear();
 }
 
-void graphics::updatePendingReadbacks()
+void Graphics::updatePendingReadbacks()
 {
 	for (int i = (int)pendingReadbacks.size() - 1; i >= 0; i--)
 	{
@@ -1413,7 +1413,7 @@ void graphics::updatePendingReadbacks()
 	}
 }
 
-void graphics::intersectScissor(const Rect &rect)
+void Graphics::intersectScissor(const Rect &rect)
 {
 	Rect currect = states.back().scissorRect;
 
@@ -1435,14 +1435,14 @@ void graphics::intersectScissor(const Rect &rect)
 	setScissor(newrect);
 }
 
-bool graphics::getScissor(Rect &rect) const
+bool Graphics::getScissor(Rect &rect) const
 {
 	const DisplayState &state = states.back();
 	rect = state.scissorRect;
 	return state.scissor;
 }
 
-void graphics::setStencilMode(StencilMode mode, int value)
+void Graphics::setStencilMode(StencilMode mode, int value)
 {
 	setStencilState(computeStencilState(mode, value));
 	if (mode == STENCIL_MODE_DRAW)
@@ -1451,13 +1451,13 @@ void graphics::setStencilMode(StencilMode mode, int value)
 		setColorMask({ true, true, true, true });
 }
 
-void graphics::setStencilMode()
+void Graphics::setStencilMode()
 {
 	setStencilState(computeStencilState(STENCIL_MODE_OFF, 0));
 	setColorMask({ true, true, true, true });
 }
 
-StencilMode graphics::getStencilMode(int &value) const
+StencilMode Graphics::getStencilMode(int &value) const
 {
 	const DisplayState& state = states.back();
 	StencilMode mode = computeStencilMode(state.stencil);
@@ -1465,52 +1465,52 @@ StencilMode graphics::getStencilMode(int &value) const
 	return mode;
 }
 
-void graphics::setStencilState()
+void Graphics::setStencilState()
 {
 	StencilState s;
 	setStencilState(s);
 }
 
-const StencilState &graphics::getStencilState() const
+const StencilState &Graphics::getStencilState() const
 {
 	const DisplayState &state = states.back();
 	return state.stencil;
 }
 
-void graphics::setDepthMode()
+void Graphics::setDepthMode()
 {
 	setDepthMode(COMPARE_ALWAYS, false);
 }
 
-void graphics::getDepthMode(CompareMode &compare, bool &write) const
+void Graphics::getDepthMode(CompareMode &compare, bool &write) const
 {
 	const DisplayState &state = states.back();
 	compare = state.depthTest;
 	write = state.depthWrite;
 }
 
-void graphics::setMeshCullMode(CullMode cull)
+void Graphics::setMeshCullMode(CullMode cull)
 {
 	// Handled inside the draw() graphics API implementations.
 	states.back().meshCullMode = cull;
 }
 
-CullMode graphics::getMeshCullMode() const
+CullMode Graphics::getMeshCullMode() const
 {
 	return states.back().meshCullMode;
 }
 
-Winding graphics::getFrontFaceWinding() const
+Winding Graphics::getFrontFaceWinding() const
 {
 	return states.back().winding;
 }
 
-ColorChannelMask graphics::getColorMask() const
+ColorChannelMask Graphics::getColorMask() const
 {
 	return states.back().colorMask;
 }
 
-void graphics::setBlendMode(BlendMode mode, BlendAlpha alphamode)
+void Graphics::setBlendMode(BlendMode mode, BlendAlpha alphamode)
 {
 	if (alphamode == BLENDALPHA_MULTIPLY && !isAlphaMultiplyBlendSupported(mode))
 	{
@@ -1522,72 +1522,72 @@ void graphics::setBlendMode(BlendMode mode, BlendAlpha alphamode)
 	setBlendState(computeBlendState(mode, alphamode));
 }
 
-BlendMode graphics::getBlendMode(BlendAlpha &alphamode) const
+BlendMode Graphics::getBlendMode(BlendAlpha &alphamode) const
 {
 	return computeBlendMode(states.back().blend, alphamode);
 }
 
-const BlendState &graphics::getBlendState() const
+const BlendState &Graphics::getBlendState() const
 {
 	return states.back().blend;
 }
 
-void graphics::setDefaultSamplerState(const SamplerState &s)
+void Graphics::setDefaultSamplerState(const SamplerState &s)
 {
 	states.back().defaultSamplerState = s;
 }
 
-const SamplerState &graphics::getDefaultSamplerState() const
+const SamplerState &Graphics::getDefaultSamplerState() const
 {
 	return states.back().defaultSamplerState;
 }
 
-void graphics::setLineWidth(float width)
+void Graphics::setLineWidth(float width)
 {
 	states.back().lineWidth = width;
 }
 
-void graphics::setLineStyle(graphics::LineStyle style)
+void Graphics::setLineStyle(Graphics::LineStyle style)
 {
 	states.back().lineStyle = style;
 }
 
-void graphics::setLineJoin(graphics::LineJoin join)
+void Graphics::setLineJoin(Graphics::LineJoin join)
 {
 	states.back().lineJoin = join;
 }
 
-float graphics::getLineWidth() const
+float Graphics::getLineWidth() const
 {
 	return states.back().lineWidth;
 }
 
-graphics::LineStyle graphics::getLineStyle() const
+Graphics::LineStyle Graphics::getLineStyle() const
 {
 	return states.back().lineStyle;
 }
 
-graphics::LineJoin graphics::getLineJoin() const
+Graphics::LineJoin Graphics::getLineJoin() const
 {
 	return states.back().lineJoin;
 }
 
-float graphics::getPointSize() const
+float Graphics::getPointSize() const
 {
 	return states.back().pointSize;
 }
 
-bool graphics::isWireframe() const
+bool Graphics::isWireframe() const
 {
 	return states.back().wireframe;
 }
 
-void graphics::captureScreenshot(const ScreenshotInfo &info)
+void Graphics::captureScreenshot(const ScreenshotInfo &info)
 {
 	pendingScreenshotCallbacks.push_back(info);
 }
 
-void graphics::copyBuffer(Buffer *source, Buffer *dest, size_t sourceoffset, size_t destoffset, size_t size)
+void Graphics::copyBuffer(Buffer *source, Buffer *dest, size_t sourceoffset, size_t destoffset, size_t size)
 {
 	Range sourcerange(sourceoffset, size);
 	Range destrange(destoffset, size);
@@ -1616,7 +1616,7 @@ void graphics::copyBuffer(Buffer *source, Buffer *dest, size_t sourceoffset, siz
 	source->copyTo(dest, sourceoffset, destoffset, size);
 }
 
-void graphics::copyTextureToBuffer(Texture *source, Buffer *dest, int slice, int mipmap, const Rect &rect, size_t destoffset, int destwidth)
+void Graphics::copyTextureToBuffer(Texture *source, Buffer *dest, int slice, int mipmap, const Rect &rect, size_t destoffset, int destwidth)
 {
 	if (!capabilities.features[FEATURE_COPY_TEXTURE_TO_BUFFER])
 	{
@@ -1705,7 +1705,7 @@ void graphics::copyTextureToBuffer(Texture *source, Buffer *dest, int slice, int
 	source->copyToBuffer(dest, slice, mipmap, rect, destoffset, destwidth, size);
 }
 
-void graphics::copyBufferToTexture(Buffer *source, Texture *dest, size_t sourceoffset, int sourcewidth, int slice, int mipmap, const Rect &rect)
+void Graphics::copyBufferToTexture(Buffer *source, Texture *dest, size_t sourceoffset, int sourcewidth, int slice, int mipmap, const Rect &rect)
 {
 	if (source->getDataUsage() == BUFFERDATAUSAGE_READBACK)
 		throw love::Exception("Buffers created with 'readback' data usage cannot be used as a copy source.");
@@ -1785,19 +1785,19 @@ void graphics::copyBufferToTexture(Buffer *source, Texture *dest, size_t sourceo
 	dest->copyFromBuffer(source, sourceoffset, sourcewidth, size, slice, mipmap, rect);
 }
 
-static const char *getIndirectArgsTypeName(graphics::IndirectArgsType argstype)
+static const char *getIndirectArgsTypeName(Graphics::IndirectArgsType argstype)
 {
 	switch (argstype)
 	{
-		case graphics::INDIRECT_ARGS_DISPATCH: return "Compute shader threadgroup argument data";
-		case graphics::INDIRECT_ARGS_DRAW_VERTICES: return "Draw vertices argument data";
-		case graphics::INDIRECT_ARGS_DRAW_INDICES: return "Draw indices argument data";
+		case Graphics::INDIRECT_ARGS_DISPATCH: return "Compute shader threadgroup argument data";
+		case Graphics::INDIRECT_ARGS_DRAW_VERTICES: return "Draw vertices argument data";
+		case Graphics::INDIRECT_ARGS_DRAW_INDICES: return "Draw indices argument data";
 	}
 
 	return "(Unknown argument data)";
 }
 
-void graphics::validateIndirectArgsBuffer(IndirectArgsType argstype, Buffer *indirectargs, int argsindex)
+void Graphics::validateIndirectArgsBuffer(IndirectArgsType argstype, Buffer *indirectargs, int argsindex)
 {
 	if (!capabilities.features[FEATURE_INDIRECT_DRAW])
 		throw love::Exception("Indirect draws and compute dispatches are not supported on this system.");
@@ -1827,7 +1827,7 @@ void graphics::validateIndirectArgsBuffer(IndirectArgsType argstype, Buffer *ind
 		throw love::Exception("The given index into the indirect argument Buffer does not fit within the Buffer's size.");
 }
 
-void graphics::dispatchThreadgroups(Shader *shader, int x, int y, int z)
+void Graphics::dispatchThreadgroups(Shader *shader, int x, int y, int z)
 {
 	if (!shader->hasStage(SHADERSTAGE_COMPUTE))
 		throw love::Exception("Only compute shaders can have threads dispatched.");
@@ -1856,7 +1856,7 @@ void graphics::dispatchThreadgroups(Shader *shader, int x, int y, int z)
 		throw love::Exception("Compute shader must have resources bound to all writable texture and buffer variables.");
 }
 
-void graphics::dispatchIndirect(Shader *shader, Buffer *indirectargs, int argsindex)
+void Graphics::dispatchIndirect(Shader *shader, Buffer *indirectargs, int argsindex)
 {
 	if (!shader->hasStage(SHADERSTAGE_COMPUTE))
 		throw love::Exception("Only compute shaders can have threads dispatched.");
@@ -1877,7 +1877,7 @@ void graphics::dispatchIndirect(Shader *shader, Buffer *indirectargs, int argsin
 		throw love::Exception("Compute shader must have resources bound to all writable texture and buffer variables.");
 }
 
-graphics::BatchedVertexData graphics::requestBatchedDraw(const BatchedDrawCommand &cmd)
+Graphics::BatchedVertexData Graphics::requestBatchedDraw(const BatchedDrawCommand &cmd)
 {
 	BatchedDrawState &state = batchedDrawState;
 
@@ -2012,7 +2012,7 @@ graphics::BatchedVertexData graphics::requestBatchedDraw(const BatchedDrawComman
 	return d;
 }
 
-void graphics::flushBatchedDraws()
+void Graphics::flushBatchedDraws()
 {
 	auto &sbstate = batchedDrawState;
 
@@ -2092,9 +2092,9 @@ void graphics::flushBatchedDraws()
 	sbstate.flushing = false;
 }
 
-void graphics::flushBatchedDrawsGlobal()
+void Graphics::flushBatchedDrawsGlobal()
 {
-	graphics *instance = getInstance<graphics>(M_GRAPHICS);
+	Graphics *instance = getInstance<Graphics>(M_GRAPHICS);
 	if (instance != nullptr)
 		instance->flushBatchedDraws();
 }
@@ -2103,37 +2103,37 @@ void graphics::flushBatchedDrawsGlobal()
  * Drawing
  **/
 
-void graphics::draw(Drawable *drawable, const Matrix4 &m)
+void Graphics::draw(Drawable *drawable, const Matrix4 &m)
 {
 	drawable->draw(this, m);
 }
 
-void graphics::draw(Texture *texture, Quad *quad, const Matrix4 &m)
+void Graphics::draw(Texture *texture, Quad *quad, const Matrix4 &m)
 {
 	texture->draw(this, quad, m);
 }
 
-void graphics::drawLayer(Texture *texture, int layer, const Matrix4 &m)
+void Graphics::drawLayer(Texture *texture, int layer, const Matrix4 &m)
 {
 	texture->drawLayer(this, layer, m);
 }
 
-void graphics::drawLayer(Texture *texture, int layer, Quad *quad, const Matrix4 &m)
+void Graphics::drawLayer(Texture *texture, int layer, Quad *quad, const Matrix4 &m)
 {
 	texture->drawLayer(this, layer, quad, m);
 }
 
-void graphics::drawInstanced(Mesh *mesh, const Matrix4 &m, int instancecount)
+void Graphics::drawInstanced(Mesh *mesh, const Matrix4 &m, int instancecount)
 {
 	mesh->drawInstanced(this, m, instancecount);
 }
 
-void graphics::drawIndirect(Mesh *mesh, const Matrix4 &m, Buffer *indirectargs, int argsindex)
+void Graphics::drawIndirect(Mesh *mesh, const Matrix4 &m, Buffer *indirectargs, int argsindex)
 {
 	mesh->drawIndirect(this, m, indirectargs, argsindex);
 }
 
-void graphics::drawFromShader(PrimitiveType primtype, int vertexcount, int instancecount, Texture *maintexture)
+void Graphics::drawFromShader(PrimitiveType primtype, int vertexcount, int instancecount, Texture *maintexture)
 {
 	if (primtype == PRIMITIVE_TRIANGLE_FAN && vertexcount > LOVE_UINT16_MAX)
 		throw love::Exception("drawFromShader cannot draw more than %d vertices when the 'fan' draw mode is used.", LOVE_UINT16_MAX);
@@ -2169,7 +2169,7 @@ void graphics::drawFromShader(PrimitiveType primtype, int vertexcount, int insta
 	draw(cmd);
 }
 
-void graphics::drawFromShader(Buffer *indexbuffer, int indexcount, int instancecount, int startindex, Texture *maintexture)
+void Graphics::drawFromShader(Buffer *indexbuffer, int indexcount, int instancecount, int startindex, Texture *maintexture)
 {
 	flushBatchedDraws();
 
@@ -2207,7 +2207,7 @@ void graphics::drawFromShader(Buffer *indexbuffer, int indexcount, int instancec
 	draw(cmd);
 }
 
-void graphics::drawFromShaderIndirect(PrimitiveType primtype, Buffer *indirectargs, int argsindex, Texture *maintexture)
+void Graphics::drawFromShaderIndirect(PrimitiveType primtype, Buffer *indirectargs, int argsindex, Texture *maintexture)
 {
 	flushBatchedDraws();
 
@@ -2234,7 +2234,7 @@ void graphics::drawFromShaderIndirect(PrimitiveType primtype, Buffer *indirectar
 	draw(cmd);
 }
 
-void graphics::drawFromShaderIndirect(Buffer *indexbuffer, Buffer *indirectargs, int argsindex, Texture *maintexture)
+void Graphics::drawFromShaderIndirect(Buffer *indexbuffer, Buffer *indirectargs, int argsindex, Texture *maintexture)
 {
 	flushBatchedDraws();
 
@@ -2262,7 +2262,7 @@ void graphics::drawFromShaderIndirect(Buffer *indexbuffer, Buffer *indirectargs,
 	draw(cmd);
 }
 
-void graphics::print(const std::vector<love::fontmod::ColoredString> &str, const Matrix4 &m)
+void Graphics::print(const std::vector<love::fontmod::ColoredString> &str, const Matrix4 &m)
 {
 	checkSetDefaultFont();
 
@@ -2270,12 +2270,12 @@ void graphics::print(const std::vector<love::fontmod::ColoredString> &str, const
 		print(str, states.back().font.get(), m);
 }
 
-void graphics::print(const std::vector<love::fontmod::ColoredString> &str, FontMod *font, const Matrix4 &m)
+void Graphics::print(const std::vector<love::fontmod::ColoredString> &str, FontMod *font, const Matrix4 &m)
 {
 	font->print(this, str, m, states.back().color);
 }
 
-void graphics::printf(const std::vector<love::fontmod::ColoredString> &str, float wrap, FontMod::AlignMode align, const Matrix4 &m)
+void Graphics::printf(const std::vector<love::fontmod::ColoredString> &str, float wrap, FontMod::AlignMode align, const Matrix4 &m)
 {
 	checkSetDefaultFont();
 
@@ -2283,7 +2283,7 @@ void graphics::printf(const std::vector<love::fontmod::ColoredString> &str, floa
 		printf(str, states.back().font.get(), wrap, align, m);
 }
 
-void graphics::printf(const std::vector<love::fontmod::ColoredString> &str, FontMod *font, float wrap, FontMod::AlignMode align, const Matrix4 &m)
+void Graphics::printf(const std::vector<love::fontmod::ColoredString> &str, FontMod *font, float wrap, FontMod::AlignMode align, const Matrix4 &m)
 {
 	font->printf(this, str, wrap, align, m, states.back().color);
 }
@@ -2292,7 +2292,7 @@ void graphics::printf(const std::vector<love::fontmod::ColoredString> &str, Font
  * Primitives (points, shapes, lines).
  **/
 
-void graphics::points(const Vector2 *positions, const Colorf *colors, size_t numpoints)
+void Graphics::points(const Vector2 *positions, const Colorf *colors, size_t numpoints)
 {
 	const Matrix4 &t = getTransform();
 	bool is2D = t.isAffine2DTransform();
@@ -2344,13 +2344,13 @@ void graphics::points(const Vector2 *positions, const Colorf *colors, size_t num
 	}
 }
 
-int graphics::calculateEllipsePoints(float rx, float ry) const
+int Graphics::calculateEllipsePoints(float rx, float ry) const
 {
 	int points = (int) sqrtf(((rx + ry) / 2.0f) * 20.0f * (float) pixelScaleStack.back());
 	return std::max(points, 8);
 }
 
-void graphics::polyline(const Vector2 *vertices, size_t count)
+void Graphics::polyline(const Vector2 *vertices, size_t count)
 {
 	float halfwidth = getLineWidth() * 0.5f;
 	LineJoin linejoin = getLineJoin();
@@ -2378,13 +2378,13 @@ void graphics::polyline(const Vector2 *vertices, size_t count)
 	}
 }
 
-void graphics::rectangle(DrawMode mode, float x, float y, float w, float h)
+void Graphics::rectangle(DrawMode mode, float x, float y, float w, float h)
 {
 	Vector2 coords[] = {Vector2(x,y), Vector2(x,y+h), Vector2(x+w,y+h), Vector2(x+w,y), Vector2(x,y)};
 	polygon(mode, coords, 5);
 }
 
-void graphics::rectangle(DrawMode mode, float x, float y, float w, float h, float rx, float ry, int points)
+void Graphics::rectangle(DrawMode mode, float x, float y, float w, float h, float rx, float ry, int points)
 {
 	if (rx <= 0 || ry <= 0)
 	{
@@ -2443,23 +2443,23 @@ void graphics::rectangle(DrawMode mode, float x, float y, float w, float h, floa
 	polygon(mode, coords, num_coords + 1);
 }
 
-void graphics::rectangle(DrawMode mode, float x, float y, float w, float h, float rx, float ry)
+void Graphics::rectangle(DrawMode mode, float x, float y, float w, float h, float rx, float ry)
 {
 	int points = calculateEllipsePoints(std::min(rx, std::abs(w/2)), std::min(ry, std::abs(h/2)));
 	rectangle(mode, x, y, w, h, rx, ry, points);
 }
 
-void graphics::circle(DrawMode mode, float x, float y, float radius, int points)
+void Graphics::circle(DrawMode mode, float x, float y, float radius, int points)
 {
 	ellipse(mode, x, y, radius, radius, points);
 }
 
-void graphics::circle(DrawMode mode, float x, float y, float radius)
+void Graphics::circle(DrawMode mode, float x, float y, float radius)
 {
 	ellipse(mode, x, y, radius, radius);
 }
 
-void graphics::ellipse(DrawMode mode, float x, float y, float a, float b, int points)
+void Graphics::ellipse(DrawMode mode, float x, float y, float a, float b, int points)
 {
 	float two_pi = (float) (LOVE_M_PI * 2);
 	if (points <= 0) points = 1;
@@ -2492,12 +2492,12 @@ void graphics::ellipse(DrawMode mode, float x, float y, float a, float b, int po
 	polygon(mode, polygoncoords, points + extrapoints, false);
 }
 
-void graphics::ellipse(DrawMode mode, float x, float y, float a, float b)
+void Graphics::ellipse(DrawMode mode, float x, float y, float a, float b)
 {
 	ellipse(mode, x, y, a, b, calculateEllipsePoints(a, b));
 }
 
-void graphics::arc(DrawMode drawmode, ArcMode arcmode, float x, float y, float radius, float angle1, float angle2, int points)
+void Graphics::arc(DrawMode drawmode, ArcMode arcmode, float x, float y, float radius, float angle1, float angle2, int points)
 {
 	// Nothing to display with no points or equal angles. (Or is there with line mode?)
 	if (points <= 0 || angle1 == angle2)
@@ -2570,7 +2570,7 @@ void graphics::arc(DrawMode drawmode, ArcMode arcmode, float x, float y, float r
 	polygon(drawmode, coords, num_coords);
 }
 
-void graphics::arc(DrawMode drawmode, ArcMode arcmode, float x, float y, float radius, float angle1, float angle2)
+void Graphics::arc(DrawMode drawmode, ArcMode arcmode, float x, float y, float radius, float angle1, float angle2)
 {
 	float points = (float) calculateEllipsePoints(radius, radius);
 
@@ -2582,7 +2582,7 @@ void graphics::arc(DrawMode drawmode, ArcMode arcmode, float x, float y, float r
 	arc(drawmode, arcmode, x, y, radius, angle1, angle2, (int) (points + 0.5f));
 }
 
-void graphics::polygon(DrawMode mode, const Vector2 *coords, size_t count, bool skipLastFilledVertex)
+void Graphics::polygon(DrawMode mode, const Vector2 *coords, size_t count, bool skipLastFilledVertex)
 {
 	// coords is an array of a closed loop of vertices, i.e.
 	// coords[count-1] == coords[0]
@@ -2636,12 +2636,12 @@ void graphics::polygon(DrawMode mode, const Vector2 *coords, size_t count, bool 
 	}
 }
 
-const graphics::Capabilities &graphics::getCapabilities() const
+const Graphics::Capabilities &Graphics::getCapabilities() const
 {
 	return capabilities;
 }
 
-PixelFormat graphics::getSizedFormat(PixelFormat format) const
+PixelFormat Graphics::getSizedFormat(PixelFormat format) const
 {
 	switch (format)
 	{
@@ -2657,7 +2657,7 @@ PixelFormat graphics::getSizedFormat(PixelFormat format) const
 	}
 }
 
-graphics::Stats graphics::getStats() const
+Graphics::Stats Graphics::getStats() const
 {
 	Stats stats;
 
@@ -2678,12 +2678,12 @@ graphics::Stats graphics::getStats() const
 	return stats;
 }
 
-size_t graphics::getStackDepth() const
+size_t Graphics::getStackDepth() const
 {
 	return stackTypeStack.size();
 }
 
-void graphics::push(StackType type)
+void Graphics::push(StackType type)
 {
 	if (stackTypeStack.size() == MAX_USER_STACK_DEPTH)
 		throw Exception("Maximum stack depth reached (more pushes than pops?)");
@@ -2698,7 +2698,7 @@ void graphics::push(StackType type)
 	stackTypeStack.push_back(type);
 }
 
-void graphics::pop()
+void Graphics::pop()
 {
 	if (stackTypeStack.size() < 1)
 		throw Exception("Minimum stack depth reached (more pops than pushes?)");
@@ -2723,59 +2723,59 @@ void graphics::pop()
  * Transform and stack functions.
  **/
 
-const Matrix4 &graphics::getTransform() const
+const Matrix4 &Graphics::getTransform() const
 {
 	return transformStack.back();
 }
 
-const Matrix4 &graphics::getDeviceProjection() const
+const Matrix4 &Graphics::getDeviceProjection() const
 {
 	return deviceProjectionMatrix;
 }
 
-void graphics::pushTransform()
+void Graphics::pushTransform()
 {
 	transformStack.push_back(transformStack.back());
 }
 
-void graphics::pushIdentityTransform()
+void Graphics::pushIdentityTransform()
 {
 	transformStack.push_back(Matrix4());
 }
 
-void graphics::popTransform()
+void Graphics::popTransform()
 {
 	transformStack.pop_back();
 }
 
-void graphics::rotate(float r)
+void Graphics::rotate(float r)
 {
 	transformStack.back().rotate(r);
 }
 
-void graphics::scale(float x, float y)
+void Graphics::scale(float x, float y)
 {
 	transformStack.back().scale(x, y);
 	pixelScaleStack.back() *= (fabs(x) + fabs(y)) / 2.0;
 }
 
-void graphics::translate(float x, float y)
+void Graphics::translate(float x, float y)
 {
 	transformStack.back().translate(x, y);
 }
 
-void graphics::shear(float kx, float ky)
+void Graphics::shear(float kx, float ky)
 {
 	transformStack.back().shear(kx, ky);
 }
 
-void graphics::origin()
+void Graphics::origin()
 {
 	transformStack.back().setIdentity();
 	pixelScaleStack.back() = 1;
 }
 
-void graphics::applyTransform(const Matrix4 &m)
+void Graphics::applyTransform(const Matrix4 &m)
 {
 	Matrix4 &current = transformStack.back();
 	current *= m;
@@ -2785,7 +2785,7 @@ void graphics::applyTransform(const Matrix4 &m)
 	pixelScaleStack.back() = (sx + sy) / 2.0;
 }
 
-void graphics::replaceTransform(const Matrix4 &m)
+void Graphics::replaceTransform(const Matrix4 &m)
 {
 	transformStack.back() = m;
 
@@ -2794,14 +2794,14 @@ void graphics::replaceTransform(const Matrix4 &m)
 	pixelScaleStack.back() = (sx + sy) / 2.0;
 }
 
-Vector2 graphics::transformPoint(Vector2 point)
+Vector2 Graphics::transformPoint(Vector2 point)
 {
 	Vector2 p;
 	transformStack.back().transformXY(&p, &point, 1);
 	return p;
 }
 
-Vector2 graphics::inverseTransformPoint(Vector2 point)
+Vector2 Graphics::inverseTransformPoint(Vector2 point)
 {
 	Vector2 p;
 	// TODO: We should probably cache the inverse transform so we don't have to
@@ -2810,7 +2810,7 @@ Vector2 graphics::inverseTransformPoint(Vector2 point)
 	return p;
 }
 
-void graphics::setProjection(const Matrix4 &m)
+void Graphics::setProjection(const Matrix4 &m)
 {
 	flushBatchedDraws();
 
@@ -2822,7 +2822,7 @@ void graphics::setProjection(const Matrix4 &m)
 	updateDeviceProjection(m);
 }
 
-void graphics::resetProjection()
+void Graphics::resetProjection()
 {
 	flushBatchedDraws();
 
@@ -2844,83 +2844,83 @@ void graphics::resetProjection()
 	updateDeviceProjection(Matrix4::ortho(0.0f, w, h, 0.0f, -10.0f, 10.0f));
 }
 
-void graphics::updateDeviceProjection(const Matrix4 &projection)
+void Graphics::updateDeviceProjection(const Matrix4 &projection)
 {
 	deviceProjectionMatrix = projection;
 }
 
-STRINGMAP_CLASS_BEGIN(graphics, graphics::DrawMode, graphics::DRAW_MAX_ENUM, drawMode)
+STRINGMAP_CLASS_BEGIN(Graphics, Graphics::DrawMode, Graphics::DRAW_MAX_ENUM, drawMode)
 {
-	{ "line", graphics::DRAW_LINE },
-	{ "fill", graphics::DRAW_FILL },
+	{ "line", Graphics::DRAW_LINE },
+	{ "fill", Graphics::DRAW_FILL },
 }
-STRINGMAP_CLASS_END(graphics, graphics::DrawMode, graphics::DRAW_MAX_ENUM, drawMode)
+STRINGMAP_CLASS_END(Graphics, Graphics::DrawMode, Graphics::DRAW_MAX_ENUM, drawMode)
 
-STRINGMAP_CLASS_BEGIN(graphics, graphics::ArcMode, graphics::ARC_MAX_ENUM, arcMode)
+STRINGMAP_CLASS_BEGIN(Graphics, Graphics::ArcMode, Graphics::ARC_MAX_ENUM, arcMode)
 {
-	{ "open",   graphics::ARC_OPEN   },
-	{ "closed", graphics::ARC_CLOSED },
-	{ "pie",    graphics::ARC_PIE    },
+	{ "open",   Graphics::ARC_OPEN   },
+	{ "closed", Graphics::ARC_CLOSED },
+	{ "pie",    Graphics::ARC_PIE    },
 }
-STRINGMAP_CLASS_END(graphics, graphics::ArcMode, graphics::ARC_MAX_ENUM, arcMode)
+STRINGMAP_CLASS_END(Graphics, Graphics::ArcMode, Graphics::ARC_MAX_ENUM, arcMode)
 
-STRINGMAP_CLASS_BEGIN(graphics, graphics::LineStyle, graphics::LINE_MAX_ENUM, lineStyle)
+STRINGMAP_CLASS_BEGIN(Graphics, Graphics::LineStyle, Graphics::LINE_MAX_ENUM, lineStyle)
 {
-	{ "smooth", graphics::LINE_SMOOTH },
-	{ "rough",  graphics::LINE_ROUGH  }
+	{ "smooth", Graphics::LINE_SMOOTH },
+	{ "rough",  Graphics::LINE_ROUGH  }
 }
-STRINGMAP_CLASS_END(graphics, graphics::LineStyle, graphics::LINE_MAX_ENUM, lineStyle)
+STRINGMAP_CLASS_END(Graphics, Graphics::LineStyle, Graphics::LINE_MAX_ENUM, lineStyle)
 
-STRINGMAP_CLASS_BEGIN(graphics, graphics::LineJoin, graphics::LINE_JOIN_MAX_ENUM, lineJoin)
+STRINGMAP_CLASS_BEGIN(Graphics, Graphics::LineJoin, Graphics::LINE_JOIN_MAX_ENUM, lineJoin)
 {
-	{ "none",  graphics::LINE_JOIN_NONE  },
-	{ "miter", graphics::LINE_JOIN_MITER },
-	{ "bevel", graphics::LINE_JOIN_BEVEL }
+	{ "none",  Graphics::LINE_JOIN_NONE  },
+	{ "miter", Graphics::LINE_JOIN_MITER },
+	{ "bevel", Graphics::LINE_JOIN_BEVEL }
 }
-STRINGMAP_CLASS_END(graphics, graphics::LineJoin, graphics::LINE_JOIN_MAX_ENUM, lineJoin)
+STRINGMAP_CLASS_END(Graphics, Graphics::LineJoin, Graphics::LINE_JOIN_MAX_ENUM, lineJoin)
 
-STRINGMAP_CLASS_BEGIN(graphics, graphics::Feature, graphics::FEATURE_MAX_ENUM, feature)
+STRINGMAP_CLASS_BEGIN(Graphics, Graphics::Feature, Graphics::FEATURE_MAX_ENUM, feature)
 {
-	{ "multirendertargetformats", graphics::FEATURE_MULTI_RENDER_TARGET_FORMATS },
-	{ "clampzero",                graphics::FEATURE_CLAMP_ZERO           },
-	{ "clampone",                 graphics::FEATURE_CLAMP_ONE            },
-	{ "lighten",                  graphics::FEATURE_LIGHTEN              },
-	{ "fullnpot",                 graphics::FEATURE_FULL_NPOT            },
-	{ "pixelshaderhighp",         graphics::FEATURE_PIXEL_SHADER_HIGHP   },
-	{ "shaderderivatives",        graphics::FEATURE_SHADER_DERIVATIVES   },
-	{ "glsl3",                    graphics::FEATURE_GLSL3                },
-	{ "glsl4",                    graphics::FEATURE_GLSL4                },
-	{ "instancing",               graphics::FEATURE_INSTANCING           },
-	{ "texelbuffer",              graphics::FEATURE_TEXEL_BUFFER         },
-	{ "copytexturetobuffer",      graphics::FEATURE_COPY_TEXTURE_TO_BUFFER },
-	{ "indirectdraw",             graphics::FEATURE_INDIRECT_DRAW        },
+	{ "multirendertargetformats", Graphics::FEATURE_MULTI_RENDER_TARGET_FORMATS },
+	{ "clampzero",                Graphics::FEATURE_CLAMP_ZERO           },
+	{ "clampone",                 Graphics::FEATURE_CLAMP_ONE            },
+	{ "lighten",                  Graphics::FEATURE_LIGHTEN              },
+	{ "fullnpot",                 Graphics::FEATURE_FULL_NPOT            },
+	{ "pixelshaderhighp",         Graphics::FEATURE_PIXEL_SHADER_HIGHP   },
+	{ "shaderderivatives",        Graphics::FEATURE_SHADER_DERIVATIVES   },
+	{ "glsl3",                    Graphics::FEATURE_GLSL3                },
+	{ "glsl4",                    Graphics::FEATURE_GLSL4                },
+	{ "instancing",               Graphics::FEATURE_INSTANCING           },
+	{ "texelbuffer",              Graphics::FEATURE_TEXEL_BUFFER         },
+	{ "copytexturetobuffer",      Graphics::FEATURE_COPY_TEXTURE_TO_BUFFER },
+	{ "indirectdraw",             Graphics::FEATURE_INDIRECT_DRAW        },
 }
-STRINGMAP_CLASS_END(graphics, graphics::Feature, graphics::FEATURE_MAX_ENUM, feature)
+STRINGMAP_CLASS_END(Graphics, Graphics::Feature, Graphics::FEATURE_MAX_ENUM, feature)
 
-STRINGMAP_CLASS_BEGIN(graphics, graphics::SystemLimit, graphics::LIMIT_MAX_ENUM, systemLimit)
+STRINGMAP_CLASS_BEGIN(Graphics, Graphics::SystemLimit, Graphics::LIMIT_MAX_ENUM, systemLimit)
 {
-	{ "pointsize",               graphics::LIMIT_POINT_SIZE                 },
-	{ "texturesize",             graphics::LIMIT_TEXTURE_SIZE               },
-	{ "texturelayers",           graphics::LIMIT_TEXTURE_LAYERS             },
-	{ "volumetexturesize",       graphics::LIMIT_VOLUME_TEXTURE_SIZE        },
-	{ "cubetexturesize",         graphics::LIMIT_CUBE_TEXTURE_SIZE          },
-	{ "texelbuffersize",         graphics::LIMIT_TEXEL_BUFFER_SIZE          },
-	{ "shaderstoragebuffersize", graphics::LIMIT_SHADER_STORAGE_BUFFER_SIZE },
-	{ "threadgroupsx",           graphics::LIMIT_THREADGROUPS_X             },
-	{ "threadgroupsy",           graphics::LIMIT_THREADGROUPS_Y             },
-	{ "threadgroupsz",           graphics::LIMIT_THREADGROUPS_Z             },
-	{ "rendertargets",           graphics::LIMIT_RENDER_TARGETS             },
-	{ "texturemsaa",             graphics::LIMIT_TEXTURE_MSAA               },
-	{ "anisotropy",              graphics::LIMIT_ANISOTROPY                 },
+	{ "pointsize",               Graphics::LIMIT_POINT_SIZE                 },
+	{ "texturesize",             Graphics::LIMIT_TEXTURE_SIZE               },
+	{ "texturelayers",           Graphics::LIMIT_TEXTURE_LAYERS             },
+	{ "volumetexturesize",       Graphics::LIMIT_VOLUME_TEXTURE_SIZE        },
+	{ "cubetexturesize",         Graphics::LIMIT_CUBE_TEXTURE_SIZE          },
+	{ "texelbuffersize",         Graphics::LIMIT_TEXEL_BUFFER_SIZE          },
+	{ "shaderstoragebuffersize", Graphics::LIMIT_SHADER_STORAGE_BUFFER_SIZE },
+	{ "threadgroupsx",           Graphics::LIMIT_THREADGROUPS_X             },
+	{ "threadgroupsy",           Graphics::LIMIT_THREADGROUPS_Y             },
+	{ "threadgroupsz",           Graphics::LIMIT_THREADGROUPS_Z             },
+	{ "rendertargets",           Graphics::LIMIT_RENDER_TARGETS             },
+	{ "texturemsaa",             Graphics::LIMIT_TEXTURE_MSAA               },
+	{ "anisotropy",              Graphics::LIMIT_ANISOTROPY                 },
 }
-STRINGMAP_CLASS_END(graphics, graphics::SystemLimit, graphics::LIMIT_MAX_ENUM, systemLimit)
+STRINGMAP_CLASS_END(Graphics, Graphics::SystemLimit, Graphics::LIMIT_MAX_ENUM, systemLimit)
 
-STRINGMAP_CLASS_BEGIN(graphics, graphics::StackType, graphics::STACK_MAX_ENUM, stackType)
+STRINGMAP_CLASS_BEGIN(Graphics, Graphics::StackType, Graphics::STACK_MAX_ENUM, stackType)
 {
-	{ "all",       graphics::STACK_ALL       },
-	{ "transform", graphics::STACK_TRANSFORM },
+	{ "all",       Graphics::STACK_ALL       },
+	{ "transform", Graphics::STACK_TRANSFORM },
 }
-STRINGMAP_CLASS_END(graphics, graphics::StackType, graphics::STACK_MAX_ENUM, stackType)
+STRINGMAP_CLASS_END(Graphics, Graphics::StackType, Graphics::STACK_MAX_ENUM, stackType)
 
 STRINGMAP_BEGIN(Renderer, RENDERER_MAX_ENUM, renderer)
 {

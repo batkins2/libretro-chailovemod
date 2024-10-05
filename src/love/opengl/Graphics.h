@@ -49,7 +49,7 @@ namespace gfx
 namespace opengl
 {
 
-class Graphics final : public love::gfx::graphics
+class Graphics final : public love::gfx::Graphics
 {
 public:
 

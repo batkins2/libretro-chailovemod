@@ -109,7 +109,7 @@ const std::vector<Renderer> &getDefaultRenderers();
 const std::vector<Renderer> &getRenderers();
 void setRenderers(const std::vector<Renderer> &renderers);
 
-class graphics : public Module
+class Graphics : public Module
 {
 public:
 
@@ -308,13 +308,13 @@ public:
 	{
 	public:
 
-		TempTransform(graphics *gfx)
+		TempTransform(Graphics *gfx)
 			: gfx(gfx)
 		{
 			gfx->pushTransform();
 		}
 
-		TempTransform(graphics *gfx, const Matrix4 &t)
+		TempTransform(Graphics *gfx, const Matrix4 &t)
 			: gfx(gfx)
 		{
 			gfx->pushTransform();
@@ -327,7 +327,7 @@ public:
 		}
 
 	private:
-		graphics *gfx;
+		Graphics *gfx;
 	};
 
 	struct ScreenshotInfo;
@@ -445,8 +445,8 @@ public:
 		}
 	};
 
-	graphics(const char *name);
-	virtual ~graphics();
+	Graphics(const char *name);
+	virtual ~Graphics();
 
 	virtual Texture *newTexture(const Texture::Settings &settings, const Texture::Slices *data = nullptr) = 0;
 	virtual Texture *newTextureView(Texture *base, const Texture::ViewSettings &viewsettings) = 0;
@@ -908,7 +908,7 @@ public:
 	// Workaround for some very old nvidia drivers that aren't compliant with the GLSL 3.30 spec.
 	bool isUsingNoTextureCubeShadowBiasHack() const { return usingNoTextureCubeShadowBiasHack; }
 
-	static graphics *createInstance();
+	static Graphics *createInstance();
 
 	STRINGMAP_CLASS_DECLARE(DrawMode);
 	STRINGMAP_CLASS_DECLARE(ArcMode);
