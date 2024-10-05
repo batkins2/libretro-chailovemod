@@ -245,7 +245,7 @@ public:
 	 * Set up necessary state (LOVE-provided shader uniforms, etc.) for drawing.
 	 * This *MUST* be called directly before OpenGL drawing functions.
 	 **/
-	void prepareDraw(graphics *gfx);
+	void prepareDraw(Graphics *gfx);
 
 	/**
 	 * State-tracked glBindBuffer.

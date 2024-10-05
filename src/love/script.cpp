@@ -304,7 +304,7 @@ script::script(const std::string& file) {
 	chai.add(fun<love::graphics&, graphics>(&graphics::clear), "clear");
 
 	// Gfx
-	chai.add(fun(&gfx::chai_gfx::wrap_newShader), "newShader");
+	chai.add(fun(&chai_gfx::wrap_newShader), "newShader");
 
 	// Font
 	chai.add(fun(&font::isOpen), "isOpen");

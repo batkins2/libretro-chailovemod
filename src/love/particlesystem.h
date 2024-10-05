@@ -511,7 +511,7 @@ public:
 	void update(float dt);
 
 	// Implements Drawable.
-	void draw(graphics *gfx, const Matrix4 &m) override;
+	void draw(Graphics *gfx, const Matrix4 &m) override;
 
 	static bool getConstant(const char *in, AreaSpreadDistribution &out);
 	static bool getConstant(AreaSpreadDistribution in, const char *&out);

@@ -137,7 +137,7 @@ static void normalizedToDPICoords(double *x, double *y)
 // handling inside the function which triggered them on some backends.
 static int SDLCALL watchAppEvents(void * /*udata*/, SDL_Event *event)
 {
-	auto gfx = Module::getInstance<graphics::Graphics>(Module::M_GRAPHICS);
+	auto gfx = Module::getInstance<Graphics::Graphics>(Module::M_GRAPHICS);
 
 	switch (event->type)
 	{
@@ -220,7 +220,7 @@ void Event::exceptionIfInRenderPass(const char *name)
 	// happens inside SDL_PumpEvents - which is called by SDL_PollEvent and
 	// friends. It's probably a bad idea to call those functions while a RT
 	// is active.
-	auto gfx = Module::getInstance<graphics::Graphics>(Module::M_GRAPHICS);
+	auto gfx = Module::getInstance<Graphics::Graphics>(Module::M_GRAPHICS);
 	if (gfx != nullptr && gfx->isRenderTargetActive())
 		throw love::Exception("%s cannot be called while a render target is active in love.graphics.", name);
 }
@@ -760,7 +760,7 @@ Message *Event::convertWindowEvent(const SDL_Event &e)
 	vargs.reserve(4);
 
 	window::Window *win = nullptr;
-	graphics::Graphics *gfx = nullptr;
+	Graphics::Graphics *gfx = nullptr;
 
 #if SDL_VERSION_ATLEAST(3, 0, 0)
 	auto event = e.type;
@@ -790,7 +790,7 @@ Message *Event::convertWindowEvent(const SDL_Event &e)
 			double width  = e.window.data1;
 			double height = e.window.data2;
 
-			gfx = Module::getInstance<graphics::Graphics>(Module::M_GRAPHICS);
+			gfx = Module::getInstance<Graphics::Graphics>(Module::M_GRAPHICS);
 			win = Module::getInstance<window::Window>(Module::M_WINDOW);
 
 			// WINDOWEVENT_SIZE_CHANGED will always occur before RESIZED.

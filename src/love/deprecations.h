@@ -37,7 +37,7 @@ public:
 	Deprecations();
 	~Deprecations();
 
-	void draw(graphics *gfx);
+	void draw(Graphics *gfx);
 
 private:
 

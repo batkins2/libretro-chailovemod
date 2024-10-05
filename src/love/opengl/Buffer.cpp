@@ -66,8 +66,8 @@ static GLenum getGLFormat(DataFormat format)
 	}
 }
 
-Buffer::Buffer(love::gfx::graphics *gfx, const Settings &settings, const std::vector<DataDeclaration> &format, const void *data, size_t size, size_t arraylength)
-	: love::gfx::Buffer(gfx, settings, format, size, arraylength)
+Buffer::Buffer(gfx::Graphics *gfx, const Settings &settings, const std::vector<DataDeclaration> &format, const void *data, size_t size, size_t arraylength)
+	: gfx::Buffer(gfx, settings, format, size, arraylength)
 {
 	size = getSize();
 	arraylength = getArrayLength();

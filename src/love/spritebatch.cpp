@@ -40,7 +40,7 @@ namespace gfx
 
 love::Type SpriteBatch::type("SpriteBatch", &Drawable::type);
 
-SpriteBatch::SpriteBatch(graphics *gfx, Texture *texture, int size, BufferDataUsage usage)
+SpriteBatch::SpriteBatch(Graphics *gfx, Texture *texture, int size, BufferDataUsage usage)
 	: texture(texture)
 	, size(size)
 	, next(0)
@@ -243,7 +243,7 @@ void SpriteBatch::setBufferSize(int newsize)
 	if (new_vertex_data == nullptr)
 		throw love::Exception("Out of memory.");
 
-	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+	auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
 	Buffer::Settings settings(array_buf->getUsageFlags(), array_buf->getDataUsage());
 	auto decl = Buffer::getCommonFormatDeclaration(vertex_format);
 
@@ -318,7 +318,7 @@ bool SpriteBatch::getDrawRange(int &start, int &count) const
 	return true;
 }
 
-void SpriteBatch::draw(graphics *gfx, const Matrix4 &m)
+void SpriteBatch::draw(Graphics *gfx, const Matrix4 &m)
 {
 	if (next == 0)
 		return;
@@ -387,7 +387,7 @@ void SpriteBatch::draw(graphics *gfx, const Matrix4 &m)
 		}
 	}
 
-	graphics::TempTransform transform(gfx, m);
+	Graphics::TempTransform transform(gfx, m);
 
 	int start = std::min(std::max(0, range_start), next - 1);
 

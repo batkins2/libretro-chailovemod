@@ -61,7 +61,7 @@ void TextBatch::uploadVertices(const std::vector<FontMod::GlyphVertex> &vertices
 		if (vertexBuffer != nullptr)
 			newsize = std::max(size_t(vertexBuffer->getSize() * 1.5), newsize);
 
-		auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+		auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
 
 		Buffer::Settings settings(BUFFERUSAGEFLAG_VERTEX, BUFFERDATAUSAGE_DYNAMIC);
 		auto decl = Buffer::getCommonFormatDeclaration(FontMod::vertexFormat);
@@ -248,7 +248,7 @@ int TextBatch::getHeight(int index) const
 	return textData[index].textInfo.height;
 }
 
-void TextBatch::draw(graphics *gfx, const Matrix4 &m)
+void TextBatch::draw(Graphics *gfx, const Matrix4 &m)
 {
 	if (vertexBuffer == nullptr || vertexData == nullptr || drawCommands.empty())
 		return;
@@ -287,7 +287,7 @@ void TextBatch::draw(graphics *gfx, const Matrix4 &m)
 		modifiedVertices.invalidate();
 	}
 
-	graphics::TempTransform transform(gfx, m);
+	Graphics::TempTransform transform(gfx, m);
 
 	for (const FontMod::DrawCommand &cmd : drawCommands)
 	{

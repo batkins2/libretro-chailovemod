@@ -270,7 +270,7 @@ public:
 	bool isUsingDeprecatedTextureUniform() const;
 
 	static SourceInfo getSourceInfo(const std::string &src);
-	static std::string createShaderStageCode(graphics *gfx, ShaderStageType stage, const std::string &code, const CompileOptions &options, const SourceInfo &info, bool gles, bool checksystemfeatures);
+	static std::string createShaderStageCode(Graphics *gfx, ShaderStageType stage, const std::string &code, const CompileOptions &options, const SourceInfo &info, bool gles, bool checksystemfeatures);
 
 	static bool validate(StrongRef<ShaderStage> stages[], std::string &err);
 

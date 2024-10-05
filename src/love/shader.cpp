@@ -580,7 +580,7 @@ Shader::SourceInfo Shader::getSourceInfo(const std::string &src)
 	return info;
 }
 
-std::string Shader::createShaderStageCode(graphics *gfx, ShaderStageType stage, const std::string &code, const CompileOptions &options, const Shader::SourceInfo &info, bool gles, bool checksystemfeatures)
+std::string Shader::createShaderStageCode(Graphics *gfx, ShaderStageType stage, const std::string &code, const CompileOptions &options, const Shader::SourceInfo &info, bool gles, bool checksystemfeatures)
 {
 	if (info.language == Shader::LANGUAGE_MAX_ENUM)
 		throw love::Exception("Invalid shader language");
@@ -595,10 +595,10 @@ std::string Shader::createShaderStageCode(graphics *gfx, ShaderStageType stage, 
 	{
 		const auto &features = gfx->getCapabilities().features;
 
-		if (stage == SHADERSTAGE_COMPUTE && !features[graphics::FEATURE_GLSL4])
+		if (stage == SHADERSTAGE_COMPUTE && !features[Graphics::FEATURE_GLSL4])
 			throw love::Exception("Compute shaders require GLSL 4 which is not supported on this system.");
 
-		if (info.language == LANGUAGE_GLSL4 && !features[graphics::FEATURE_GLSL4])
+		if (info.language == LANGUAGE_GLSL4 && !features[Graphics::FEATURE_GLSL4])
 			throw love::Exception("GLSL 4 shaders are not supported on this system.");
 	}
 
@@ -653,7 +653,7 @@ Shader::Shader(StrongRef<ShaderStage> _stages[], const CompileOptions &options)
 	activeTextures.resize(reflection.textureCount);
 	activeBuffers.resize(reflection.bufferCount);
 
-	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+	auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
 
 	// Default bindings for read-only resources.
 	for (const auto &kvp : reflection.allUniforms)

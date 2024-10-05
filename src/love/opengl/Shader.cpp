@@ -413,7 +413,7 @@ void Shader::attach()
 {
 	if (current != this)
 	{
-		graphics::flushBatchedDrawsGlobal();
+		Graphics::flushBatchedDrawsGlobal();
 
 		gl.useProgram(program);
 		current = this;
@@ -586,7 +586,7 @@ void Shader::sendTextures(const UniformInfo *info, love::gfx::Texture **textures
 		}
 		else
 		{
-			auto graphics = Module::getInstance<love::gfx::graphics>(Module::M_GRAPHICS);
+			auto graphics = Module::getInstance<love::gfx::Graphics>(Module::M_GRAPHICS);
 			tex = graphics->getDefaultTexture(info->textureType, info->dataBaseType, info->isDepthSampler);
 		}
 
@@ -667,7 +667,7 @@ void Shader::sendBuffers(const UniformInfo *info, love::gfx::Buffer **buffers, i
 		}
 		else
 		{
-			auto graphics = Module::getInstance<love::gfx::graphics>(Module::M_GRAPHICS);
+			auto graphics = Module::getInstance<love::gfx::Graphics>(Module::M_GRAPHICS);
 			if (texelbinding)
 				buffer = graphics->getDefaultTexelBuffer(info->dataBaseType);
 			else
@@ -716,7 +716,7 @@ void Shader::sendBuffers(const UniformInfo *info, love::gfx::Buffer **buffers, i
 void Shader::flushBatchedDraws() const
 {
 	if (current == this)
-		graphics::flushBatchedDrawsGlobal();
+		Graphics::flushBatchedDrawsGlobal();
 }
 
 ptrdiff_t Shader::getHandle() const
@@ -755,7 +755,7 @@ void Shader::setVideoTextures(love::gfx::Texture *ytexture, love::gfx::Texture *
 	}
 }
 
-void Shader::updateBuiltinUniforms(love::gfx::graphics *gfx, int viewportW, int viewportH)
+void Shader::updateBuiltinUniforms(love::gfx::Graphics *gfx, int viewportW, int viewportH)
 {
 	if (current != this)
 		return;

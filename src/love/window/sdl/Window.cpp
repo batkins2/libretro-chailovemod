@@ -113,7 +113,7 @@ Window::~Window()
 	SDL_QuitSubSystem(SDL_INIT_VIDEO);
 }
 
-void Window::setGraphics(gfx::graphics *graphics)
+void Window::setGraphics(gfx::Graphics *graphics)
 {
 	this->graphics.set(graphics);
 }
@@ -496,7 +496,7 @@ static SDL_DisplayID GetSDLDisplayIDForIndex(int displayindex)
 bool Window::setWindow(int width, int height, WindowSettings *settings)
 {
 	if (!graphics.get())
-		graphics.set(Module::getInstance<gfx::graphics>(Module::M_GRAPHICS));
+		graphics.set(Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS));
 
 	if (graphics.get() && graphics->isRenderTargetActive())
 		throw love::Exception("love.window.setMode cannot be called while a render target is active in love.graphics.");
@@ -653,7 +653,7 @@ bool Window::setWindow(int width, int height, WindowSettings *settings)
 		if (renderer == gfx::RENDERER_OPENGL)
 			sdlflags |= SDL_WINDOW_OPENGL;
 	#ifdef LOVE_GRAPHICS_METAL
-		if (renderer == graphics::RENDERER_METAL)
+		if (renderer == Graphics::RENDERER_METAL)
 			sdlflags |= SDL_WINDOW_METAL;
 	#endif
 

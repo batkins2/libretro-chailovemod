@@ -45,7 +45,7 @@ std::vector<Buffer::DataDeclaration> Mesh::getDefaultVertexFormat()
 
 love::Type Mesh::type("Mesh", &Drawable::type);
 
-Mesh::Mesh(graphics *gfx, const std::vector<Buffer::DataDeclaration> &vertexformat, const void *data, size_t datasize, PrimitiveType drawmode, BufferDataUsage usage)
+Mesh::Mesh(Graphics *gfx, const std::vector<Buffer::DataDeclaration> &vertexformat, const void *data, size_t datasize, PrimitiveType drawmode, BufferDataUsage usage)
 	: primitiveType(drawmode)
 {
 	try
@@ -71,7 +71,7 @@ Mesh::Mesh(graphics *gfx, const std::vector<Buffer::DataDeclaration> &vertexform
 	indexDataType = getIndexDataTypeFromMax(vertexCount);
 }
 
-Mesh::Mesh(graphics *gfx, const std::vector<Buffer::DataDeclaration> &vertexformat, int vertexcount, PrimitiveType drawmode, BufferDataUsage usage)
+Mesh::Mesh(Graphics *gfx, const std::vector<Buffer::DataDeclaration> &vertexformat, int vertexcount, PrimitiveType drawmode, BufferDataUsage usage)
 	: vertexCount((size_t) vertexcount)
 	, indexDataType(getIndexDataTypeFromMax(vertexcount))
 	, primitiveType(drawmode)
@@ -356,7 +356,7 @@ void Mesh::setVertexMap(const std::vector<uint32> &map)
 
 	if (recreate)
 	{
-		auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+		auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
 		auto usage = vertexBuffer.get() ? vertexBuffer->getDataUsage() : BUFFERDATAUSAGE_DYNAMIC;
 		Buffer::Settings settings(BUFFERUSAGEFLAG_INDEX, usage);
 		auto buffer = StrongRef<Buffer>(gfx->newBuffer(settings, dataformat, nullptr, size, 0), Acquire::NORETAIN);
@@ -400,7 +400,7 @@ void Mesh::setVertexMap(IndexDataType datatype, const void *data, size_t datasiz
 
 	if (recreate)
 	{
-		auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+		auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
 		auto usage = vertexBuffer.get() ? vertexBuffer->getDataUsage() : BUFFERDATAUSAGE_DYNAMIC;
 		Buffer::Settings settings(BUFFERUSAGEFLAG_INDEX, usage);
 		auto buffer = StrongRef<Buffer>(gfx->newBuffer(settings, dataformat, nullptr, datasize, 0), Acquire::NORETAIN);
@@ -546,22 +546,22 @@ bool Mesh::getDrawRange(int &start, int &count) const
 	return true;
 }
 
-void Mesh::draw(graphics *gfx, const love::Matrix4 &m)
+void Mesh::draw(Graphics *gfx, const love::Matrix4 &m)
 {
 	drawInternal(gfx, m, 1, nullptr, 0);
 }
 
-void Mesh::drawInstanced(graphics *gfx, const Matrix4 &m, int instancecount)
+void Mesh::drawInstanced(Graphics *gfx, const Matrix4 &m, int instancecount)
 {
 	drawInternal(gfx, m, instancecount, nullptr, 0);
 }
 
-void Mesh::drawIndirect(graphics *gfx, const Matrix4 &m, Buffer *indirectargs, int argsindex)
+void Mesh::drawIndirect(Graphics *gfx, const Matrix4 &m, Buffer *indirectargs, int argsindex)
 {
 	drawInternal(gfx, m, 0, indirectargs, argsindex);
 }
 
-void Mesh::drawInternal(graphics *gfx, const Matrix4 &m, int instancecount, Buffer *indirectargs, int argsindex)
+void Mesh::drawInternal(Graphics *gfx, const Matrix4 &m, int instancecount, Buffer *indirectargs, int argsindex)
 {
 	if (vertexCount <= 0 || (instancecount <= 0 && indirectargs == nullptr))
 		return;
@@ -572,9 +572,9 @@ void Mesh::drawInternal(graphics *gfx, const Matrix4 &m, int instancecount, Buff
 			throw love::Exception("The fan draw mode is not supported in indirect draws.");
 
 		if (useIndexBuffer && indexBuffer != nullptr)
-			gfx->validateIndirectArgsBuffer(graphics::INDIRECT_ARGS_DRAW_INDICES, indirectargs, argsindex);
+			gfx->validateIndirectArgsBuffer(Graphics::INDIRECT_ARGS_DRAW_INDICES, indirectargs, argsindex);
 		else
-			gfx->validateIndirectArgsBuffer(graphics::INDIRECT_ARGS_DRAW_VERTICES, indirectargs, argsindex);
+			gfx->validateIndirectArgsBuffer(Graphics::INDIRECT_ARGS_DRAW_VERTICES, indirectargs, argsindex);
 	}
 
 	// Some graphics backends don't natively support triangle fans. So we'd
@@ -635,7 +635,7 @@ void Mesh::drawInternal(graphics *gfx, const Matrix4 &m, int instancecount, Buff
 	if ((attributes.enableBits & ~(ATTRIBFLAG_TEXCOORD | ATTRIBFLAG_COLOR)) == 0)
 		throw love::Exception("Mesh must have an enabled VertexPosition or custom attribute to be drawn.");
 
-	graphics::TempTransform transform(gfx, m);
+	Graphics::TempTransform transform(gfx, m);
 
 	Buffer *indexbuffer = useIndexBuffer ? indexBuffer : nullptr;
 	int indexcount = (int) indexCount;
@@ -660,7 +660,7 @@ void Mesh::drawInternal(graphics *gfx, const Matrix4 &m, int instancecount, Buff
 		if (range.isValid())
 			r.intersect(range);
 
-		graphics::DrawIndexedCommand cmd(&attributes, &buffers, indexbuffer);
+		Graphics::DrawIndexedCommand cmd(&attributes, &buffers, indexbuffer);
 
 		cmd.primitiveType = primitiveType;
 		cmd.indexType = indexDataType;
@@ -683,7 +683,7 @@ void Mesh::drawInternal(graphics *gfx, const Matrix4 &m, int instancecount, Buff
 		if (range.isValid())
 			r.intersect(range);
 
-		graphics::DrawCommand cmd(&attributes, &buffers);
+		Graphics::DrawCommand cmd(&attributes, &buffers);
 
 		cmd.primitiveType = primitiveType;
 		cmd.vertexStart = (int) r.getOffset();

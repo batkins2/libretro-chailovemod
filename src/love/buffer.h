@@ -103,7 +103,7 @@ public:
 		{}
 	};
 
-	Buffer(graphics *gfx, const Settings &settings, const std::vector<DataDeclaration> &format, size_t size, size_t arraylength);
+	Buffer(Graphics *gfx, const Settings &settings, const std::vector<DataDeclaration> &format, size_t size, size_t arraylength);
 	virtual ~Buffer();
 
 	size_t getSize() const { return size; }

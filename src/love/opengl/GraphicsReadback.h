@@ -36,8 +36,8 @@ class GraphicsReadback final : public love::gfx::GraphicsReadback
 {
 public:
 
-	GraphicsReadback(love::gfx::graphics *gfx, ReadbackMethod method, love::gfx::Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset);
-	GraphicsReadback(love::gfx::graphics *gfx, ReadbackMethod method, love::gfx::Texture *texture, int slice, int mipmap, const Rect &rect, imagemod::ImageData *dest, int destx, int desty);
+	GraphicsReadback(love::gfx::Graphics *gfx, ReadbackMethod method, love::gfx::Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset);
+	GraphicsReadback(love::gfx::Graphics *gfx, ReadbackMethod method, love::gfx::Texture *texture, int slice, int mipmap, const Rect &rect, imagemod::ImageData *dest, int destx, int desty);
 	virtual ~GraphicsReadback();
 
 	void wait() override;

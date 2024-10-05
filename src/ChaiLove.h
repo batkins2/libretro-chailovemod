@@ -70,7 +70,6 @@
 #include "love/math.h"
 #include "love/event.h"
 #include "love/console.h"
-
 #include "love/chai_gfx.h"
 
 class ChaiLove {
@@ -102,7 +101,7 @@ class ChaiLove {
 	love::math math;
 	love::window window;
 	love::event event;
-	love::graphics::chai_gfx chai_gfx;
+	love::chai_gfx chai_gfx;
 
 	~ChaiLove();
 	void quit(void);

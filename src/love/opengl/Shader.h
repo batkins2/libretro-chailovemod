@@ -70,7 +70,7 @@ public:
 	ptrdiff_t getHandle() const override;
 	void setVideoTextures(love::gfx::Texture *ytexture, love::gfx::Texture *cbtexture, love::gfx::Texture *crtexture) override;
 
-	void updateBuiltinUniforms(graphics *gfx, int viewportW, int viewportH);
+	void updateBuiltinUniforms(Graphics *gfx, int viewportW, int viewportH);
 
 	const std::vector<Buffer *> &getActiveWritableStorageBuffers() const { return activeWritableStorageBuffers; }
 	const std::vector<StorageTextureBinding> &getStorageTextureBindings() const { return storageTextureBindings; }

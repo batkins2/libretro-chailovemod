@@ -68,8 +68,8 @@ public:
 
 	static love::Type type;
 
-	GraphicsReadback(graphics *gfx, ReadbackMethod method, Buffer *buffer, size_t offset, size_t size, love::datamod::ByteData *dest, size_t destoffset);
-	GraphicsReadback(graphics *gfx, ReadbackMethod method, Texture *texture, int slice, int mipmap, const Rect &rect, love::imagemod::ImageData *dest, int destx, int desty);
+	GraphicsReadback(Graphics *gfx, ReadbackMethod method, Buffer *buffer, size_t offset, size_t size, love::datamod::ByteData *dest, size_t destoffset);
+	GraphicsReadback(Graphics *gfx, ReadbackMethod method, Texture *texture, int slice, int mipmap, const Rect &rect, love::imagemod::ImageData *dest, int destx, int desty);
 	virtual ~GraphicsReadback();
 
 	virtual void wait() = 0;

@@ -397,7 +397,7 @@ Polyline::~Polyline()
 		delete[] vertices;
 }
 
-void Polyline::draw(graphics *gfx)
+void Polyline::draw(Graphics *gfx)
 {
 	const Matrix4 &t = gfx->getTransform();
 	bool is2D = t.isAffine2DTransform();
@@ -422,13 +422,13 @@ void Polyline::draw(graphics *gfx)
 	{
 		const Vector2 *verts = vertices + vertex_start;
 
-		graphics::BatchedDrawCommand cmd;
+		Graphics::BatchedDrawCommand cmd;
 		cmd.formats[0] = getSinglePositionFormat(is2D);
 		cmd.formats[1] = CommonFormat::STf_RGBAub;
 		cmd.indexMode = triangle_mode;
 		cmd.vertexCount = std::min(maxvertices, total_vertex_count - vertex_start);
 
-		graphics::BatchedVertexData data = gfx->requestBatchedDraw(cmd);
+		Graphics::BatchedVertexData data = gfx->requestBatchedDraw(cmd);
 
 		if (is2D)
 			t.transformXY((Vector2 *) data.stream[0], verts, cmd.vertexCount);

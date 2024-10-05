@@ -210,7 +210,7 @@ static GLenum newRenderbuffer(int width, int height, int &samples, PixelFormat p
 	return status;
 }
 
-Texture::Texture(love::gfx::graphics *gfx, const Settings &settings, const Slices *data)
+Texture::Texture(love::gfx::Graphics *gfx, const Settings &settings, const Slices *data)
 	: love::gfx::Texture(gfx, settings, data)
 	, slices(settings.type)
 	, fbo(0)
@@ -236,7 +236,7 @@ Texture::Texture(love::gfx::graphics *gfx, const Settings &settings, const Slice
 	slices.clear();
 }
 
-Texture::Texture(love::gfx::graphics *gfx, love::gfx::Texture *base, const Texture::ViewSettings &viewsettings)
+Texture::Texture(love::gfx::Graphics *gfx, love::gfx::Texture *base, const Texture::ViewSettings &viewsettings)
 	: love::gfx::Texture(gfx, base, viewsettings)
 	, slices(viewsettings.type.get(base->getTextureType()))
 	, fbo(0)

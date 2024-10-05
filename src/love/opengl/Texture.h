@@ -38,8 +38,8 @@ class Texture final : public love::gfx::Texture, public Volatile
 {
 public:
 
-	Texture(gfx::graphics *gfx, const Settings &settings, const Slices *data);
-	Texture(gfx::graphics *gfx, love::gfx::Texture *base, const Texture::ViewSettings &viewsettings);
+	Texture(gfx::Graphics *gfx, const Settings &settings, const Slices *data);
+	Texture(gfx::Graphics *gfx, love::gfx::Texture *base, const Texture::ViewSettings &viewsettings);
 
 	virtual ~Texture();
 

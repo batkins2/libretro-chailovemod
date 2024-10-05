@@ -43,7 +43,7 @@ public:
 	Window();
 	~Window();
 
-	void setGraphics(gfx::graphics *graphics) override;
+	void setGraphics(gfx::Graphics *graphics) override;
 
 	bool setWindow(int width = 800, int height = 600, WindowSettings *settings = nullptr) override;
 	void getWindow(int &width, int &height, WindowSettings &settings) override;
@@ -182,7 +182,7 @@ private:
 	bool displayedWindowError;
 	ContextAttribs contextAttribs;
 
-	StrongRef<gfx::graphics> graphics;
+	StrongRef<gfx::Graphics> graphics;
 
 }; // Window
 

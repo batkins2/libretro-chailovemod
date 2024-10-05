@@ -65,7 +65,7 @@ public:
 	int getHeight(int index = 0) const;
 
 	// Implements Drawable.
-	void draw(graphics *gfx, const Matrix4 &m) override;
+	void draw(Graphics *gfx, const Matrix4 &m) override;
 
 private:
 

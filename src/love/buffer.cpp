@@ -32,7 +32,7 @@ love::Type Buffer::type("GraphicsBuffer", &Object::type);
 int Buffer::bufferCount = 0;
 int64 Buffer::totalGraphicsMemory = 0;
 
-Buffer::Buffer(graphics *gfx, const Settings &settings, const std::vector<DataDeclaration> &bufferformat, size_t size, size_t arraylength)
+Buffer::Buffer(Graphics *gfx, const Settings &settings, const std::vector<DataDeclaration> &bufferformat, size_t size, size_t arraylength)
 	: arrayLength(0)
 	, arrayStride(0)
 	, size(size)
@@ -57,7 +57,7 @@ Buffer::Buffer(graphics *gfx, const Settings &settings, const std::vector<DataDe
 	bool storagebuffer = usageFlags & BUFFERUSAGEFLAG_SHADER_STORAGE;
 	bool indirectbuffer = usageFlags & BUFFERUSAGEFLAG_INDIRECT_ARGUMENTS;
 
-	// if (texelbuffer && !caps.features[graphics::FEATURE_TEXEL_BUFFER])
+	// if (texelbuffer && !caps.features[Graphics::FEATURE_TEXEL_BUFFER])
 		// throw love::Exception("Texel buffers are not supported on this system.");
 
 	// if (storagebuffer && !caps.features[Graphics::FEATURE_GLSL4])

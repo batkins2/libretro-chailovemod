@@ -52,7 +52,7 @@ public:
 
 	static love::Type type;
 
-	SpriteBatch(graphics *gfx, Texture *texture, int size, BufferDataUsage usage);
+	SpriteBatch(Graphics *gfx, Texture *texture, int size, BufferDataUsage usage);
 	virtual ~SpriteBatch();
 
 	int add(const Matrix4 &m, int index = -1);
@@ -104,7 +104,7 @@ public:
 	bool getDrawRange(int &start, int &count) const;
 
 	// Implements Drawable.
-	void draw(graphics *gfx, const Matrix4 &m) override;
+	void draw(Graphics *gfx, const Matrix4 &m) override;
 
 private:
 

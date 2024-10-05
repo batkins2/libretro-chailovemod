@@ -89,9 +89,9 @@ static GLenum getGLBlendFactor(BlendFactor factor)
 	return 0;
 }
 
-love::gfx::graphics *createInstance()
+love::gfx::Graphics *createInstance()
 {
-	love::gfx::graphics *instance = nullptr;
+	love::gfx::Graphics *instance = nullptr;
 
 	try
 	{
@@ -106,7 +106,7 @@ love::gfx::graphics *createInstance()
 }
 
 Graphics::Graphics()
-	: love::gfx::graphics("love.gfx.opengl")
+	: love::gfx::Graphics("love.gfx.opengl")
 	, windowHasStencil(false)
 	, mainVAO(0)
 	, internalBackbufferFBO(0)

@@ -86,8 +86,8 @@ public:
 	/**
 	 * Draws the specified text.
 	 **/
-	void print(graphics *gfx, const std::vector<love::fontmod::ColoredString> &text, const Matrix4 &m, const Colorf &constantColor);
-	void printf(graphics *gfx, const std::vector<love::fontmod::ColoredString> &text, float wrap, AlignMode align, const Matrix4 &m, const Colorf &constantColor);
+	void print(Graphics *gfx, const std::vector<love::fontmod::ColoredString> &text, const Matrix4 &m, const Colorf &constantColor);
+	void printf(Graphics *gfx, const std::vector<love::fontmod::ColoredString> &text, float wrap, AlignMode align, const Matrix4 &m, const Colorf &constantColor);
 
 	/**
 	 * Returns the height of the font.
@@ -180,7 +180,7 @@ private:
 	love::fontmod::GlyphData *getRasterizerGlyphData(love::fontmod::TextShaper::GlyphIndex glyphindex, float &dpiscale);
 	const Glyph &addGlyph(love::fontmod::TextShaper::GlyphIndex glyphindex);
 	const Glyph &findGlyph(love::fontmod::TextShaper::GlyphIndex glyphindex);
-	void printv(graphics *gfx, const Matrix4 &t, const std::vector<DrawCommand> &drawcommands, const std::vector<GlyphVertex> &vertices);
+	void printv(Graphics *gfx, const Matrix4 &t, const std::vector<DrawCommand> &drawcommands, const std::vector<GlyphVertex> &vertices);
 
 	StrongRef<love::fontmod::TextShaper> shaper;
 

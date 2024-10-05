@@ -27,7 +27,7 @@ namespace gfx
 namespace opengl
 {
 
-ShaderStage::ShaderStage(graphics *gfx, ShaderStageType stage, const std::string &source, bool gles, const std::string &cachekey)
+ShaderStage::ShaderStage(Graphics *gfx, ShaderStageType stage, const std::string &source, bool gles, const std::string &cachekey)
 	: love::gfx::ShaderStage(gfx, stage, source, gles, cachekey)
 	, glShader(0)
 {

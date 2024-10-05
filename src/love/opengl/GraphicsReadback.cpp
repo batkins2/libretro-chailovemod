@@ -31,7 +31,7 @@ namespace gfx
 namespace opengl
 {
 
-GraphicsReadback::GraphicsReadback(love::gfx::graphics *gfx, ReadbackMethod method, love::gfx::Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset)
+GraphicsReadback::GraphicsReadback(love::gfx::Graphics *gfx, ReadbackMethod method, love::gfx::Buffer *buffer, size_t offset, size_t size, datamod::ByteData *dest, size_t destoffset)
 	: love::gfx::GraphicsReadback(gfx, method, buffer, offset, size, dest, destoffset)
 {
 	// Immediate readback of readback-type buffers doesn't need a staging buffer.
@@ -59,7 +59,7 @@ GraphicsReadback::GraphicsReadback(love::gfx::graphics *gfx, ReadbackMethod meth
 	}
 }
 
-GraphicsReadback::GraphicsReadback(love::gfx::graphics *gfx, ReadbackMethod method, love::gfx::Texture *texture, int slice, int mipmap, const Rect &rect, imagemod::ImageData *dest, int destx, int desty)
+GraphicsReadback::GraphicsReadback(love::gfx::Graphics *gfx, ReadbackMethod method, love::gfx::Texture *texture, int slice, int mipmap, const Rect &rect, imagemod::ImageData *dest, int destx, int desty)
 	: love::gfx::GraphicsReadback(gfx, method, texture, slice, mipmap, rect, dest, destx, desty)
 {
 	size_t size = getPixelFormatSliceSize(textureFormat, rect.w, rect.h);
@@ -111,7 +111,7 @@ void GraphicsReadback::update()
 
 		if (stagingBuffer.get())
 		{
-			auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+			auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
 			if (gfx != nullptr)
 				gfx->releaseTemporaryBuffer(stagingBuffer);
 			stagingBuffer.set(nullptr);

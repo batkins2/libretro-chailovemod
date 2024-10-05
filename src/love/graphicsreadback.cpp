@@ -33,7 +33,7 @@ namespace gfx
 
 love::Type GraphicsReadback::type("GraphicsReadback", &Object::type);
 
-GraphicsReadback::GraphicsReadback(graphics */*gfx*/, ReadbackMethod method, Buffer *buffer, size_t offset, size_t size, love::datamod::ByteData *dest, size_t destoffset)
+GraphicsReadback::GraphicsReadback(Graphics */*gfx*/, ReadbackMethod method, Buffer *buffer, size_t offset, size_t size, love::datamod::ByteData *dest, size_t destoffset)
 	: dataType(DATA_BUFFER)
 	, method(method)
 	, bufferData(dest)
@@ -47,7 +47,7 @@ GraphicsReadback::GraphicsReadback(graphics */*gfx*/, ReadbackMethod method, Buf
 	bufferDataOffset = dest != nullptr ? destoffset : 0;
 }
 
-GraphicsReadback::GraphicsReadback(graphics *gfx, ReadbackMethod method, Texture *texture, int slice, int mipmap, const Rect &rect, love::imagemod::ImageData *dest, int destx, int desty)
+GraphicsReadback::GraphicsReadback(Graphics *gfx, ReadbackMethod method, Texture *texture, int slice, int mipmap, const Rect &rect, love::imagemod::ImageData *dest, int destx, int desty)
 	: dataType(DATA_TEXTURE)
 	, method(method)
 	, imageData(dest)
@@ -89,12 +89,12 @@ GraphicsReadback::GraphicsReadback(graphics *gfx, ReadbackMethod method, Texture
 
 	if (method == READBACK_ASYNC)
 	{
-		if (!isRT && !caps.features[graphics::FEATURE_COPY_TEXTURE_TO_BUFFER])
+		if (!isRT && !caps.features[Graphics::FEATURE_COPY_TEXTURE_TO_BUFFER])
 			throw love::Exception("readbackTextureAsync with a non-render-target texture is not supported on this system.");
 	}
 	else
 	{
-		if (!isRT && !caps.features[graphics::FEATURE_COPY_TEXTURE_TO_BUFFER])
+		if (!isRT && !caps.features[Graphics::FEATURE_COPY_TEXTURE_TO_BUFFER])
 			throw love::Exception("readbackTexture with a non-render-target texture is not supported on this system.");
 	}
 

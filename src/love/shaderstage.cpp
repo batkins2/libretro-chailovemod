@@ -30,7 +30,7 @@ namespace love
 namespace gfx
 {
 
-ShaderStage::ShaderStage(graphics */*gfx*/, ShaderStageType stage, const std::string &glsl, bool gles, const std::string &cachekey)
+ShaderStage::ShaderStage(Graphics */*gfx*/, ShaderStageType stage, const std::string &glsl, bool gles, const std::string &cachekey)
 	: stageType(stage)
 	, source(glsl)
 	, cacheKey(cachekey)
@@ -78,7 +78,7 @@ ShaderStage::~ShaderStage()
 {
 	if (!cacheKey.empty())
 	{
-		auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+		auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
 		if (gfx != nullptr)
 			gfx->cleanupCachedShaderStage(stageType, cacheKey);
 	}

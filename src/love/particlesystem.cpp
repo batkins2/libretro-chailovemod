@@ -188,7 +188,7 @@ void ParticleSystem::createBuffers(size_t size)
 		pFree = pMem = new Particle[size];
 		maxParticles = (uint32) size;
 
-		auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+		auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
 
 		size_t bytes = sizeof(Vertex) * size * 4;
 		Buffer::Settings settings(BUFFERUSAGEFLAG_VERTEX, BUFFERDATAUSAGE_STREAM);
@@ -1025,7 +1025,7 @@ void ParticleSystem::update(float dt)
 	prevPosition = position;
 }
 
-void ParticleSystem::draw(graphics *gfx, const Matrix4 &m)
+void ParticleSystem::draw(Graphics *gfx, const Matrix4 &m)
 {
 	uint32 pCount = getCount();
 
@@ -1081,7 +1081,7 @@ void ParticleSystem::draw(graphics *gfx, const Matrix4 &m)
 
 	buffer->unmap(0, pCount * sizeof(Vertex) * 4);
 
-	graphics::TempTransform transform(gfx, m);
+	Graphics::TempTransform transform(gfx, m);
 
 	BufferBindings vertexbuffers;
 	vertexbuffers.set(0, buffer, 0);

@@ -449,7 +449,7 @@ void OpenGL::initMaxValues()
 		maxLODBias = 0.0f;
 }
 
-void OpenGL::prepareDraw(love::gfx::graphics *gfx)
+void OpenGL::prepareDraw(love::gfx::Graphics *gfx)
 {
 	TempDebugGroup debuggroup("Prepare OpenGL draw");
 

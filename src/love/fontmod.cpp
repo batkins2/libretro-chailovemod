@@ -88,7 +88,7 @@ FontMod::FontMod(love::fontmod::Rasterizer *r, const SamplerState &s)
 	pixelFormat = gd->getFormat();
 	gd->release();
 
-	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+	auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
 	if (pixelFormat == PIXELFORMAT_LA8_UNORM && !gfx->isPixelFormatSupported(pixelFormat, PIXELFORMATUSAGEFLAGS_SAMPLE))
 		pixelFormat = PIXELFORMAT_RGBA8_UNORM;
 
@@ -106,11 +106,11 @@ FontMod::TextureSize FontMod::getNextTextureSize() const
 	TextureSize size = {textureWidth, textureHeight};
 
 	int maxsize = 2048;
-	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+	auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
 	if (gfx != nullptr)
 	{
 		const auto &caps = gfx->getCapabilities();
-		maxsize = (int) caps.limits[graphics::LIMIT_TEXTURE_SIZE];
+		maxsize = (int) caps.limits[Graphics::LIMIT_TEXTURE_SIZE];
 	}
 
 	int maxwidth  = std::min(8192, maxsize);
@@ -139,7 +139,7 @@ bool FontMod::loadVolatile()
 
 void FontMod::createTexture()
 {
-	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+	auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
 	gfx->flushBatchedDraws();
 
 	Texture *texture = nullptr;
@@ -557,7 +557,7 @@ std::vector<FontMod::DrawCommand> FontMod::generateVerticesFormatted(const love:
 	return drawcommands;
 }
 
-void FontMod::printv(graphics *gfx, const Matrix4 &t, const std::vector<DrawCommand> &drawcommands, const std::vector<GlyphVertex> &vertices)
+void FontMod::printv(Graphics *gfx, const Matrix4 &t, const std::vector<DrawCommand> &drawcommands, const std::vector<GlyphVertex> &vertices)
 {
 	if (vertices.empty() || drawcommands.empty())
 		return;
@@ -566,13 +566,13 @@ void FontMod::printv(graphics *gfx, const Matrix4 &t, const std::vector<DrawComm
 
 	for (const DrawCommand &cmd : drawcommands)
 	{
-		graphics::BatchedDrawCommand streamcmd;
+		Graphics::BatchedDrawCommand streamcmd;
 		streamcmd.formats[0] = vertexFormat;
 		streamcmd.indexMode = TRIANGLEINDEX_QUADS;
 		streamcmd.vertexCount = cmd.vertexcount;
 		streamcmd.texture = cmd.texture;
 
-		graphics::BatchedVertexData data = gfx->requestBatchedDraw(streamcmd);
+		Graphics::BatchedVertexData data = gfx->requestBatchedDraw(streamcmd);
 		GlyphVertex *vertexdata = (GlyphVertex *) data.stream[0];
 
 		memcpy(vertexdata, &vertices[cmd.startvertex], sizeof(GlyphVertex) * cmd.vertexcount);
@@ -580,7 +580,7 @@ void FontMod::printv(graphics *gfx, const Matrix4 &t, const std::vector<DrawComm
 	}
 }
 
-void FontMod::print(graphics *gfx, const std::vector<love::fontmod::ColoredString> &text, const Matrix4 &m, const Colorf &constantcolor)
+void FontMod::print(Graphics *gfx, const std::vector<love::fontmod::ColoredString> &text, const Matrix4 &m, const Colorf &constantcolor)
 {
 	love::fontmod::ColoredCodepoints codepoints;
 	love::fontmod::getCodepointsFromString(text, codepoints);
@@ -591,7 +591,7 @@ void FontMod::print(graphics *gfx, const std::vector<love::fontmod::ColoredStrin
 	printv(gfx, m, drawcommands, vertices);
 }
 
-void FontMod::printf(graphics *gfx, const std::vector<love::fontmod::ColoredString> &text, float wrap, AlignMode align, const Matrix4 &m, const Colorf &constantcolor)
+void FontMod::printf(Graphics *gfx, const std::vector<love::fontmod::ColoredString> &text, float wrap, AlignMode align, const Matrix4 &m, const Colorf &constantcolor)
 {
 	love::fontmod::ColoredCodepoints codepoints;
 	love::fontmod::getCodepointsFromString(text, codepoints);

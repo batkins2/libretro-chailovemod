@@ -60,7 +60,7 @@ class ShaderStage : public love::Object
 {
 public:
 
-	ShaderStage(graphics *gfx, ShaderStageType stage, const std::string &glsl, bool gles, const std::string &cachekey);
+	ShaderStage(Graphics *gfx, ShaderStageType stage, const std::string &glsl, bool gles, const std::string &cachekey);
 	virtual ~ShaderStage();
 
 	virtual ptrdiff_t getHandle() const = 0;
@@ -94,7 +94,7 @@ class ShaderStageForValidation final : public ShaderStage
 {
 public:
 
-	ShaderStageForValidation(graphics *gfx, ShaderStageType stage, const std::string &glsl, bool gles)
+	ShaderStageForValidation(Graphics *gfx, ShaderStageType stage, const std::string &glsl, bool gles)
 		: ShaderStage(gfx, stage, glsl, gles, "")
 	{}
 	virtual ~ShaderStageForValidation() {}

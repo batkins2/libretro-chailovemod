@@ -67,7 +67,7 @@ public:
 
 	/** Draws the line on the screen
 	 */
-	void draw(love::gfx::graphics *gfx);
+	void draw(love::gfx::Graphics *gfx);
 
 protected:
 

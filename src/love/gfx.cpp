@@ -103,7 +103,7 @@ bool isDebugEnabled()
 	return debugMode;
 }
 
-love::Type type("Graphics", &Module::type);
+love::Type Graphics::type("graphics", &Module::type);
 
 namespace opengl { extern love::gfx::Graphics *createInstance(); }
 // #ifdef LOVE_GRAPHICS_METAL
@@ -114,16 +114,16 @@ namespace opengl { extern love::gfx::Graphics *createInstance(); }
 // #endif
 
 static const Renderer rendererOrder[] = {
-	RENDERER_METAL,
+	// RENDERER_METAL,
 	RENDERER_OPENGL,
-	RENDERER_VULKAN,
+	// RENDERER_VULKAN,
 };
 
 static std::vector<Renderer> defaultRenderers =
 {
-	RENDERER_METAL,
+	// RENDERER_METAL,
 	RENDERER_OPENGL,
-	RENDERER_VULKAN,
+	// RENDERER_VULKAN,
 };
 
 static std::vector<Renderer> _renderers = defaultRenderers;
@@ -143,9 +143,9 @@ void setRenderers(const std::vector<Renderer> &renderers)
 	_renderers = renderers;
 }
 
-love::gfx::Graphics *createInstance()
+Graphics *Graphics::createInstance()
 {
-	love::gfx::Graphics *instance = Module::getInstance<Graphics>(Module::M_GRAPHICS);
+	Graphics *instance = Module::getInstance<Graphics>(Module::M_GRAPHICS);
 
 	if (instance != nullptr)
 		instance->retain();

@@ -161,7 +161,7 @@ love::Type Texture::type("Texture", &Drawable::type);
 int Texture::textureCount = 0;
 int64 Texture::totalGraphicsMemory = 0;
 
-Texture::Texture(graphics *gfx, const Settings &settings, const Slices *slices)
+Texture::Texture(Graphics *gfx, const Settings &settings, const Slices *slices)
 	: texType(settings.type)
 	, format(settings.format)
 	, renderTarget(settings.renderTarget)
@@ -334,7 +334,7 @@ Texture::Texture(graphics *gfx, const Settings &settings, const Slices *slices)
 	++textureCount;
 }
 
-Texture::Texture(graphics *gfx, Texture *base, const ViewSettings &viewsettings)
+Texture::Texture(Graphics *gfx, Texture *base, const ViewSettings &viewsettings)
 	: texType(viewsettings.type.get(base->getTextureType()))
 	, format(viewsettings.format.get(base->getPixelFormat()))
 	, renderTarget(base->renderTarget)
@@ -399,7 +399,7 @@ Texture::Texture(graphics *gfx, Texture *base, const ViewSettings &viewsettings)
 	}
 
 	const auto &caps = gfx->getCapabilities();
-	if (!caps.features[graphics::FEATURE_GLSL4])
+	if (!caps.features[Graphics::FEATURE_GLSL4])
 		throw love::Exception("Texture views are not supported on this system (GLSL 4 support is necessary.)");
 
 	validatePixelFormat(gfx);
@@ -491,12 +491,12 @@ void Texture::updateGraphicsMemorySize(bool loaded)
 	totalGraphicsMemory += memsize;
 }
 
-void Texture::draw(graphics *gfx, const Matrix4 &m)
+void Texture::draw(Graphics *gfx, const Matrix4 &m)
 {
 	draw(gfx, quad, m);
 }
 
-void Texture::draw(graphics *gfx, Quad *q, const Matrix4 &localTransform)
+void Texture::draw(Graphics *gfx, Quad *q, const Matrix4 &localTransform)
 {
 	if (texType == TEXTURE_2D_ARRAY)
 	{
@@ -513,14 +513,14 @@ void Texture::draw(graphics *gfx, Quad *q, const Matrix4 &localTransform)
 	const Matrix4 &tm = gfx->getTransform();
 	bool is2D = tm.isAffine2DTransform();
 
-	graphics::BatchedDrawCommand cmd;
+	Graphics::BatchedDrawCommand cmd;
 	cmd.formats[0] = getSinglePositionFormat(is2D);
 	cmd.formats[1] = CommonFormat::STf_RGBAub;
 	cmd.indexMode = TRIANGLEINDEX_QUADS;
 	cmd.vertexCount = 4;
 	cmd.texture = this;
 
-	graphics::BatchedVertexData data = gfx->requestBatchedDraw(cmd);
+	Graphics::BatchedVertexData data = gfx->requestBatchedDraw(cmd);
 
 	Matrix4 t(tm, localTransform);
 
@@ -542,12 +542,12 @@ void Texture::draw(graphics *gfx, Quad *q, const Matrix4 &localTransform)
 	}
 }
 
-void Texture::drawLayer(graphics *gfx, int layer, const Matrix4 &m)
+void Texture::drawLayer(Graphics *gfx, int layer, const Matrix4 &m)
 {
 	drawLayer(gfx, layer, quad, m);
 }
 
-void Texture::drawLayer(graphics *gfx, int layer, Quad *q, const Matrix4 &m)
+void Texture::drawLayer(Graphics *gfx, int layer, Quad *q, const Matrix4 &m)
 {
 	if (!readable)
 		throw love::Exception("Textures with non-readable formats cannot be drawn.");
@@ -568,7 +568,7 @@ void Texture::drawLayer(graphics *gfx, int layer, Quad *q, const Matrix4 &m)
 
 	Matrix4 t(tm, m);
 
-	graphics::BatchedDrawCommand cmd;
+	Graphics::BatchedDrawCommand cmd;
 	cmd.formats[0] = getSinglePositionFormat(is2D);
 	cmd.formats[1] = CommonFormat::STPf_RGBAub;
 	cmd.indexMode = TRIANGLEINDEX_QUADS;
@@ -576,7 +576,7 @@ void Texture::drawLayer(graphics *gfx, int layer, Quad *q, const Matrix4 &m)
 	cmd.texture = this;
 	cmd.standardShaderType = Shader::STANDARD_ARRAY;
 
-	graphics::BatchedVertexData data = gfx->requestBatchedDraw(cmd);
+	Graphics::BatchedVertexData data = gfx->requestBatchedDraw(cmd);
 
 	if (is2D)
 		t.transformXY((Vector2 *) data.stream[0], q->getVertexPositions(), 4);
@@ -612,7 +612,7 @@ void Texture::replacePixels(love::imagemod::ImageDataBase *d, int slice, int mip
 	if (isPixelFormatDepthStencil(format))
 		throw love::Exception("replacePixels cannot be called on depth or stencil Textures.");
 
-	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+	auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
 	if (gfx != nullptr && gfx->isRenderTargetActive(this))
 		throw love::Exception("replacePixels cannot be called on this Texture while it's an active render target.");
 
@@ -659,7 +659,7 @@ void Texture::replacePixels(love::imagemod::ImageDataBase *d, int slice, int mip
 		}
 	}
 
-	graphics::flushBatchedDrawsGlobal();
+	Graphics::flushBatchedDrawsGlobal();
 
 	uploadImageData(d, mipmap, slice, x, y);
 
@@ -672,11 +672,11 @@ void Texture::replacePixels(const void *data, size_t size, int slice, int mipmap
 	if (!isReadable() || getMSAA() > 1)
 		return;
 
-	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+	auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
 	if (gfx != nullptr && gfx->isRenderTargetActive(this))
 		return;
 
-	graphics::flushBatchedDrawsGlobal();
+	Graphics::flushBatchedDrawsGlobal();
 
 	uploadByteData(data, size, mipmap, slice, rect);
 
@@ -712,7 +712,7 @@ bool Texture::supportsGenerateMipmaps(const char *&outReason) const
 
 	// This should be linear | rt because that's what metal needs, but the above
 	// code handles textures can't be used as RTs in metal.
-	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+	auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
 	if (gfx != nullptr && !gfx->isPixelFormatSupported(format, PIXELFORMATUSAGEFLAGS_LINEAR))
 	{
 		outReason = "generateMipmaps cannot be called on textures with formats that don't support linear filtering on this system.";
@@ -728,7 +728,7 @@ void Texture::generateMipmaps()
 	if (!supportsGenerateMipmaps(err))
 		throw love::Exception("%s", err);
 
-	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+	auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
 	if (gfx != nullptr && gfx->isRenderTargetActive(this))
 		throw love::Exception("generateMipmaps cannot be called on this Texture while it's an active render target.");
 
@@ -829,7 +829,7 @@ SamplerState Texture::validateSamplerState(SamplerState s) const
 
 	if (s.minFilter == SamplerState::FILTER_LINEAR || s.magFilter == SamplerState::FILTER_LINEAR || s.mipmapFilter == SamplerState::MIPMAP_FILTER_LINEAR)
 	{
-		auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+		auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
 		if (!gfx->isPixelFormatSupported(format, PIXELFORMATUSAGEFLAGS_LINEAR))
 		{
 			s.minFilter = s.magFilter = SamplerState::FILTER_NEAREST;
@@ -838,7 +838,7 @@ SamplerState Texture::validateSamplerState(SamplerState s) const
 		}
 	}
 
-	graphics::flushBatchedDrawsGlobal();
+	Graphics::flushBatchedDrawsGlobal();
 
 	return s;
 }
@@ -862,16 +862,16 @@ bool Texture::validateDimensions(bool throwException) const
 {
 	bool success = true;
 
-	auto gfx = Module::getInstance<graphics>(Module::M_GRAPHICS);
+	auto gfx = Module::getInstance<Graphics>(Module::M_GRAPHICS);
 	if (gfx == nullptr)
 		return false;
 
-	const graphics::Capabilities &caps = gfx->getCapabilities();
+	const Graphics::Capabilities &caps = gfx->getCapabilities();
 
-	int max2Dsize   = (int) caps.limits[graphics::LIMIT_TEXTURE_SIZE];
-	int max3Dsize   = (int) caps.limits[graphics::LIMIT_VOLUME_TEXTURE_SIZE];
-	int maxcubesize = (int) caps.limits[graphics::LIMIT_CUBE_TEXTURE_SIZE];
-	int maxlayers   = (int) caps.limits[graphics::LIMIT_TEXTURE_LAYERS];
+	int max2Dsize   = (int) caps.limits[Graphics::LIMIT_TEXTURE_SIZE];
+	int max3Dsize   = (int) caps.limits[Graphics::LIMIT_VOLUME_TEXTURE_SIZE];
+	int maxcubesize = (int) caps.limits[Graphics::LIMIT_CUBE_TEXTURE_SIZE];
+	int maxlayers   = (int) caps.limits[Graphics::LIMIT_TEXTURE_LAYERS];
 
 	int largestdim = 0;
 	const char *largestname = nullptr;
@@ -915,7 +915,7 @@ bool Texture::validateDimensions(bool throwException) const
 	return success;
 }
 
-void Texture::validatePixelFormat(graphics *gfx) const
+void Texture::validatePixelFormat(Graphics *gfx) const
 {
 	uint32 usage = PIXELFORMATUSAGEFLAGS_NONE;
 	if (renderTarget)

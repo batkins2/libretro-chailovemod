@@ -42,7 +42,7 @@ Deprecations::~Deprecations()
 {
 }
 
-void Deprecations::draw(graphics *gfx)
+void Deprecations::draw(Graphics *gfx)
 {
 	if (!isDeprecationOutputEnabled())
 		return;
@@ -84,7 +84,7 @@ void Deprecations::draw(graphics *gfx)
 
 	gfx->flushBatchedDraws();
 
-	gfx->push(graphics::STACK_ALL);
+	gfx->push(Graphics::STACK_ALL);
 	gfx->reset();
 
 	int maxcount = 4;
@@ -124,7 +124,7 @@ void Deprecations::draw(graphics *gfx)
 	int y = std::max(gfx->getHeight() - height, 0);
 
 	gfx->setColor(Colorf(0, 0, 0, 0.85 * alpha));
-	gfx->rectangle(graphics::DRAW_FILL, x, y, width, height);
+	gfx->rectangle(Graphics::DRAW_FILL, x, y, width, height);
 
 	gfx->setColor(Colorf(1, 0.9, 0.8, 1 * alpha));
 	gfx->setScissor({x, y, width, height});

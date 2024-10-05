@@ -2,20 +2,24 @@
 #include <sstream>
 #include "filesystem/Filesystem.h"
 #include "opengl/Graphics.h"
+#include "gfx.h"
+
 namespace love
 {
-namespace gfx
-{
-// #define instance() (Module::getInstance<gfx::opengl::Graphics>(Module::M_GRAPHICS))
+#define instance() (Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS))
 
 chai_gfx::chai_gfx() {
-    instance = Graphics::createInstance();
+    instance()->createInstance();
 }
 
 chai_gfx& chai_gfx::wrap_newShader(const std::string *FileName) {
-    if (instance->isCreated()) {
+    // 
+    if (instance()->isCreated()) {
         auto file = Module::getInstance<filesystemmod::Filesystem>(Module::M_FILESYSTEM);
-        std::string data = (const char *) file->read(FileName->c_str())->getData();
+        auto fn = FileName->c_str();
+        auto fd = file->read(fn);
+        const char *d = (const char *)fd->getData();
+        std::string data = d;
         std::stringstream s(data);
         std::vector<std::string> lines;
         std::string line;
@@ -23,13 +27,9 @@ chai_gfx& chai_gfx::wrap_newShader(const std::string *FileName) {
             lines.push_back(line);
         }
         love::gfx::Shader::CompileOptions options;
-        instance->newShader(lines, options);
+        instance()->newShader(lines, options);
     }
     return *this;
 }
 
-void load() {
-}
-
-}
 }

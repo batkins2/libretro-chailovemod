@@ -50,7 +50,7 @@ public:
 	/**
 	 * Draws the object with the specified transformation matrix.
 	 **/
-	virtual void draw(graphics *gfx, const Matrix4 &m) = 0;
+	virtual void draw(Graphics *gfx, const Matrix4 &m) = 0;
 };
 
 } // graphics
