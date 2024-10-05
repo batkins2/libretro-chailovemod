@@ -26,15 +26,20 @@ bool chai_gfx::wrap_newShader(const std::string *FileName) {
         love::gfx::Shader::CompileOptions options;
         bool shaderFound = false;
         while (std::getline(s, line)) {
-            if (line == "" || (line[0] == '/' && line[1] == '/')) {
+            if (!line.length() || (line[0] == '/' && line[1] == '/')) {
                 continue;
             }
-            
-            if (shaderFound || line.substr(0, 13) == "vec4 position(") {
+
+            int delim = line.find_last_of(" //");
+            if (delim) {
+                line.erase(delim, line.length() - 1);
+            }
+
+            if (shaderFound || strstr(line.c_str(), "vec4 position(") != NULL) {
                 lines.push_back(line);
                 shaderFound = true;
             } else {
-                int delim = line.find_last_of(' ');
+                delim = line.find_last_of(' ');
                 std::string first = line.substr(0, delim-1);
                 std::string last = line.substr(delim+1,line.size()-1);
                 options.defines.emplace(first, last);
