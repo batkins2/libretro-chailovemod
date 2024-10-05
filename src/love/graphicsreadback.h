@@ -46,7 +46,7 @@ namespace gfx
 
 class Buffer;
 class Texture;
-class graphics;
+class Graphics;
 
 enum ReadbackMethod
 {

@@ -38,7 +38,7 @@ namespace love
 namespace gfx
 {
 
-class graphics;
+class Graphics;
 
 /**
  * A block of GPU-owned memory.
@@ -198,7 +198,7 @@ protected:
 	bool mapped;
 	MapType mappedType;
 	bool immutable;
-	
+
 }; // Buffer
 
 } // graphics

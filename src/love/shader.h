@@ -39,7 +39,7 @@ namespace love
 namespace gfx
 {
 
-class graphics;
+class Graphics;
 class Buffer;
 
 // A GLSL shader

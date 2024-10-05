@@ -39,7 +39,7 @@ namespace love
 namespace gfx
 {
 
-class graphics;
+class Graphics;
 
 /**
  * A class for creating, moving and drawing particles.

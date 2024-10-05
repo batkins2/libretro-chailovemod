@@ -34,7 +34,7 @@ namespace love
 namespace gfx
 {
 
-class graphics;
+class Graphics;
 
 /**
  * Abstract base class for a chain of segments.

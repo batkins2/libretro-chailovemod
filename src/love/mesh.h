@@ -40,7 +40,7 @@ namespace love
 namespace gfx
 {
 
-class graphics;
+class Graphics;
 
 /**
  * Holds and draws arbitrary vertex geometry.

@@ -41,7 +41,7 @@ namespace gfx
 {
 
 // Forward declarations.
-class graphics;
+class Graphics;
 class Texture;
 class Quad;
 class Buffer;
@@ -143,10 +143,10 @@ private:
 	Range modified_sprites;
 
 	std::unordered_map<std::string, AttachedAttribute> attached_attributes;
-	
+
 	int range_start;
 	int range_count;
-	
+
 }; // SpriteBatch
 
 } // graphics

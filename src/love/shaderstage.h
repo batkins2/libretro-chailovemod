@@ -37,7 +37,7 @@ namespace love
 namespace gfx
 {
 
-class graphics;
+class Graphics;
 
 // Order is used for stages array in ShaderStage.cpp
 enum ShaderStageType

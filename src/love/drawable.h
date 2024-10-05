@@ -30,7 +30,7 @@ namespace love
 namespace gfx
 {
 
-class graphics;
+class Graphics;
 
 /**
  * A Drawable is anything that can be drawn on screen with a
