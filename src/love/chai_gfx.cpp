@@ -7,7 +7,7 @@ namespace love
 // #define instance() (Module::getInstance<gfx::opengl::Graphics>(Module::M_GRAPHICS))
 
 chai_gfx::chai_gfx() {
-    instance = gfx::opengl::createInstance();
+    instance = gfx::graphics::createInstance();
 }
 
 chai_gfx& chai_gfx::wrap_newShader(const std::string *FileName) {

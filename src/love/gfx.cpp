@@ -103,7 +103,7 @@ bool isDebugEnabled()
 	return debugMode;
 }
 
-love::Type type("Graphicsp", &Module::type);
+love::Type type("Graphics", &Module::type);
 
 namespace opengl { extern love::gfx::graphics *createInstance(); }
 // #ifdef LOVE_GRAPHICS_METAL
