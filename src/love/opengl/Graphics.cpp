@@ -106,7 +106,7 @@ love::gfx::graphics *createInstance()
 }
 
 Graphics::Graphics()
-	: love::gfx::graphics("love.graphics.opengl")
+	: love::gfx::graphics("love.gfx.opengl")
 	, windowHasStencil(false)
 	, mainVAO(0)
 	, internalBackbufferFBO(0)

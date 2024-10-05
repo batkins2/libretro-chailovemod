@@ -58,7 +58,6 @@
 #include "love/script.h"
 #include "love/filesystem.h"
 #include "love/graphics.h"
-#include "love/gfx.h"
 #include "love/image.h"
 #include "love/system.h"
 #include "love/sound.h"
@@ -71,6 +70,8 @@
 #include "love/math.h"
 #include "love/event.h"
 #include "love/console.h"
+
+#include "love/chai_gfx.h"
 
 class ChaiLove {
 	public:
@@ -101,8 +102,7 @@ class ChaiLove {
 	love::math math;
 	love::window window;
 	love::event event;
-
-	love::gfx::graphics *gfx = (love::Module::getInstance<love::gfx::graphics>(love::Module::M_GRAPHICS));
+	love::chai_gfx chai_gfx;
 
 	~ChaiLove();
 	void quit(void);

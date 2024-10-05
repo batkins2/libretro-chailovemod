@@ -18,8 +18,8 @@
  * 3. This notice may not be removed or altered from any source distribution.
  **/
 
-#ifndef LOVE_GRAPHICS_OPENGL_GRAPHICS_H
-#define LOVE_GRAPHICS_OPENGL_GRAPHICS_H
+#ifndef LOVE_GFX_OPENGL_GRAPHICS_H
+#define LOVE_GFX_OPENGL_GRAPHICS_H
 
 // STD
 #include <stack>

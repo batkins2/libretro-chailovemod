@@ -103,12 +103,12 @@ bool isDebugEnabled()
 	return debugMode;
 }
 
-love::Type type("gfx", &Module::type);
+love::Type type("Graphicsp", &Module::type);
 
 namespace opengl { extern love::gfx::graphics *createInstance(); }
-#ifdef LOVE_GRAPHICS_METAL
-namespace metal { extern love::gfx::graphics *createInstance(); }
-#endif
+// #ifdef LOVE_GRAPHICS_METAL
+// namespace metal { extern love::gfx::graphics *createInstance(); }
+// #endif
 // #ifdef LOVE_GRAPHICS_VULKAN
 // namespace vulkan { extern love::gfx::graphics* createInstance(); }
 // #endif
@@ -163,10 +163,10 @@ graphics *createInstance()
 // #endif
 			if (r == RENDERER_OPENGL)
 				instance = opengl::createInstance();
-#ifdef LOVE_GRAPHICS_METAL
-			if (r == RENDERER_METAL)
-				instance = metal::createInstance();
-#endif
+// #ifdef LOVE_GRAPHICS_METAL
+// 			if (r == RENDERER_METAL)
+// 				instance = metal::createInstance();
+// #endif
 			if (instance != nullptr)
 				break;
 		}
@@ -2926,7 +2926,7 @@ STRINGMAP_BEGIN(Renderer, RENDERER_MAX_ENUM, renderer)
 {
 	{ "opengl", RENDERER_OPENGL },
 	// { "vulkan", RENDERER_VULKAN },
-	{ "metal",  RENDERER_METAL  },
+	// { "metal",  RENDERER_METAL  },
 }
 STRINGMAP_END(Renderer, RENDERER_MAX_ENUM, renderer)
 

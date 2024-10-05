@@ -1,20 +1,14 @@
-#include "gfx.h"
-#include "shader.h"
-#include "common/Module.h"
-#include "filesystem/Filesystem.h"
 
+#include <iostream>
+#include "gfx.h"
 
 namespace love
 {
-
-class Module;
-class Filesystemmod;
-class File;
-class Shader;
-
-namespace gfx
-{
-    love::gfx::graphics *instance = (Module::getInstance<love::gfx::graphics>(Module::M_GRAPHICS));
-    Shader *wrap_newShader(const char *FileName);
-}
+class chai_gfx {
+    public:
+    chai_gfx();
+    chai_gfx& wrap_newShader(const std::string *FileName);
+    void load();
+    static love::gfx::graphics *instance;
+};
 }
