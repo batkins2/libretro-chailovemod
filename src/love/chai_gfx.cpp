@@ -2,17 +2,21 @@
 #include <sstream>
 // #include "filesystem/Filesystem.h"
 #include "filesystem.h"
+#include "window/Window.h"
 namespace love
 {
 #define instance() (Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS))
+#define window() (Module::getInstance<window::Window>(Module::M_WINDOW))
 
 chai_gfx::chai_gfx() {
-    instance = instance()->createInstance();
+    // instance = instance()->createInstance();
+    love::window::WindowSettings ws;
+    ws.fullscreen = true;
+    window()->setWindow(800, 600, &ws);
 }
 
 bool chai_gfx::wrap_newShader(const std::string *FileName) {
-    // instance->isCreated()
-    if (true) {
+    if (instance()->isCreated()) {
         auto file = new filesystem();
         std::string data = file->read(FileName->c_str());
         // auto file = Module::getInstance<filesystemmod::Filesystem>(Module::M_FILESYSTEM);
@@ -64,7 +68,7 @@ bool chai_gfx::wrap_newShader(const std::string *FileName) {
             }
         }
         lines.push_back(shaderFunc);
-        instance->newShader(lines, options);
+        instance()->newShader(lines, options);
         return true;
     }
     return false;
