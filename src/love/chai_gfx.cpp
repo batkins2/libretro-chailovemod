@@ -47,7 +47,7 @@ bool chai_gfx::wrap_newShader(const std::string *FileName) {
                         shaderFunc.append(trimmed);
                     }
                     delim = line.find_last_of("}");
-                    if (delim > 0 && delim < line.length()) {
+                    if (delim >= 0 && delim < line.length()) {
                         std::string trimmed = line.substr(0, delim+1);
                         shaderFunc.append(trimmed);
                     }
@@ -55,10 +55,10 @@ bool chai_gfx::wrap_newShader(const std::string *FileName) {
             } else {
                 int delim = line.find_last_of(";");
                 if (delim > 0 && delim < line.length()) {
-                    std::string trimmed = line.substr(0, delim+1);
+                    std::string trimmed = line.substr(0, delim);
                     delim = trimmed.find_last_of(" ");
-                    std::string first = trimmed.substr(0, delim);
-                    std::string last = trimmed.substr(delim+1,line.size()-1);
+                    std::string last = trimmed.substr(0, delim);
+                    std::string first = trimmed.substr(delim+1,trimmed.length()-1);
                     options.defines.emplace(first, last);
                 }
             }
