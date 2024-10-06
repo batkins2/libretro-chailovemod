@@ -37,27 +37,27 @@ bool chai_gfx::wrap_newShader(const std::string *FileName) {
                 } else {
                     int delim = line.find_last_of(";");
                     if (delim > 0 && delim < line.length()) {
-                        std::string trimmed = line.substr(0, delim);
+                        std::string trimmed = line.substr(0, delim+1);
                         lines.push_back(trimmed);
                     }
                     delim = line.find_last_of("{");
                     if (delim > 0 && delim < line.length()) {
-                        std::string trimmed = line.substr(0, delim);
+                        std::string trimmed = line.substr(0, delim+1);
                         lines.push_back(trimmed);
                     }
                     delim = line.find_last_of("}");
                     if (delim > 0 && delim < line.length()) {
-                        std::string trimmed = line.substr(0, delim);
+                        std::string trimmed = line.substr(0, delim+1);
                         lines.push_back(trimmed);
                     }
                 }
             } else {
                 int delim = line.find_last_of(";");
                 if (delim > 0 && delim < line.length()) {
-                    std::string trimmed = line.substr(0, delim);
+                    std::string trimmed = line.substr(0, delim+1);
                     delim = trimmed.find_last_of(" ");
-                    std::string first = line.substr(0, delim);
-                    std::string last = line.substr(delim+1,line.size()-1);
+                    std::string first = trimmed.substr(0, delim+1);
+                    std::string last = trimmed.substr(delim+1,line.size()-1);
                     options.defines.emplace(first, last);
                 }
             }
