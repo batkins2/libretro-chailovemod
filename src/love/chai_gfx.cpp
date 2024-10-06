@@ -30,19 +30,36 @@ bool chai_gfx::wrap_newShader(const std::string *FileName) {
                 continue;
             }
 
-            int delim = line.find_last_of(" //");
-            if (delim) {
-                line.erase(delim, line.length() - 1);
-            }
-
             if (shaderFound || strstr(line.c_str(), "vec4 position(") != NULL) {
-                lines.push_back(line);
-                shaderFound = true;
+                if (!shaderFound) {
+                    lines.push_back(line);
+                    shaderFound = true;
+                } else {
+                    int delim = line.find_last_of(";");
+                    if (delim > 0 && delim < line.length()) {
+                        std::string trimmed = line.substr(0, delim);
+                        lines.push_back(trimmed);
+                    }
+                    delim = line.find_last_of("{");
+                    if (delim > 0 && delim < line.length()) {
+                        std::string trimmed = line.substr(0, delim);
+                        lines.push_back(trimmed);
+                    }
+                    delim = line.find_last_of("}");
+                    if (delim > 0 && delim < line.length()) {
+                        std::string trimmed = line.substr(0, delim);
+                        lines.push_back(trimmed);
+                    }
+                }
             } else {
-                delim = line.find_last_of(' ');
-                std::string first = line.substr(0, delim-1);
-                std::string last = line.substr(delim+1,line.size()-1);
-                options.defines.emplace(first, last);
+                int delim = line.find_last_of(";");
+                if (delim > 0 && delim < line.length()) {
+                    std::string trimmed = line.substr(0, delim);
+                    delim = trimmed.find_last_of(" ");
+                    std::string first = line.substr(0, delim);
+                    std::string last = line.substr(delim+1,line.size()-1);
+                    options.defines.emplace(first, last);
+                }
             }
         }
         instance->newShader(lines, options);
