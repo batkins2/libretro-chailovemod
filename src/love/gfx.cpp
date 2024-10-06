@@ -355,7 +355,8 @@ ShaderStage *Graphics::newShaderStage(ShaderStageType stage, const std::string &
 
 	if (s == nullptr)
 	{
-		bool glsles = usesGLSLES();
+		// bool glsles = usesGLSLES();
+		bool glsles = false;
 		std::string glsl = Shader::createShaderStageCode(this, stage, source, options, info, glsles, true);
 		s = newShaderStageInternal(stage, cachekey, glsl, glsles);
 		if (cache && !cachekey.empty())

@@ -615,8 +615,8 @@ std::string Shader::createShaderStageCode(Graphics *gfx, ShaderStageType stage, 
 	if (info.usesMRT)
 		ss << "#define LOVE_MULTI_RENDER_TARGETS 1\n";
 
-	if (gfx->isUsingNoTextureCubeShadowBiasHack())
-		ss << "#define LOVE_NO_TEXTURECUBESHADOWBIAS_HACK 1\n";
+	// if (gfx->isUsingNoTextureCubeShadowBiasHack())
+	// 	ss << "#define LOVE_NO_TEXTURECUBESHADOWBIAS_HACK 1\n";
 
 	for (const auto &def : options.defines)
 		ss << "#define " + def.first + " " + def.second + "\n";

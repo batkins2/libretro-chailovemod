@@ -3,6 +3,8 @@
 
 #include "opengl/Graphics.h"
 #include "gfx.h"
+#include "window/Window.h"
+#include "window/sdl/Window.h"
 namespace love
 {
 // class Graphics;

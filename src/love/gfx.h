@@ -906,7 +906,7 @@ public:
 	}
 
 	// Workaround for some very old nvidia drivers that aren't compliant with the GLSL 3.30 spec.
-	bool isUsingNoTextureCubeShadowBiasHack() const { return usingNoTextureCubeShadowBiasHack; }
+	bool isUsingNoTextureCubeShadowBiasHack() const { return false && usingNoTextureCubeShadowBiasHack; }
 
 	static Graphics *createInstance();
 
