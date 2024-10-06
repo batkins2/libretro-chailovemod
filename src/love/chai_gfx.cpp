@@ -22,6 +22,7 @@ bool chai_gfx::wrap_newShader(const std::string *FileName) {
         // std::string data = d;
         std::stringstream s(data);
         std::vector<std::string> lines;
+        std::string shaderFunc = "";
         std::string line;
         love::gfx::Shader::CompileOptions options;
         bool shaderFound = false;
@@ -32,23 +33,23 @@ bool chai_gfx::wrap_newShader(const std::string *FileName) {
 
             if (shaderFound || strstr(line.c_str(), "vec4 position(") != NULL) {
                 if (!shaderFound) {
-                    lines.push_back(line);
+                    shaderFunc.append(line);
                     shaderFound = true;
                 } else {
                     int delim = line.find_last_of(";");
                     if (delim > 0 && delim < line.length()) {
                         std::string trimmed = line.substr(0, delim+1);
-                        lines.push_back(trimmed);
+                        shaderFunc.append(trimmed);
                     }
                     delim = line.find_last_of("{");
                     if (delim > 0 && delim < line.length()) {
                         std::string trimmed = line.substr(0, delim+1);
-                        lines.push_back(trimmed);
+                        shaderFunc.append(trimmed);
                     }
                     delim = line.find_last_of("}");
                     if (delim > 0 && delim < line.length()) {
                         std::string trimmed = line.substr(0, delim+1);
-                        lines.push_back(trimmed);
+                        shaderFunc.append(trimmed);
                     }
                 }
             } else {
@@ -56,12 +57,13 @@ bool chai_gfx::wrap_newShader(const std::string *FileName) {
                 if (delim > 0 && delim < line.length()) {
                     std::string trimmed = line.substr(0, delim+1);
                     delim = trimmed.find_last_of(" ");
-                    std::string first = trimmed.substr(0, delim+1);
+                    std::string first = trimmed.substr(0, delim);
                     std::string last = trimmed.substr(delim+1,line.size()-1);
                     options.defines.emplace(first, last);
                 }
             }
         }
+        lines.push_back(shaderFunc);
         instance->newShader(lines, options);
         return true;
     }
