@@ -9,6 +9,10 @@ retro_input_state_t ChaiLove::input_state_cb = NULL;
 retro_input_poll_t ChaiLove::input_poll_cb = NULL;
 retro_environment_t ChaiLove::environ_cb = NULL;
 
+ChaiLove::ChaiLove() {
+
+}
+
 void ChaiLove::destroy() {
 	LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] Attempting to destroy ChaiLove" << std::endl;
 	if (hasInstance()) {
@@ -63,6 +67,8 @@ bool ChaiLove::load(const std::string& file, const void* data) {
 #endif
 	std::string version = CHAILOVE_VERSION_STRING GIT_VERSION;
 	LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] ChaiLove " << version.c_str() << std::endl;
+
+	chai_gfx.init();
 
 	// Iniitalize some of the initial subsystems.
 	sound.load();
@@ -133,7 +139,7 @@ void ChaiLove::reset() {
  * Render the ChaiLove.
  */
 void ChaiLove::draw() {
-	if (event.m_shouldclose) {
+	if (event.m_shouldclose || event.m_pauserendering) {
 		return;
 	}
 

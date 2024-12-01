@@ -70,7 +70,15 @@
 #include "love/math.h"
 #include "love/event.h"
 #include "love/console.h"
+#ifndef __HAVE_CHAI_GFX__
 #include "love/chai_gfx.h"
+#endif
+#ifndef __HAVE_CHAI_MESH__
+#include "love/chai_mesh.h"
+#endif
+#ifndef __HAVE_CHAI_SHADER__
+#include "love/chai_shader.h"
+#endif
 
 class ChaiLove {
 	public:
@@ -101,8 +109,17 @@ class ChaiLove {
 	love::math math;
 	love::window window;
 	love::event event;
+	// #ifndef __HAVE_CHAI_GFX__
 	love::chai_gfx chai_gfx;
+	// #endif
+	// #ifndef __HAVE_CHAI_MESH__
+	love::chai_mesh chai_mesh;
+	// #endif
+	// #ifndef __HAVE_CHAI_SHADER__
+	love::chai_mesh chai_shader;
+	// #endif
 
+	ChaiLove();
 	~ChaiLove();
 	void quit(void);
 	bool load(const std::string& file, const void* data);
@@ -119,6 +136,8 @@ class ChaiLove {
 	SDL_Renderer* renderer = NULL;
 	SDL_Window* win = NULL;
 	SDL_Texture* texture = NULL;
+	love::imagemod::Image *getImageModule() { return love::Module::getInstance<love::imagemod::Image>(love::Module::M_IMAGE);; };
+	love::filesystem getFSModule() { return filesystem; };
 };
 
 #endif  // SRC_CHAILOVE_H_

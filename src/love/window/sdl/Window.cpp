@@ -63,7 +63,7 @@
 
 namespace love
 {
-namespace window
+namespace windowmod
 {
 
 // See src/modules/window/Window.cpp.
@@ -82,7 +82,7 @@ namespace sdl
 {
 
 Window::Window()
-	: love::window::Window("love.window.sdl")
+	: love::windowmod::Window("love.windowmod.sdl")
 	, open(false)
 	, mouseGrabbed(false)
 	, window(nullptr)
@@ -288,7 +288,7 @@ std::vector<Window::ContextAttribs> Window::getContextAttribsList() const
 	return attribslist;
 }
 
-bool Window::createWindowAndContext(int x, int y, int w, int h, Uint32 windowflags, gfx::Renderer renderer)
+bool Window::createWindowAndContext(int x, int y, int w, int h, Uint32 windowflags, love::gfx::Renderer renderer)
 {
 	bool needsglcontext = (windowflags & SDL_WINDOW_OPENGL) != 0;
 #ifdef LOVE_GRAPHICS_METAL
@@ -348,7 +348,7 @@ bool Window::createWindowAndContext(int x, int y, int w, int h, Uint32 windowfla
 		SDL_SetWindowPosition(window, x, y);
 #endif
 
-		if (attribs != nullptr && renderer == love::gfx::Renderer::RENDERER_OPENGL)
+		if (attribs != nullptr && renderer == love::gfx::RENDERER_OPENGL)
 		{
 #ifdef LOVE_MACOS
 			love::macos::setWindowSRGBColorSpace(window);
@@ -377,7 +377,7 @@ bool Window::createWindowAndContext(int x, int y, int w, int h, Uint32 windowfla
 		return true;
 	};
 
-	if (renderer == gfx::RENDERER_OPENGL)
+	if (renderer == love::gfx::RENDERER_OPENGL)
 	{
 		std::vector<ContextAttribs> attribslist = getContextAttribsList();
 
@@ -1747,7 +1747,7 @@ void Window::requestAttention(bool continuous)
 	if (!SDL_GetWindowWMInfo(window, &wminfo))
 		return;
 
-	flashinfo.hwnd = wminfo.info.win.window;
+	// flashinfo.hwnd = wminfo.info.win.window;
 #endif
 
 	flashinfo.uCount = 1;

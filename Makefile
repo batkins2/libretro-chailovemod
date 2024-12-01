@@ -12,8 +12,8 @@ endif
 
 FLAGS += -D__LIBRETRO__ $(COREDEFINES) $(ENDIANNESS_DEFINES) $(PLATFORM_DEFINES) $(WARNINGS) $(fpic)
 
-CXXFLAGS += $(FLAGS) -std=c++17
-CFLAGS += $(FLAGS) -std=gnu99
+CXXFLAGS += $(FLAGS) -O1 -std=c++17 -Wa,-mbig-obj
+CFLAGS += $(FLAGS) -std=gnu99 -Wno-implicit-function-declaration
 
 # Ignore first attempt builds, and re-try for a cleaner dependency chain.
 all: $(TARGET)
@@ -23,7 +23,7 @@ $(TARGET): $(OBJECTS)
 ifeq ($(STATIC_LINKING), 1)
 	$(AR) rcs $@ $(OBJECTS)
 else
-	$(CXX) -o $@ $^ $(LDFLAGS)
+	$(CXX) -o $@ $^ $(LDFLAGS) -lWinmm -lole32 -loleaut32 -lDwmapi -lgdi32 -limm32 -lversion -luuid
 endif
 
 %.o: %.cpp

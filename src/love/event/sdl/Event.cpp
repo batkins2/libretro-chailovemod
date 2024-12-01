@@ -100,14 +100,14 @@ namespace sdl
 // we want them in pixel coordinates (may be different with high-DPI enabled.)
 static void windowToDPICoords(double *x, double *y)
 {
-	auto window = Module::getInstance<window::Window>(Module::M_WINDOW);
+	auto window = Module::getInstance<windowmod::Window>(Module::M_WINDOW);
 	if (window)
 		window->windowToDPICoords(x, y);
 }
 
 static void clampToWindow(double *x, double *y)
 {
-	auto window = Module::getInstance<window::Window>(Module::M_WINDOW);
+	auto window = Module::getInstance<windowmod::Window>(Module::M_WINDOW);
 	if (window)
 		window->clampPositionInWindow(x, y);
 }
@@ -117,7 +117,7 @@ static void normalizedToDPICoords(double *x, double *y)
 {
 	double w = 1.0, h = 1.0;
 
-	auto window = Module::getInstance<window::Window>(Module::M_WINDOW);
+	auto window = Module::getInstance<windowmod::Window>(Module::M_WINDOW);
 	if (window)
 	{
 		w = window->getWidth();
@@ -454,28 +454,28 @@ Message *Event::convert(const SDL_Event &e)
 		if (e.display.event == SDL_DISPLAYEVENT_ORIENTATION)
 #endif
 		{
-			auto orientation = window::Window::ORIENTATION_UNKNOWN;
+			auto orientation = windowmod::Window::ORIENTATION_UNKNOWN;
 			switch ((SDL_DisplayOrientation) e.display.data1)
 			{
 			case SDL_ORIENTATION_UNKNOWN:
 			default:
-				orientation = window::Window::ORIENTATION_UNKNOWN;
+				orientation = windowmod::Window::ORIENTATION_UNKNOWN;
 				break;
 			case SDL_ORIENTATION_LANDSCAPE:
-				orientation = window::Window::ORIENTATION_LANDSCAPE;
+				orientation = windowmod::Window::ORIENTATION_LANDSCAPE;
 				break;
 			case SDL_ORIENTATION_LANDSCAPE_FLIPPED:
-				orientation = window::Window::ORIENTATION_LANDSCAPE_FLIPPED;
+				orientation = windowmod::Window::ORIENTATION_LANDSCAPE_FLIPPED;
 				break;
 			case SDL_ORIENTATION_PORTRAIT:
-				orientation = window::Window::ORIENTATION_PORTRAIT;
+				orientation = windowmod::Window::ORIENTATION_PORTRAIT;
 				break;
 			case SDL_ORIENTATION_PORTRAIT_FLIPPED:
-				orientation = window::Window::ORIENTATION_PORTRAIT_FLIPPED;
+				orientation = windowmod::Window::ORIENTATION_PORTRAIT_FLIPPED;
 				break;
 			}
 
-			if (!window::Window::getConstant(orientation, txt))
+			if (!windowmod::Window::getConstant(orientation, txt))
 				txt = "unknown";
 
 #if SDL_VERSION_ATLEAST(3, 0, 0)
@@ -501,7 +501,7 @@ Message *Event::convert(const SDL_Event &e)
 		}
 		break;
 	case SDL_EVENT_DROP_FILE:
-		filesystem = Module::getInstance<filesystem::Filesystem>(Module::M_FILESYSTEM);
+		filesystem = Module::getInstance<filesystemmod::Filesystem>(Module::M_FILESYSTEM);
 		if (filesystem != nullptr)
 		{
 #if SDL_VERSION_ATLEAST(3, 0, 0)
@@ -759,7 +759,7 @@ Message *Event::convertWindowEvent(const SDL_Event &e)
 	std::vector<Variant> vargs;
 	vargs.reserve(4);
 
-	window::Window *win = nullptr;
+	windowmod::Window *win = nullptr;
 	Graphics::Graphics *gfx = nullptr;
 
 #if SDL_VERSION_ATLEAST(3, 0, 0)
@@ -791,7 +791,7 @@ Message *Event::convertWindowEvent(const SDL_Event &e)
 			double height = e.window.data2;
 
 			gfx = Module::getInstance<Graphics::Graphics>(Module::M_GRAPHICS);
-			win = Module::getInstance<window::Window>(Module::M_WINDOW);
+			win = Module::getInstance<windowmod::Window>(Module::M_WINDOW);
 
 			// WINDOWEVENT_SIZE_CHANGED will always occur before RESIZED.
 			// The size values in the Window aren't necessarily the same as the
@@ -814,7 +814,7 @@ Message *Event::convertWindowEvent(const SDL_Event &e)
 		}
 		break;
 	case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-		win = Module::getInstance<window::Window>(Module::M_WINDOW);
+		win = Module::getInstance<windowmod::Window>(Module::M_WINDOW);
 		if (win)
 			win->onSizeChanged(e.window.data1, e.window.data2);
 		break;

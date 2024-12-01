@@ -155,7 +155,7 @@ void Keyboard::setTextInput(bool enable, double x, double y, double w, double h)
 {
 	// SDL_SetTextInputRect expects coordinates in window-space but setTextInput
 	// takes pixels, so we should convert.
-	auto window = Module::getInstance<window::Window>(M_WINDOW);
+	auto window = Module::getInstance<windowmod::Window>(M_WINDOW);
 	if (window)
 	{
 		window->DPIToWindowCoords(&x, &y);

@@ -123,9 +123,9 @@ public:
 	virtual bool setupWriteDirectory() = 0;
 
 	/**
-	 * This sets the save location on Android. 
+	 * This sets the save location on Android.
 	 * False for internal, true for external
-	 * @param external Bool for whether 
+	 * @param external Bool for whether
 	 * Android should use external file storage.
 	**/
 	virtual void setAndroidSaveExternal(bool useExternal = false);
@@ -134,7 +134,7 @@ public:
 	 * Gets whether the Android save is external.
 	 * Returns a bool.
 	**/
-	virtual bool isAndroidSaveExternal() const; 
+	virtual bool isAndroidSaveExternal() const;
 
 	/**
 	 * Sets the name of the save folder.

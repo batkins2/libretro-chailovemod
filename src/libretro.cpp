@@ -523,7 +523,11 @@ void retro_run(void) {
 	app->draw();
 
 	// Copy the video buffer to the screen.
-	video_cb(app->videoBuffer, app->config.window.width, app->config.window.height, app->config.window.width << 2);
+	if (!app->event.m_pauserendering) {
+		app->event.renderlock();
+		video_cb(app->videoBuffer, app->config.window.width, app->config.window.height, app->config.window.width << 2);
+		app->event.renderlock();
+	}
 
 	// See if the game requested to close itself.
 	if (app->event.m_shouldclose) {

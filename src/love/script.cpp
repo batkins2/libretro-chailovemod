@@ -21,6 +21,7 @@ using love::Types::Config::ModuleConfig;
 using love::Types::Audio::SoundData;
 using love::Types::FileSystem::FileData;
 using love::graphics;
+using love::chai_mesh;
 
 namespace love {
 
@@ -143,6 +144,8 @@ script::script(const std::string& file) {
 		love["font"] = var(std::ref(app->font));
 		love["graphics"] = var(std::ref(app->graphics));
 		love["chai_gfx"] = var(std::ref(app->chai_gfx));
+		love["chai_mesh"] = var(std::ref(app->chai_mesh));
+		love["chai_shader"] = var(std::ref(app->chai_shader));
 		love["image"] = var(std::ref(app->image));
 		love["joystick"] = var(std::ref(app->joystick));
 		love["keyboard"] = var(std::ref(app->keyboard));
@@ -203,6 +206,8 @@ script::script(const std::string& file) {
 
 	// Image Object.
 	chai.add(user_type<Image>(), "Image");
+	chai.add(constructor<Image(const Image &)>(), "Image");
+	chai.add(fun(&Image::operator=), "=");
 	chai.add(fun(&Image::getWidth), "getWidth");
 	chai.add(fun(&Image::getHeight), "getHeight");
 
@@ -305,6 +310,16 @@ script::script(const std::string& file) {
 
 	// Gfx
 	chai.add(fun(&chai_gfx::wrap_newShader), "newShader");
+	chai.add(fun(&chai_gfx::wrap_setShader), "setShader");
+	chai.add(fun(&chai_gfx::wrap_newMesh), "newMesh");
+	chai.add(fun(&chai_gfx::draw), "draw");
+	chai.add(fun(&chai_gfx::createCanvas), "createCanvas");
+	chai.add(fun(&chai_gfx::drawCanvas), "drawCanvas");
+	chai.add(user_type<chai_mesh>(), "chai_mesh");
+	chai.add(constructor<chai_mesh(const chai_mesh &)>(), "chai_mesh");
+	chai.add(fun(&chai_mesh::operator=), "=");
+	chai.add(fun(&chai_mesh::wrap_setTexture), "setTexture");
+	chai.add(fun(&chai_shader::send), "send");
 
 	// Font
 	chai.add(fun(&font::isOpen), "isOpen");
@@ -318,6 +333,8 @@ script::script(const std::string& file) {
 
 	// Event
 	chai.add(fun(&event::quit), "quit");
+	chai.add(fun(&event::pause), "pause");
+	chai.add(fun(&event::isrenderlocked), "isrenderlocked");
 
 	// Image
 	chai.add(fun(&image::newImageData), "newImageData");

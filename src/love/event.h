@@ -14,8 +14,13 @@ class event {
 	 */
 	void quit();
 	void update();
+	void pause();
+	void renderlock();
+	bool isrenderlocked();
 
 	bool m_shouldclose = false;
+	bool m_pauserendering = false;
+	bool m_renderlocked = false;
 };
 
 }  // namespace love

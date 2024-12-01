@@ -74,6 +74,16 @@ Image::Image(const std::string& filename) {
 	loadFromRW(image);
 }
 
+Image::Image(const Image &c) {
+	surface = c.surface;
+	texture = c.texture;
+}
+
+Image *Image::clone() const
+{
+	return new Image(*this);
+}
+
 int Image::getWidth() {
 	if (loaded()) {
 		return surface->w;

@@ -57,9 +57,11 @@ graphics& graphics::clear(int r, int g, int b, int a) {
 	// SDL_Window* screen = getScreen();
 	// Uint32 color = SDL_MapRGBA(screen->format, r, g, b, a);
 	// SDL_FillRect(screen, NULL, color);
+
 	auto renderer = ChaiLove::getInstance()->renderer;
 	SDL_SetRenderDrawColor(renderer, r, g, b, a);
 	SDL_RenderClear(renderer);
+
 	// SDL_RenderPresent(ChaiLove::getInstance()->renderer);
 	return *this;
 }
@@ -118,7 +120,7 @@ graphics& graphics::draw(Image* image, int x, int y) {
 		dstrect.y = y;
 		// dstrect.w = image->surface->w;
 		// dstrect.h = image->surface->h;
-		
+
 		auto app = ChaiLove::getInstance();
 		// auto texture = SDL_CreateTextureFromSurface(app->renderer, image->surface);
 		// SDL_RenderCopy(app->renderer, texture, NULL, &dstrect);

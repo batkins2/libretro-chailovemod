@@ -126,7 +126,7 @@ Graphics::Graphics()
 		// Handled in getBufferMapMemory.
 	}
 
-	auto window = getInstance<love::window::Window>(M_WINDOW);
+	auto window = getInstance<love::windowmod::Window>(M_WINDOW);
 
 	if (window != nullptr)
 	{
@@ -136,7 +136,7 @@ Graphics::Graphics()
 		if (window->isOpen())
 		{
 			int w, h;
-			love::window::WindowSettings settings;
+			love::windowmod::WindowSettings settings;
 			window->getWindow(w, h, settings);
 			window->setWindow(w, h, &settings);
 		}
@@ -295,6 +295,19 @@ GLuint Graphics::getSystemBackbufferFBO() const
 #endif
 }
 
+void MessageCallback( GLenum source,
+                 GLenum type,
+                 GLuint id,
+                 GLenum severity,
+                 GLsizei length,
+                 const GLchar* message,
+                 const void* userParam )
+{
+  fprintf( stderr, "GL CALLBACK: %s type = 0x%x, severity = 0x%x, message = %s\n",
+           ( type == GL_DEBUG_TYPE_ERROR ? "** GL ERROR **" : "" ),
+            type, severity, message );
+}
+
 bool Graphics::setMode(void */*context*/, int width, int height, int pixelwidth, int pixelheight, bool backbufferstencil, bool backbufferdepth, int msaa)
 {
 	// Okay, setup OpenGL.
@@ -329,6 +342,9 @@ bool Graphics::setMode(void */*context*/, int width, int height, int pixelwidth,
 
 	if (!GLAD_ES_VERSION_2_0)
 		glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+
+	glEnable(GL_DEBUG_OUTPUT);
+	glDebugMessageCallback( MessageCallback, 0 );
 
 	gl.setTextureUnit(0);
 
@@ -1292,7 +1308,7 @@ void Graphics::present(void *screenshotCallbackData)
 		buffer->nextFrame();
 	batchedDrawState.indexBuffer->nextFrame();
 
-	auto window = getInstance<love::window::Window>(M_WINDOW);
+	auto window = getInstance<love::windowmod::Window>(M_WINDOW);
 	if (window != nullptr)
 		window->swapBuffers();
 

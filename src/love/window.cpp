@@ -24,7 +24,7 @@ bool window::load(const config& conf) {
 		if (errorChar != NULL) {
 			errString = errorChar;
 		}
-		LibretroLog::log(RETRO_LOG_ERROR) << "[game] Unable to initialize SDL " << errString << std::endl;
+		LibretroLog::log(RETRO_LOG_ERROR) << "[game] Unable to initialize SDL (1) " << errString << std::endl;
 		return false;
 	}
 
@@ -41,14 +41,16 @@ bool window::load(const config& conf) {
 	// if (conf.window.doublebuffering) {
 	// 	// flags |= SDL_DOUBLEBUF;
 	// }
-	SDL_CreateWindowAndRenderer(conf.window.width, conf.window.height, SDL_WINDOW_FULLSCREEN, &app->win, &app->renderer);
+	SDL_CreateWindowAndRenderer(conf.window.width, conf.window.height, SDL_WINDOW_OPENGL, &app->win, &app->renderer);
+
+	// app->win = (SDL_Window *) app->chai_gfx.win->getHandle();
 	if (app->win == NULL) {
 		const char* errorChar = SDL_GetError();
 		std::string errString("");
 		if (errorChar != NULL) {
 			errString = errorChar;
 		}
-		LibretroLog::log(RETRO_LOG_ERROR) << "[game] Unable to initialize SDL" << errString << std::endl;
+		LibretroLog::log(RETRO_LOG_ERROR) << "[game] Unable to initialize SDL (2) " << errString << std::endl;
 		SDL_Quit();
 		return false;
 	}
@@ -56,16 +58,18 @@ bool window::load(const config& conf) {
 	// SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
 	// SDL_RenderSetLogicalSize(app->renderer, conf.window.width, conf.window.height);
 
-	app->texture = SDL_CreateTexture(app->renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, conf.window.width, conf.window.height);
-
 	app->screen = SDL_GetWindowSurface(app->win);
+	// app->renderer = SDL_CreateSoftwareRenderer(app->screen);
+
+	// app->texture = SDL_CreateTexture(app->renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, conf.window.width, conf.window.height);
+
 	// app->screen = SDL_CreateRGBSurface(0, conf.window.width, conf.window.height, 32, 0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF);
 
 	// Enable video buffering.
-	app->videoBuffer = (uint32_t *)app->screen->pixels;
+	app->videoBuffer = (uint32_t *)app->win;
 
 	// Set the title.
-	setTitle(conf.window.title);
+	// setTitle(conf.window.title);
 	return true;
 }
 

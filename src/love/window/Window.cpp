@@ -23,7 +23,7 @@
 
 namespace love
 {
-namespace window
+namespace windowmod
 {
 
 static bool highDPIAllowed = false;

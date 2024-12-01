@@ -31,12 +31,12 @@
 
 namespace love
 {
-namespace window
+namespace windowmod
 {
 namespace sdl
 {
 
-class Window final : public love::window::Window
+class Window final : public love::windowmod::Window
 {
 public:
 

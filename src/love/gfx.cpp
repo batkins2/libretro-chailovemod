@@ -355,8 +355,7 @@ ShaderStage *Graphics::newShaderStage(ShaderStageType stage, const std::string &
 
 	if (s == nullptr)
 	{
-		// bool glsles = usesGLSLES();
-		bool glsles = false;
+		bool glsles = usesGLSLES();
 		std::string glsl = Shader::createShaderStageCode(this, stage, source, options, info, glsles, true);
 		s = newShaderStageInternal(stage, cachekey, glsl, glsles);
 		if (cache && !cachekey.empty())
@@ -780,7 +779,7 @@ bool Graphics::isActive() const
 {
 	// The graphics module is only completely 'active' if there's a window, a
 	// context, and the active variable is set.
-	auto window = getInstance<love::window::Window>(M_WINDOW);
+	auto window = getInstance<love::windowmod::Window>(M_WINDOW);
 	return active && isCreated() && window != nullptr && window->isOpen();
 }
 

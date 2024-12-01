@@ -1,63 +1,9 @@
-# ChaiLove
-SOURCES_CXX := $(wildcard \
-	$(CORE_DIR)/src/*.cpp \
-	$(CORE_DIR)/src/love/*.cpp \
-	$(CORE_DIR)/src/love/Types/Audio/*.cpp \
-	$(CORE_DIR)/src/love/Types/Config/*.cpp \
-	$(CORE_DIR)/src/love/Types/FileSystem/*.cpp \
-	$(CORE_DIR)/src/love/Types/Graphics/*.cpp \
-	$(CORE_DIR)/src/love/Types/Input/*.cpp \
-	$(CORE_DIR)/src/love/audio/*.cpp \
-	$(CORE_DIR)/src/love/audio/null/*.cpp \
-	$(CORE_DIR)/src/love/audio/openal/*.cpp \
-	$(CORE_DIR)/src/love/common/*.cpp \
-	$(CORE_DIR)/src/love/data/*.cpp \
-	$(CORE_DIR)/src/love/filesystem/*.cpp \
-	$(CORE_DIR)/src/love/filesystem/physfs/*.cpp \
-	$(CORE_DIR)/src/love/font/*.cpp \
-	$(CORE_DIR)/src/love/font/freetype/*.cpp \
-	$(CORE_DIR)/src/love/font/libraries/*.cpp \
-	$(CORE_DIR)/src/love/font/libraries/utf8/*.cpp \
-	$(CORE_DIR)/src/love/image/*.cpp \
-	$(CORE_DIR)/src/love/image/magpie/*.cpp \
-	$(CORE_DIR)/src/love/math/*.cpp \
-	$(CORE_DIR)/src/love/opengl/*.cpp \
-	$(CORE_DIR)/src/love/sound/*.cpp \
-	$(CORE_DIR)/src/love/sound/lullaby/*.cpp \
-	$(CORE_DIR)/src/love/thread/*.cpp \
-	$(CORE_DIR)/src/love/thread/sdl/*.cpp \
-	$(CORE_DIR)/src/love/timer/*.cpp \
-	$(CORE_DIR)/src/love/video/*.cpp \
-	$(CORE_DIR)/src/love/video/theora/*.cpp \
-	$(CORE_DIR)/src/love/window/*.cpp \
-	$(CORE_DIR)/src/love/window/sdl/*.cpp \
-	$(CORE_DIR)/src/love/image/magpie/*.cpp \
-	$(CORE_DIR)/src/love/image/magpie/ddsparse/*.cpp \
-	$(CORE_DIR)/src/love/libraries/glslang/glslang/MachineIndependent/*.cpp \
-	$(CORE_DIR)/src/love/libraries/glslang/glslang/MachineIndependent/preprocessor/*.cpp \
-	$(CORE_DIR)/src/love/libraries/glslang/glslang/ResourceLimits/*.cpp \
-	$(CORE_DIR)/src/love/libraries/glslang/glslang/GenericCodeGen/*.cpp \
-	$(CORE_DIR)/src/love/libraries/lodepng/*.cpp \
-	$(CORE_DIR)/src/love/opengl/libraries/glad/*.cpp \
-)
-SOURCES_C = $(CORE_DIR)/src/physfs_platform_libretro.c
-SOURCES_S =
-FLAGS += -Wfatal-errors
+# SDL
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/bin/include
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/bin/include/SDL2
 
-# LOVE
-FLAGS += -I$(CORE_DIR)/src/love/libraries/tinyexr
-FLAGS += -I$(CORE_DIR)/src/love/libraries/lodepng
-
-# glslang
-FLAGS += -I$(CORE_DIR)/src/love/libraries/glslang/glslang/Include
-FLAGS += -I$(CORE_DIR)/src/love/libraries/glslang/glslang/Public
-FLAGS += -I$(CORE_DIR)/src/love/libraries/glslang/glslang/MachineIndependent
-
-FLAGS += -I$(CORE_DIR)/src/love/opengl/libraries/glad
-# FLAGS += -I$(CORE_DIR)/src/love/joystick/sdl
-
-# random
-FLAGS += -I$(CORE_DIR)/vendor/random/include
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL_image/include
+# FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/haptic
 
 # libretro-common
 FLAGS += -I$(CORE_DIR)/vendor/libretro-common/include \
@@ -108,6 +54,155 @@ endif
 ifeq ($(platform), emscripten)
      SOURCES_C += $(CORE_DIR)/vendor/libretro-common/rthreads/rthreads.c
 endif
+
+ifeq ($(platform), win)
+	SOURCES_C += $(wildcard \
+	./vendor/sdl2-libretro/src/thread/generic/*.c \
+	./vendor/sdl2-libretro/src/core/windows/*.c \
+	./vendor/sdl2-libretro/src/timer/windows/*.c \
+	./vendor/sdl2-libretro/src/timer/*.c \
+	./vendor/sdl2-libretro/src/*.c \
+	./vendor/sdl2-libretro/src/thread/*.c \
+	./vendor/sdl2-libretro/src/cdrom/dummy/*.c \
+	./vendor/sdl2-libretro/src/cdrom/*.c \
+	./vendor/sdl2-libretro/src/cpuinfo/*.c \
+	./vendor/sdl2-libretro/src/stdlib/*.c \
+	./vendor/sdl2-libretro/src/nojoystick/*.c \
+	./vendor/sdl2-libretro/src/nojoystick/libretro/*.c \
+	./vendor/sdl2-libretro/src/loadso/windows/*.c \
+	./vendor/sdl2-libretro/src/audio/libretro/*.c \
+	./vendor/sdl2-libretro/src/timer/libretro/*.c \
+	./vendor/sdl2-libretro/src/audio/*.c \
+	./vendor/sdl2-libretro/src/audio/dummy_libretro/*.c \
+	./vendor/sdl2-libretro/src/events/*.c \
+	./vendor/sdl2-libretro/src/video/*.c \
+	./vendor/sdl2-libretro/src/video/windows/*.c \
+	./vendor/sdl2-libretro/src/file/*.c)
+else
+	SOURCES_C += $(wildcard \
+		$(CORE_DIR)/vendor/sdl2-libretro/src/*.c \
+		$(CORE_DIR)/vendor/sdl2-libretro/src/audio/*.c  \
+		$(CORE_DIR)/vendor/sdl2-libretro/src/cdrom/dummy/*.c \
+		$(CORE_DIR)/vendor/sdl2-libretro/src/cdrom/*.c  \
+		$(CORE_DIR)/vendor/sdl2-libretro/src/cpuinfo/*.c  \
+		$(CORE_DIR)/vendor/sdl2-libretro/src/events/*.c  \
+		$(CORE_DIR)/vendor/sdl2-libretro/src/file/*.c  \
+		$(CORE_DIR)/vendor/sdl2-libretro/src/stdlib/*.c  \
+		$(CORE_DIR)/vendor/sdl2-libretro/src/thread/*.c  \
+		$(CORE_DIR)/vendor/sdl2-libretro/src/timer/*.c  \
+		$(CORE_DIR)/vendor/sdl2-libretro/src/video/*.c  \
+		$(CORE_DIR)/vendor/sdl2-libretro/src/nojoystick/*.c  \
+		$(CORE_DIR)/vendor/sdl2-libretro/src/video/dummy_libretro/*.c  \
+		$(CORE_DIR)/vendor/sdl2-libretro/src/thread/generic/*.c \
+		$(CORE_DIR)/vendor/sdl2-libretro/src/nojoystick/libretro/*.c  \
+		$(CORE_DIR)/vendor/sdl2-libretro/src/timer/libretro/*.c  \
+		$(CORE_DIR)/vendor/sdl2-libretro/src/audio/libretro/*.c  \
+		$(CORE_DIR)/vendor/sdl2-libretro/src/loadso/dummy/*.c)
+endif
+FLAGS += -DSDL_THREADS_DISABLED -DSDL_CDROM_DISABLED
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/include
+
+# SDL_gfx
+# FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/video/libretro
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/video/khronos
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/video/windows
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/test_sdlgfx
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/software
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengl
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengles
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengles2
+
+SOURCES_C += $(wildcard \
+	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL2_gfx-1.0.3/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL2_ttf-2.0.14/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL_image/src/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL_image/external/jpeg/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL_image/external/libpng/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL_image/external/libpng/arm/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/src/render/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/src/render/software/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengl/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengles/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengles2/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/src/atomic/*.c \
+	$(CORE_DIR)/vendor/physfs/extras/physfsrwops.c \
+	$(CORE_DIR)/src/love/data/libraries/lz4/*.c \
+	$(CORE_DIR)/vendor/physfs/src/*.c \
+	$(CORE_DIR)/src/love/libraries/xxHash/*.c \
+)
+#   $(CORE_DIR)/vendor/sdl2-libretro/src/timer/*.c \
+# 	$(CORE_DIR)/vendor/sdl2-libretro/src/timer/dummy_libretro/*.c \
+# 	$(CORE_DIR)/vendor/sdl2-libretro/src/video/*.c \
+# 	$(CORE_DIR)/vendor/sdl2-libretro/src/video/dummy_libretro/*.c \
+# 	$(CORE_DIR)/vendor/sdl2-libretro/src/thread/*.c \
+# 	$(CORE_DIR)/vendor/sdl2-libretro/src/stdlib/*.c \
+# 	$(CORE_DIR)/vendor/sdl2-libretro/src/audio/*.c \
+# 	$(CORE_DIR)/vendor/sdl2-libretro/src/audio/dummy/*.c \
+# 	$(CORE_DIR)/vendor/sdl2-libretro/src/file/*.c \
+#	$(CORE_DIR)/vendor/sdl2-libretro/src/thread/*.c \
+
+# $(CORE_DIR)/vendor/sdl2-libretro/src/joystick/*.c \
+
+# ChaiLove
+SOURCES_CXX := $(wildcard \
+	$(CORE_DIR)/src/*.cpp \
+	$(CORE_DIR)/src/love/*.cpp \
+	$(CORE_DIR)/src/love/Types/Audio/*.cpp \
+	$(CORE_DIR)/src/love/Types/Config/*.cpp \
+	$(CORE_DIR)/src/love/Types/FileSystem/*.cpp \
+	$(CORE_DIR)/src/love/Types/Graphics/*.cpp \
+	$(CORE_DIR)/src/love/Types/Input/*.cpp \
+	$(CORE_DIR)/src/love/audio/*.cpp \
+	$(CORE_DIR)/src/love/audio/null/*.cpp \
+	$(CORE_DIR)/src/love/audio/openal/*.cpp \
+	$(CORE_DIR)/src/love/common/*.cpp \
+	$(CORE_DIR)/src/love/data/*.cpp \
+	$(CORE_DIR)/src/love/filesystem/*.cpp \
+	$(CORE_DIR)/src/love/filesystem/physfs/*.cpp \
+	$(CORE_DIR)/src/love/font/*.cpp \
+	$(CORE_DIR)/src/love/font/freetype/*.cpp \
+	$(CORE_DIR)/src/love/font/libraries/*.cpp \
+	$(CORE_DIR)/src/love/font/libraries/utf8/*.cpp \
+	$(CORE_DIR)/src/love/image/*.cpp \
+	$(CORE_DIR)/src/love/image/magpie/*.cpp \
+	$(CORE_DIR)/src/love/math/*.cpp \
+	$(CORE_DIR)/src/love/opengl/*.cpp \
+	$(CORE_DIR)/src/love/sound/*.cpp \
+	$(CORE_DIR)/src/love/sound/lullaby/*.cpp \
+	$(CORE_DIR)/src/love/thread/*.cpp \
+	$(CORE_DIR)/src/love/thread/sdl/*.cpp \
+	$(CORE_DIR)/src/love/timer/*.cpp \
+	$(CORE_DIR)/src/love/video/*.cpp \
+	$(CORE_DIR)/src/love/video/theora/*.cpp \
+	$(CORE_DIR)/src/love/window/*.cpp \
+	$(CORE_DIR)/src/love/window/sdl/*.cpp \
+	$(CORE_DIR)/src/love/image/magpie/*.cpp \
+	$(CORE_DIR)/src/love/image/magpie/ddsparse/*.cpp \
+	$(CORE_DIR)/src/love/libraries/glslang/glslang/MachineIndependent/*.cpp \
+	$(CORE_DIR)/src/love/libraries/glslang/glslang/MachineIndependent/preprocessor/*.cpp \
+	$(CORE_DIR)/src/love/libraries/glslang/glslang/ResourceLimits/*.cpp \
+	$(CORE_DIR)/src/love/libraries/glslang/glslang/GenericCodeGen/*.cpp \
+	$(CORE_DIR)/src/love/libraries/lodepng/*.cpp \
+	$(CORE_DIR)/src/love/opengl/libraries/glad/*.cpp \
+)
+SOURCES_C += $(CORE_DIR)/src/physfs_platform_libretro.c
+SOURCES_S =
+FLAGS += -Wfatal-errors
+
+# LOVE
+FLAGS += -I$(CORE_DIR)/src/love/libraries/tinyexr
+FLAGS += -I$(CORE_DIR)/src/love/libraries/lodepng
+
+# glslang
+FLAGS += -I$(CORE_DIR)/src/love/libraries/glslang/glslang/Include
+FLAGS += -I$(CORE_DIR)/src/love/libraries/glslang/glslang/Public
+FLAGS += -I$(CORE_DIR)/src/love/libraries/glslang/glslang/MachineIndependent
+
+FLAGS += -I$(CORE_DIR)/src/love/opengl/libraries/glad
+# FLAGS += -I$(CORE_DIR)/src/love/joystick/sdl
+
+# random
+FLAGS += -I$(CORE_DIR)/vendor/random/include
 
 # stb_vorbis
 #SOURCES_C += $(CORE_DIR)/vendor/stb/stb_vorbis.c
@@ -180,49 +275,6 @@ SOURCES_C += $(wildcard \
 # SOURCES_C += $(wildcard \
 # 	$(CORE_DIR)/src/pgl.c \
 # )
-
-# SDL_gfx
-FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/bin/include
-FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/bin/include/SDL2
-# FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/video/libretro
-FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/test_sdlgfx
-FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/software
-FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengl
-FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengles
-FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengles2
-	
-	
-FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL_image/include
-# FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/haptic
-SOURCES_C += $(wildcard \
-	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL2_gfx-1.0.3/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL2_ttf-2.0.14/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL_image/src/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL_image/external/jpeg/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL_image/external/libpng/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL_image/external/libpng/arm/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/render/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/render/software/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengl/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengles/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengles2/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/timer/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/timer/dummy_libretro/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/video/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/video/dummy_libretro/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/thread/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/stdlib/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/audio/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/audio/dummy/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/file/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/atomic/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/thread/*.c \
-	$(CORE_DIR)/vendor/physfs/extras/physfsrwops.c \
-	$(CORE_DIR)/src/love/data/libraries/lz4/*.c \
-	$(CORE_DIR)/vendor/physfs/src/*.c \
-	$(CORE_DIR)/src/love/libraries/xxHash/*.c \
-)
-# $(CORE_DIR)/vendor/sdl2-libretro/src/joystick/*.c \
 
 # FreeType2
 # See https://github.com/emscripten-ports/FreeType/blob/master/builds/amiga/makefile
@@ -308,16 +360,7 @@ ifeq ($(HAVE_CHAISCRIPT),)
 	FLAGS += -DCHAISCRIPT_EXTRAS_MATH_SKIP_ADVANCED
 endif
 
-# SDL
-ifeq ($(platform), win)
-	SOURCES_C += $(wildcard ./vendor/sdl2-libretro/src/*.c  ./vendor/sdl2-libretro/src/audio/*.c  ./vendor/sdl2-libretro/src/cdrom/dummy/*.c  ./vendor/sdl2-libretro/src/cdrom/*.c  ./vendor/sdl2-libretro/src/cpuinfo/*.c  ./vendor/sdl2-libretro/src/events/*.c  ./vendor/sdl2-libretro/src/file/*.c  ./vendor/sdl2-libretro/src/stdlib/*.c  ./vendor/sdl2-libretro/src/thread/*.c  ./vendor/sdl2-libretro/src/timer/*.c  ./vendor/sdl2-libretro/src/video/*.c  ./vendor/sdl2-libretro/src/nojoystick/*.c  ./vendor/sdl2-libretro/src/video/dummy_libretro/*.c  ./vendor/sdl2-libretro/src/nojoystick/libretro/*.c  ./vendor/sdl2-libretro/src/timer/libretro/*.c  ./vendor/sdl2-libretro/src/audio/libretro/*.c  ./vendor/sdl2-libretro/src/thread/win32/SDL_sysmutex.c ./vendor/sdl2-libretro/src/thread/win32/SDL_syssem.c ./vendor/sdl2-libretro/src/thread/win32/SDL_systhread.c ./vendor/sdl2-libretro/src/thread/generic/SDL_syscond.c ./vendor/sdl2-libretro/src/loadso/dummy/*.c)
-else
-	SOURCES_C += $(wildcard $(CORE_DIR)/vendor/sdl2-libretro/src/*.c $(CORE_DIR)/vendor/sdl2-libretro/src/audio/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/cdrom/dummy/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/cdrom/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/cpuinfo/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/events/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/file/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/stdlib/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/thread/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/timer/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/video/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/nojoystick/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/video/dummy_libretro/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/thread/generic/*.c $(CORE_DIR)/vendor/sdl2-libretro/src/nojoystick/libretro/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/timer/libretro/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/audio/libretro/*.c  $(CORE_DIR)/vendor/sdl2-libretro/src/loadso/dummy/*.c)
-endif
-FLAGS += -DSDL_THREADS_DISABLED -DSDL_CDROM_DISABLED
-FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/include
-
-OBJECTS += $(SOURCES_CXX:.cpp=.o) $(SOURCES_C:.c=.o) $(SOURCES_S:.S=.o) $(SOURCES_M:.m=.o)
+OBJECTS += $(SOURCES_C:.c=.o) $(SOURCES_CXX:.cpp=.o) $(SOURCES_S:.S=.o) $(SOURCES_M:.m=.o)
 
 LDFLAGS +=  $(fpic) $(SHARED) $(EXTRA_LDF)
 

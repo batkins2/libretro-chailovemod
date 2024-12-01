@@ -599,7 +599,7 @@ CFLAGS += -D_CRT_SECURE_NO_DEPRECATE
 else
 	TARGET := $(TARGET_NAME)_libretro.dll
 	CC ?= gcc
-	SHARED := -shared -static-libgcc -static-libstdc++ -s -Wl,--version-script=link.T
+	SHARED := -shared -static-libgcc -static-libstdc++ -Wl,--version-script=link.T
    PSS_STYLE :=2
 endif
 

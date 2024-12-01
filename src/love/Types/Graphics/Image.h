@@ -19,7 +19,12 @@ class Image {
 	SDL_Texture* texture;
 	Image(SDL_RWops* rw);
 	Image(const std::string& filename);
+	Image(const Image &c);
 	~Image();
+	Image *clone() const;
+	Image& operator=(const Image& i) {
+		return *this;
+	};
 	bool loaded();
 	bool loadFromRW(SDL_RWops* rw);
 	bool destroy();

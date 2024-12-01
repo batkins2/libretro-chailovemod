@@ -27,4 +27,16 @@ void event::update() {
 	}
 }
 
+void event::pause() {
+	m_pauserendering = !m_pauserendering;
+}
+
+void event::renderlock() {
+	m_renderlocked = !m_renderlocked;
+}
+
+bool event::isrenderlocked() {
+	return m_renderlocked;
+}
+
 }  // namespace love

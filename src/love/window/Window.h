@@ -40,7 +40,7 @@ namespace gfx
 class Graphics;
 }
 
-namespace window
+namespace windowmod
 {
 
 // Applied when the window is first created.
