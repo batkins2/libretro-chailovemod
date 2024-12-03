@@ -163,4 +163,21 @@ void chai_gfx::drawCanvas() {
 
 }
 
+void readFBOIntoVideoBuffer() {
+    GLuint fbo = getInternalBackbufferFBO(); // or getSystemBackbufferFBO()
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+    int width = 800; // Set appropriate width
+    int height = 600; // Set appropriate height
+    std::vector<uint8_t> buffer(width * height * 4); // Assuming RGBA format
+
+    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer.data());
+
+    // Copy to video buffer
+    auto cl = ChaiLove::getInstance();
+    memcpy(cl->videoBuffer, buffer.data(), buffer.size());
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind the FBO
+}
+
 }
