@@ -16,11 +16,9 @@ bool chai_mesh::newMesh(love::gfx::Graphics *inst, const std::vector<chaiscript:
     for (auto vectors : data) {
         for (auto value : chaiscript::boxed_cast<std::vector<chaiscript::Boxed_Value>>(vectors)) {
             auto v = chaiscript::boxed_cast<float>(value);
-            std::byte* ret = (std::byte*) std::malloc(4 * sizeof(std::byte));
-            unsigned int asInt = *((int*)&v);
-
-            for (int i = 3; i > 0; i--) {
-                prepD->push_back((asInt >> 8 * i) & 0xFF);
+            uint8_t* byteArray = reinterpret_cast<uint8_t*>(&v);
+            for (int i = 0; i < sizeof(float); ++i) {
+                prepD->push_back(byteArray[i]);
             }
 
             // size_t currentSize = prepD->size();
