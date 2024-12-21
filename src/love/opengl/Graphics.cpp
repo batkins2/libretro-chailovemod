@@ -208,7 +208,7 @@ void Graphics::backbufferChanged(int width, int height, int pixelwidth, int pixe
 	if (!isRenderTargetActive())
 	{
 		// Set the viewport to top-left corner.
-		gl.setViewport({0, 0, pixelwidth, pixelheight});
+		// gl.setViewport({0, 0, pixelwidth, pixelheight});
 
 		// Re-apply the scissor if it was active, since the rectangle passed to
 		// glScissor is affected by the viewport dimensions.
@@ -319,48 +319,50 @@ bool Graphics::setMode(void */*context*/, int width, int height, int pixelwidth,
 		glBindVertexArray(mainVAO);
 	}
 
+	gl.hw_render = hw_render;
+	gl.INT_FRAMEBUFFER = FRAMEBUFFER;
 	gl.setupContext();
 
 	created = true;
 	initCapabilities();
 
 	// Enable blending
-	gl.setEnableState(OpenGL::ENABLE_BLEND, true);
+	// gl.setEnableState(OpenGL::ENABLE_BLEND, true);
 
 	// Auto-generated mipmaps should be the best quality possible
-	if (!gl.isCoreProfile())
-		glHint(GL_GENERATE_MIPMAP_HINT, GL_NICEST);
+	// if (!gl.isCoreProfile())
+	// 	glHint(GL_GENERATE_MIPMAP_HINT, GL_NICEST);
 
-	if (!GLAD_ES_VERSION_2_0 && !gl.isCoreProfile())
-	{
-		// Make sure antialiasing works when set elsewhere
-		glEnable(GL_MULTISAMPLE);
+	// if (!GL_VERSION_2_0 && !gl.isCoreProfile())
+	// {
+	// 	// Make sure antialiasing works when set elsewhere
+	// 	glEnable(GL_MULTISAMPLE);
 
-		// Enable texturing
-		glEnable(GL_TEXTURE_2D);
-	}
+	// 	// Enable texturing
+	// 	glEnable(GL_TEXTURE_2D);
+	// }
 
-	if (!GLAD_ES_VERSION_2_0)
-		glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+	// if (!GL_VERSION_2_0)
+	// 	glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
 
-	glEnable(GL_DEBUG_OUTPUT);
-	glDebugMessageCallback( MessageCallback, 0 );
+	// glEnable(GL_DEBUG_OUTPUT);
+	// glDebugMessageCallback( MessageCallback, 0 );
 
 	gl.setTextureUnit(0);
 
 	// Set pixel row alignment - code that calls glTexSubImage and glReadPixels
 	// assumes there's no row alignment, but OpenGL defaults to 4 bytes.
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	// glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	// glPixelStorei(GL_PACK_ALIGNMENT, 1);
 
-	// Always enable seamless cubemap filtering when possible.
-	if (GLAD_VERSION_3_2 || GLAD_ARB_seamless_cube_map)
-		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+	// // Always enable seamless cubemap filtering when possible.
+	// if (GL_VERSION_3_2 || GL_ARB_seamless_cube_map)
+	// 	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
 	// Set whether drawing converts input from linear -> sRGB colorspace.
 	if (!gl.bugs.brokenSRGB)
 	{
-		if (GLAD_VERSION_1_0 || GLAD_EXT_sRGB_write_control)
+		if (GL_VERSION_1_1 || false)
 			gl.setEnableState(OpenGL::ENABLE_FRAMEBUFFER_SRGB, isGammaCorrect());
 	}
 	else
@@ -383,10 +385,10 @@ bool Graphics::setMode(void */*context*/, int width, int height, int pixelwidth,
 	if (!Volatile::loadAll())
 		::printf("Could not reload all volatile objects.\n");
 
-	createQuadIndexBuffer();
+	// createQuadIndexBuffer();
 
 	// Restore the graphics state.
-	restoreState(states.back());
+	// restoreState(states.back());
 
 	// We always need a default shader.
 	for (int i = 0; i < Shader::STANDARD_MAX_ENUM; i++)
@@ -426,6 +428,15 @@ bool Graphics::setMode(void */*context*/, int width, int height, int pixelwidth,
 	if (!Shader::current)
 		Shader::standardShaders[Shader::STANDARD_DEFAULT]->attach();
 
+	return true;
+}
+
+bool Graphics::bindVAO()
+{
+	if (mainVAO == 0)
+		return false;
+
+	glBindVertexArray(mainVAO);
 	return true;
 }
 
@@ -662,10 +673,10 @@ void Graphics::drawQuads(int start, int count, const VertexAttributes &attribute
 	const int MAX_QUADS_PER_DRAW    = MAX_VERTICES_PER_DRAW / 4;
 
 	gl.prepareDraw(this);
-	gl.bindTextureToUnit(texture, 0, false);
+	// gl.bindTextureToUnit(texture, 0, false);
 	gl.setCullMode(CULL_NONE);
 
-	gl.bindBuffer(BUFFERUSAGE_INDEX, quadIndexBuffer->getHandle());
+	// gl.bindBuffer(BUFFERUSAGE_INDEX, quadIndexBuffer->getHandle());
 
 	if (gl.isBaseVertexSupported())
 	{
@@ -685,22 +696,22 @@ void Graphics::drawQuads(int start, int count, const VertexAttributes &attribute
 	}
 	else
 	{
-		BufferBindings bufferscopy = buffers;
-		if (start > 0)
-			advanceVertexOffsets(attributes, bufferscopy, start * 4);
+		// BufferBindings bufferscopy = buffers;
+		// if (start > 0)
+		// 	advanceVertexOffsets(attributes, bufferscopy, start * 4);
 
-		for (int quadindex = 0; quadindex < count; quadindex += MAX_QUADS_PER_DRAW)
-		{
-			gl.setVertexAttributes(attributes, bufferscopy);
+		// for (int quadindex = 0; quadindex < count; quadindex += MAX_QUADS_PER_DRAW)
+		// {
+		// 	gl.setVertexAttributes(attributes, bufferscopy);
 
-			int quadcount = std::min(MAX_QUADS_PER_DRAW, count - quadindex);
+		// 	int quadcount = std::min(MAX_QUADS_PER_DRAW, count - quadindex);
 
-			glDrawElements(GL_TRIANGLES, quadcount * 6, GL_UNSIGNED_SHORT, BUFFER_OFFSET(0));
-			++drawCalls;
+		// 	glDrawElements(GL_TRIANGLES, quadcount * 6, GL_UNSIGNED_SHORT, BUFFER_OFFSET(0));
+		// 	++drawCalls;
 
-			if (count > MAX_QUADS_PER_DRAW)
-				advanceVertexOffsets(attributes, bufferscopy, quadcount * 4);
-		}
+		// 	if (count > MAX_QUADS_PER_DRAW)
+		// 		advanceVertexOffsets(attributes, bufferscopy, quadcount * 4);
+		// }
 	}
 }
 
@@ -722,19 +733,19 @@ void Graphics::setDebug(bool enable)
 {
 	// Make sure debug output is supported. The AMD ext. is a bit different
 	// so we don't make use of it, since AMD drivers now support KHR_debug.
-	if (!(GLAD_VERSION_4_3 || GLAD_ES_VERSION_3_2 || GLAD_KHR_debug || GLAD_ARB_debug_output))
+	if (!(GL_VERSION_4_3 || GL_VERSION_3_2 || GL_KHR_debug || GL_ARB_debug_output))
 		return;
 
 	// TODO: We don't support GL_KHR_debug in GLES yet.
-	if (GLAD_ES_VERSION_2_0 && !GLAD_ES_VERSION_3_2)
+	if (GL_VERSION_2_0 && !GL_VERSION_3_2)
 		return;
 
 	// Ugly hack to reduce code duplication.
-	if (GLAD_ARB_debug_output && !(GLAD_VERSION_4_3 || GLAD_KHR_debug))
-	{
-		fp_glDebugMessageCallback = (pfn_glDebugMessageCallback) fp_glDebugMessageCallbackARB;
-		fp_glDebugMessageControl = (pfn_glDebugMessageControl) fp_glDebugMessageControlARB;
-	}
+	// if (GL_ARB_debug_output && !(GL_VERSION_4_3 || GL_KHR_debug))
+	// {
+	// 	fp_glDebugMessageCallback = (pfn_glDebugMessageCallback) fp_glDebugMessageCallbackARB;
+	// 	fp_glDebugMessageControl = (pfn_glDebugMessageControl) fp_glDebugMessageControlARB;
+	// }
 
 	if (!enable)
 	{
@@ -742,7 +753,7 @@ void Graphics::setDebug(bool enable)
 		glDebugMessageCallback(nullptr, nullptr);
 
 		// We can disable debug output entirely with KHR_debug.
-		if (GLAD_VERSION_4_3 || GLAD_ES_VERSION_3_2 || GLAD_KHR_debug)
+		if (GL_VERSION_4_3 || GL_VERSION_3_2 || GL_KHR_debug)
 			glDisable(GL_DEBUG_OUTPUT);
 
 		return;
@@ -751,7 +762,7 @@ void Graphics::setDebug(bool enable)
 	// We don't want asynchronous debug output.
 	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
 
-	glDebugMessageCallback(debugCB, nullptr);
+	// glDebugMessageCallback(debugCB, nullptr);
 
 	// Initially, enable everything.
 	glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, 0, GL_TRUE);
@@ -760,7 +771,7 @@ void Graphics::setDebug(bool enable)
 	glDebugMessageControl(GL_DEBUG_SOURCE_API, GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR, GL_DONT_CARE, 0, 0, GL_FALSE);
 	glDebugMessageControl(GL_DEBUG_SOURCE_SHADER_COMPILER, GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR, GL_DONT_CARE, 0, 0, GL_FALSE);
 
-	if (GLAD_VERSION_4_3 || GLAD_ES_VERSION_3_2 || GLAD_KHR_debug)
+	if (GL_VERSION_4_3 || GL_VERSION_3_2 || GL_KHR_debug)
 		glEnable(GL_DEBUG_OUTPUT);
 
 	::printf("OpenGL debug output enabled (LOVE_GRAPHICS_DEBUG=1)\n");
@@ -801,7 +812,7 @@ void Graphics::setRenderTargetsInternal(const RenderTargets &rts, int pixelw, in
 		setScissor(state.scissorRect);
 
 	// Make sure the correct sRGB setting is used when drawing to the textures.
-	if (GLAD_VERSION_1_0 || GLAD_EXT_sRGB_write_control)
+	if (GL_VERSION_1_1 || false)
 	{
 		if (hasSRGBtexture != gl.isStateEnabled(OpenGL::ENABLE_FRAMEBUFFER_SRGB))
 			gl.setEnableState(OpenGL::ENABLE_FRAMEBUFFER_SRGB, hasSRGBtexture);
@@ -840,9 +851,9 @@ void Graphics::endPass(bool presenting)
 
 			gl.bindFramebuffer(OpenGL::FRAMEBUFFER_DRAW, c->getFBO());
 
-			if (GLAD_APPLE_framebuffer_multisample)
-				glResolveMultisampleFramebufferAPPLE();
-			else
+			// if (GL_APPLE_framebuffer_multisample)
+			// 	glResolveMultisampleFramebufferAPPLE();
+			// else
 				glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 		}
 	}
@@ -851,9 +862,9 @@ void Graphics::endPass(bool presenting)
 	{
 		gl.bindFramebuffer(OpenGL::FRAMEBUFFER_DRAW, ((Texture *) depthstencil)->getFBO());
 
-		if (GLAD_APPLE_framebuffer_multisample)
-			glResolveMultisampleFramebufferAPPLE();
-		else
+		if (false) {
+			// glResolveMultisampleFramebufferAPPLE();
+		} else
 		{
 			int mip = rts.depthStencil.mipmap;
 			int w = depthstencil->getPixelWidth(mip);
@@ -1026,7 +1037,7 @@ void Graphics::discard(const std::vector<bool> &colorbuffers, bool depthstencil)
 
 void Graphics::discard(OpenGL::FramebufferTarget target, const std::vector<bool> &colorbuffers, bool depthstencil)
 {
-	if (!(GLAD_VERSION_4_3 || GLAD_ARB_invalidate_subdata || GLAD_ES_VERSION_3_0 || GLAD_EXT_discard_framebuffer))
+	if (!(GL_VERSION_4_3 || GL_ARB_invalidate_subdata || GL_VERSION_3_0 || false))
 		return;
 
 	GLenum gltarget = GL_FRAMEBUFFER;
@@ -1068,10 +1079,10 @@ void Graphics::discard(OpenGL::FramebufferTarget target, const std::vector<bool>
 	}
 
 	// Hint for the driver that it doesn't need to save these buffers.
-	if (GLAD_VERSION_4_3 || GLAD_ARB_invalidate_subdata || GLAD_ES_VERSION_3_0)
+	if (GL_VERSION_4_3 || GL_ARB_invalidate_subdata || GL_VERSION_3_0)
 		glInvalidateFramebuffer(gltarget, (GLint) attachments.size(), &attachments[0]);
-	else if (GLAD_EXT_discard_framebuffer)
-		glDiscardFramebufferEXT(gltarget, (GLint) attachments.size(), &attachments[0]);
+	// else if (false)
+		// glDiscardFramebufferEXT(gltarget, (GLint) attachments.size(), &attachments[0]);
 }
 
 void Graphics::cleanupRenderTexture(love::gfx::Texture *texture)
@@ -1218,9 +1229,9 @@ void Graphics::present(void *screenshotCallbackData)
 		discard(OpenGL::FRAMEBUFFER_DRAW, {true}, true);
 
 		// updateBackbuffer checks for glBlitFramebuffer support.
-		if (GLAD_APPLE_framebuffer_multisample && internalBackbuffer->getMSAA() > 1)
-			glResolveMultisampleFramebufferAPPLE();
-		else
+		// if (false && internalBackbuffer->getMSAA() > 1)
+			// glResolveMultisampleFramebufferAPPLE();
+		// else
 			glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
 		// Discarding the internal backbuffer directly after resolving it should
@@ -1530,7 +1541,7 @@ void Graphics::setPointSize(float size)
 void Graphics::setWireframe(bool enable)
 {
 	// Not supported in OpenGL ES.
-	if (GLAD_ES_VERSION_2_0)
+	if (GL_VERSION_2_0)
 		return;
 
 	flushBatchedDraws();
@@ -1561,14 +1572,14 @@ Renderer Graphics::getRenderer() const
 
 bool Graphics::usesGLSLES() const
 {
-	return GLAD_ES_VERSION_2_0;
+	return GL_VERSION_2_0;
 }
 
 Graphics::RendererInfo Graphics::getRendererInfo() const
 {
 	RendererInfo info;
 
-	if (GLAD_ES_VERSION_2_0)
+	if (GL_VERSION_2_0)
 		info.name = "OpenGL ES";
 	else
 		info.name = "OpenGL";
@@ -1609,7 +1620,7 @@ void Graphics::initCapabilities()
 	capabilities.features[FEATURE_PIXEL_SHADER_HIGHP] = true;
 	capabilities.features[FEATURE_SHADER_DERIVATIVES] = true;
 	capabilities.features[FEATURE_GLSL3] = true;
-	capabilities.features[FEATURE_GLSL4] = GLAD_ES_VERSION_3_1 || (gl.isCoreProfile() && GLAD_VERSION_4_3);
+	capabilities.features[FEATURE_GLSL4] = GL_VERSION_3_1 || (gl.isCoreProfile() && GL_VERSION_4_3);
 	capabilities.features[FEATURE_INSTANCING] = true;
 	capabilities.features[FEATURE_TEXEL_BUFFER] = gl.isBufferUsageSupported(BUFFERUSAGE_TEXEL);
 	capabilities.features[FEATURE_COPY_TEXTURE_TO_BUFFER] = gl.isCopyTextureToBufferSupported();
@@ -1634,7 +1645,7 @@ void Graphics::initCapabilities()
 	for (int i = 0; i < TEXTURE_MAX_ENUM; i++)
 		capabilities.textureTypes[i] = true;
 
-	for (int i = 0; i < PIXELFORMAT_MAX_ENUM; i++)
+	for (int i = PIXELFORMAT_RGBA8_UNORM; i < PIXELFORMAT_RGBA8_UNORM + 1; i++)
 	{
 		auto format = (PixelFormat) i;
 		pixelFormatUsage[i][0] = computePixelFormatUsage(format, false);
@@ -1644,7 +1655,7 @@ void Graphics::initCapabilities()
 #ifdef LOVE_ANDROID
 	// This can't be done in initContext with the rest of the bug checks because
 	// isPixelFormatSupported relies on state initialized here / after init.
-	if (GLAD_ES_VERSION_3_0 && !isPixelFormatSupported(PIXELFORMAT_R8_UNORM, PIXELFORMATUSAGEFLAGS_SAMPLE | PIXELFORMATUSAGEFLAGS_RENDERTARGET))
+	if (GL_VERSION_3_0 && !isPixelFormatSupported(PIXELFORMAT_R8_UNORM, PIXELFORMATUSAGEFLAGS_SAMPLE | PIXELFORMATUSAGEFLAGS_RENDERTARGET))
 	{
 		gl.bugs.brokenR8PixelFormat = true;
 		pixelFormatUsage[PIXELFORMAT_R8_UNORM][0] = computePixelFormatUsage(PIXELFORMAT_R8_UNORM, false);
@@ -1656,7 +1667,7 @@ void Graphics::initCapabilities()
 uint32 Graphics::computePixelFormatUsage(PixelFormat format, bool readable)
 {
 	uint32 usage = OpenGL::getPixelFormatUsageFlags(format);
-
+	return usage;
 	if (readable && (usage & PIXELFORMATUSAGEFLAGS_SAMPLE) == 0)
 		return 0;
 

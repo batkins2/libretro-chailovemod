@@ -32,9 +32,13 @@
 #include "../vertex.h"
 #include "../renderstate.h"
 #include "../common/Matrix.h"
+#include <libretro.h>
 
 // GLAD
-#include "libraries/glad/gladfuncs.hpp"
+// #include "libraries/glad/gladfuncs.hpp"
+#include "glsym/glsym.h"
+// #include "GL/glew.h"
+
 
 // C++
 #include <vector>
@@ -57,7 +61,7 @@ namespace opengl
 // Awful, but the library uses the namespace in order to use the functions sanely
 // with proper autocomplete in IDEs while having name mangling safety -
 // no clashes with other GL libraries when linking, etc.
-using namespace glad;
+// using namespace glad;
 
 /**
  * Thin layer between OpenGL and the rest of the program.
@@ -459,6 +463,9 @@ public:
 	static const char *debugSeverityString(GLenum severity);
 	static const char *debugSourceString(GLenum source);
 	static const char *debugTypeString(GLenum type);
+
+	inline static struct retro_hw_render_callback hw_render;
+	inline static unsigned int INT_FRAMEBUFFER;
 
 private:
 

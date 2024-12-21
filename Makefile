@@ -23,7 +23,7 @@ $(TARGET): $(OBJECTS)
 ifeq ($(STATIC_LINKING), 1)
 	$(AR) rcs $@ $(OBJECTS)
 else
-	$(CXX) -o $@ $^ $(LDFLAGS) -lWinmm -lole32 -loleaut32 -lDwmapi -lgdi32 -limm32 -lversion -luuid
+	$(CXX) -o $@ $^ $(LDFLAGS) -lWinmm -lole32 -loleaut32 -lDwmapi -lgdi32 -limm32 -lversion -luuid -lopengl32 -llibglew32
 endif
 
 %.o: %.cpp

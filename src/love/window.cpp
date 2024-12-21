@@ -41,32 +41,36 @@ bool window::load(const config& conf) {
 	// if (conf.window.doublebuffering) {
 	// 	// flags |= SDL_DOUBLEBUF;
 	// }
-	SDL_CreateWindowAndRenderer(conf.window.width, conf.window.height, SDL_WINDOW_OPENGL, &app->win, &app->renderer);
+	// SDL_CreateWindowAndRenderer(conf.window.width, conf.window.height, SDL_WINDOW_HIDDEN, &app->win, &app->renderer);
+
+	// app->win = SDL_CreateWindow(conf.window.title.c_str(), 0, 0, conf.window.width, conf.window.height, SDL_WINDOW_HIDDEN);
 
 	// app->win = (SDL_Window *) app->chai_gfx.win->getHandle();
-	if (app->win == NULL) {
-		const char* errorChar = SDL_GetError();
-		std::string errString("");
-		if (errorChar != NULL) {
-			errString = errorChar;
-		}
-		LibretroLog::log(RETRO_LOG_ERROR) << "[game] Unable to initialize SDL (2) " << errString << std::endl;
-		SDL_Quit();
-		return false;
-	}
+	// if (app->win == NULL) {
+	// 	const char* errorChar = SDL_GetError();
+	// 	std::string errString("");
+	// 	if (errorChar != NULL) {
+	// 		errString = errorChar;
+	// 	}
+	// 	LibretroLog::log(RETRO_LOG_ERROR) << "[game] Unable to initialize SDL (2) " << errString << std::endl;
+	// 	SDL_Quit();
+	// 	return false;
+	// }
 
 	// SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
 	// SDL_RenderSetLogicalSize(app->renderer, conf.window.width, conf.window.height);
 
-	app->screen = SDL_GetWindowSurface(app->win);
+	// app->screen = SDL_GetWindowSurface(app->win);
 	// app->renderer = SDL_CreateSoftwareRenderer(app->screen);
 
-	// app->texture = SDL_CreateTexture(app->renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, conf.window.width, conf.window.height);
+	// app->texture = SDL_CreateTexture(app->renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, conf.window.width, conf.window.height);
 
+	// SDL_SetRenderTarget(app->renderer, app->texture);
 	// app->screen = SDL_CreateRGBSurface(0, conf.window.width, conf.window.height, 32, 0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF);
 
 	// Enable video buffering.
-	app->videoBuffer = (uint32_t *)app->win;
+	// Allocate memory using new[]
+	// app->videoBuffer = new uint32_t[conf.window.width * conf.window.height];
 
 	// Set the title.
 	// setTitle(conf.window.title);

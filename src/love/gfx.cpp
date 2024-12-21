@@ -349,7 +349,7 @@ ShaderStage *Graphics::newShaderStage(ShaderStageType stage, const std::string &
 		if (it != cachedShaderStages[stage].end())
 		{
 			s = it->second;
-			s->retain();
+			// s->retain();
 		}
 	}
 

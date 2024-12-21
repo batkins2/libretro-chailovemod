@@ -79,12 +79,12 @@ static GLenum createFBO(GLuint &framebuffer, TextureType texType, PixelFormat fo
 						if (datatype == PIXELFORMATTYPE_SINT)
 						{
 							const GLint carray[] = { 0, 0, 0, 0 };
-							glClearBufferiv(GL_COLOR, 0, carray);
+							// glClearBufferiv(GL_COLOR, 0, carray);
 						}
 						else
 						{
 							const GLuint carray[] = { 0, 0, 0, 0 };
-							glClearBufferuiv(GL_COLOR, 0, carray);
+							// glClearBufferuiv(GL_COLOR, 0, carray);
 						}
 					}
 					else if (clear)
@@ -97,21 +97,21 @@ static GLenum createFBO(GLuint &framebuffer, TextureType texType, PixelFormat fo
 						if (ds)
 						{
 							gl.clearDepth(1.0);
-							glClearStencil(0);
+							// glClearStencil(0);
 						}
 						else
 						{
-							glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+							// glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 						}
 
-						glClear(clearflags);
+						// glClear(clearflags);
 					}
 				}
 			}
 		}
 	}
 
-	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	GLenum status = GL_FRAMEBUFFER_COMPLETE /*glCheckFramebufferStatus(GL_FRAMEBUFFER)*/;
 
 	gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, current_fbo);
 
@@ -132,33 +132,33 @@ static GLenum newRenderbuffer(int width, int height, int &samples, PixelFormat p
 	if (isPixelFormatDepthStencil(pixelformat))
 	{
 		GLenum none = GL_NONE;
-		glDrawBuffers(1, &none);
-		glReadBuffer(GL_NONE);
+		// glDrawBuffers(1, &none);
+		// glReadBuffer(GL_NONE);
 	}
 
 	glGenRenderbuffers(1, &buffer);
 	glBindRenderbuffer(GL_RENDERBUFFER, buffer);
 
-	if (samples > 1)
-		glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, fmt.internalformat, width, height);
-	else
-		glRenderbufferStorage(GL_RENDERBUFFER, fmt.internalformat, width, height);
+	// if (samples > 1)
+	// 	glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, fmt.internalformat, width, height);
+	// else
+	// 	glRenderbufferStorage(GL_RENDERBUFFER, fmt.internalformat, width, height);
 
 	for (GLenum attachment : fmt.framebufferAttachments)
 	{
-		if (attachment != GL_NONE)
-			glFramebufferRenderbuffer(GL_FRAMEBUFFER, attachment, GL_RENDERBUFFER, buffer);
+		// if (attachment != GL_NONE)
+			// glFramebufferRenderbuffer(GL_FRAMEBUFFER, attachment, GL_RENDERBUFFER, buffer);
 	}
 
 	if (samples > 1)
 	{
-		glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_SAMPLES, &samples);
+		// glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_SAMPLES, &samples);
 		samples = std::max(1, samples);
 	}
 
-	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	// glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
-	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	GLenum status = GL_FRAMEBUFFER_COMPLETE/*glCheckFramebufferStatus(GL_FRAMEBUFFER)*/;
 
 	if (status == GL_FRAMEBUFFER_COMPLETE)
 	{
@@ -168,12 +168,12 @@ static GLenum newRenderbuffer(int width, int height, int &samples, PixelFormat p
 			if (datatype == PIXELFORMATTYPE_SINT)
 			{
 				const GLint carray[] = { 0, 0, 0, 0 };
-				glClearBufferiv(GL_COLOR, 0, carray);
+				// glClearBufferiv(GL_COLOR, 0, carray);
 			}
 			else
 			{
 				const GLuint carray[] = { 0, 0, 0, 0 };
-				glClearBufferuiv(GL_COLOR, 0, carray);
+				// glClearBufferuiv(GL_COLOR, 0, carray);
 			}
 		}
 		else
@@ -186,26 +186,26 @@ static GLenum newRenderbuffer(int width, int height, int &samples, PixelFormat p
 			if (ds)
 			{
 				gl.clearDepth(1.0);
-				glClearStencil(0);
+				// glClearStencil(0);
 			}
 			else
 			{
 				// Initialize the buffer to transparent black.
-				glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+				// glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 			}
 
-			glClear(clearflags);
+			// glClear(clearflags);
 		}
 	}
 	else
 	{
-		glDeleteRenderbuffers(1, &buffer);
+		// glDeleteRenderbuffers(1, &buffer);
 		buffer = 0;
 		samples = 1;
 	}
 
 	gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, current_fbo);
-	gl.deleteFramebuffer(fbo);
+	// gl.deleteFramebuffer(fbo);
 
 	return status;
 }
@@ -274,9 +274,9 @@ void Texture::createTexture()
 		Texture *basetex = (Texture *) parentView.texture;
 		int layers = texType == TEXTURE_CUBE ? 6 : getLayerCount();
 
-		glTextureView(texture, gltype, basetex->texture, fmt.internalformat,
-		              parentView.startMipmap, getMipmapCount(),
-		              parentView.startLayer, layers);
+		// glTextureView(texture, gltype, basetex->texture, fmt.internalformat,
+		//               parentView.startMipmap, getMipmapCount(),
+		//               parentView.startLayer, layers);
 
 		gl.bindTextureToUnit(this, 0, false);
 		setSamplerState(samplerState);
@@ -285,8 +285,8 @@ void Texture::createTexture()
 
 	gl.bindTextureToUnit(this, 0, false);
 
-	if (renderTarget && GLAD_ANGLE_texture_usage)
-		glTexParameteri(gltype, GL_TEXTURE_USAGE_ANGLE, GL_FRAMEBUFFER_ATTACHMENT_ANGLE);
+	// if (renderTarget && GL_ANGLE_texture_usage)
+	// 	glTexParameteri(gltype, GL_TEXTURE_USAGE_ANGLE, GL_FRAMEBUFFER_ATTACHMENT_ANGLE);
 
 	setSamplerState(samplerState);
 
@@ -309,8 +309,8 @@ void Texture::createTexture()
 		gl.rawTexStorage(texType, mipcount, format, pixelWidth, pixelHeight, texType == TEXTURE_VOLUME ? depth : layers);
 
 	// rawTexStorage handles this for uncompressed textures.
-	if (isCompressed())
-		glTexParameteri(gltype, GL_TEXTURE_MAX_LEVEL, mipcount - 1);
+	// if (isCompressed())
+	// 	glTexParameteri(gltype, GL_TEXTURE_MAX_LEVEL, mipcount - 1);
 
 	int w = pixelWidth;
 	int h = pixelHeight;
@@ -332,8 +332,8 @@ void Texture::createTexture()
 					mipsize += id->getSize();
 			}
 
-			if (mipsize > 0)
-				glCompressedTexImage3D(gltype, mip, fmt.internalformat, w, h, slicecount, 0, mipsize, nullptr);
+			// if (mipsize > 0)
+			// 	glCompressedTexImage3D(gltype, mip, fmt.internalformat, w, h, slicecount, 0, mipsize, nullptr);
 		}
 
 		for (int slice = 0; slice < slicecount; slice++)
@@ -407,7 +407,7 @@ bool Texture::loadVolatile()
 
 	actualSamples = std::max(1, std::min(getRequestedMSAA(), gl.getMaxSamples()));
 
-	while (glGetError() != GL_NO_ERROR); // Clear errors.
+	// while (glGetError() != GL_NO_ERROR); // Clear errors.
 
 	framebufferStatus = GL_FRAMEBUFFER_COMPLETE;
 	textureGLError = GL_NO_ERROR;
@@ -418,7 +418,7 @@ bool Texture::loadVolatile()
 	if (framebufferStatus == GL_FRAMEBUFFER_COMPLETE && (!isReadable() || actualSamples > 1))
 		framebufferStatus = newRenderbuffer(pixelWidth, pixelHeight, actualSamples, format, renderbuffer);
 
-	textureGLError = glGetError();
+	// textureGLError = glGetError();
 
 	if (framebufferStatus != GL_FRAMEBUFFER_COMPLETE || textureGLError != GL_NO_ERROR)
 	{
@@ -426,17 +426,17 @@ bool Texture::loadVolatile()
 		return false;
 	}
 
-	if (!debugName.empty() && (GLAD_VERSION_4_3 || GLAD_ES_VERSION_3_2))
+	if (!debugName.empty() && (GL_VERSION_4_3 || GL_VERSION_3_2))
 	{
 		if (texture)
-			glObjectLabel(GL_TEXTURE, texture, -1, debugName.c_str());
+			// glObjectLabel(GL_TEXTURE, texture, -1, debugName.c_str());
 
 		if (renderbuffer)
 		{
 			std::string rname = debugName;
 			if (actualSamples > 1)
 				rname += " (MSAA buffer)";
-			glObjectLabel(GL_RENDERBUFFER, renderbuffer, -1, rname.c_str());
+			// glObjectLabel(GL_RENDERBUFFER, renderbuffer, -1, rname.c_str());
 		}
 	}
 
@@ -456,11 +456,11 @@ void Texture::unloadVolatile()
 			graphics->cleanupRenderTexture(this);
 	}
 
-	if (fbo != 0)
-		gl.deleteFramebuffer(fbo);
+	// if (fbo != 0)
+		// gl.deleteFramebuffer(fbo);
 
-	if (renderbuffer != 0)
-		glDeleteRenderbuffers(1, &renderbuffer);
+	// if (renderbuffer != 0)
+		// glDeleteRenderbuffers(1, &renderbuffer);
 
 	if (texture != 0)
 		gl.deleteTexture(texture);
@@ -494,15 +494,15 @@ void Texture::uploadByteData(const void *data, size_t size, int level, int slice
 			else
 				glCompressedTexImage2D(gltarget, level, fmt.internalformat, r.w, r.h, 0, size, data);
 		}
-		else if (texType == TEXTURE_2D_ARRAY || texType == TEXTURE_VOLUME)
-			glCompressedTexSubImage3D(gltarget, level, r.x, r.y, slice, r.w, r.h, 1, fmt.internalformat, size, data);
+		// else if (texType == TEXTURE_2D_ARRAY || texType == TEXTURE_VOLUME)
+		// 	glCompressedTexSubImage3D(gltarget, level, r.x, r.y, slice, r.w, r.h, 1, fmt.internalformat, size, data);
 	}
 	else
 	{
 		if (texType == TEXTURE_2D || texType == TEXTURE_CUBE)
 			glTexSubImage2D(gltarget, level, r.x, r.y, r.w, r.h, fmt.externalformat, fmt.type, data);
-		else if (texType == TEXTURE_2D_ARRAY || texType == TEXTURE_VOLUME)
-			glTexSubImage3D(gltarget, level, r.x, r.y, slice, r.w, r.h, 1, fmt.externalformat, fmt.type, data);
+		// else if (texType == TEXTURE_2D_ARRAY || texType == TEXTURE_VOLUME)
+		// 	glTexSubImage3D(gltarget, level, r.x, r.y, slice, r.w, r.h, 1, fmt.externalformat, fmt.type, data);
 	}
 }
 
@@ -512,8 +512,8 @@ void Texture::generateMipmapsInternal()
 
 	GLenum gltextype = OpenGL::getGLTextureType(texType);
 
-	if (gl.bugs.generateMipmapsRequiresTexture2DEnable)
-		glEnable(gltextype);
+	// if (gl.bugs.generateMipmapsRequiresTexture2DEnable)
+	// 	glEnable(gltextype);
 
 	glGenerateMipmap(gltextype);
 }
@@ -521,19 +521,19 @@ void Texture::generateMipmapsInternal()
 void Texture::readbackInternal(int slice, int mipmap, const Rect &rect, int destwidth, size_t size, void *dest)
 {
 	// Not supported in GL with compressed textures...
-	if (!isCompressed())
-		glPixelStorei(GL_PACK_ROW_LENGTH, destwidth);
+	// if (!isCompressed())
+	// 	glPixelStorei(GL_PACK_ROW_LENGTH, destwidth);
 
 	gl.bindTextureToUnit(this, 0, false);
 
 	OpenGL::TextureFormat fmt = gl.convertPixelFormat(format);
 
-	if (gl.isCopyTextureToBufferSupported())
+	if (false && gl.isCopyTextureToBufferSupported())
 	{
-		if (isCompressed())
-			glGetCompressedTextureSubImage(texture, mipmap, rect.x, rect.y, slice, rect.w, rect.h, 1, size, dest);
-		else
-			glGetTextureSubImage(texture, mipmap, rect.x, rect.y, slice, rect.w, rect.h, 1, fmt.externalformat, fmt.type, size, dest);
+		// if (isCompressed())
+		// 	glGetCompressedTextureSubImage(texture, mipmap, rect.x, rect.y, slice, rect.w, rect.h, 1, size, dest);
+		// else
+			// glGetTextureSubImage(texture, mipmap, rect.x, rect.y, slice, rect.w, rect.h, 1, fmt.externalformat, fmt.type, size, dest);
 	}
 	else if (fbo)
 	{
@@ -547,7 +547,7 @@ void Texture::readbackInternal(int slice, int mipmap, const Rect &rect, int dest
 			gl.framebufferTexture(GL_COLOR_ATTACHMENT0, texType, texture, mipmap, layer, face);
 		}
 
-		glReadPixels(rect.x, rect.y, rect.w, rect.h, fmt.externalformat, fmt.type, dest);
+		// glReadPixels(rect.x, rect.y, rect.w, rect.h, fmt.externalformat, fmt.type, dest);
 
 		if (slice > 0 || mipmap > 0)
 			gl.framebufferTexture(GL_COLOR_ATTACHMENT0, texType, texture, 0, 0, 0);
@@ -555,8 +555,8 @@ void Texture::readbackInternal(int slice, int mipmap, const Rect &rect, int dest
 		gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, current_fbo);
 	}
 
-	if (!isCompressed())
-		glPixelStorei(GL_PACK_ROW_LENGTH, 0);
+	// if (!isCompressed())
+	// 	glPixelStorei(GL_PACK_ROW_LENGTH, 0);
 }
 
 void Texture::copyFromBuffer(love::gfx::Buffer *source, size_t sourceoffset, int sourcewidth, size_t size, int slice, int mipmap, const Rect &rect)
@@ -564,18 +564,18 @@ void Texture::copyFromBuffer(love::gfx::Buffer *source, size_t sourceoffset, int
 	// Higher level code does validation.
 
 	GLuint glbuffer = (GLuint) source->getHandle();
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, glbuffer);
+	// glBindBuffer(GL_PIXEL_UNPACK_BUFFER, glbuffer);
 
-	if (!isCompressed()) // Not supported in GL with compressed textures...
-		glPixelStorei(GL_UNPACK_ROW_LENGTH, sourcewidth);
+	// if (!isCompressed()) // Not supported in GL with compressed textures...
+	// 	glPixelStorei(GL_UNPACK_ROW_LENGTH, sourcewidth);
 
 	// glTexSubImage and friends copy from the active pixel_unpack_buffer by
 	// treating the pointer as a byte offset.
 	const uint8 *byteoffset = (const uint8 *)(ptrdiff_t)sourceoffset;
 	uploadByteData(byteoffset, size, mipmap, slice, rect);
 
-	glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+	// glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+	// glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 }
 
 void Texture::copyToBuffer(love::gfx::Buffer *dest, int slice, int mipmap, const Rect &rect, size_t destoffset, int destwidth, size_t size)
@@ -583,7 +583,7 @@ void Texture::copyToBuffer(love::gfx::Buffer *dest, int slice, int mipmap, const
 	// Higher level code does validation.
 
 	GLuint glbuffer = (GLuint) dest->getHandle();
-	glBindBuffer(GL_PIXEL_PACK_BUFFER, glbuffer);
+	// glBindBuffer(GL_PIXEL_PACK_BUFFER, glbuffer);
 
 	// glTexSubImage and friends copy to the active PIXEL_PACK_BUFFER by
 	// treating the pointer as a byte offset.
@@ -591,7 +591,7 @@ void Texture::copyToBuffer(love::gfx::Buffer *dest, int slice, int mipmap, const
 
 	readbackInternal(slice, mipmap, rect, destwidth, size, byteoffset);
 
-	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+	// glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
 }
 
 void Texture::setSamplerState(const SamplerState &s)

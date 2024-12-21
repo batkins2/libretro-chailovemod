@@ -10,10 +10,26 @@
 #include <retro_dirent.h>
 #include <streams/file_stream.h>
 
+#if defined(HAVE_PSGL)
+#define RARCH_GL_FRAMEBUFFER GL_FRAMEBUFFER_OES
+#define RARCH_GL_FRAMEBUFFER_COMPLETE GL_FRAMEBUFFER_COMPLETE_OES
+#define RARCH_GL_COLOR_ATTACHMENT0 GL_COLOR_ATTACHMENT0_EXT
+#elif defined(OSX_PPC)
+#define RARCH_GL_FRAMEBUFFER GL_FRAMEBUFFER_EXT
+#define RARCH_GL_FRAMEBUFFER_COMPLETE GL_FRAMEBUFFER_COMPLETE_EXT
+#define RARCH_GL_COLOR_ATTACHMENT0 GL_COLOR_ATTACHMENT0_EXT
+#else
+#define RARCH_GL_FRAMEBUFFER GL_FRAMEBUFFER
+#define RARCH_GL_FRAMEBUFFER_COMPLETE GL_FRAMEBUFFER_COMPLETE
+#define RARCH_GL_COLOR_ATTACHMENT0 GL_COLOR_ATTACHMENT0
+#endif
+
+
 static void fallback_log(enum retro_log_level level,
 			 const char *fmt, ...);
 
 static retro_video_refresh_t video_cb;
+static struct retro_hw_render_callback hw_render;
 retro_log_printf_t log_cb = fallback_log;
 
 // This is needed to allow SDL-libretro to compile.
@@ -431,6 +447,67 @@ size_t retro_get_memory_size(unsigned id) {
 	return 0;
 }
 
+
+static void context_reset(void)
+{
+
+	ChaiLove::getInstance()->chai_gfx.hw_render = hw_render;
+	ChaiLove::getInstance()->chai_gfx.FRAMEBUFFER = RARCH_GL_FRAMEBUFFER;
+	ChaiLove::getInstance()->chai_gfx.init();
+}
+
+static void context_destroy(void)
+{
+	ChaiLove::getInstance()->chai_gfx.destroy();
+}
+
+
+#ifdef HAVE_OPENGLES
+static bool retro_init_hw_context(void)
+{
+#if defined(HAVE_OPENGLES_3_1)
+   hw_render.context_type = RETRO_HW_CONTEXT_OPENGLES_VERSION;
+   hw_render.version_major = 3;
+   hw_render.version_minor = 1;
+#elif defined(HAVE_OPENGLES3)
+   hw_render.context_type = RETRO_HW_CONTEXT_OPENGLES3;
+#else
+   hw_render.context_type = RETRO_HW_CONTEXT_OPENGLES2;
+#endif
+   hw_render.context_reset = context_reset;
+   hw_render.context_destroy = context_destroy;
+   hw_render.depth = true;
+   hw_render.stencil = true;
+   hw_render.bottom_left_origin = true;
+
+   if (!ChaiLove::environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &hw_render))
+      return false;
+
+   return true;
+}
+#else
+static bool retro_init_hw_context(void)
+{
+#if defined(CORE)
+   hw_render.context_type = RETRO_HW_CONTEXT_OPENGL_CORE;
+   hw_render.version_major = 3;
+   hw_render.version_minor = 1;
+#else
+   hw_render.context_type = RETRO_HW_CONTEXT_OPENGL;
+#endif
+   hw_render.context_reset = context_reset;
+   hw_render.context_destroy = context_destroy;
+   hw_render.depth = true;
+   hw_render.stencil = true;
+   hw_render.bottom_left_origin = true;
+
+   if (!ChaiLove::environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &hw_render))
+      return false;
+
+   return true;
+}
+#endif
+
 /**
  * libretro callback; Initialize the core.
  */
@@ -439,6 +516,11 @@ void retro_init(void) {
 	enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
 	if (!ChaiLove::environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt)) {
 		LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] Pixel format XRGB8888 not supported by platform, cannot use." << std::endl;
+	}
+
+	if (!retro_init_hw_context())
+	{
+		LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] HW Context could not be initialized." << std::endl;
 	}
 
 	const char *content_dir = NULL;
@@ -496,6 +578,9 @@ std::ostream &LibretroLog::log(enum retro_log_level level) {
 	return *streams[level];
 }
 
+
+int runCount = 0;
+
 /**
  * libretro callback; Run a game loop in the core.
  */
@@ -523,11 +608,11 @@ void retro_run(void) {
 	app->draw();
 
 	// Copy the video buffer to the screen.
+	// video_cb(app->videoBuffer, app->config.window.width, app->config.window.height, app->config.window.width << 2);
 	if (!app->event.m_pauserendering) {
-		app->event.renderlock();
-		video_cb(app->videoBuffer, app->config.window.width, app->config.window.height, app->config.window.width << 2);
-		app->event.renderlock();
+		video_cb(RETRO_HW_FRAME_BUFFER_VALID, app->config.window.width, app->config.window.height, app->config.window.width << 2);
 	}
+
 
 	// See if the game requested to close itself.
 	if (app->event.m_shouldclose) {

@@ -11,11 +11,13 @@ chai_shader::chai_shader() {
 
 chai_shader::~chai_shader() {
     shader = NULL;
+    fragmentShader = NULL;
     instance = NULL;
 }
 
 chai_shader::chai_shader(const chai_shader &c) {
     shader = c.shader;
+    fragmentShader = c.fragmentShader;
     instance = c.instance;
 }
 
@@ -28,6 +30,13 @@ void chai_shader::newShader(love::gfx::Graphics *inst, std::vector<std::string> 
     instance = inst;
     if (instance->isCreated()) {
         shader = instance->newShader(lines, options);
+    }
+}
+
+void chai_shader::newFragmentShader(love::gfx::Graphics *inst, std::vector<std::string> lines, love::gfx::Shader::CompileOptions options) {
+    instance = inst;
+    if (instance->isCreated()) {
+        fragmentShader = instance->newShader(lines, options);
     }
 }
 

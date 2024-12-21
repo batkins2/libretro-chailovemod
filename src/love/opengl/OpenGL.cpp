@@ -69,12 +69,12 @@ OpenGL::TempDebugGroup::TempDebugGroup(const char *name)
 {
 	if (isDebugEnabled())
 	{
-		if (GLAD_VERSION_4_3 || (GLAD_KHR_debug && !GLAD_ES_VERSION_2_0))
+		if (GL_VERSION_4_3 || (GL_KHR_debug && !GL_VERSION_2_0))
 			glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, 0, (const GLchar *) name);
-		else if (GLAD_ES_VERSION_2_0 && GLAD_KHR_debug)
-			glPushDebugGroupKHR(GL_DEBUG_SOURCE_APPLICATION, 0, 0, (const GLchar *) name);
-		else if (GLAD_EXT_debug_marker)
-			glPushGroupMarkerEXT(0, (const GLchar *) name);
+		else if (GL_VERSION_2_0 && GL_KHR_debug)
+			glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, 0, (const GLchar *) name);
+		// else if (GL_EXT_debug_marker)
+		// 	glPushGroupMarkerEXT(0, (const GLchar *) name);
 	}
 }
 
@@ -82,12 +82,12 @@ OpenGL::TempDebugGroup::~TempDebugGroup()
 {
 	if (isDebugEnabled())
 	{
-		if (GLAD_VERSION_4_3 || (GLAD_KHR_debug && !GLAD_ES_VERSION_2_0))
+		if (GL_VERSION_4_3 || (GL_KHR_debug && !GL_VERSION_2_0))
 			glPopDebugGroup();
-		else if (GLAD_ES_VERSION_2_0 && GLAD_KHR_debug)
-			glPopDebugGroupKHR();
-		else if (GLAD_EXT_debug_marker)
-			glPopGroupMarkerEXT();
+		// else if (GL_VERSION_2_0 && GL_KHR_debug)
+		// 	glPopDebugGroupKHR();
+		// else if (GL_EXT_debug_marker)
+		// 	glPopGroupMarkerEXT();
 	}
 }
 
@@ -158,14 +158,13 @@ bool OpenGL::initContext()
 	if (contextInitialized)
 		return true;
 
-	if (!gladLoadGLLoader(LOVEGetProcAddress))
-		return false;
+	rglgen_resolve_symbols(hw_render.get_proc_address);
 
 	initVendor();
 
 	bugs = {};
 
-	if (GLAD_VERSION_3_2)
+	if (GL_VERSION_3_2)
 	{
 		GLint profileMask = 0;
 		glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &profileMask);
@@ -181,7 +180,7 @@ bool OpenGL::initContext()
 	if (getVendor() == VENDOR_AMD)
 	{
 		bugs.clearRequiresDriverTextureStateUpdate = true;
-		if (!gl.isCoreProfile() && !GLAD_ES_VERSION_2_0)
+		if (!gl.isCoreProfile() && !GL_VERSION_2_0)
 			bugs.generateMipmapsRequiresTexture2DEnable = true;
 	}
 #endif
@@ -230,7 +229,7 @@ void OpenGL::setupContext()
 	initMaxValues();
 
 	GLfloat glcolor[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-	glVertexAttrib4fv(ATTRIB_COLOR, glcolor);
+	// glVertexAttrib4fv(ATTRIB_COLOR, glcolor);
 
 	GLint maxvertexattribs = 1;
 	glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &maxvertexattribs);
@@ -238,7 +237,7 @@ void OpenGL::setupContext()
 	state.enabledAttribArrays = (uint32) ((1ull << uint32(maxvertexattribs)) - 1);
 	state.instancedAttribArrays = 0;
 
-	setVertexAttributes(VertexAttributes(), BufferBindings());
+	// setVertexAttributes(VertexAttributes(), BufferBindings());
 
 	// Get the current viewport.
 	glGetIntegerv(GL_VIEWPORT, (GLint *) &state.viewport.x);
@@ -250,7 +249,8 @@ void OpenGL::setupContext()
 
 	for (int i = 0; i < 2; i++)
 		state.boundFramebuffers[i] = std::numeric_limits<GLuint>::max();
-	bindFramebuffer(FRAMEBUFFER_ALL, getDefaultFBO());
+	// bindFramebuffer(FRAMEBUFFER, getDefaultFBO());
+	bindFramebuffer(FRAMEBUFFER_ALL, hw_render.get_current_framebuffer());
 
 	setEnableState(ENABLE_BLEND, state.enableState[ENABLE_BLEND]);
 	setEnableState(ENABLE_DEPTH_TEST, state.enableState[ENABLE_DEPTH_TEST]);
@@ -353,42 +353,41 @@ void OpenGL::initVendor()
 
 void OpenGL::initOpenGLFunctions()
 {
-	if (!GLAD_VERSION_3_2 && !GLAD_ES_VERSION_3_2 && !GLAD_ARB_draw_elements_base_vertex)
-	{
-		if (GLAD_OES_draw_elements_base_vertex)
-		{
-			fp_glDrawElementsBaseVertex = fp_glDrawElementsBaseVertexOES;
+	// if (!GL_VERSION_3_2 && !GL_VERSION_3_2 && !GL_ARB_draw_elements_base_vertex)
+	// {
+	// 	if (GL_OES_draw_elements_base_vertex)
+	// 	{
+	// 		fp_glDrawElementsBaseVertex = fp_glDrawElementsBaseVertexOES;
 
-			if (GLAD_ES_VERSION_3_0)
-			{
-				fp_glDrawRangeElementsBaseVertex = fp_glDrawRangeElementsBaseVertexOES;
-				fp_glDrawElementsInstancedBaseVertex = fp_glDrawElementsInstancedBaseVertexOES;
-			}
+	// 		if (GL_VERSION_3_0)
+	// 		{
+	// 			fp_glDrawRangeElementsBaseVertex = fp_glDrawRangeElementsBaseVertexOES;
+	// 			fp_glDrawElementsInstancedBaseVertex = fp_glDrawElementsInstancedBaseVertexOES;
+	// 		}
 
-		}
-		else if (GLAD_EXT_draw_elements_base_vertex)
-		{
-			fp_glDrawElementsBaseVertex = fp_glDrawElementsBaseVertexEXT;
+	// 	}
+	// 	else if (GL_EXT_draw_elements_base_vertex)
+	// 	{
+	// 		fp_glDrawElementsBaseVertex = fp_glDrawElementsBaseVertexEXT;
 
-			if (GLAD_ES_VERSION_3_0)
-			{
-				fp_glDrawRangeElementsBaseVertex = fp_glDrawRangeElementsBaseVertexEXT;
-				fp_glDrawElementsInstancedBaseVertex = fp_glDrawElementsInstancedBaseVertexEXT;
-			}
+	// 		if (GL_VERSION_3_0)
+	// 		{
+	// 			fp_glDrawRangeElementsBaseVertex = fp_glDrawRangeElementsBaseVertexEXT;
+	// 			fp_glDrawElementsInstancedBaseVertex = fp_glDrawElementsInstancedBaseVertexEXT;
+	// 		}
 
-		}
-	}
+	// 	}
+	// }
 }
 
 void OpenGL::initMaxValues()
 {
-	baseVertexSupported = GLAD_VERSION_3_2 || GLAD_ES_VERSION_3_2 || GLAD_ARB_draw_elements_base_vertex
-		|| GLAD_OES_draw_elements_base_vertex || GLAD_EXT_draw_elements_base_vertex;
+	baseVertexSupported = GL_VERSION_3_2 || GL_VERSION_3_2 || GL_ARB_draw_elements_base_vertex;
 
 	// We'll need this value to clamp anisotropy.
-	if (GLAD_EXT_texture_filter_anisotropic)
-		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAnisotropy);
-	else
+	// if (GL_EXT_texture_filter_anisotropic)
+	// 	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAnisotropy);
+	// else
 		maxAnisotropy = 1.0f;
 
 	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max2DTextureSize);
@@ -412,7 +411,7 @@ void OpenGL::initMaxValues()
 		maxShaderStorageBufferBindings = 0;
 	}
 
-	if (GLAD_ES_VERSION_3_1 || GLAD_VERSION_4_3)
+	if (false && (GL_VERSION_3_1 || GL_VERSION_4_3))
 	{
 		glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &maxComputeWorkGroupsX);
 		glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &maxComputeWorkGroupsY);
@@ -437,7 +436,7 @@ void OpenGL::initMaxValues()
 	glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &maxTextureUnits);
 
 	GLfloat limits[2];
-	if (GLAD_VERSION_3_0)
+	if (GL_VERSION_3_0)
 		glGetFloatv(GL_POINT_SIZE_RANGE, limits);
 	else
 		glGetFloatv(GL_ALIASED_POINT_SIZE_RANGE, limits);
@@ -775,7 +774,7 @@ void OpenGL::setCullMode(CullMode mode)
 
 void OpenGL::clearDepth(double value)
 {
-	if (GLAD_ES_VERSION_2_0)
+	if (GL_VERSION_2_0)
 		glClearDepthf((GLfloat) value);
 	else
 		glClearDepth(value);
@@ -867,9 +866,9 @@ void OpenGL::bindFramebuffer(FramebufferTarget target, GLuint framebuffer)
 	{
 		GLenum gltarget = GL_FRAMEBUFFER;
 		if (target == FRAMEBUFFER_DRAW)
-			gltarget = GL_DRAW_FRAMEBUFFER;
+			gltarget = INT_FRAMEBUFFER;
 		else if (target == FRAMEBUFFER_READ)
-			gltarget = GL_READ_FRAMEBUFFER;
+			gltarget = INT_FRAMEBUFFER;
 
 		glBindFramebuffer(gltarget, framebuffer);
 	}
@@ -897,6 +896,7 @@ void OpenGL::deleteFramebuffer(GLuint framebuffer)
 }
 
 void OpenGL::framebufferTexture(GLenum attachment, TextureType texType, GLuint texture, int level, int layer, int face)
+
 {
 	GLenum textarget = getGLTextureType(texType);
 
@@ -1140,7 +1140,7 @@ void OpenGL::setSamplerState(TextureType target, SamplerState &s)
 		s.lodBias = 0.0f;
 	}
 
-	if (GLAD_EXT_texture_filter_anisotropic)
+	if (false)
 	{
 		uint8 maxAniso = (uint8) std::min(maxAnisotropy, (float)LOVE_UINT8_MAX);
 		s.maxAnisotropy = std::min(std::max(s.maxAnisotropy, (uint8)1), maxAniso);
@@ -1176,7 +1176,7 @@ bool OpenGL::rawTexStorage(TextureType target, int levels, PixelFormat pixelform
 	// This shouldn't be needed for glTexStorage, but some drivers don't follow
 	// the spec apparently.
 	// https://stackoverflow.com/questions/13859061/does-an-immutable-texture-need-a-gl-texture-max-level
-	if (GLAD_VERSION_1_2 || GLAD_ES_VERSION_3_0)
+	if (GL_VERSION_1_2 || GL_VERSION_3_0)
 		glTexParameteri(gltarget, GL_TEXTURE_MAX_LEVEL, levels - 1);
 
 	if (fmt.swizzled)
@@ -1191,7 +1191,7 @@ bool OpenGL::rawTexStorage(TextureType target, int levels, PixelFormat pixelform
 
 	// The fallback for bugs.brokenR8PixelFormat is GL_LUMINANCE, which doesn't have a sized
 	// version in ES3 so it can't be used with glTexStorage.
-	if (pixelformat == PIXELFORMAT_R8_UNORM && bugs.brokenR8PixelFormat && GLAD_ES_VERSION_3_0)
+	if (pixelformat == PIXELFORMAT_R8_UNORM && bugs.brokenR8PixelFormat && GL_VERSION_3_0)
 	{
 		usetexstorage = false;
 		fmt.internalformat = fmt.externalformat;
@@ -1246,7 +1246,7 @@ bool OpenGL::isTexStorageSupported()
 	if (gl.bugs.texStorageBreaksSubImage)
 		return false;
 
-	return GLAD_ES_VERSION_3_0 || GLAD_VERSION_4_2 || GLAD_ARB_texture_storage;
+	return GL_VERSION_3_0 || GL_VERSION_4_2 || GL_ARB_texture_storage;
 }
 
 bool OpenGL::isBufferUsageSupported(BufferUsage usage) const
@@ -1257,13 +1257,13 @@ bool OpenGL::isBufferUsageSupported(BufferUsage usage) const
 	case BUFFERUSAGE_INDEX:
 		return true;
 	case BUFFERUSAGE_TEXEL:
-		return GLAD_VERSION_3_1 || GLAD_ES_VERSION_3_2;
+		return GL_VERSION_3_1 || GL_VERSION_3_2;
 	case BUFFERUSAGE_UNIFORM:
 		return true;
 	case BUFFERUSAGE_SHADER_STORAGE:
-		return (GLAD_VERSION_4_3 && isCoreProfile()) || GLAD_ES_VERSION_3_1;
+		return (GL_VERSION_4_3 && isCoreProfile()) || GL_VERSION_3_1;
 	case BUFFERUSAGE_INDIRECT_ARGUMENTS:
-		return (GLAD_VERSION_4_0 && isCoreProfile()) || GLAD_ES_VERSION_3_1;
+		return (GL_VERSION_4_0 && isCoreProfile()) || GL_VERSION_3_1;
 	case BUFFERUSAGE_MAX_ENUM:
 		return false;
 	}
@@ -1272,12 +1272,12 @@ bool OpenGL::isBufferUsageSupported(BufferUsage usage) const
 
 bool OpenGL::isClampZeroOneTextureWrapSupported() const
 {
-	return GLAD_VERSION_1_3 || GLAD_EXT_texture_border_clamp || GLAD_NV_texture_border_clamp;
+	return GL_VERSION_1_3;
 }
 
 bool OpenGL::isSamplerLODBiasSupported() const
 {
-	return GLAD_VERSION_1_4;
+	return GL_VERSION_1_4;
 }
 
 bool OpenGL::isBaseVertexSupported() const
@@ -1288,7 +1288,7 @@ bool OpenGL::isBaseVertexSupported() const
 bool OpenGL::isCopyTextureToBufferSupported() const
 {
 	// Requires glGetTextureSubImage support.
-	return GLAD_VERSION_4_5 || GLAD_ARB_get_texture_sub_image;
+	return GL_VERSION_4_5 || GL_ARB_get_texture_sub_image;
 }
 
 int OpenGL::getMax2DTextureSize() const
@@ -1391,7 +1391,7 @@ OpenGL::TextureFormat OpenGL::convertPixelFormat(PixelFormat pixelformat)
 	if (pixelformat == PIXELFORMAT_ETC1_UNORM)
 	{
 		// The ETC2 format can load ETC1 textures.
-		if (GLAD_ES_VERSION_3_0 || GLAD_VERSION_4_3 || GLAD_ARB_ES3_compatibility)
+		if (GL_VERSION_3_0 || GL_VERSION_4_3 || GL_ARB_ES3_compatibility)
 			pixelformat = PIXELFORMAT_ETC2_RGB_UNORM;
 	}
 
@@ -1448,25 +1448,25 @@ OpenGL::TextureFormat OpenGL::convertPixelFormat(PixelFormat pixelformat)
 	case PIXELFORMAT_R16_FLOAT:
 		f.internalformat = GL_R16F;
 		f.externalformat = GL_RED;
-		if (GLAD_OES_texture_half_float)
-			f.type = GL_HALF_FLOAT_OES;
-		else
+		// if (GL_OES_texture_half_float)
+		// 	f.type = GL_HALF_FLOAT_OES;
+		// else
 			f.type = GL_HALF_FLOAT;
 		break;
 	case PIXELFORMAT_RG16_FLOAT:
 		f.internalformat = GL_RG16F;
 		f.externalformat = GL_RG;
-		if (GLAD_OES_texture_half_float)
-			f.type = GL_HALF_FLOAT_OES;
-		else
+		// if (GL_OES_texture_half_float)
+		// 	f.type = GL_HALF_FLOAT_OES;
+		// else
 			f.type = GL_HALF_FLOAT;
 		break;
 	case PIXELFORMAT_RGBA16_FLOAT:
 		f.internalformat = GL_RGBA16F;
 		f.externalformat = GL_RGBA;
-		if (GLAD_OES_texture_half_float)
-			f.type = GL_HALF_FLOAT_OES;
-		else
+		// if (GL_OES_texture_half_float)
+		// 	f.type = GL_HALF_FLOAT_OES;
+		// else
 			f.type = GL_HALF_FLOAT;
 		break;
 	case PIXELFORMAT_R32_FLOAT:
@@ -1577,7 +1577,7 @@ OpenGL::TextureFormat OpenGL::convertPixelFormat(PixelFormat pixelformat)
 		break;
 
 	case PIXELFORMAT_LA8_UNORM:
-		if (gl.isCoreProfile() || GLAD_ES_VERSION_3_0)
+		if (gl.isCoreProfile() || GL_VERSION_3_0)
 		{
 			f.internalformat = GL_RG8;
 			f.externalformat = GL_RG;
@@ -1706,34 +1706,34 @@ OpenGL::TextureFormat OpenGL::convertPixelFormat(PixelFormat pixelformat)
 		f.internalformat = GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM;
 		break;
 
-	case PIXELFORMAT_PVR1_RGB2_UNORM:
-		f.internalformat = GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG;
-		break;
-	case PIXELFORMAT_PVR1_RGB2_sRGB:
-		f.internalformat = GL_COMPRESSED_SRGB_PVRTC_2BPPV1_EXT;
-		break;
-	case PIXELFORMAT_PVR1_RGB4_UNORM:
-		f.internalformat = GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG;
-		break;
-	case PIXELFORMAT_PVR1_RGB4_sRGB:
-		f.internalformat = GL_COMPRESSED_SRGB_PVRTC_4BPPV1_EXT;
-		break;
-	case PIXELFORMAT_PVR1_RGBA2_UNORM:
-		f.internalformat = GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG;
-		break;
-	case PIXELFORMAT_PVR1_RGBA2_sRGB:
-		f.internalformat = GL_COMPRESSED_SRGB_ALPHA_PVRTC_2BPPV1_EXT;
-		break;
-	case PIXELFORMAT_PVR1_RGBA4_UNORM:
-		f.internalformat = GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG;
-		break;
-	case PIXELFORMAT_PVR1_RGBA4_sRGB:
-		f.internalformat = GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV1_EXT;
-		break;
+	// case PIXELFORMAT_PVR1_RGB2_UNORM:
+	// 	f.internalformat = GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG;
+	// 	break;
+	// case PIXELFORMAT_PVR1_RGB2_sRGB:
+	// 	f.internalformat = GL_COMPRESSED_SRGB_PVRTC_2BPPV1_EXT;
+	// 	break;
+	// case PIXELFORMAT_PVR1_RGB4_UNORM:
+	// 	f.internalformat = GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG;
+	// 	break;
+	// case PIXELFORMAT_PVR1_RGB4_sRGB:
+	// 	f.internalformat = GL_COMPRESSED_SRGB_PVRTC_4BPPV1_EXT;
+	// 	break;
+	// case PIXELFORMAT_PVR1_RGBA2_UNORM:
+	// 	f.internalformat = GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG;
+	// 	break;
+	// case PIXELFORMAT_PVR1_RGBA2_sRGB:
+	// 	f.internalformat = GL_COMPRESSED_SRGB_ALPHA_PVRTC_2BPPV1_EXT;
+	// 	break;
+	// case PIXELFORMAT_PVR1_RGBA4_UNORM:
+	// 	f.internalformat = GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG;
+	// 	break;
+	// case PIXELFORMAT_PVR1_RGBA4_sRGB:
+	// 	f.internalformat = GL_COMPRESSED_SRGB_ALPHA_PVRTC_4BPPV1_EXT;
+	// 	break;
 
-	case PIXELFORMAT_ETC1_UNORM:
-		f.internalformat = GL_ETC1_RGB8_OES;
-		break;
+	// case PIXELFORMAT_ETC1_UNORM:
+	// 	f.internalformat = GL_ETC1_RGB8_OES;
+	// 	break;
 	case PIXELFORMAT_ETC2_RGB_UNORM:
 		f.internalformat = GL_COMPRESSED_RGB8_ETC2;
 		break;
@@ -1871,12 +1871,12 @@ uint32 OpenGL::getPixelFormatUsageFlags(PixelFormat pixelformat)
 	case PIXELFORMAT_R8_UNORM:
 	case PIXELFORMAT_RG8_UNORM:
 		flags |= commonsample | commonrender;
-		if (GLAD_VERSION_4_3)
+		if (GL_VERSION_4_3)
 			flags |= computewrite;
 		break;
 	case PIXELFORMAT_RGBA8_UNORM:
 		flags |= commonsample | commonrender;
-		if (GLAD_VERSION_4_3 || GLAD_ES_VERSION_3_1)
+		if (GL_VERSION_4_3 || GL_VERSION_3_1)
 			flags |= computewrite;
 		break;
 	case PIXELFORMAT_RGBA8_sRGB:
@@ -1890,60 +1890,60 @@ uint32 OpenGL::getPixelFormatUsageFlags(PixelFormat pixelformat)
 		break;
 	case PIXELFORMAT_R16_UNORM:
 	case PIXELFORMAT_RG16_UNORM:
-		if (GLAD_VERSION_3_0 || (GLAD_EXT_texture_norm16 && GLAD_ES_VERSION_3_0))
+		if (GL_VERSION_3_0 || (false && GL_VERSION_3_0))
 			flags |= commonsample | commonrender;
-		if (GLAD_VERSION_4_3)
+		if (GL_VERSION_4_3)
 			flags |= computewrite;
 		break;
 	case PIXELFORMAT_RGBA16_UNORM:
-		if (GLAD_VERSION_1_1 || GLAD_EXT_texture_norm16)
+		if (GL_VERSION_1_1)
 			flags |= commonsample | commonrender;
-		if (GLAD_VERSION_4_3)
+		if (GL_VERSION_4_3)
 			flags |= computewrite;
 		break;
 	case PIXELFORMAT_R16_FLOAT:
 	case PIXELFORMAT_RG16_FLOAT:
 		flags |= commonsample;
-		if (GLAD_VERSION_3_0)
+		if (GL_VERSION_3_0)
 			flags |= commonrender;
-		if ((GLAD_EXT_color_buffer_half_float || GLAD_EXT_color_buffer_float) && GLAD_ES_VERSION_3_0)
-			flags |= commonrender;
-		if (GLAD_VERSION_4_3)
+		// if ((GL_EXT_color_buffer_half_float || GL_EXT_color_buffer_float) && GL_VERSION_3_0)
+		// 	flags |= commonrender;
+		if (GL_VERSION_4_3)
 			flags |= computewrite;
 		break;
 	case PIXELFORMAT_RGBA16_FLOAT:
 		flags |= commonsample;
-		if (GLAD_VERSION_3_0)
+		if (GL_VERSION_3_0)
 			flags |= commonrender;
-		if (GLAD_EXT_color_buffer_half_float || GLAD_EXT_color_buffer_float)
-			flags |= commonrender;
-		if (GLAD_VERSION_4_3 || GLAD_ES_VERSION_3_1)
+		// if (GL_EXT_color_buffer_half_float || GL_EXT_color_buffer_float)
+		// 	flags |= commonrender;
+		if (GL_VERSION_4_3 || GL_VERSION_3_1)
 			flags |= computewrite;
 		break;
 	case PIXELFORMAT_R32_FLOAT:
-		if (GLAD_ES_VERSION_3_1)
+		if (GL_VERSION_3_1)
 			flags |= computewrite;
 		// Fallthrough.
 	case PIXELFORMAT_RG32_FLOAT:
 		flags |= commonsample;
-		if (GLAD_VERSION_3_0)
+		if (GL_VERSION_3_0)
 			flags |= commonrender;
-		if (GLAD_EXT_color_buffer_float)
-			flags |= commonrender;
-		if (!(GLAD_VERSION_1_1 || GLAD_OES_texture_float_linear))
+		// if (GL_EXT_color_buffer_float)
+		// 	flags |= commonrender;
+		if (!(GL_VERSION_1_1))
 			flags &= ~PIXELFORMATUSAGEFLAGS_LINEAR;
-		if (GLAD_VERSION_4_3)
+		if (GL_VERSION_4_3)
 			flags |= computewrite;
 		break;
 	case PIXELFORMAT_RGBA32_FLOAT:
 		flags |= commonsample;
-		if (GLAD_VERSION_3_0)
+		if (GL_VERSION_3_0)
 			flags |= commonrender;
-		if (GLAD_EXT_color_buffer_float)
-			flags |= commonrender;
-		if (!(GLAD_VERSION_1_1 || GLAD_OES_texture_float_linear))
+		// if (GL_EXT_color_buffer_float)
+		// 	flags |= commonrender;
+		if (!(GL_VERSION_1_1))
 			flags &= ~PIXELFORMATUSAGEFLAGS_LINEAR;
-		if (GLAD_VERSION_4_3 || GLAD_ES_VERSION_3_1)
+		if (GL_VERSION_4_3 || GL_VERSION_3_1)
 			flags |= computewrite;
 		break;
 
@@ -1966,9 +1966,9 @@ uint32 OpenGL::getPixelFormatUsageFlags(PixelFormat pixelformat)
 	case PIXELFORMAT_RGBA32_INT:
 	case PIXELFORMAT_RGBA32_UINT:
 		flags |= PIXELFORMATUSAGEFLAGS_SAMPLE | PIXELFORMATUSAGEFLAGS_RENDERTARGET;
-		if (GLAD_VERSION_4_3)
+		if (GL_VERSION_4_3)
 			flags |= computewrite;
-		if (GLAD_ES_VERSION_3_1)
+		if (GL_VERSION_3_1)
 		{
 			switch (pixelformat)
 			{
@@ -1997,22 +1997,22 @@ uint32 OpenGL::getPixelFormatUsageFlags(PixelFormat pixelformat)
 		flags |= commonsample | commonrender;
 		break;
 	case PIXELFORMAT_RGB565_UNORM:
-		if (GLAD_ES_VERSION_2_0 || GLAD_VERSION_4_2 || GLAD_ARB_ES2_compatibility)
+		if (GL_VERSION_2_0 || GL_VERSION_4_2 || GL_ARB_ES2_compatibility)
 			flags |= commonsample | commonrender;
 		break;
 	case PIXELFORMAT_RGB10A2_UNORM:
 		flags |= commonsample | commonrender;
-		if (GLAD_VERSION_4_3)
+		if (GL_VERSION_4_3)
 			flags |= computewrite;
 		break;
 	case PIXELFORMAT_RG11B10_FLOAT:
-		if (GLAD_ES_VERSION_3_1 || GLAD_VERSION_3_0 || GLAD_EXT_packed_float || GLAD_APPLE_texture_packed_float)
+		if (GL_VERSION_3_1 || GL_VERSION_3_0)
 			flags |= commonsample;
-		if (GLAD_VERSION_3_0 || GLAD_EXT_packed_float || GLAD_APPLE_color_buffer_packed_float)
+		if (GL_VERSION_3_0)
 			flags |= commonrender;
-		if (GLAD_EXT_color_buffer_float)
-			flags |= commonrender;
-		if (GLAD_VERSION_4_3)
+		// if (GL_EXT_color_buffer_float)
+		// 	flags |= commonrender;
+		if (GL_VERSION_4_3)
 			flags |= computewrite;
 		break;
 
@@ -2037,52 +2037,52 @@ uint32 OpenGL::getPixelFormatUsageFlags(PixelFormat pixelformat)
 		flags |= commonsample | PIXELFORMATUSAGEFLAGS_RENDERTARGET | PIXELFORMATUSAGEFLAGS_MSAA;
 		break;
 
-	case PIXELFORMAT_DXT1_UNORM:
-	case PIXELFORMAT_DXT1_sRGB:
-		if (GLAD_EXT_texture_compression_s3tc || GLAD_EXT_texture_compression_dxt1)
-			flags |= commonsample;
-		break;
-	case PIXELFORMAT_DXT3_UNORM:
-	case PIXELFORMAT_DXT3_sRGB:
-		if (GLAD_EXT_texture_compression_s3tc || GLAD_ANGLE_texture_compression_dxt3)
-			flags |= commonsample;
-		break;
-	case PIXELFORMAT_DXT5_UNORM:
-	case PIXELFORMAT_DXT5_sRGB:
-		if (GLAD_EXT_texture_compression_s3tc || GLAD_ANGLE_texture_compression_dxt5)
-			flags |= commonsample;
-		break;
+	// case PIXELFORMAT_DXT1_UNORM:
+	// case PIXELFORMAT_DXT1_sRGB:
+	// 	if (GL_EXT_texture_compression_s3tc || GL_EXT_texture_compression_dxt1)
+	// 		flags |= commonsample;
+	// 	break;
+	// case PIXELFORMAT_DXT3_UNORM:
+	// case PIXELFORMAT_DXT3_sRGB:
+	// 	if (GL_EXT_texture_compression_s3tc || GL_ANGLE_texture_compression_dxt3)
+	// 		flags |= commonsample;
+	// 	break;
+	// case PIXELFORMAT_DXT5_UNORM:
+	// case PIXELFORMAT_DXT5_sRGB:
+	// 	if (GL_EXT_texture_compression_s3tc || GL_ANGLE_texture_compression_dxt5)
+	// 		flags |= commonsample;
+	// 	break;
 	case PIXELFORMAT_BC4_UNORM:
 	case PIXELFORMAT_BC4_SNORM:
 	case PIXELFORMAT_BC5_UNORM:
 	case PIXELFORMAT_BC5_SNORM:
-		if (GLAD_VERSION_3_0 || GLAD_ARB_texture_compression_rgtc || GLAD_EXT_texture_compression_rgtc)
+		if (GL_VERSION_3_0 || GL_ARB_texture_compression_rgtc)
 			flags |= commonsample;
 		break;
 	case PIXELFORMAT_BC6H_UFLOAT:
 	case PIXELFORMAT_BC6H_FLOAT:
 	case PIXELFORMAT_BC7_UNORM:
 	case PIXELFORMAT_BC7_sRGB:
-		if (GLAD_VERSION_4_2 || GLAD_ARB_texture_compression_bptc)
+		if (GL_VERSION_4_2 || GL_ARB_texture_compression_bptc)
 			flags |= commonsample;
 		break;
-	case PIXELFORMAT_PVR1_RGB2_UNORM:
-	case PIXELFORMAT_PVR1_RGB4_UNORM:
-	case PIXELFORMAT_PVR1_RGBA2_UNORM:
-	case PIXELFORMAT_PVR1_RGBA4_UNORM:
-		if (GLAD_IMG_texture_compression_pvrtc)
-			flags |= commonsample;
-		break;
-	case PIXELFORMAT_PVR1_RGB2_sRGB:
-	case PIXELFORMAT_PVR1_RGB4_sRGB:
-	case PIXELFORMAT_PVR1_RGBA2_sRGB:
-	case PIXELFORMAT_PVR1_RGBA4_sRGB:
-		if (GLAD_EXT_pvrtc_sRGB)
-			flags |= commonsample;
-		break;
+	// case PIXELFORMAT_PVR1_RGB2_UNORM:
+	// case PIXELFORMAT_PVR1_RGB4_UNORM:
+	// case PIXELFORMAT_PVR1_RGBA2_UNORM:
+	// case PIXELFORMAT_PVR1_RGBA4_UNORM:
+	// 	if (GL_IMG_texture_compression_pvrtc)
+	// 		flags |= commonsample;
+	// 	break;
+	// case PIXELFORMAT_PVR1_RGB2_sRGB:
+	// case PIXELFORMAT_PVR1_RGB4_sRGB:
+	// case PIXELFORMAT_PVR1_RGBA2_sRGB:
+	// case PIXELFORMAT_PVR1_RGBA4_sRGB:
+	// 	if (GL_EXT_pvrtc_sRGB)
+	// 		flags |= commonsample;
+	// 	break;
 	case PIXELFORMAT_ETC1_UNORM:
 		// ETC2 support guarantees ETC1 support as well.
-		if (GLAD_ES_VERSION_3_0 || GLAD_VERSION_4_3 || GLAD_ARB_ES3_compatibility)
+		if (GL_VERSION_3_0 || GL_VERSION_4_3 || GL_ARB_ES3_compatibility)
 			flags |= commonsample;
 		break;
 	case PIXELFORMAT_ETC2_RGB_UNORM:
@@ -2095,7 +2095,7 @@ uint32 OpenGL::getPixelFormatUsageFlags(PixelFormat pixelformat)
 	case PIXELFORMAT_EAC_R_SNORM:
 	case PIXELFORMAT_EAC_RG_UNORM:
 	case PIXELFORMAT_EAC_RG_SNORM:
-		if (GLAD_ES_VERSION_3_0 || GLAD_VERSION_4_3 || GLAD_ARB_ES3_compatibility)
+		if (GL_VERSION_3_0 || GL_VERSION_4_3 || GL_ARB_ES3_compatibility)
 			flags |= commonsample;
 		break;
 	case PIXELFORMAT_ASTC_4x4_UNORM:
@@ -2126,7 +2126,7 @@ uint32 OpenGL::getPixelFormatUsageFlags(PixelFormat pixelformat)
 	case PIXELFORMAT_ASTC_10x10_sRGB:
 	case PIXELFORMAT_ASTC_12x10_sRGB:
 	case PIXELFORMAT_ASTC_12x12_sRGB:
-		if (GLAD_ES_VERSION_3_2 || GLAD_KHR_texture_compression_astc_ldr)
+		if (GL_VERSION_3_2 || GL_KHR_texture_compression_astc_ldr)
 			flags |= commonsample;
 		break;
 
@@ -2170,6 +2170,7 @@ const char *OpenGL::errorString(GLenum errorcode)
 }
 
 const char *OpenGL::framebufferStatusString(GLenum status)
+
 {
 	switch (status)
 	{

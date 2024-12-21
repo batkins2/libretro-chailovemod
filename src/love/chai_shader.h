@@ -18,8 +18,10 @@ class chai_shader {
 		return *this;
 	};
     void newShader(love::gfx::Graphics *inst, std::vector<std::string> lines, love::gfx::Shader::CompileOptions options);
+    void newFragmentShader(love::gfx::Graphics *inst, std::vector<std::string> lines, love::gfx::Shader::CompileOptions options);
     void send(const std::string &uniform, const std::vector<chaiscript::Boxed_Value> &data);
     love::gfx::Graphics *instance;
     gfx::Shader *shader;
+    gfx::Shader *fragmentShader;
 };
 }

@@ -68,8 +68,6 @@ bool ChaiLove::load(const std::string& file, const void* data) {
 	std::string version = CHAILOVE_VERSION_STRING GIT_VERSION;
 	LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] ChaiLove " << version.c_str() << std::endl;
 
-	chai_gfx.init();
-
 	// Iniitalize some of the initial subsystems.
 	sound.load();
 
@@ -93,9 +91,9 @@ bool ChaiLove::load(const std::string& file, const void* data) {
 
 	// Load up the window dimensions.
 	window.load(config);
-
 	console.load(config);
 	graphics.load();
+	// chai_gfx.init();
 	image.load();
 	keyboard.load();
 	joystick.load();
@@ -144,7 +142,7 @@ void ChaiLove::draw() {
 	}
 
 	// Clear the screen.
-	graphics.clear();
+	// graphics.clear();
 
 	// SDL_LockTexture(texture, NULL, &screen->pixels, &screen->pitch);
 	// SDL_SetRenderTarget(renderer, texture);
@@ -156,7 +154,7 @@ void ChaiLove::draw() {
 	}
 
 	// Render the in-game console.
-	console.draw();
+	// console.draw();
 
 	// Flip the buffer.
 	// if (SDL_blit(screen)) {

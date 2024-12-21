@@ -303,7 +303,7 @@ bool Shader::loadVolatile()
 	if (program == 0)
 		throw love::Exception("Cannot create shader program object.");
 
-	if (!debugName.empty() && (GLAD_VERSION_4_3 || GLAD_ES_VERSION_3_2))
+	if (!debugName.empty() && (GL_VERSION_4_3 || GL_VERSION_3_2))
 		glObjectLabel(GL_PROGRAM, program, -1, debugName.c_str());
 
 	for (const auto &stage : stages)

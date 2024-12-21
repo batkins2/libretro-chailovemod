@@ -62,6 +62,7 @@ public:
 
 	void backbufferChanged(int width, int height, int pixelwidth, int pixelheight, bool backbufferstencil, bool backbufferdepth, int msaa) override;
 	bool setMode(void *context, int width, int height, int pixelwidth, int pixelheight, bool backbufferstencil, bool backbufferdepth, int msaa) override;
+	bool bindVAO();
 	void unSetMode() override;
 
 	void setActive(bool active) override;

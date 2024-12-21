@@ -37,6 +37,9 @@ ifneq ($(STATIC_LINKING), 1)
 		$(CORE_DIR)/vendor/libretro-common/streams/file_stream.c \
 		$(CORE_DIR)/vendor/libretro-common/string/stdstring.c \
 		$(CORE_DIR)/vendor/libretro-common/vfs/vfs_implementation.c \
+		$(CORE_DIR)/vendor/libretro-common/glsm/glsm.c \
+		$(CORE_DIR)/vendor/libretro-common/glsym/rglgen.c \
+		$(CORE_DIR)/vendor/libretro-common/glsym/glsym_gl.c \
 	)
     # Ensure the sinc_resampler_neon is available for ARM NEON devices.
 	SOURCES_S += $(CORE_DIR)/vendor/libretro-common/audio/resampler/drivers/sinc_resampler_neon.S
@@ -254,6 +257,9 @@ FLAGS += -I$(CORE_DIR)/vendor/physfs/extras
 # #	FLAGS += -DMAC_OS_X_VERSION_MIN_REQUIRED=1020
 # 	FLAGS += -D__MACH__ -D__APPLE__ -DPHYSFS_PLATFORM_APPLE
 # endif
+
+FLAGS += -I$(CORE_DIR)/vendor/libretro-common/include/glsm
+FLAGS += -I$(CORE_DIR)/vendor/libretro-common/include/glsym
 
 # SDL_tty
 FLAGS += -I$(CORE_DIR)/vendor/SDL2_tty/include/SDL_tty

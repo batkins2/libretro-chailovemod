@@ -46,6 +46,8 @@
 #include "video/VideoStream.h"
 #include "data/HashFunction.h"
 
+#include <libretro.h>
+
 // C++
 #include <string>
 #include <vector>
@@ -510,6 +512,8 @@ public:
 	 **/
 	virtual bool setMode(void *context, int width, int height, int pixelwidth, int pixelheight, bool backbufferstencil, bool backbufferdepth, int msaa) = 0;
 
+	virtual bool bindVAO() = 0;
+
 	/**
 	 * Un-sets the current graphics display mode (uninitializing objects if
 	 * necessary.)
@@ -847,6 +851,9 @@ public:
 	 * anything!
 	 **/
 	virtual RendererInfo getRendererInfo() const = 0;
+
+	inline static struct retro_hw_render_callback hw_render;
+	unsigned int FRAMEBUFFER;
 
 	/**
 	 * Returns performance-related statistics.

@@ -89,7 +89,7 @@ Buffer::Buffer(gfx::Graphics *gfx, const Settings &settings, const std::vector<D
 		ownsMemoryMap = true;
 
 	std::vector<uint8> emptydata;
-	if (settings.zeroInitialize && data == nullptr && !GLAD_VERSION_4_3)
+	if (settings.zeroInitialize && data == nullptr && !GL_VERSION_4_3)
 	{
 		try
 		{
@@ -108,7 +108,7 @@ Buffer::Buffer(gfx::Graphics *gfx, const Settings &settings, const std::vector<D
 		throw love::Exception("Could not create buffer with %d bytes (out of VRAM?)", size);
 	}
 
-	if (settings.zeroInitialize && data == nullptr && GLAD_VERSION_4_3)
+	if (settings.zeroInitialize && data == nullptr && GL_VERSION_4_3)
 	{
 		gl.bindBuffer(mapUsage, buffer);
 		glClearBufferData(target, GL_R8UI, GL_RED, GL_UNSIGNED_BYTE, nullptr);
@@ -164,7 +164,7 @@ bool Buffer::load(const void *initialdata)
 		glTexBuffer(target, glformat, buffer);
 	}
 
-	if (!debugName.empty() && (GLAD_VERSION_4_3 || GLAD_ES_VERSION_3_2))
+	if (!debugName.empty() && (GL_VERSION_4_3 || GL_VERSION_3_2))
 		glObjectLabel(GL_BUFFER, buffer, -1, debugName.c_str());
 
 	return (glGetError() == GL_NO_ERROR);
@@ -297,7 +297,7 @@ bool Buffer::fill(size_t offset, size_t size, const void *data)
 
 void Buffer::clearInternal(size_t offset, size_t size)
 {
-	if (GLAD_VERSION_4_3)
+	if (GL_VERSION_4_3)
 	{
 		gl.bindBuffer(mapUsage, buffer);
 		glClearBufferSubData(target, GL_R8UI, offset, size, GL_RED, GL_UNSIGNED_BYTE, nullptr);

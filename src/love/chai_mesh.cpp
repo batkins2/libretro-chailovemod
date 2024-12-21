@@ -1,4 +1,7 @@
 #include "../ChaiLove.h"
+#include "data/DataModule.h"
+#include "image/CompressedImageData.h"
+#include "image/FormatHandler.h"
 
 namespace love
 {
@@ -9,33 +12,28 @@ chai_mesh::chai_mesh() {
 bool chai_mesh::newMesh(love::gfx::Graphics *inst, const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::vector<chaiscript::Boxed_Value> &data, const std::string &type) {
     instance = inst;
 
-    auto prepD = new std::vector<uint8_t>();
+    std::vector<uint32_t> prepD;
 
-    uint8_t vc = 255;
+    uint32_t vc = 0xffffffff;
 
     for (auto vectors : data) {
         for (auto value : chaiscript::boxed_cast<std::vector<chaiscript::Boxed_Value>>(vectors)) {
             auto v = chaiscript::boxed_cast<float>(value);
-            uint8_t* byteArray = reinterpret_cast<uint8_t*>(&v);
-            for (int i = 0; i < sizeof(float); ++i) {
-                prepD->push_back(byteArray[i]);
-            }
-
-            // size_t currentSize = prepD->size();
-            // prepD->resize(currentSize + sizeof(float));
-            // std::memcpy(prepD->data() + currentSize, &ret, sizeof(float));
+            uint32_t fbits = 0;
+            memcpy(&fbits, &v, sizeof(fbits));
+            prepD.push_back(fbits);
         }
-        for (int i = 0; i < 4; i++) {
+        // for (int i = 0; i < 4; i++) {
             // size_t currentSize = prepD->size();
             // prepD->resize(currentSize + sizeof(float));
             // std::memcpy(prepD->data() + currentSize, &vc, sizeof(uint8_t));
-            prepD->push_back(vc);
-        }
+            prepD.push_back(vc);
+        // }
     }
 
     // std::memcpy(d, &prepD, prepD->size() * sizeof(float));
 
-    auto vf = std::vector<gfx::Buffer::DataDeclaration>();
+    vf = std::vector<gfx::Buffer::DataDeclaration>();
     for (int i = 0; i < vertexFormat.size(); i++) {
         auto t = chaiscript::boxed_cast<std::vector<chaiscript::Boxed_Value>>(vertexFormat.at(i));
         auto temp = std::vector<std::string>();
@@ -46,7 +44,8 @@ bool chai_mesh::newMesh(love::gfx::Graphics *inst, const std::vector<chaiscript:
 
         auto t1 = gfx::DATAFORMAT_UINT8_VEC4;
         if (temp[1] == "byte") {
-            vf.push_back(gfx::Buffer::DataDeclaration(temp[0], t1, atoi(temp[2].c_str())));
+            // vf.push_back(gfx::Buffer::DataDeclaration(temp[0], t1, atoi(temp[2].c_str())));
+            vf.push_back(gfx::Buffer::DataDeclaration(temp[0], t1, 1));
         } else if (temp[1] == "float") {
             auto t2 = atoi(temp[2].c_str());
             if (t2 > 2) {
@@ -54,12 +53,13 @@ bool chai_mesh::newMesh(love::gfx::Graphics *inst, const std::vector<chaiscript:
             } else {
                 t1 = gfx::DATAFORMAT_FLOAT_VEC2;
             }
+            t2 = 1;
             vf.push_back(gfx::Buffer::DataDeclaration(temp[0], t1, t2));
         }
     }
-    auto usage = gfx::BufferDataUsage::BUFFERDATAUSAGE_STATIC;
+    auto usage = gfx::BufferDataUsage::BUFFERDATAUSAGE_DYNAMIC;
     if (type == "triangles") {
-        mesh = instance->newMesh(vf, prepD->data(), prepD->size() * sizeof(uint8_t), gfx::PrimitiveType::PRIMITIVE_TRIANGLES, usage);
+        mesh = instance->newMesh(vf, prepD.data(), prepD.size() * sizeof(float), gfx::PrimitiveType::PRIMITIVE_TRIANGLES, usage);
     }
     return true;
 }
@@ -70,37 +70,18 @@ bool chai_mesh::wrap_setTexture(const std::string &texture) {
     auto w = img->getWidth();
     auto h = img->getHeight();
 
-    auto cl = ChaiLove::getInstance();
-    // auto fs = cl->getFSModule();
-    auto i = cl->getImageModule();
-    // auto filesize = fs.getSize(texture);
-
-    // buf.push_back(fs.readBuffer(texture, filesize));
-
     gfx::Texture::Settings settings;
     settings.width = w;
     settings.height = h;
-    settings.format = PIXELFORMAT_RGBA8_UINT;
-
-    // settings.renderTarget = true;
-
-    auto gfx = Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS);
-
-    slices.push_back(new gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D));
-
-    // slices.back()->add(0, 0, image.back());
-
-    tex.push_back(gfx->newTexture(settings, slices.back()));
-
-    Rect rect = Rect();
-    rect.w = w;
-    rect.h = h;
+    settings.format = PIXELFORMAT_RGBA8_UNORM;
+    // settings.mipmaps = gfx::Texture::MipmapsMode::MIPMAPS_AUTO;
 
     size_t dataSize = w*h;
 
     SDL_LockSurface(img->surface);
     // Assuming pixelData is a byte array containing the ARGB data.
     uint8_t* pixelData = static_cast<uint8_t*>(img->surface->pixels);
+    uint8_t* copyOfPixelData = new uint8_t[dataSize * 4];
     for (size_t i = 0; i < dataSize * 4; i += 4) {
         uint8_t alpha = pixelData[i];        // ARGB - Alpha at index 0
         uint8_t blue = pixelData[i + 1];      // ARGB - Red at index 1
@@ -108,21 +89,61 @@ bool chai_mesh::wrap_setTexture(const std::string &texture) {
         uint8_t red = pixelData[i + 3];     // ARGB - Blue at index 3
 
         // Swap to RGBA format
-        pixelData[i] = red;                 // RGBA - Red at index 0
-        pixelData[i + 1] = green;           // RGBA - Green at index 1
-        pixelData[i + 2] = blue;            // RGBA - Blue at index 2
-        pixelData[i + 3] = alpha;           // RGBA - Alpha at index 3
+        copyOfPixelData[i] = red;                 // RGBA - Red at index 0
+        copyOfPixelData[i + 1] = green;           // RGBA - Green at index 1
+        copyOfPixelData[i + 2] = blue;            // RGBA - Blue at index 2
+        copyOfPixelData[i + 3] = alpha;           // RGBA - Alpha at index 3
     }
-    tex.back()->replacePixels(pixelData, dataSize*8, 0, 0, rect, false);
-    // image.push_back(i->newImageData(w, h, settings.format, img->surface->pixels, false));
 
     SDL_UnlockSurface(img->surface);
-
-    mesh->setTexture(tex.back());
 
     img->~Image();
 
     img = NULL;
+
+    auto cl = ChaiLove::getInstance();
+    auto i = cl->getImageModule();
+    // auto image = i->newImageData(w, h, settings.format);
+    auto gfx = Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS);
+
+    auto slices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
+
+    Rect rect = Rect();
+    rect.w = w;
+    rect.h = h;
+
+    // for (size_t i = 0; i < dataSize * 4; i += 4) {
+    //     uint8_t red = copyOfPixelData[i];        // ARGB - Alpha at index 0
+    //     uint8_t green = copyOfPixelData[i + 1];      // ARGB - Red at index 1
+    //     uint8_t blue = copyOfPixelData[i + 2];    // ARGB - Green at index 2
+    //     uint8_t alpha = copyOfPixelData[i + 3];     // ARGB - Blue at index 3
+
+    //     int pixelIndex = i / 4;
+    //     int x = pixelIndex % w;
+    //     int y = pixelIndex / w;
+
+    //     auto color = Colorf(red, green, blue, alpha);
+
+    //     image->setPixel(x, y, color);
+    // }
+
+    tex = gfx->newTexture(settings, &slices);
+    tex->replacePixels(copyOfPixelData, dataSize*4, 0, 0, rect, false);
+    // image.push_back(i->newImageData(w, h, settings.format, pixelData, false));
+    // auto image = i->newImageData(w, h, settings.format, copyOfPixelData, false);
+
+    // slices.set(0, 0, image);
+
+    // slices.validate();
+
+    // slices->clear();
+
+    // tex->replacePixels(copyOfPixelData, dataSize * 4, 0, 0, rect, false);
+
+
+    // tex->replacePixels(image->getData(), image->getSize(), 0, 0, rect, false);
+    mesh->setTexture(tex);
+
 
     return true;
 }

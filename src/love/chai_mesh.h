@@ -24,11 +24,12 @@ class chai_mesh {
     bool wrap_setTexture(const std::string &texture);
     love::gfx::Graphics *instance;
     gfx::Mesh *mesh;
-    std::vector<gfx::Texture *> tex;
+    gfx::Texture *tex;
     std::vector<imagemod::ImageData *> image;
     Image *img;
     std::vector<gfx::Texture::Slices *>slices;
     std::vector<void *> buf;
     chai_gfx *chaigfx;
+    std::vector<gfx::Buffer::DataDeclaration> vf;
 };
 }

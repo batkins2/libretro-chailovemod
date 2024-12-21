@@ -7,12 +7,12 @@ namespace love
 {
 
 chai_gfx::chai_gfx() {
-    instance = new gfx::opengl::Graphics();
-    win = new windowmod::sdl::Window();
-    win->setGraphics(instance);
-    auto winset = new windowmod::WindowSettings();
-    winset->displayindex = 0;
-    win->setWindow(800, 600, winset);
+    // instance = new gfx::opengl::Graphics();
+    // win = new windowmod::sdl::Window();
+    // win->setGraphics(instance);
+    // auto winset = new windowmod::WindowSettings();
+    // winset->displayindex = 0;
+    // win->setWindow(800, 600, winset);
 }
 
 chai_gfx::~chai_gfx() {
@@ -21,6 +21,17 @@ chai_gfx::~chai_gfx() {
 }
 
 bool chai_gfx::init() {
+    instance = new gfx::opengl::Graphics();
+    instance->hw_render = hw_render;
+    instance->FRAMEBUFFER = FRAMEBUFFER;
+    win = new windowmod::sdl::Window();
+    win->setGraphics(instance);
+    //auto winset = new windowmod::WindowSettings();
+    //winset->displayindex = 0;
+    //win->setWindow(800, 600, winset);
+    //instance->setMode(nullptr, 800, 600, 800, 600, true, true, 0);
+
+
     // instance = new gfx::opengl::Graphics();
     // love::window::WindowSettings *ws;
     // ws->fullscreen = true;
@@ -33,10 +44,17 @@ bool chai_gfx::init() {
     return true;
 }
 
+bool chai_gfx::destroy() {
+    delete win;
+    delete instance;
+    return true;
+}
+
 chai_shader *chai_gfx::wrap_newShader(const std::string *FileName) {
     // delete win;
     // delete instance;
-    // init();
+    //init();
+
     if (instance->isCreated()) {
         auto file = new filesystem();
         std::string data = file->read(FileName->c_str());
@@ -97,10 +115,26 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName) {
         for (const auto &piece : lines) a += piece+'\n';
 
         std::vector<std::string> code;
+        std::string c = "vec4 effect( vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords ){ ";
+            c += "vec4 pixel = Texel(texture, texture_coords );";
+            c += "return pixel * color;";
+            c += "}";
+
         code.push_back(a);
+        code.push_back(c);
 
         auto shader = new chai_shader();
         shader->newShader(instance, code, options);
+
+        // if (!shader->fragmentShader) {
+        //     shader->fragmentShader = new love::gfx::ShaderStage(
+        //         instance,
+        //         love::gfx::SHADERSTAGE_PIXEL,
+        //         c,
+        //         false, // Assuming not GLES
+        //         "GL_FRAGMENT_SHADER"
+        //     );
+        // }
         return shader;
         // return instance->newShader(lines, options);
     }
@@ -127,22 +161,67 @@ void chai_gfx::createCanvas() {
     settings.width = 800;
     settings.height = 600;
     settings.renderTarget = true;
-    settings.format = PIXELFORMAT_RGBA8_UINT;
-    auto slices = new gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
-    canvas = instance->newTexture(settings, slices);
+    settings.format = PIXELFORMAT_RGBA8_UNORM;
+    auto slices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
+    slices.clear();
+    canvas = instance->newTexture(settings, &slices);
 }
+
+void readFBOIntoVideoBuffer(love::gfx::Graphics *instance, love::gfx::Mesh *mesh) {
+    // gfx::Buffer::Settings settings(gfx::BufferUsageFlags::BUFFERUSAGEFLAG_VERTEX, gfx::BufferDataUsage::BUFFERDATAUSAGE_STATIC);
+    // gfx::Buffer *buffer = new gfx::Buffer(instance, settings, mesh->getVertexFormat(), mesh->getVertexCount() * mesh->getVertexStride(), 0);
+    // // Create a destination ByteData object
+    // love::datamod::ByteData *dest = new love::datamod::ByteData(800*600*4); // Assuming RGBA format
+
+    // // Call readbackBuffer
+    // love::datamod::ByteData *result = graphics->readbackBuffer(buffer, 0, size, dest, 0);
+
+    // glad::glBindFramebuffer(GL_FRAMEBUFFER, result->getData());
+
+    // int width = 800; // Set appropriate width
+    // int height = 600; // Set appropriate height
+    // std::vector<uint8_t> buffer(width * height * 4); // Assuming RGBA format
+
+    // glad::glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer.data());
+
+    // // Copy to video buffer
+    // auto cl = ChaiLove::getInstance();
+    // memcpy(cl->videoBuffer, buffer.data(), buffer.size());
+
+    // glad::glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind the FBO
+
+    // // Clean up
+    // result->release();
+    // dest->release();
+}
+
 
 void chai_gfx::draw(chai_mesh *m) {
     if (instance->isCreated()) {
-        auto matrix = new Matrix4();
+        auto winset = new windowmod::WindowSettings();
+        winset->displayindex = 0;
+        win->setWindow(800, 600, winset);
+        //instance->setMode(nullptr, 800, 600, 800, 600, true, true, 0);
+        auto matrix = Matrix4();
         // auto tex = m->mesh->getTexture();
+        // m->mesh->setTexture(m->tex);
 
-        instance->setRenderTarget(canvas, 0);
-        instance->draw(m->mesh, *matrix);
-        instance->setRenderTarget();
-        // instance->draw(canvas, *matrix);
-
+        // createCanvas();
+        // auto rt = gfx::Graphics::RenderTarget(canvas, 0, 0);
+        // instance->setRenderTarget(rt, 0);
+        auto cl = ChaiLove::getInstance();
+        cl->event.pause();
+        // instance->bindVAO();
+        instance->draw(m->mesh, matrix);
+        // instance->setRenderTarget();
         instance->setShader();
+        // instance->draw(canvas, matrix);
+
+
+        cl->event.pause();
+        // instance->unSetMode();
+        // readFBOIntoVideoBuffer(instance, m->mesh);
+        // drawCanvas();
     }
 }
 
@@ -155,29 +234,12 @@ void chai_gfx::drawCanvas() {
     instance->readbackTexture(canvas, 0, 0, rect, img, 0, 0);
     auto d = img->getData();
     auto cl = ChaiLove::getInstance();
-    auto surf = SDL_CreateRGBSurfaceFrom(d, canvas->getWidth(), canvas->getHeight(), 32, 4*canvas->getWidth(), 0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF);
-    SDL_Rect dstrect;
-    dstrect.x = 0;
-    dstrect.y = 0;
-    SDL_BlitSurface(surf, NULL, cl->screen, &dstrect);
-
-}
-
-void readFBOIntoVideoBuffer() {
-    GLuint fbo = getInternalBackbufferFBO(); // or getSystemBackbufferFBO()
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-
-    int width = 800; // Set appropriate width
-    int height = 600; // Set appropriate height
-    std::vector<uint8_t> buffer(width * height * 4); // Assuming RGBA format
-
-    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer.data());
-
-    // Copy to video buffer
-    auto cl = ChaiLove::getInstance();
-    memcpy(cl->videoBuffer, buffer.data(), buffer.size());
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0); // Unbind the FBO
+    // auto surf = SDL_CreateRGBSurfaceFrom(d, canvas->getWidth(), canvas->getHeight(), 32, 4*canvas->getWidth(), 0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF);
+    // SDL_Rect dstrect;
+    // dstrect.x = 0;
+    // dstrect.y = 0;
+    // SDL_BlitSurface(surf, NULL, cl->screen, &dstrect);
+    memcpy(cl->videoBuffer, img->getData(), img->getSize());
 }
 
 }

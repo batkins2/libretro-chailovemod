@@ -514,7 +514,7 @@ love::gfx::StreamBuffer *CreateStreamBuffer(BufferUsage mode, size_t size)
 		{
 			// AMD's pinned memory seems to be faster than persistent mapping,
 			// on AMD GPUs.
-			if (GLAD_AMD_pinned_memory && gl.getVendor() == OpenGL::VENDOR_AMD)
+			if (GL_AMD_pinned_memory && gl.getVendor() == OpenGL::VENDOR_AMD)
 			{
 				try
 				{
@@ -530,7 +530,7 @@ love::gfx::StreamBuffer *CreateStreamBuffer(BufferUsage mode, size_t size)
 				}
 			}
 
-			if (GLAD_VERSION_4_4 || GLAD_ARB_buffer_storage)
+			if (GL_VERSION_4_4 || GL_ARB_buffer_storage)
 				return new StreamBufferPersistentMapSync(mode, size);
 
 			// Most modern drivers have a separate internal thread which queues
