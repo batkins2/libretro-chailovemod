@@ -34,6 +34,7 @@ bool chai_mesh::newMesh(love::gfx::Graphics *inst, const std::vector<chaiscript:
     // std::memcpy(d, &prepD, prepD->size() * sizeof(float));
 
     vf = std::vector<gfx::Buffer::DataDeclaration>();
+    auto b = std::vector<gfx::Buffer::DataDeclaration>();
     for (int i = 0; i < vertexFormat.size(); i++) {
         auto t = chaiscript::boxed_cast<std::vector<chaiscript::Boxed_Value>>(vertexFormat.at(i));
         auto temp = std::vector<std::string>();
@@ -42,10 +43,11 @@ bool chai_mesh::newMesh(love::gfx::Graphics *inst, const std::vector<chaiscript:
             temp.push_back(p);
         }
 
-        auto t1 = gfx::DATAFORMAT_UINT8_VEC4;
+        auto t1 = gfx::DATAFORMAT_UNORM8_VEC4;
         if (temp[1] == "byte") {
-            // vf.push_back(gfx::Buffer::DataDeclaration(temp[0], t1, atoi(temp[2].c_str())));
             vf.push_back(gfx::Buffer::DataDeclaration(temp[0], t1, 1));
+            // vf.push_back(gfx::Buffer::DataDeclaration(temp[0], t1, atoi(temp[2].c_str())));
+            
         } else if (temp[1] == "float") {
             auto t2 = atoi(temp[2].c_str());
             if (t2 > 2) {
@@ -57,7 +59,8 @@ bool chai_mesh::newMesh(love::gfx::Graphics *inst, const std::vector<chaiscript:
             vf.push_back(gfx::Buffer::DataDeclaration(temp[0], t1, t2));
         }
     }
-    auto usage = gfx::BufferDataUsage::BUFFERDATAUSAGE_DYNAMIC;
+    // vf.push_back(b.at(0));
+    auto usage = gfx::BufferDataUsage::BUFFERDATAUSAGE_STATIC;
     if (type == "triangles") {
         mesh = instance->newMesh(vf, prepD.data(), prepD.size() * sizeof(float), gfx::PrimitiveType::PRIMITIVE_TRIANGLES, usage);
     }
@@ -101,8 +104,8 @@ bool chai_mesh::wrap_setTexture(const std::string &texture) {
 
     img = NULL;
 
-    auto cl = ChaiLove::getInstance();
-    auto i = cl->getImageModule();
+    // auto cl = ChaiLove::getInstance();
+    // auto i = cl->getImageModule();
     // auto image = i->newImageData(w, h, settings.format);
     auto gfx = Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS);
 
@@ -167,7 +170,7 @@ chai_mesh::chai_mesh(const chai_mesh &c) {
     instance = c.instance;
 
     tex = c.tex;
-    image = c.image;
+    // image = c.image;
     img = c.img;
 
     slices = c.slices;

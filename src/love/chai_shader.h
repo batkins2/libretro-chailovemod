@@ -13,6 +13,7 @@ class chai_shader {
     chai_shader();
     chai_shader(const chai_shader &c);
     ~chai_shader();
+    void destroy();
     chai_shader *clone() const;
     chai_shader& operator=(const chai_shader& m) {
 		return *this;

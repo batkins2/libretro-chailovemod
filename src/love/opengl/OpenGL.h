@@ -466,6 +466,7 @@ public:
 
 	inline static struct retro_hw_render_callback hw_render;
 	inline static unsigned int INT_FRAMEBUFFER;
+	inline static unsigned int INT_COLORATTACH;
 
 private:
 

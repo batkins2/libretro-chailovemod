@@ -453,6 +453,7 @@ static void context_reset(void)
 
 	ChaiLove::getInstance()->chai_gfx.hw_render = hw_render;
 	ChaiLove::getInstance()->chai_gfx.FRAMEBUFFER = RARCH_GL_FRAMEBUFFER;
+	ChaiLove::getInstance()->chai_gfx.COLORATTACH = RARCH_GL_COLOR_ATTACHMENT0;
 	ChaiLove::getInstance()->chai_gfx.init();
 }
 
@@ -461,40 +462,12 @@ static void context_destroy(void)
 	ChaiLove::getInstance()->chai_gfx.destroy();
 }
 
-
-#ifdef HAVE_OPENGLES
 static bool retro_init_hw_context(void)
 {
-#if defined(HAVE_OPENGLES_3_1)
-   hw_render.context_type = RETRO_HW_CONTEXT_OPENGLES_VERSION;
-   hw_render.version_major = 3;
-   hw_render.version_minor = 1;
-#elif defined(HAVE_OPENGLES3)
-   hw_render.context_type = RETRO_HW_CONTEXT_OPENGLES3;
-#else
-   hw_render.context_type = RETRO_HW_CONTEXT_OPENGLES2;
-#endif
-   hw_render.context_reset = context_reset;
-   hw_render.context_destroy = context_destroy;
-   hw_render.depth = true;
-   hw_render.stencil = true;
-   hw_render.bottom_left_origin = true;
-
-   if (!ChaiLove::environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &hw_render))
-      return false;
-
-   return true;
-}
-#else
-static bool retro_init_hw_context(void)
-{
-#if defined(CORE)
    hw_render.context_type = RETRO_HW_CONTEXT_OPENGL_CORE;
    hw_render.version_major = 3;
    hw_render.version_minor = 1;
-#else
-   hw_render.context_type = RETRO_HW_CONTEXT_OPENGL;
-#endif
+
    hw_render.context_reset = context_reset;
    hw_render.context_destroy = context_destroy;
    hw_render.depth = true;
@@ -506,7 +479,6 @@ static bool retro_init_hw_context(void)
 
    return true;
 }
-#endif
 
 /**
  * libretro callback; Initialize the core.

@@ -16,6 +16,17 @@ class chai_mesh {
     chai_mesh();
     chai_mesh(const chai_mesh &c);
     ~chai_mesh();
+    void destroy() {
+        delete mesh;
+        tex->~Drawable();
+        delete img;
+        // for (auto i : image) {
+        //     delete i;
+        // }
+        for (auto i : slices) {
+            delete i;
+        }
+    }
     chai_mesh *clone() const;
     chai_mesh& operator=(const chai_mesh& m) {
 		return *this;
@@ -25,7 +36,7 @@ class chai_mesh {
     love::gfx::Graphics *instance;
     gfx::Mesh *mesh;
     gfx::Texture *tex;
-    std::vector<imagemod::ImageData *> image;
+    // std::vector<imagemod::ImageData *> image;
     Image *img;
     std::vector<gfx::Texture::Slices *>slices;
     std::vector<void *> buf;

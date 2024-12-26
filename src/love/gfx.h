@@ -854,7 +854,7 @@ public:
 
 	inline static struct retro_hw_render_callback hw_render;
 	unsigned int FRAMEBUFFER;
-
+	unsigned int COLORATTACH;
 	/**
 	 * Returns performance-related statistics.
 	 **/

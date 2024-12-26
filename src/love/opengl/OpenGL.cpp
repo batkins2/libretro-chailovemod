@@ -229,7 +229,7 @@ void OpenGL::setupContext()
 	initMaxValues();
 
 	GLfloat glcolor[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-	// glVertexAttrib4fv(ATTRIB_COLOR, glcolor);
+	glVertexAttrib4fv(ATTRIB_COLOR, glcolor);
 
 	GLint maxvertexattribs = 1;
 	glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &maxvertexattribs);
@@ -237,7 +237,7 @@ void OpenGL::setupContext()
 	state.enabledAttribArrays = (uint32) ((1ull << uint32(maxvertexattribs)) - 1);
 	state.instancedAttribArrays = 0;
 
-	// setVertexAttributes(VertexAttributes(), BufferBindings());
+	setVertexAttributes(VertexAttributes(), BufferBindings());
 
 	// Get the current viewport.
 	glGetIntegerv(GL_VIEWPORT, (GLint *) &state.viewport.x);
@@ -249,8 +249,8 @@ void OpenGL::setupContext()
 
 	for (int i = 0; i < 2; i++)
 		state.boundFramebuffers[i] = std::numeric_limits<GLuint>::max();
-	// bindFramebuffer(FRAMEBUFFER, getDefaultFBO());
-	bindFramebuffer(FRAMEBUFFER_ALL, hw_render.get_current_framebuffer());
+	// bindFramebuffer(FRAMEBUFFER_ALL, getDefaultFBO());
+	// bindFramebuffer(FRAMEBUFFER_ALL, hw_render.get_current_framebuffer());
 
 	setEnableState(ENABLE_BLEND, state.enableState[ENABLE_BLEND]);
 	setEnableState(ENABLE_DEPTH_TEST, state.enableState[ENABLE_DEPTH_TEST]);
@@ -667,7 +667,7 @@ GLenum OpenGL::getGLBufferDataUsage(BufferDataUsage usage)
 
 void OpenGL::bindBuffer(BufferUsage type, GLuint buffer)
 {
-	if (state.boundBuffers[type] != buffer)
+	if (true || state.boundBuffers[type] != buffer)
 	{
 		glBindBuffer(getGLBufferType(type), buffer);
 		state.boundBuffers[type] = buffer;
@@ -731,7 +731,8 @@ void OpenGL::setVertexAttributes(const VertexAttributes &attributes, const Buffe
 
 			const void *offsetpointer = reinterpret_cast<void*>(bufferinfo.offset + attrib.offsetFromVertex);
 
-			bindBuffer(BUFFERUSAGE_VERTEX, (GLuint) bufferinfo.buffer->getHandle());
+			if (i == 0)
+				bindBuffer(BUFFERUSAGE_VERTEX, (GLuint) bufferinfo.buffer->getHandle());
 
 			if (intformat)
 				glVertexAttribIPointer(i, components, gltype, layout.stride, offsetpointer);
@@ -848,6 +849,9 @@ bool OpenGL::isStateEnabled(EnableState enablestate) const
 
 void OpenGL::bindFramebuffer(FramebufferTarget target, GLuint framebuffer)
 {
+	auto fb = hw_render.get_current_framebuffer();
+	if (fb != UINT_MAX)
+		framebuffer = fb;
 	bool bindingmodified = false;
 
 	if ((target & FRAMEBUFFER_DRAW) && state.boundFramebuffers[0] != framebuffer)
@@ -864,11 +868,11 @@ void OpenGL::bindFramebuffer(FramebufferTarget target, GLuint framebuffer)
 
 	if (bindingmodified)
 	{
-		GLenum gltarget = GL_FRAMEBUFFER;
+		GLenum gltarget = INT_FRAMEBUFFER;
 		if (target == FRAMEBUFFER_DRAW)
-			gltarget = INT_FRAMEBUFFER;
+			gltarget = GL_DRAW_FRAMEBUFFER;
 		else if (target == FRAMEBUFFER_READ)
-			gltarget = INT_FRAMEBUFFER;
+			gltarget = GL_READ_FRAMEBUFFER;
 
 		glBindFramebuffer(gltarget, framebuffer);
 	}
@@ -981,7 +985,7 @@ void OpenGL::setTextureUnit(int textureunit)
 
 void OpenGL::bindTextureToUnit(TextureType target, GLuint texture, int textureunit, bool restoreprev, bool bindforedit)
 {
-	if (texture != state.boundTextures[target][textureunit])
+	if (true || texture != state.boundTextures[target][textureunit])
 	{
 		int oldtextureunit = state.curTextureUnit;
 		if (oldtextureunit != textureunit)

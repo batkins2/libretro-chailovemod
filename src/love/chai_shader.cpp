@@ -5,14 +5,20 @@ namespace love
 {
 
 chai_shader::chai_shader() {
-
 }
 
+void chai_shader::destroy() {
+    // instance->setShader();
+    // shader->~Shader();
+    // instance->unSetMode();
+    // fragmentShader->deinitialize();
+    // delete instance;
+}
 
 chai_shader::~chai_shader() {
-    shader = NULL;
-    fragmentShader = NULL;
-    instance = NULL;
+    delete shader;
+    delete fragmentShader;
+    delete instance;
 }
 
 chai_shader::chai_shader(const chai_shader &c) {

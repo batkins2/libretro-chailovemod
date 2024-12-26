@@ -41,6 +41,9 @@ class chai_gfx {
     love::gfx::Texture *canvas;
     inline static struct retro_hw_render_callback hw_render;
     unsigned int FRAMEBUFFER;
+    unsigned int COLORATTACH;
+    chai_shader *shader;
+    std::vector<chai_mesh *> meshes;
     // imagemod::Image *i = NULL;
     // filesystem *fs = NULL;
 };

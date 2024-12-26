@@ -24,12 +24,14 @@ bool chai_gfx::init() {
     instance = new gfx::opengl::Graphics();
     instance->hw_render = hw_render;
     instance->FRAMEBUFFER = FRAMEBUFFER;
+    instance->COLORATTACH = COLORATTACH;
+    
+    // instance->setMode(nullptr, 800, 600, 800, 600, true, true, 0);
     win = new windowmod::sdl::Window();
     win->setGraphics(instance);
-    //auto winset = new windowmod::WindowSettings();
-    //winset->displayindex = 0;
-    //win->setWindow(800, 600, winset);
-    //instance->setMode(nullptr, 800, 600, 800, 600, true, true, 0);
+    auto winset = new windowmod::WindowSettings();
+    winset->displayindex = 0;
+    win->setWindow(800, 600, winset);
 
 
     // instance = new gfx::opengl::Graphics();
@@ -46,16 +48,23 @@ bool chai_gfx::init() {
 
 bool chai_gfx::destroy() {
     delete win;
-    delete instance;
+    instance->setShader();
+    shader->destroy();
+    instance->unSetMode();
+    for_each(meshes.begin(), meshes.end(), [](chai_mesh *m) { m->destroy(); });
+    // delete instance;
     return true;
 }
 
 chai_shader *chai_gfx::wrap_newShader(const std::string *FileName) {
     // delete win;
     // delete instance;
-    //init();
+    // init();
+
+   
 
     if (instance->isCreated()) {
+        instance->bindVAO();
         auto file = new filesystem();
         std::string data = file->read(FileName->c_str());
         // auto file = Module::getInstance<filesystemmod::Filesystem>(Module::M_FILESYSTEM);
@@ -123,7 +132,7 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName) {
         code.push_back(a);
         code.push_back(c);
 
-        auto shader = new chai_shader();
+        shader = new chai_shader();
         shader->newShader(instance, code, options);
 
         // if (!shader->fragmentShader) {
@@ -143,6 +152,8 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName) {
 
 void chai_gfx::wrap_setShader(chai_shader *s) {
     if (instance->isCreated()) {
+        
+        // instance->bindVAO();
         instance->setShader(s->shader);
     }
 }
@@ -150,7 +161,10 @@ void chai_gfx::wrap_setShader(chai_shader *s) {
 chai_mesh *chai_gfx::wrap_newMesh(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::vector<chaiscript::Boxed_Value> &data, const std::string &type) {
     if (instance->isCreated()) {
         auto m = new chai_mesh();
+        
+        // instance->bindVAO();
         m->newMesh(instance, vertexFormat, data, type);
+        meshes.push_back(m);
         return m;
     }
     return nullptr;
@@ -198,10 +212,11 @@ void readFBOIntoVideoBuffer(love::gfx::Graphics *instance, love::gfx::Mesh *mesh
 
 void chai_gfx::draw(chai_mesh *m) {
     if (instance->isCreated()) {
-        auto winset = new windowmod::WindowSettings();
-        winset->displayindex = 0;
-        win->setWindow(800, 600, winset);
-        //instance->setMode(nullptr, 800, 600, 800, 600, true, true, 0);
+        // auto winset = new windowmod::WindowSettings();
+        // winset->displayindex = 0;
+        // win->setWindow(800, 600, winset);
+        // instance->setMode(nullptr, 800, 600, 800, 600, true, true, 0);
+        // glBindFramebuffer(FRAMEBUFFER, hw_render.get_current_framebuffer());
         auto matrix = Matrix4();
         // auto tex = m->mesh->getTexture();
         // m->mesh->setTexture(m->tex);
@@ -209,16 +224,15 @@ void chai_gfx::draw(chai_mesh *m) {
         // createCanvas();
         // auto rt = gfx::Graphics::RenderTarget(canvas, 0, 0);
         // instance->setRenderTarget(rt, 0);
-        auto cl = ChaiLove::getInstance();
-        cl->event.pause();
-        // instance->bindVAO();
-        instance->draw(m->mesh, matrix);
+        // auto cl = ChaiLove::getInstance();
+        // cl->event.pause();
+        m->mesh->draw(instance, matrix);
         // instance->setRenderTarget();
         instance->setShader();
         // instance->draw(canvas, matrix);
 
 
-        cl->event.pause();
+        // cl->event.pause();
         // instance->unSetMode();
         // readFBOIntoVideoBuffer(instance, m->mesh);
         // drawCanvas();

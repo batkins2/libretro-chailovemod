@@ -208,7 +208,7 @@ void Graphics::backbufferChanged(int width, int height, int pixelwidth, int pixe
 	if (!isRenderTargetActive())
 	{
 		// Set the viewport to top-left corner.
-		// gl.setViewport({0, 0, pixelwidth, pixelheight});
+		gl.setViewport({0, 0, pixelwidth, pixelheight});
 
 		// Re-apply the scissor if it was active, since the rectangle passed to
 		// glScissor is affected by the viewport dimensions.
@@ -310,54 +310,57 @@ void MessageCallback( GLenum source,
 
 bool Graphics::setMode(void */*context*/, int width, int height, int pixelwidth, int pixelheight, bool backbufferstencil, bool backbufferdepth, int msaa)
 {
-	// Okay, setup OpenGL.
-	gl.initContext();
-
-	if (gl.isCoreProfile())
-	{
-		glGenVertexArrays(1, &mainVAO);
-		glBindVertexArray(mainVAO);
-	}
 
 	gl.hw_render = hw_render;
 	gl.INT_FRAMEBUFFER = FRAMEBUFFER;
+	gl.INT_COLORATTACH = COLORATTACH;
+	// Okay, setup OpenGL.
+	gl.initContext();
+
+	if (true || gl.isCoreProfile())
+	{
+		// glGenVertexArrays(1, &mainVAO);
+		// glBindVertexArray(mainVAO);
+	}
+
+	
 	gl.setupContext();
 
 	created = true;
 	initCapabilities();
 
 	// Enable blending
-	// gl.setEnableState(OpenGL::ENABLE_BLEND, true);
+	gl.setEnableState(OpenGL::ENABLE_BLEND, true);
 
 	// Auto-generated mipmaps should be the best quality possible
-	// if (!gl.isCoreProfile())
-	// 	glHint(GL_GENERATE_MIPMAP_HINT, GL_NICEST);
+	if (!gl.isCoreProfile())
+		glHint(GL_GENERATE_MIPMAP_HINT, GL_NICEST);
 
-	// if (!GL_VERSION_2_0 && !gl.isCoreProfile())
-	// {
-	// 	// Make sure antialiasing works when set elsewhere
-	// 	glEnable(GL_MULTISAMPLE);
+	if (!GL_VERSION_2_0 && !gl.isCoreProfile())
+	{
+		// Make sure antialiasing works when set elsewhere
+		glEnable(GL_MULTISAMPLE);
 
-	// 	// Enable texturing
-	// 	glEnable(GL_TEXTURE_2D);
-	// }
+		// Enable texturing
+		glEnable(GL_TEXTURE_2D);
+	}
 
-	// if (!GL_VERSION_2_0)
-	// 	glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+	if (!GL_VERSION_2_0)
+		glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
 
-	// glEnable(GL_DEBUG_OUTPUT);
+	glEnable(GL_DEBUG_OUTPUT);
 	// glDebugMessageCallback( MessageCallback, 0 );
 
 	gl.setTextureUnit(0);
 
 	// Set pixel row alignment - code that calls glTexSubImage and glReadPixels
 	// assumes there's no row alignment, but OpenGL defaults to 4 bytes.
-	// glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-	// glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
 
-	// // Always enable seamless cubemap filtering when possible.
-	// if (GL_VERSION_3_2 || GL_ARB_seamless_cube_map)
-	// 	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+	// Always enable seamless cubemap filtering when possible.
+	if (GL_VERSION_3_2 || GL_ARB_seamless_cube_map)
+		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
 	// Set whether drawing converts input from linear -> sRGB colorspace.
 	if (!gl.bugs.brokenSRGB)
@@ -385,10 +388,10 @@ bool Graphics::setMode(void */*context*/, int width, int height, int pixelwidth,
 	if (!Volatile::loadAll())
 		::printf("Could not reload all volatile objects.\n");
 
-	// createQuadIndexBuffer();
+	createQuadIndexBuffer();
 
 	// Restore the graphics state.
-	// restoreState(states.back());
+	restoreState(states.back());
 
 	// We always need a default shader.
 	for (int i = 0; i < Shader::STANDARD_MAX_ENUM; i++)
@@ -433,6 +436,7 @@ bool Graphics::setMode(void */*context*/, int width, int height, int pixelwidth,
 
 bool Graphics::bindVAO()
 {
+	glGenVertexArrays(1, &mainVAO);
 	if (mainVAO == 0)
 		return false;
 
@@ -673,10 +677,10 @@ void Graphics::drawQuads(int start, int count, const VertexAttributes &attribute
 	const int MAX_QUADS_PER_DRAW    = MAX_VERTICES_PER_DRAW / 4;
 
 	gl.prepareDraw(this);
-	// gl.bindTextureToUnit(texture, 0, false);
+	gl.bindTextureToUnit(texture, 0, false);
 	gl.setCullMode(CULL_NONE);
 
-	// gl.bindBuffer(BUFFERUSAGE_INDEX, quadIndexBuffer->getHandle());
+	gl.bindBuffer(BUFFERUSAGE_INDEX, quadIndexBuffer->getHandle());
 
 	if (gl.isBaseVertexSupported())
 	{
@@ -750,7 +754,7 @@ void Graphics::setDebug(bool enable)
 	if (!enable)
 	{
 		// Disable the debug callback function.
-		glDebugMessageCallback(nullptr, nullptr);
+		// glDebugMessageCallback(nullptr, nullptr);
 
 		// We can disable debug output entirely with KHR_debug.
 		if (GL_VERSION_4_3 || GL_VERSION_3_2 || GL_KHR_debug)
@@ -1667,7 +1671,7 @@ void Graphics::initCapabilities()
 uint32 Graphics::computePixelFormatUsage(PixelFormat format, bool readable)
 {
 	uint32 usage = OpenGL::getPixelFormatUsageFlags(format);
-	return usage;
+
 	if (readable && (usage & PIXELFORMATUSAGEFLAGS_SAMPLE) == 0)
 		return 0;
 
