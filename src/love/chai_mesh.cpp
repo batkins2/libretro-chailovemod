@@ -60,9 +60,9 @@ bool chai_mesh::newMesh(love::gfx::Graphics *inst, const std::vector<chaiscript:
         }
     }
     // vf.push_back(b.at(0));
-    auto usage = gfx::BufferDataUsage::BUFFERDATAUSAGE_STATIC;
+    auto usage = gfx::BufferDataUsage::BUFFERDATAUSAGE_DYNAMIC;
     if (type == "triangles") {
-        mesh = instance->newMesh(vf, prepD.data(), prepD.size() * sizeof(float), gfx::PrimitiveType::PRIMITIVE_TRIANGLES, usage);
+        mesh = instance->newMesh(vf, prepD.data(), prepD.size() * sizeof(uint32_t), gfx::PrimitiveType::PRIMITIVE_TRIANGLES, usage);
     }
     return true;
 }

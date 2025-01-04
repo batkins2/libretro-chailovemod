@@ -44,7 +44,7 @@ class chai_gfx {
     unsigned int COLORATTACH;
     chai_shader *shader;
     std::vector<chai_mesh *> meshes;
-    // imagemod::Image *i = NULL;
-    // filesystem *fs = NULL;
+    int width = 800;
+    int height = 600;
 };
 }

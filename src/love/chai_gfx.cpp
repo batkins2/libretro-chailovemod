@@ -26,14 +26,20 @@ bool chai_gfx::init() {
     instance->FRAMEBUFFER = FRAMEBUFFER;
     instance->COLORATTACH = COLORATTACH;
     
-    // instance->setMode(nullptr, 800, 600, 800, 600, true, true, 0);
     win = new windowmod::sdl::Window();
     win->setGraphics(instance);
     auto winset = new windowmod::WindowSettings();
     winset->displayindex = 0;
+    winset->depth = 16;
+    
+
     win->setWindow(800, 600, winset);
-
-
+    width = 800;
+    height = 600;
+    
+    
+    // instance->setProjection(Matrix4());
+    // instance->setMode(nullptr, 800, 600, 800, 600, true, 16, 0);
     // instance = new gfx::opengl::Graphics();
     // love::window::WindowSettings *ws;
     // ws->fullscreen = true;
@@ -126,6 +132,7 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName) {
         std::vector<std::string> code;
         std::string c = "vec4 effect( vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords ){ ";
             c += "vec4 pixel = Texel(texture, texture_coords );";
+            // c += "return vec4(1.0,.0,.0,1.0);";
             c += "return pixel * color;";
             c += "}";
 
@@ -154,6 +161,7 @@ void chai_gfx::wrap_setShader(chai_shader *s) {
     if (instance->isCreated()) {
         
         // instance->bindVAO();
+        instance->setShader(0);
         instance->setShader(s->shader);
     }
 }
@@ -175,7 +183,9 @@ void chai_gfx::createCanvas() {
     settings.width = 800;
     settings.height = 600;
     settings.renderTarget = true;
+    settings.debugName = "RARCH_TEXTURE_2";
     settings.format = PIXELFORMAT_RGBA8_UNORM;
+
     auto slices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
     slices.clear();
     canvas = instance->newTexture(settings, &slices);
@@ -212,14 +222,53 @@ void readFBOIntoVideoBuffer(love::gfx::Graphics *instance, love::gfx::Mesh *mesh
 
 void chai_gfx::draw(chai_mesh *m) {
     if (instance->isCreated()) {
+        instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+        gfx::OptionalColorD clearcolor;
+		OptionalInt clearstencil(0);
+		OptionalDouble cleardepth(1.0);
+        instance->clear(clearcolor, clearstencil, cleardepth);
         // auto winset = new windowmod::WindowSettings();
         // winset->displayindex = 0;
         // win->setWindow(800, 600, winset);
         // instance->setMode(nullptr, 800, 600, 800, 600, true, true, 0);
         // glBindFramebuffer(FRAMEBUFFER, hw_render.get_current_framebuffer());
-        auto matrix = Matrix4();
+        auto matrix = Matrix4(new float[16] {
+            1.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            1.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            1.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            1.0f});
+        // auto matrix2 = Matrix4(new float[16] {
+        //     1.0f,
+        //     0.0f,
+        //     0.0f,
+        //     0.0f,
+        //     0.0f,
+        //     1.0f,
+        //     0.0f,
+        //     0.0f,
+        //     0.0f,
+        //     0.0f,
+        //     1.0f,
+        //     0.0f,
+        //     0.0f,
+        //     0.0f,
+        //     0.0f,
+        //     1.0f});
         // auto tex = m->mesh->getTexture();
-        // m->mesh->setTexture(m->tex);
+        // auto q = gfx::Quad({0,0,800,600},1,1);
+        // tex->draw(instance, &q, matrix2);
 
         // createCanvas();
         // auto rt = gfx::Graphics::RenderTarget(canvas, 0, 0);
@@ -229,6 +278,9 @@ void chai_gfx::draw(chai_mesh *m) {
         m->mesh->draw(instance, matrix);
         // instance->setRenderTarget();
         instance->setShader();
+        // instance->setShader(0);
+        // canvas->draw(instance, matrix);
+        
         // instance->draw(canvas, matrix);
 
 

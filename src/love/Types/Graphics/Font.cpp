@@ -114,6 +114,8 @@ int Font::getWidth(const std::string& text) {
 }
 
 void Font::print(const std::string& text, int x, int y, int r, int g, int b, int a) {
+	ChaiLove::getInstance()->printNew(text, x, y, r, g, b, a);
+	return;
 	SDL_Surface* screen = ChaiLove::getInstance()->screen;
 
 	// Attempt to render the TTF Font.

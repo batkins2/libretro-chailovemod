@@ -266,8 +266,8 @@ void Graphics::backbufferChanged(int width, int height, int pixelwidth, int pixe
 		internalBackbufferFBO = 0;
 	}
 
-	if (restoreFBO)
-		gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, prevFBO);
+	// if (restoreFBO)
+	// 	gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, prevFBO);
 }
 
 GLuint Graphics::getInternalBackbufferFBO() const
@@ -794,7 +794,7 @@ void Graphics::setRenderTargetsInternal(const RenderTargets &rts, int pixelw, in
 
 	if (iswindow)
 	{
-		gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, getInternalBackbufferFBO());
+		// gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, getInternalBackbufferFBO());
 	}
 	else
 	{
@@ -853,7 +853,7 @@ void Graphics::endPass(bool presenting)
 
 			glReadBuffer(GL_COLOR_ATTACHMENT0 + i);
 
-			gl.bindFramebuffer(OpenGL::FRAMEBUFFER_DRAW, c->getFBO());
+			// gl.bindFramebuffer(OpenGL::FRAMEBUFFER_DRAW, c->getFBO());
 
 			// if (GL_APPLE_framebuffer_multisample)
 			// 	glResolveMultisampleFramebufferAPPLE();
@@ -864,7 +864,7 @@ void Graphics::endPass(bool presenting)
 
 	if (depthstencil != nullptr && depthstencil->getMSAA() > 1 && depthstencil->isReadable())
 	{
-		gl.bindFramebuffer(OpenGL::FRAMEBUFFER_DRAW, ((Texture *) depthstencil)->getFBO());
+		// gl.bindFramebuffer(OpenGL::FRAMEBUFFER_DRAW, ((Texture *) depthstencil)->getFBO());
 
 		if (false) {
 			// glResolveMultisampleFramebufferAPPLE();
@@ -1127,7 +1127,7 @@ GLuint Graphics::bindCachedFBO(const RenderTargets &targets)
 
 	if (fbo != 0)
 	{
-		gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, fbo);
+		// gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, fbo);
 	}
 	else
 	{
@@ -1135,7 +1135,7 @@ GLuint Graphics::bindCachedFBO(const RenderTargets &targets)
 		bool hasDS = targets.depthStencil.texture != nullptr;
 
 		glGenFramebuffers(1, &fbo);
-		gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, fbo);
+		// gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, fbo);
 
 		int ncolortargets = 0;
 		GLenum drawbuffers[MAX_COLOR_RENDER_TARGETS];
@@ -1220,13 +1220,13 @@ void Graphics::present(void *screenshotCallbackData)
 	int w = getPixelWidth();
 	int h = getPixelHeight();
 
-	gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, getInternalBackbufferFBO());
+	// gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, getInternalBackbufferFBO());
 
 	// Copy internal backbuffer to system backbuffer. When MSAA is used this
 	// is a direct MSAA resolve.
 	if (internalBackbuffer.get())
 	{
-		gl.bindFramebuffer(OpenGL::FRAMEBUFFER_DRAW, getSystemBackbufferFBO());
+		// gl.bindFramebuffer(OpenGL::FRAMEBUFFER_DRAW, getSystemBackbufferFBO());
 
 		// Discard system backbuffer to prevent it from copying its contents
 		// from VRAM to chip memory.
@@ -1263,7 +1263,7 @@ void Graphics::present(void *screenshotCallbackData)
 			throw love::Exception("Out of memory.");
 		}
 
-		gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, getSystemBackbufferFBO());
+		// gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, getSystemBackbufferFBO());
 		glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 
 		// Replace alpha values with full opacity.
@@ -1327,7 +1327,7 @@ void Graphics::present(void *screenshotCallbackData)
 	if (window != nullptr)
 		window->swapBuffers();
 
-	gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, getInternalBackbufferFBO());
+	// gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, getInternalBackbufferFBO());
 
 	// Reset the per-frame stat counts.
 	drawCalls = 0;

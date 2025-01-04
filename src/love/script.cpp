@@ -146,6 +146,7 @@ script::script(const std::string& file) {
 		love["chai_gfx"] = var(std::ref(app->chai_gfx));
 		love["chai_mesh"] = var(std::ref(app->chai_mesh));
 		love["chai_shader"] = var(std::ref(app->chai_shader));
+		love["chai_matrices"] = var(std::ref(app->chai_matrices));
 		love["image"] = var(std::ref(app->image));
 		love["joystick"] = var(std::ref(app->joystick));
 		love["keyboard"] = var(std::ref(app->keyboard));
@@ -321,6 +322,12 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_mesh::wrap_setTexture), "setTexture");
 	chai.add(fun(&chai_shader::send), "send");
 
+	// Matrices
+	chai.add(fun(&chai_matrices::setTransformationMatrix), "setTransformationMatrix");
+	chai.add(fun(&chai_matrices::setProjectionMatrix), "setProjectionMatrix");
+	chai.add(fun(&chai_matrices::setViewMatrix), "setViewMatrix");
+	chai.add(fun(&chai_matrices::setOrthographicMatrix), "setOrthographicMatrix");
+	
 	// Font
 	chai.add(fun(&font::isOpen), "isOpen");
 

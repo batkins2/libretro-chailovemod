@@ -41,7 +41,7 @@ static GLenum createFBO(GLuint &framebuffer, TextureType texType, PixelFormat fo
 	GLuint current_fbo = gl.getFramebuffer(OpenGL::FRAMEBUFFER_ALL);
 
 	glGenFramebuffers(1, &framebuffer);
-	gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, framebuffer);
+	// gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, framebuffer);
 
 	if (texture != 0)
 	{
@@ -113,7 +113,7 @@ static GLenum createFBO(GLuint &framebuffer, TextureType texType, PixelFormat fo
 
 	GLenum status = GL_FRAMEBUFFER_COMPLETE /*glCheckFramebufferStatus(GL_FRAMEBUFFER)*/;
 
-	gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, current_fbo);
+	// gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, current_fbo);
 
 	return status;
 }
@@ -127,7 +127,7 @@ static GLenum newRenderbuffer(int width, int height, int &samples, PixelFormat p
 	// Temporary FBO used to clear the renderbuffer.
 	GLuint fbo = 0;
 	glGenFramebuffers(1, &fbo);
-	gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, fbo);
+	// gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, fbo);
 
 	if (isPixelFormatDepthStencil(pixelformat))
 	{
@@ -204,7 +204,7 @@ static GLenum newRenderbuffer(int width, int height, int &samples, PixelFormat p
 		samples = 1;
 	}
 
-	gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, current_fbo);
+	// gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, current_fbo);
 	gl.deleteFramebuffer(fbo);
 
 	return status;
@@ -538,7 +538,7 @@ void Texture::readbackInternal(int slice, int mipmap, const Rect &rect, int dest
 	else if (fbo)
 	{
 		GLuint current_fbo = gl.getFramebuffer(OpenGL::FRAMEBUFFER_ALL);
-		gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, getFBO());
+		// gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, getFBO());
 
 		if (slice > 0 || mipmap > 0)
 		{
@@ -552,7 +552,7 @@ void Texture::readbackInternal(int slice, int mipmap, const Rect &rect, int dest
 		if (slice > 0 || mipmap > 0)
 			gl.framebufferTexture(GL_COLOR_ATTACHMENT0, texType, texture, 0, 0, 0);
 
-		gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, current_fbo);
+		// gl.bindFramebuffer(OpenGL::FRAMEBUFFER_ALL, current_fbo);
 	}
 
 	// if (!isCompressed())

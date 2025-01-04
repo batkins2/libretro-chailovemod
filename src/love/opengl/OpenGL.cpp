@@ -667,7 +667,7 @@ GLenum OpenGL::getGLBufferDataUsage(BufferDataUsage usage)
 
 void OpenGL::bindBuffer(BufferUsage type, GLuint buffer)
 {
-	if (true || state.boundBuffers[type] != buffer)
+	if (state.boundBuffers[type] != buffer)
 	{
 		glBindBuffer(getGLBufferType(type), buffer);
 		state.boundBuffers[type] = buffer;
@@ -849,9 +849,6 @@ bool OpenGL::isStateEnabled(EnableState enablestate) const
 
 void OpenGL::bindFramebuffer(FramebufferTarget target, GLuint framebuffer)
 {
-	auto fb = hw_render.get_current_framebuffer();
-	if (fb != UINT_MAX)
-		framebuffer = fb;
 	bool bindingmodified = false;
 
 	if ((target & FRAMEBUFFER_DRAW) && state.boundFramebuffers[0] != framebuffer)
@@ -868,6 +865,9 @@ void OpenGL::bindFramebuffer(FramebufferTarget target, GLuint framebuffer)
 
 	if (bindingmodified)
 	{
+		auto fb = hw_render.get_current_framebuffer();
+		if (fb != UINT_MAX)
+			framebuffer = fb;
 		GLenum gltarget = INT_FRAMEBUFFER;
 		if (target == FRAMEBUFFER_DRAW)
 			gltarget = GL_DRAW_FRAMEBUFFER;
@@ -985,7 +985,7 @@ void OpenGL::setTextureUnit(int textureunit)
 
 void OpenGL::bindTextureToUnit(TextureType target, GLuint texture, int textureunit, bool restoreprev, bool bindforedit)
 {
-	if (true || texture != state.boundTextures[target][textureunit])
+	if (texture != state.boundTextures[target][textureunit])
 	{
 		int oldtextureunit = state.curTextureUnit;
 		if (oldtextureunit != textureunit)

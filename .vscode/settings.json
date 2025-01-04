@@ -131,7 +131,8 @@
         "ranges": "cpp",
         "span": "cpp",
         "retro_common_api.h": "c",
-        "coroutine": "cpp"
+        "coroutine": "cpp",
+        "format": "cpp"
     },
     "cmake.ignoreCMakeListsMissing": true
 }

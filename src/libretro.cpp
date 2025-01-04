@@ -582,7 +582,15 @@ void retro_run(void) {
 	// Copy the video buffer to the screen.
 	// video_cb(app->videoBuffer, app->config.window.width, app->config.window.height, app->config.window.width << 2);
 	if (!app->event.m_pauserendering) {
-		video_cb(RETRO_HW_FRAME_BUFFER_VALID, app->config.window.width, app->config.window.height, app->config.window.width << 2);
+		glUseProgram(0);
+		// glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, hw_render.get_current_framebuffer());
+		glBlitFramebuffer(0, 0, app->chai_gfx.width, app->chai_gfx.height,
+				0, 0, app->chai_gfx.width, app->chai_gfx.height,
+				GL_COLOR_BUFFER_BIT, GL_NEAREST);
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+		video_cb(RETRO_HW_FRAME_BUFFER_VALID, app->chai_gfx.width, app->chai_gfx.height, 0);
 	}
 
 

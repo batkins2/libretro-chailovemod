@@ -62,6 +62,8 @@
 #include "love/system.h"
 #include "love/sound.h"
 #include "love/font.h"
+#include "love/fontmod.h"
+#include "love/font/BMFontRasterizer.h"
 #include "love/timer.h"
 #include "love/audio.h"
 #include "love/joystick.h"
@@ -70,6 +72,7 @@
 #include "love/math.h"
 #include "love/event.h"
 #include "love/console.h"
+#include "love/chai_matrices.h"
 #ifndef __HAVE_CHAI_GFX__
 #include "love/chai_gfx.h"
 #endif
@@ -109,6 +112,7 @@ class ChaiLove {
 	love::math math;
 	love::window window;
 	love::event event;
+	love::chai_matrices chai_matrices;
 	// #ifndef __HAVE_CHAI_GFX__
 	love::chai_gfx chai_gfx;
 	// #endif
@@ -136,8 +140,41 @@ class ChaiLove {
 	SDL_Renderer* renderer = NULL;
 	SDL_Window* win = NULL;
 	SDL_Texture* texture = NULL;
-	love::imagemod::Image *getImageModule() { return love::Module::getInstance<love::imagemod::Image>(love::Module::M_IMAGE);; };
+	love::imagemod::Image *getImageModule() { return love::Module::getInstance<love::imagemod::Image>(love::Module::M_IMAGE); };
 	love::filesystem getFSModule() { return filesystem; };
+	void printNew(const std::string& text, int x, int y, int r, int g, int b, int a) {
+		// return;
+		auto t = std::vector<love::fontmod::ColoredString>();
+		auto cs = love::fontmod::ColoredString();
+		cs.str = text;
+		cs.color = love::toColorf(love::Color32(r, g, b, a));
+		t.push_back(cs);
+		
+		 // Load the font definition and image list
+        love::filesystemmod::FileData* fontdef = new love::filesystemmod::FileData(8331, "./love/font/Unnamed.fnt");
+        std::vector<love::imagemod::ImageData*> imagelist;
+		
+		auto imgFile = new love::filesystemmod::FileData(52762, "./love/font/Unnamed.png");
+		auto d = imgFile->getData();
+
+		auto img = love::imagemod::ImageData(426, 434, love::PIXELFORMAT_RGBA8_UNORM, d, false);
+        imagelist.push_back(&img);
+
+        // Instantiate the BMFontRasterizer
+        float dpiscale = 1.0f; // Adjust as needed
+        auto rasterizer = new love::fontmod::BMFontRasterizer(fontdef, imagelist, dpiscale);
+
+		auto sampler = love::gfx::SamplerState { love::gfx::SamplerState::FILTER_NEAREST, love::gfx::SamplerState::FILTER_NEAREST, love::gfx::SamplerState::MIPMAP_FILTER_NONE };
+		auto fontmod = love::gfx::FontMod(rasterizer, sampler);
+		auto i = love::Module::getInstance<love::gfx::Graphics>(love::Module::M_GRAPHICS);
+		fontmod.print(i, t, love::Matrix4(), cs.color);
+
+		delete rasterizer; // Clean up the rasterizer
+        delete fontdef; // Clean up the font definition
+        for (auto img : imagelist) {
+            delete img; // Clean up the image data
+        }
+	}
 };
 
 #endif  // SRC_CHAILOVE_H_

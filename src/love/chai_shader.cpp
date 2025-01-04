@@ -50,11 +50,40 @@ void chai_shader::send(const std::string &uniform, const std::vector<chaiscript:
     if (instance->isCreated()) {
         // int startidx = 0;
         auto info = shader->getUniformInfo(uniform);
+        // newinfo.access = info->access;
         if (info->baseType == gfx::Shader::UNIFORM_SAMPLER || info->baseType == gfx::Shader::UNIFORM_STORAGETEXTURE
             || info->baseType == gfx::Shader::UNIFORM_TEXELBUFFER || info->baseType == gfx::Shader::UNIFORM_STORAGEBUFFER)
             return;
 
-        mathmod::Transform::MatrixLayout layout = mathmod::Transform::MATRIX_ROW_MAJOR;
+        // mathmod::Transform::MatrixLayout layout = mathmod::Transform::MATRIX_ROW_MAJOR;
+        int startidx = 0;
+        std::vector<float> prepD;
+        for (auto d : data) {
+            auto v = chaiscript::boxed_cast<float>(d);
+            prepD.push_back(v);
+            startidx++;
+        }
+
+        // Delete old memory if previously allocated
+        // if (newinfo.floats != nullptr) {
+        //     delete[] newinfo.floats;
+        // }
+
+        // Resize info->floats to accommodate the data from prepD
+        // info->floats = prepD.data();
+        // std::reverse(prepD.begin(), prepD.end());
+        std::memcpy(info->floats, prepD.data(), prepD.size()*sizeof(float));
+
+        // newinfo.baseType = info->baseType;
+        // newinfo.components = info->components;
+        // newinfo.count = startidx;
+        // newinfo.bufferMemberCount = startidx;
+        // newinfo.bufferStride = startidx * sizeof(float);
+        // newinfo.dataSize = prepD.size() * sizeof(float);
+        // newinfo.location = info->location;
+        // newinfo.name = info->name;
+        // newinfo.stageMask = info->stageMask;
+        // newinfo.matrix = info->matrix;
         // int dataidx = startidx;
         // if (info->baseType == gfx::Shader::UNIFORM_MATRIX)
         // {
@@ -82,49 +111,49 @@ void chai_shader::send(const std::string &uniform, const std::vector<chaiscript:
         //     }
         // }
 
-        bool columnmajor = (layout == mathmod::Transform::MATRIX_COLUMN_MAJOR);
-        size_t uniformstride = info->dataSize / info->count;
-        int count = (int) (data.size() / uniformstride);
-        const char *mem = (const char *) data.data();
+        // bool columnmajor = (layout == mathmod::Transform::MATRIX_COLUMN_MAJOR);
+        // size_t uniformstride = info->dataSize / info->count;
+        // int count = (int) (data.size() / uniformstride);
+        // const char *mem = (const char *) data.data();
 
-        if (info->baseType != gfx::Shader::UNIFORM_MATRIX || columnmajor)
-            memcpy(info->data, mem, data.size());
-        else
-        {
-            int columns = info->matrix.columns;
-            int rows = info->matrix.rows;
+        // if (info->baseType != gfx::Shader::UNIFORM_MATRIX || columnmajor)
+        //     memcpy(info->data, mem, data.size());
+        // else
+        // {
+        //     int columns = info->matrix.columns;
+        //     int rows = info->matrix.rows;
 
-            const float *src = (const float *) mem;
-            float *dst = info->floats;
+        //     const float *src = (const float *) mem;
+        //     float *dst = info->floats;
 
-            for (int i = 0; i < count; i++)
-            {
-                for (int row = 0; row < rows; row++)
-                {
-                    for (int column = 0; column < columns; column++)
-                        dst[column * rows + row] = src[row * columns + column];
-                }
+        //     for (int i = 0; i < count; i++)
+        //     {
+        //         for (int row = 0; row < rows; row++)
+        //         {
+        //             for (int column = 0; column < columns; column++)
+        //                 dst[column * rows + row] = src[row * columns + column];
+        //         }
 
-                src += columns * rows;
-                dst += columns * rows;
-            }
-        }
+        //         src += columns * rows;
+        //         dst += columns * rows;
+        //     }
+        // }
 
-        if (false /*&& graphics::isGammaCorrect()*/)
-        {
-            // alpha is always linear (when present).
-            int components = info->components;
-            int gammacomponents = std::min(components, 3);
-            float *values = info->floats;
+        // if (false /*&& graphics::isGammaCorrect()*/)
+        // {
+        //     // alpha is always linear (when present).
+        //     int components = info->components;
+        //     int gammacomponents = std::min(components, 3);
+        //     float *values = info->floats;
 
-            for (int i = 0; i < count; i++)
-            {
-                for (int j = 0; j < gammacomponents; j++)
-                    values[i * components + j] = mathmod::gammaToLinear(values[i * components + j]);
-            }
-        }
+        //     for (int i = 0; i < count; i++)
+        //     {
+        //         for (int j = 0; j < gammacomponents; j++)
+        //             values[i * components + j] = mathmod::gammaToLinear(values[i * components + j]);
+        //     }
+        // }
 
-        shader->updateUniform(info, count);
+        shader->updateUniform(info, startidx/(info->matrix.columns*info->matrix.rows));
     }
 }
 }

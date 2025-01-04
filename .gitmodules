@@ -88,3 +88,6 @@
 [submodule "vendor/libpng"]
 	path = vendor/libpng
 	url = https://github.com/pnggroup/libpng
+[submodule "vendor/glm"]
+	path = vendor/glm
+	url = https://github.com/g-truc/glm.git

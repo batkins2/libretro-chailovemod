@@ -50,7 +50,7 @@ static inline love::fontmod::TextShaper::GlyphIndex unpackGlyphIndex(uint64 pack
 	return {(int) (packedindex & 0xFFFFFFFF), (int) (packedindex >> 32)};
 }
 
-love::Type FontMod::type("Font", &Object::type);
+love::Type FontMod::type("FontMod", &Object::type);
 int FontMod::fontCount = 0;
 
 const CommonFormat FontMod::vertexFormat = CommonFormat::XYf_STus_RGBAub;
