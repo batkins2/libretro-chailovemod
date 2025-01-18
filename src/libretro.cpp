@@ -240,14 +240,14 @@ void retro_get_system_av_info(struct retro_system_av_info *info) {
 	if (!ChaiLove::hasInstance()) {
 		return;
 	}
-	unsigned int width = 640;
-	unsigned int height = 480;
+	unsigned int width = 1440;
+	unsigned int height = 1080;
 
-	ChaiLove* app = ChaiLove::getInstance();
-	if (app != NULL) {
-		width = app->config.window.width;
-		height = app->config.window.height;
-	}
+	// ChaiLove* app = ChaiLove::getInstance();
+	// if (app != NULL) {
+	// 	width = app->config.window.width;
+	// 	height = app->config.window.height;
+	// }
 
 	info->geometry.base_width   = width;
 	info->geometry.base_height  = height;
@@ -575,6 +575,12 @@ void retro_run(void) {
 
 	// Update the game.
 	app->update();
+
+	// Clear the color and depth buffers
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // Set the clear color (optional, if you want to change the background color)
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
 	// Render the game.
 	app->draw();

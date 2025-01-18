@@ -132,7 +132,9 @@
         "span": "cpp",
         "retro_common_api.h": "c",
         "coroutine": "cpp",
-        "format": "cpp"
+        "format": "cpp",
+        "csetjmp": "cpp",
+        "version": "cpp"
     },
     "cmake.ignoreCMakeListsMissing": true
 }

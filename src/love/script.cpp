@@ -122,6 +122,7 @@ script::script(const std::string& file) {
 	chai.add(bootstrap::standard_library::map_type<std::map<std::string, bool>>("StringBoolMap"));
 	chai.add(bootstrap::standard_library::map_type<std::map<std::string, int>>("StringIntMap"));
 	chai.add(bootstrap::standard_library::map_type<std::map<std::string, float>>("StringFloatMap"));
+	chai.add(bootstrap::standard_library::map_type<std::map<std::string, std::vector<float>>>("StringFloatVectorMap"));
 
 	// ChaiScript_Extras: String Methods
 	auto stringmethods = chaiscript::extras::string_methods::bootstrap();
@@ -313,13 +314,16 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_gfx::wrap_newShader), "newShader");
 	chai.add(fun(&chai_gfx::wrap_setShader), "setShader");
 	chai.add(fun(&chai_gfx::wrap_newMesh), "newMesh");
+	chai.add(fun(&chai_gfx::wrap_newMeshFromFile), "newMeshFromFile");
 	chai.add(fun(&chai_gfx::draw), "draw");
+	chai.add(fun(&chai_gfx::drawScene), "drawScene");
 	chai.add(fun(&chai_gfx::createCanvas), "createCanvas");
 	chai.add(fun(&chai_gfx::drawCanvas), "drawCanvas");
 	chai.add(user_type<chai_mesh>(), "chai_mesh");
 	chai.add(constructor<chai_mesh(const chai_mesh &)>(), "chai_mesh");
 	chai.add(fun(&chai_mesh::operator=), "=");
 	chai.add(fun(&chai_mesh::wrap_setTexture), "setTexture");
+	chai.add(fun(&chai_mesh::getCameraParams), "getCameraParams");
 	chai.add(fun(&chai_shader::send), "send");
 
 	// Matrices

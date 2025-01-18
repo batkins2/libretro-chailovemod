@@ -52,6 +52,16 @@
 #include "SDL2/SDL.h"
 #include "libretro.h"
 #include "love/common/Module.h"
+#include "love/chai_matrices.h"
+#ifndef __HAVE_CHAI_GFX__
+#include "love/chai_gfx.h"
+#endif
+#ifndef __HAVE_CHAI_MESH__
+#include "love/chai_mesh.h"
+#endif
+#ifndef __HAVE_CHAI_SHADER__
+#include "love/chai_shader.h"
+#endif
 #include "love/keyboard.h"
 #include "love/config.h"
 #include "love/data.h"
@@ -72,16 +82,6 @@
 #include "love/math.h"
 #include "love/event.h"
 #include "love/console.h"
-#include "love/chai_matrices.h"
-#ifndef __HAVE_CHAI_GFX__
-#include "love/chai_gfx.h"
-#endif
-#ifndef __HAVE_CHAI_MESH__
-#include "love/chai_mesh.h"
-#endif
-#ifndef __HAVE_CHAI_SHADER__
-#include "love/chai_shader.h"
-#endif
 
 class ChaiLove {
 	public:

@@ -277,13 +277,13 @@ std::string graphics::getDefaultFilter() {
 
 
 int graphics::getWidth() {
-	return 800;
+	return 1440;
 	int w = NULL;
 	SDL_GL_GetDrawableSize(ChaiLove::getInstance()->win, &w, NULL);
 	return w;
 }
 int graphics::getHeight() {
-	return 600;
+	return 1080;
 	int h = NULL;
 	SDL_GL_GetDrawableSize(ChaiLove::getInstance()->win, NULL, &h);
 	return h;

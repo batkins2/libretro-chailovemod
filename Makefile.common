@@ -359,6 +359,21 @@ FLAGS += -I$(CORE_DIR)/vendor/TinySHA1
 # cppcodec
 FLAGS += -I$(CORE_DIR)/vendor/cppcodec
 
+# Magnum
+#FLAGS += -I$(CORE_DIR)/vendor/magnum/src/Magnum/Trade
+#FLAGS += -I$(CORE_DIR)/vendor/corrade/src/Corrade/PluginManager
+#FLAGS += -I$(CORE_DIR)/vendor/corrade/src/Corrade/Containers
+# FLAGS += -DCORRADE_BUILD_STATIC
+# FLAGS += -I$(CORE_DIR)/vendor/corrade_x64-windows/include
+# FLAGS += -I$(CORE_DIR)/vendor/magnum_x64-windows/include
+# SOURCES_CXX += $(wildcard \
+# 	./vendor/corrade/src/Corrade/Containers/*.cpp \
+# 	./vendor/corrade/src/Corrade/PluginManager/*.cpp \
+# 	./vendor/magnum/src/Magnum/Trade/*.cpp)
+
+# RapidJSON
+FLAGS += -I$(CORE_DIR)/vendor/rapidjson/include/rapidjson
+
 # ChaiScript
 ifeq ($(HAVE_CHAISCRIPT),)
 	FLAGS += -I$(CORE_DIR)/vendor/chaiscript/include

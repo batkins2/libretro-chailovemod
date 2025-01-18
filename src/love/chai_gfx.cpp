@@ -25,21 +25,21 @@ bool chai_gfx::init() {
     instance->hw_render = hw_render;
     instance->FRAMEBUFFER = FRAMEBUFFER;
     instance->COLORATTACH = COLORATTACH;
-    
+    // instance->setProjection(Matrix4::perspective(120000.0f, 800.0f/600.0f, 0.1f, 100.0f));
     win = new windowmod::sdl::Window();
-    win->setGraphics(instance);
+    
     auto winset = new windowmod::WindowSettings();
     winset->displayindex = 0;
     winset->depth = 16;
     
+    width = 1440;
+    height = 1080;
 
-    win->setWindow(800, 600, winset);
-    width = 800;
-    height = 600;
-    
-    
-    // instance->setProjection(Matrix4());
-    // instance->setMode(nullptr, 800, 600, 800, 600, true, 16, 0);
+    win->setWindow(width, height, winset);
+  
+    win->setGraphics(instance);
+
+    // instance->setMode(nullptr, 1920, 1080, 1920, 1080, true, 16, 0);
     // instance = new gfx::opengl::Graphics();
     // love::window::WindowSettings *ws;
     // ws->fullscreen = true;
@@ -178,6 +178,18 @@ chai_mesh *chai_gfx::wrap_newMesh(const std::vector<chaiscript::Boxed_Value> &ve
     return nullptr;
 }
 
+chai_mesh *chai_gfx::wrap_newMeshFromFile(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type) {
+    if (instance->isCreated()) {
+        auto m = new chai_mesh();
+        
+        // instance->bindVAO();
+        m->newMeshFromFile(instance, vertexFormat, FileName, type);
+        meshes.push_back(m);
+        return m;
+    }
+    return nullptr;
+}
+
 void chai_gfx::createCanvas() {
     gfx::Texture::Settings settings;
     settings.width = 800;
@@ -220,75 +232,42 @@ void readFBOIntoVideoBuffer(love::gfx::Graphics *instance, love::gfx::Mesh *mesh
 }
 
 
-void chai_gfx::draw(chai_mesh *m) {
+void chai_gfx::drawScene() {
     if (instance->isCreated()) {
-        instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
-        gfx::OptionalColorD clearcolor;
-		OptionalInt clearstencil(0);
-		OptionalDouble cleardepth(1.0);
-        instance->clear(clearcolor, clearstencil, cleardepth);
-        // auto winset = new windowmod::WindowSettings();
-        // winset->displayindex = 0;
-        // win->setWindow(800, 600, winset);
-        // instance->setMode(nullptr, 800, 600, 800, 600, true, true, 0);
-        // glBindFramebuffer(FRAMEBUFFER, hw_render.get_current_framebuffer());
-        auto matrix = Matrix4(new float[16] {
-            1.0f,
-            0.0f,
-            0.0f,
-            0.0f,
-            0.0f,
-            1.0f,
-            0.0f,
-            0.0f,
-            0.0f,
-            0.0f,
-            1.0f,
-            0.0f,
-            0.0f,
-            0.0f,
-            0.0f,
-            1.0f});
-        // auto matrix2 = Matrix4(new float[16] {
-        //     1.0f,
-        //     0.0f,
-        //     0.0f,
-        //     0.0f,
-        //     0.0f,
-        //     1.0f,
-        //     0.0f,
-        //     0.0f,
-        //     0.0f,
-        //     0.0f,
-        //     1.0f,
-        //     0.0f,
-        //     0.0f,
-        //     0.0f,
-        //     0.0f,
-        //     1.0f});
-        // auto tex = m->mesh->getTexture();
-        // auto q = gfx::Quad({0,0,800,600},1,1);
-        // tex->draw(instance, &q, matrix2);
-
-        // createCanvas();
-        // auto rt = gfx::Graphics::RenderTarget(canvas, 0, 0);
-        // instance->setRenderTarget(rt, 0);
-        // auto cl = ChaiLove::getInstance();
-        // cl->event.pause();
-        m->mesh->draw(instance, matrix);
         // instance->setRenderTarget();
-        instance->setShader();
-        // instance->setShader(0);
-        // canvas->draw(instance, matrix);
-        
+        // auto matrix = Matrix4(new float[16] {
+        //     1.0f, 0.0f, 0.0f, 0.0f,
+        //     0.0f, 1.0f, 0.0f, 0.0f,
+        //     0.0f, 0.0f, 1.0f, 0.0f,
+        //     0.0f, 0.0f, 0.0f, 1.0f});
         // instance->draw(canvas, matrix);
-
-
-        // cl->event.pause();
-        // instance->unSetMode();
-        // readFBOIntoVideoBuffer(instance, m->mesh);
-        // drawCanvas();
+        instance->setShader();
+        scene = nullptr;
     }
+}
+
+void chai_gfx::draw(chai_mesh *m) {
+    if (instance->isCreated()) { 
+        if (scene == nullptr) {
+            scene = new SceneMesh();
+            instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+            gfx::OptionalColorD clearcolor;
+            OptionalInt clearstencil(0);
+            OptionalDouble cleardepth(1.0);
+            instance->clear(clearcolor, clearstencil, cleardepth);
+            // createCanvas();
+            // auto rt = gfx::Graphics::RenderTarget(canvas, 0, 0);
+            // instance->setRenderTarget(rt, 0);        
+        }    
+        auto matrix = Matrix4(new float[16] {
+            1.0f, 0.0f, 0.0f, 0.0f,
+            0.0f, 1.0f, 0.0f, 0.0f,
+            0.0f, 0.0f, 1.0f, 0.0f,
+            0.0f, 0.0f, 0.0f, 1.0f});  
+        m->draw(instance, matrix, shader);
+    }
+
+//     scene->addMesh(m);
 }
 
 void chai_gfx::drawCanvas() {

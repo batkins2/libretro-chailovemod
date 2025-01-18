@@ -19,7 +19,7 @@ glm::mat4 chai_matrices::setTransformationMatrixInternal(glm::vec3 translation, 
 }
 glm::mat4 chai_matrices::setProjectionMatrixInternal(float fov, float aspect, float near, float far)
 {
-    return glm::perspective(glm::radians(fov), aspect, near, far);
+    return glm::perspective(fov, aspect, near, far);
 }
 glm::mat4 chai_matrices::setOrthographicMatrixInternal(float left, float right, float bottom, float top, float near, float far)
 {

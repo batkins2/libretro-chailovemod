@@ -1,6 +1,7 @@
+#define __HAVE_CHAI_SHADER__
+
 #include "gfx.h"
 
-#define __HAVE_CHAI_SHADER__
 
 #ifdef __HAVE_CHAISCRIPT__
 #include <chaiscript/chaiscript.hpp>
