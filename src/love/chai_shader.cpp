@@ -46,114 +46,96 @@ void chai_shader::newFragmentShader(love::gfx::Graphics *inst, std::vector<std::
     }
 }
 
-void chai_shader::send(const std::string &uniform, const std::vector<chaiscript::Boxed_Value> &data) {
+void chai_shader::sendMap(const std::string &uniform, const std::map<int, glm::mat4> &data) {
     if (instance->isCreated()) {
-        // int startidx = 0;
         auto info = shader->getUniformInfo(uniform);
-        // newinfo.access = info->access;
         if (info->baseType == gfx::Shader::UNIFORM_SAMPLER || info->baseType == gfx::Shader::UNIFORM_STORAGETEXTURE
             || info->baseType == gfx::Shader::UNIFORM_TEXELBUFFER || info->baseType == gfx::Shader::UNIFORM_STORAGEBUFFER)
             return;
 
-        // mathmod::Transform::MatrixLayout layout = mathmod::Transform::MATRIX_ROW_MAJOR;
+
         int startidx = 0;
-        std::vector<float> prepD;
-        for (auto d : data) {
-            auto v = chaiscript::boxed_cast<float>(d);
-            prepD.push_back(v);
-            startidx++;
+        std::vector<float> prepD;    
+        for (auto value : data) {
+            auto i = value.first;
+            auto m = value.second;
+            for (int c = 0; c < 4; ++c) {
+                prepD.push_back(m[c].x);
+                // printf("%f ", m[c].x);
+                prepD.push_back(m[c].y);
+                // printf("%f ", m[c].y);
+                prepD.push_back(m[c].z);
+                // printf("%f ", m[c].z);
+                prepD.push_back(m[c].w);
+                // printf("%f\n", m[c].w);
+                startidx+=4;
+            }            
         }
-
-        // Delete old memory if previously allocated
-        // if (newinfo.floats != nullptr) {
-        //     delete[] newinfo.floats;
-        // }
-
-        // Resize info->floats to accommodate the data from prepD
-        // info->floats = prepD.data();
-        // std::reverse(prepD.begin(), prepD.end());
         std::memcpy(info->floats, prepD.data(), prepD.size()*sizeof(float));
 
-        // newinfo.baseType = info->baseType;
-        // newinfo.components = info->components;
-        // newinfo.count = startidx;
-        // newinfo.bufferMemberCount = startidx;
-        // newinfo.bufferStride = startidx * sizeof(float);
-        // newinfo.dataSize = prepD.size() * sizeof(float);
-        // newinfo.location = info->location;
-        // newinfo.name = info->name;
-        // newinfo.stageMask = info->stageMask;
-        // newinfo.matrix = info->matrix;
-        // int dataidx = startidx;
-        // if (info->baseType == gfx::Shader::UNIFORM_MATRIX)
-        // {
-
-        //     if (lua_type(L, startidx) == LUA_TSTRING)
-        //     {
-        //         // (matrixlayout, data, ...)
-        //         const char *layoutstr = lua_tostring(L, startidx);
-        //         if (!math::Transform::getConstant(layoutstr, layout))
-        //             return luax_enumerror(L, "matrix layout", math::Transform::getConstants(layout), layoutstr);
-
-        //         startidx++;
-        //         dataidx = startidx;
-        //     }
-        //     else if (lua_type(L, startidx + 1) == LUA_TSTRING)
-        //     {
-        //         // (data, matrixlayout, ...)
-        //         // Should be deprecated in the future (doesn't match the argument
-        //         // order of Shader:send(name, matrixlayout, table))
-        //         const char *layoutstr = lua_tostring(L, startidx + 1);
-        //         if (!math::Transform::getConstant(layoutstr, layout))
-        //             return luax_enumerror(L, "matrix layout", math::Transform::getConstants(layout), layoutstr);
-
-        //         startidx++;
-        //     }
-        // }
-
-        // bool columnmajor = (layout == mathmod::Transform::MATRIX_COLUMN_MAJOR);
-        // size_t uniformstride = info->dataSize / info->count;
-        // int count = (int) (data.size() / uniformstride);
-        // const char *mem = (const char *) data.data();
-
-        // if (info->baseType != gfx::Shader::UNIFORM_MATRIX || columnmajor)
-        //     memcpy(info->data, mem, data.size());
-        // else
-        // {
-        //     int columns = info->matrix.columns;
-        //     int rows = info->matrix.rows;
-
-        //     const float *src = (const float *) mem;
-        //     float *dst = info->floats;
-
-        //     for (int i = 0; i < count; i++)
-        //     {
-        //         for (int row = 0; row < rows; row++)
-        //         {
-        //             for (int column = 0; column < columns; column++)
-        //                 dst[column * rows + row] = src[row * columns + column];
-        //         }
-
-        //         src += columns * rows;
-        //         dst += columns * rows;
-        //     }
-        // }
-
-        // if (false /*&& graphics::isGammaCorrect()*/)
-        // {
-        //     // alpha is always linear (when present).
-        //     int components = info->components;
-        //     int gammacomponents = std::min(components, 3);
-        //     float *values = info->floats;
-
-        //     for (int i = 0; i < count; i++)
-        //     {
-        //         for (int j = 0; j < gammacomponents; j++)
-        //             values[i * components + j] = mathmod::gammaToLinear(values[i * components + j]);
-        //     }
-        // }
-
         shader->updateUniform(info, startidx/(info->matrix.columns*info->matrix.rows));
+    }
+}
+
+void chai_shader::send(const std::string &uniform, const std::vector<chaiscript::Boxed_Value> &data) {
+    if (instance->isCreated()) {
+        auto info = shader->getUniformInfo(uniform);
+        if (info->baseType == gfx::Shader::UNIFORM_SAMPLER || info->baseType == gfx::Shader::UNIFORM_STORAGETEXTURE
+            || info->baseType == gfx::Shader::UNIFORM_TEXELBUFFER || info->baseType == gfx::Shader::UNIFORM_STORAGEBUFFER)
+            return;
+
+        if (info->baseType == gfx::Shader::UNIFORM_INT) {
+            int startidx = 0;
+            std::vector<int> prepD;
+            for (auto d : data) {
+                auto v = chaiscript::boxed_cast<int>(d);
+                prepD.push_back(v);
+                startidx++;
+            }
+            std::memcpy(info->ints, prepD.data(), prepD.size()*sizeof(int));
+
+            shader->updateUniform(info, startidx);
+        } else if (info->baseType == gfx::Shader::UNIFORM_MATRIX && uniform == "jointMatrix") {
+            int startidx = 0;
+            
+            for (auto d : data) {
+                for (auto v : chaiscript::boxed_cast<std::vector<chaiscript::Boxed_Value>>(d)) {
+                    auto f = chaiscript::boxed_cast<std::map<chaiscript::Boxed_Value, chaiscript::Boxed_Value>>(v);
+                    for (auto value : f) {
+                        auto i = chaiscript::boxed_cast<int>(value.first);
+                        auto m = chaiscript::boxed_cast<std::vector<chaiscript::Boxed_Value>>(value.second);
+                        std::vector<float> prepD;
+                        for (auto d : m) {
+                            auto v = chaiscript::boxed_cast<float>(d);
+                            prepD.push_back(v);
+                            startidx++;
+                        }
+                        std::memcpy(info->data, prepD.data(), prepD.size()*sizeof(float));
+
+                        shader->updateUniform(info, startidx/(info->matrix.columns*info->matrix.rows));
+                    }
+                }
+            }
+            
+        
+        } else {
+            int startidx = 0;
+            std::vector<float> prepD;
+            for (auto d : data) {
+                auto v = chaiscript::boxed_cast<float>(d);
+                prepD.push_back(v);
+                startidx++;
+            }
+            std::memcpy(info->floats, prepD.data(), prepD.size()*sizeof(float));
+
+            if (info->matrix.rows != 0) {
+                shader->updateUniform(info, startidx/(info->matrix.columns*info->matrix.rows));
+            } else {
+                shader->updateUniform(info, startidx / info->matrix.columns);
+            }
+
+        }
+        
     }
 }
 }

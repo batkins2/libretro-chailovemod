@@ -12,6 +12,7 @@
 #include <chaiscript/chaiscript.hpp>
 #endif
 
+#include <glm/glm.hpp>
 
 namespace love {
 class chai_gfx;
@@ -60,6 +61,8 @@ class chai_mesh {
     bool newMesh(love::gfx::Graphics *inst, const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::vector<chaiscript::Boxed_Value> &data, const std::string &type);
     bool newMeshFromFile(love::gfx::Graphics *inst, const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type);
     bool wrap_setTexture(const std::string &texture);
+    void playAnimation(const std::string &name, const bool loop);
+    void stopAnimation(const std::string &name);
     void draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *s);
     love::gfx::Graphics *instance;
     gfx::Mesh *mesh = nullptr;
@@ -74,7 +77,9 @@ class chai_mesh {
     std::vector<gfx::Texture *> textures;
     std::vector<gfx::Buffer::DataDeclaration> vf;
     std::map<std::string, std::vector<float>> cameraParams;
-    std::vector< // Animation
+    std::map<std::string, std::vector<float>> lightParams;
+    std::map< // Animation
+        std::string, // Name
         std::vector< // Channel
             std::map<
                 int, // Node
@@ -87,5 +92,13 @@ class chai_mesh {
             >
         >
     > animations;
+    float currentTime = 0.0f;
+    std::vector<int> nodes;
+    // std::vector<int> meshList;
+    std::map<int, std::map<int, std::vector<float>>> skins;
+    std::map<int, int> meshToNode;
+    std::map<std::string, std::pair<float, bool>> activeAnimations;
+    // std::map<int, std::vector<int>> nodeChildren;
+    // float jointMinValue;
 };
 }

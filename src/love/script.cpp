@@ -324,6 +324,8 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_mesh::operator=), "=");
 	chai.add(fun(&chai_mesh::wrap_setTexture), "setTexture");
 	chai.add(fun(&chai_mesh::getCameraParams), "getCameraParams");
+	chai.add(fun(&chai_mesh::playAnimation), "playAnimation");
+	chai.add(fun(&chai_mesh::stopAnimation), "stopAnimation");
 	chai.add(fun(&chai_shader::send), "send");
 
 	// Matrices

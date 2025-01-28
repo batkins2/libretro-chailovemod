@@ -2,7 +2,7 @@
 #include "data/DataModule.h"
 #include "image/CompressedImageData.h"
 #include "image/FormatHandler.h"
-#include <glm/glm.hpp>
+#include <chrono>
 
 #ifndef TINY_GLTF_H_
 #define TINYGLTF_USE_RAPIDJSON
@@ -38,13 +38,17 @@ std::vector<gfx::Buffer::DataDeclaration> vertexFormatLoader(const std::vector<c
             
         } else if (temp[1] == "float") {
             auto t2 = atoi(temp[2].c_str());
-            if (t2 > 2) {
+            if (t2 > 3) {
+                t1 = gfx::DATAFORMAT_FLOAT_VEC4;
+            } else if (t2 > 2) {
                 t1 = gfx::DATAFORMAT_FLOAT_VEC3;
             } else {
                 t1 = gfx::DATAFORMAT_FLOAT_VEC2;
             }
             t2 = 1;
             vf.push_back(gfx::Buffer::DataDeclaration(temp[0], t1, t2));
+        } else if (temp[1] == "word") {
+            vf.push_back(gfx::Buffer::DataDeclaration(temp[0], gfx::DATAFORMAT_UINT16_VEC4, 1));
         }
     }
     // vf.push_back(b.at(0));
@@ -165,8 +169,68 @@ gfx::Mesh *loadMesh(size_t i, tinygltf::Model &model, love::gfx::Graphics *insta
     auto jointAccessor = model.accessors[primitive.attributes["JOINTS_0"]];
     auto jointBufferView = model.bufferViews[jointAccessor.bufferView];
     auto jointBuffer = model.buffers[jointBufferView.buffer];
-    const unsigned short* joints = reinterpret_cast<const unsigned short*>(&jointBuffer.data[jointAccessor.byteOffset + jointBufferView.byteOffset]);
+    
+    // cm->nodes = model.scenes[0].nodes;
 
+    cm->skins = std::map<
+        int,
+        std::map<
+            int, std::vector<float>
+        >
+    >();
+
+    auto skinMaps = std::vector<std::map<int, std::vector<float>>>();
+
+    for (auto skin : model.skins) {
+        auto inverseBindMatricesAccessor = model.accessors[skin.inverseBindMatrices];
+        auto inverseBindMatricesBufferView = model.bufferViews[inverseBindMatricesAccessor.bufferView];
+        auto inverseBindMatricesBuffer = model.buffers[inverseBindMatricesBufferView.buffer];
+        const float* inverseBindMatrices = reinterpret_cast<const float*>(&inverseBindMatricesBuffer.data[inverseBindMatricesAccessor.byteOffset + inverseBindMatricesBufferView.byteOffset]);
+        
+        std::map<int, std::vector<float>> skinMap;
+
+        for (size_t i = 0; i < inverseBindMatricesAccessor.count; ++i) {
+            auto node = skin.joints[i];
+            auto ibMatrix = std::vector<float>();        
+            for (size_t j = 0; j < 16; ++j) {
+                ibMatrix.push_back(inverseBindMatrices[i * 16 + j]);
+            }
+            skinMap[node] = ibMatrix;
+        }
+        skinMaps.push_back(skinMap);
+    }
+
+    int index = 0;
+    for (auto node : model.nodes) {
+        if (node.mesh != -1 && node.skin != -1) {
+            auto skin = skinMaps[node.skin];
+            auto skinMap = std::map<int, std::vector<float>>();
+            for (auto s : skin) {
+                skinMap[s.first] = s.second;
+            }
+            cm->skins[node.mesh] = skinMap;
+        }
+        if (node.mesh != -1) {
+            // cm->meshList.push_back(index);
+            cm->meshToNode[node.mesh] = index;
+        }
+        // if (node.children.size() > 0) {
+        //     auto joints = std::vector<int>();
+        //     auto m = -1;
+        //     for (auto child : node.children) {
+        //         if (model.nodes[child].mesh != -1) {
+        //             m = child;       
+        //         } else {
+        //             joints.push_back(child);
+        //         }                
+        //     }
+        //     if (m != -1) {
+        //         cm->nodeChildren[m] = joints;
+        //     }
+        // }
+        index++;
+    }
+        
     if (indiceAccessor.componentType != TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
         const unsigned int* indices = reinterpret_cast<const unsigned int*>(&indiceBuffer.data[indiceAccessor.byteOffset + indiceBufferView.byteOffset]);
         uint32_t fbits = 0xffffffff;
@@ -188,18 +252,124 @@ gfx::Mesh *loadMesh(size_t i, tinygltf::Model &model, love::gfx::Graphics *insta
                 memcpy(&fbits, &normals[indices[i] * 3 + j], sizeof(fbits));
                 prepD.push_back(fbits);
             }
-
-            // // Extract and push weights
+            
+             // Extract and push weights
             // for (size_t j = 0; j < 4; ++j) {
-            //     memcpy(&fbits, &weights[indices[i] * 4 + j], sizeof(fbits));
+            //     float weight = weights[indices[i] * 4 + j];
+            //     // uint8_t joint = joints[indices[i] * 4 + j];
+                
+            //     // if (weight > 0.0f && joint == 0) {
+            //     //     memcpy(&fbits, &weight, sizeof(fbits));
+            //     // } else {
+            //     //     fbits = 0.0f;
+            //     // }
+            //     memcpy(&fbits, &weight, sizeof(fbits));
             //     prepD.push_back(fbits);
+            //     // printf("%f\n", weights[indices[i] * 4 + j]);
+            //     // printf("%f\n", fbits);
             // }
 
-            // // Extract and push joints
-            // for (size_t j = 0; j < 4; ++j) {
-            //     memcpy(&fbits, &joints[indices[i] * 4 + j], sizeof(fbits));
-            //     prepD.push_back(fbits);
-            // }
+            // Extract and push weights and joints
+            if (jointAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+                const uint8_t* joints = reinterpret_cast<const uint8_t*>(&jointBuffer.data[jointAccessor.byteOffset + jointBufferView.byteOffset]);
+                
+                for (size_t j = 0; j < 4; ++j) {
+                    float weight = weights[indices[i] * 4 + j];
+                    uint8_t joint = joints[indices[i] * 4 + j];
+                    
+                    // if (weight > 0.0f && joint == i) {
+                    //     memcpy(&fbits, &weight, sizeof(fbits));
+                    // } else {
+                    //     fbits = 0xffffffff;
+                    // }
+                    memcpy(&fbits, &weight, sizeof(fbits));
+                    prepD.push_back(fbits);
+                    // printf("%f\n", weights[indices[i] * 4 + j]);
+                    // printf("%f\n", fbits);
+                }
+
+                for (size_t j = 0; j < 4; ++j) {
+                    float weight = weights[indices[i] * 4 + j];                
+                    uint8_t joint = joints[indices[i] * 4 + j];
+                    // printf("%d\n", joint);
+                    // if (weight > 0.0f && joint == i) {
+                    //     auto v = static_cast<float>(joint);
+                    //     memcpy(&fbits, &v, sizeof(fbits));                
+                    // } else {
+                    //     fbits = 0xffffffff;
+                    // }
+                    auto v = static_cast<float>(joint);
+                    memcpy(&fbits, &v, sizeof(fbits));                
+                    // printf("%f\n", fbits);
+                    prepD.push_back(fbits);
+                }
+            } else if (jointAccessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT) {
+                const float* joints = reinterpret_cast<const float*>(&jointBuffer.data[jointAccessor.byteOffset + jointBufferView.byteOffset]);
+
+                for (size_t j = 0; j < 4; ++j) {
+                    float weight = weights[indices[i] * 4 + j];
+                    float joint = joints[indices[i] * 4 + j];
+                    
+                    // if (weight > 0.0f && i == (int)joint) {
+                    //     memcpy(&fbits, &weight, sizeof(fbits));
+                    // } else {
+                    //     fbits = 0xffffffff;
+                    // }
+                    memcpy(&fbits, &weight, sizeof(fbits));
+                    prepD.push_back(fbits);
+                    // printf("%f\n", weights[indices[i] * 4 + j]);
+                    // printf("%f\n", fbits);
+                }
+
+                for (size_t j = 0; j < 4; ++j) {
+                    float weight = weights[indices[i] * 4 + j];                
+                    float joint = joints[indices[i] * 4 + j];
+                    // printf("%d\n", joint);
+                    // if (weight > 0.0f && i == (int)joint) {
+                    //     memcpy(&fbits, &joint, sizeof(fbits));                
+                    // } else {
+                    //     fbits = 0xffffffff;
+                    // }
+                    // auto v = static_cast<float>(joint);
+                    memcpy(&fbits, &joint, sizeof(fbits));                
+                    // printf("%f\n", fbits);
+                    prepD.push_back(fbits);
+                }
+            
+            } else {
+                const uint16_t* joints = reinterpret_cast<const uint16_t*>(&jointBuffer.data[jointAccessor.byteOffset + jointBufferView.byteOffset]);
+                
+                for (size_t j = 0; j < 4; ++j) {
+                    float weight = weights[indices[i] * 4 + j];
+                    uint16_t joint = joints[indices[i] * 4 + j];
+                    
+                    // if (weight > 0.0f && joint == i) {
+                    //     memcpy(&fbits, &weight, sizeof(fbits));
+                    // } else {
+                    //     fbits = 0xffffffff;
+                    // }
+                    memcpy(&fbits, &weight, sizeof(fbits));
+                    prepD.push_back(fbits);
+                    // printf("%f\n", weights[indices[i] * 4 + j]);
+                    // printf("%f\n", fbits);
+                }
+
+                for (size_t j = 0; j < 4; ++j) {
+                    float weight = weights[indices[i] * 4 + j];                
+                    uint16_t joint = joints[indices[i] * 4 + j];
+                    // printf("%d\n", joint);
+                    // if (weight > 0.0f && joint == i) {
+                    //     auto v = static_cast<float>(joint);
+                    //     memcpy(&fbits, &v, sizeof(fbits));                
+                    // } else {
+                    //     fbits = 0xffffffff;
+                    // }
+                    auto v = static_cast<float>(joint);
+                    memcpy(&fbits, &v, sizeof(fbits));                
+                    // printf("%f\n", fbits);
+                    prepD.push_back(fbits);
+                }
+            }
 
             prepD.push_back(0xffffffff); // Placeholder for any additional data
         }
@@ -225,17 +395,123 @@ gfx::Mesh *loadMesh(size_t i, tinygltf::Model &model, love::gfx::Graphics *insta
                 prepD.push_back(fbits);
             }
 
-            // // Extract and push weights
+            // Extract and push weights
             // for (size_t j = 0; j < 4; ++j) {
-            //     memcpy(&fbits, &weights[indices[i] * 4 + j], sizeof(fbits));
+            //     float weight = weights[indices[i] * 4 + j];
+            //     // uint8_t joint = joints[indices[i] * 4 + j];
+                
+            //     // if (weight > 0.0f && joint == 0) {
+            //     //     memcpy(&fbits, &weight, sizeof(fbits));
+            //     // } else {
+            //     //     fbits = 0.0f;
+            //     // }
+            //     memcpy(&fbits, &weight, sizeof(fbits));
             //     prepD.push_back(fbits);
+            //     // printf("%f\n", weights[indices[i] * 4 + j]);
+            //     // printf("%f\n", fbits);
             // }
 
-            // // Extract and push joints
-            // for (size_t j = 0; j < 4; ++j) {
-            //     memcpy(&fbits, &joints[indices[i] * 4 + j], sizeof(fbits));
-            //     prepD.push_back(fbits);
-            // }
+            // Extract and push weights and joints
+            if (jointAccessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+                const uint8_t* joints = reinterpret_cast<const uint8_t*>(&jointBuffer.data[jointAccessor.byteOffset + jointBufferView.byteOffset]);
+                
+                for (size_t j = 0; j < 4; ++j) {
+                    float weight = weights[indices[i] * 4 + j];
+                    uint8_t joint = joints[indices[i] * 4 + j];
+                    
+                    // if (weight > 0.0f && joint == i) {
+                    //     memcpy(&fbits, &weight, sizeof(fbits));
+                    // } else {
+                    //     fbits = 0xffffffff;
+                    // }
+                    memcpy(&fbits, &weight, sizeof(fbits));
+                    prepD.push_back(fbits);
+                    // printf("%f\n", weights[indices[i] * 4 + j]);
+                    // printf("%f\n", fbits);
+                }
+
+                for (size_t j = 0; j < 4; ++j) {
+                    float weight = weights[indices[i] * 4 + j];                
+                    uint8_t joint = joints[indices[i] * 4 + j];
+                    // printf("%d\n", joint);
+                    // if (weight > 0.0f && joint == i) {
+                    //     auto v = static_cast<float>(joint);
+                    //     memcpy(&fbits, &v, sizeof(fbits));                
+                    // } else {
+                    //     fbits = 0xffffffff;
+                    // }
+                    auto v = static_cast<float>(joint);
+                    memcpy(&fbits, &v, sizeof(fbits));                
+                    // printf("%f\n", fbits);
+                    prepD.push_back(fbits);
+                }
+            } else if (jointAccessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT) {
+                const float* joints = reinterpret_cast<const float*>(&jointBuffer.data[jointAccessor.byteOffset + jointBufferView.byteOffset]);
+
+                for (size_t j = 0; j < 4; ++j) {
+                    float weight = weights[indices[i] * 4 + j];
+                    float joint = joints[indices[i] * 4 + j];
+                    
+                    // if (weight > 0.0f && i == (int)joint) {
+                    //     memcpy(&fbits, &weight, sizeof(fbits));
+                    // } else {
+                    //     fbits = 0xffffffff;
+                    // }
+                    memcpy(&fbits, &weight, sizeof(fbits));
+                    prepD.push_back(fbits);
+                    // printf("%f\n", weights[indices[i] * 4 + j]);
+                    // printf("%f\n", fbits);
+                }
+
+                for (size_t j = 0; j < 4; ++j) {
+                    float weight = weights[indices[i] * 4 + j];                
+                    float joint = joints[indices[i] * 4 + j];
+                    // printf("%d\n", joint);
+                    // if (weight > 0.0f && i == (int)joint) {
+                    //     memcpy(&fbits, &joint, sizeof(fbits));                
+                    // } else {
+                    //     fbits = 0xffffffff;
+                    // }
+                    // auto v = static_cast<float>(joint);
+                    memcpy(&fbits, &joint, sizeof(fbits));                
+                    // printf("%f\n", fbits);
+                    prepD.push_back(fbits);
+                }
+            
+            } else {
+                const uint16_t* joints = reinterpret_cast<const uint16_t*>(&jointBuffer.data[jointAccessor.byteOffset + jointBufferView.byteOffset]);
+                
+                for (size_t j = 0; j < 4; ++j) {
+                    float weight = weights[indices[i] * 4 + j];
+                    uint16_t joint = joints[indices[i] * 4 + j];
+                    
+                    // if (weight > 0.0f && joint == i) {
+                    //     memcpy(&fbits, &weight, sizeof(fbits));
+                    // } else {
+                    //     fbits = 0xffffffff;
+                    // }
+                    memcpy(&fbits, &weight, sizeof(fbits));
+                    prepD.push_back(fbits);
+                    // printf("%f\n", weights[indices[i] * 4 + j]);
+                    // printf("%f\n", fbits);
+                }
+
+                for (size_t j = 0; j < 4; ++j) {
+                    float weight = weights[indices[i] * 4 + j];                
+                    uint16_t joint = joints[indices[i] * 4 + j];
+                    // printf("%d\n", joint);
+                    // if (weight > 0.0f && joint == i) {
+                    //     auto v = static_cast<float>(joint);
+                    //     memcpy(&fbits, &v, sizeof(fbits));                
+                    // } else {
+                    //     fbits = 0xffffffff;
+                    // }
+                    auto v = static_cast<float>(joint);
+                    memcpy(&fbits, &v, sizeof(fbits));                
+                    // printf("%f\n", fbits);
+                    prepD.push_back(fbits);
+                }
+            }
 
             prepD.push_back(0xffffffff); // Placeholder for any additional data
         }
@@ -310,9 +586,37 @@ gfx::Mesh *loadMesh(size_t i, tinygltf::Model &model, love::gfx::Graphics *insta
             break;
         }
     }
+ 
+    // Retrieve the light position
+    for (auto node : model.nodes) {
+        if (node.extensions.find("KHR_lights_punctual") != node.extensions.end()) {
+            auto light = node.extensions["KHR_lights_punctual"];
+            auto lightNode = model.lights[0];
+            glm::vec3 lightPosition(0.0f);
+            if (!node.translation.empty()) {
+                lightPosition = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
+            }
+            cm->lightParams["position"] = std::vector<float> { lightPosition.x, lightPosition.y, lightPosition.z };
+            cm->lightParams["color"] = std::vector<float> { lightNode.color[0], lightNode.color[1], lightNode.color[2] };
+            cm->lightParams["intensity"] = std::vector<float> { lightNode.intensity/900.0f };
+            
+            if (lightNode.type == "directional") {
+                glm::vec3 lightDirection(0.0f, -1.0f, 0.0f); // Default direction
+                if (!node.rotation.empty()) {
+                    glm::quat rotation = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
+                    glm::mat4 rotationMatrix = glm::mat4_cast(rotation);
+                    lightDirection = glm::vec3(rotationMatrix * glm::vec4(lightDirection, 0.0f));
+                }
+                cm->lightParams["direction"] = std::vector<float> { lightDirection.x, lightDirection.y, lightDirection.z };
+            }
+            break;
+        }
+    }
+
 
     // Load animations
-    std::vector< // Animation
+    std::map< // Animation
+        std::string, // Name
         std::vector< // Channel
             std::map<
                 int, // Node
@@ -327,6 +631,7 @@ gfx::Mesh *loadMesh(size_t i, tinygltf::Model &model, love::gfx::Graphics *insta
     > anims;
     size_t anim = 0;
     for (auto animation : model.animations) {
+        auto name = animation.name;
         std::vector< // Channel
             std::map<
                 int, // Node
@@ -387,12 +692,12 @@ gfx::Mesh *loadMesh(size_t i, tinygltf::Model &model, love::gfx::Graphics *insta
             channels.push_back(keyframes);
             chan++;
         }
-        anims.push_back(channels);
+        anims[name] = channels;
         anim++;
     }
 
     cm->animations = anims;
-
+    
     auto usage = gfx::BufferDataUsage::BUFFERDATAUSAGE_DYNAMIC;
     if (type == "triangles") {
         auto m = instance->newMesh(vf, prepD.data(), prepD.size() * sizeof(float), gfx::PrimitiveType::PRIMITIVE_TRIANGLES, usage);
@@ -451,6 +756,14 @@ bool LoadImageData(tinygltf::Image *image, const int image_idx, std::string *err
 
     auto tex = cm->instance->newTexture(settings, &slices);
     tex->replacePixels(copyOfPixelData, dataSize*4, 0, 0, rect, false);
+
+    gfx::SamplerState sampler = gfx::SamplerState();
+    
+    sampler.wrapU = gfx::SamplerState::WrapMode::WRAP_REPEAT;
+    sampler.wrapV = gfx::SamplerState::WrapMode::WRAP_REPEAT;
+    sampler.wrapW = gfx::SamplerState::WrapMode::WRAP_REPEAT;
+
+    tex->setSamplerState(sampler);
 
     cm->textures.push_back(tex);
 
@@ -571,7 +884,13 @@ bool chai_mesh::wrap_setTexture(const std::string &texture) {
 
     // tex->replacePixels(copyOfPixelData, dataSize * 4, 0, 0, rect, false);
 
+    gfx::SamplerState sampler = gfx::SamplerState();
+    
+    sampler.wrapU = gfx::SamplerState::WrapMode::WRAP_REPEAT;
+    sampler.wrapV = gfx::SamplerState::WrapMode::WRAP_REPEAT;
+    sampler.wrapW = gfx::SamplerState::WrapMode::WRAP_REPEAT;
 
+    tex->setSamplerState(sampler);
     // tex->replacePixels(image->getData(), image->getSize(), 0, 0, rect, false);
     mesh->setTexture(tex);
 
@@ -579,12 +898,25 @@ bool chai_mesh::wrap_setTexture(const std::string &texture) {
     return true;
 }
 
+void chai_mesh::playAnimation(const std::string &name, const bool loop) {
+    auto animation = animations.find(name);
+    if (animation != animations.end()) {
+        activeAnimations[name] = std::pair<float, bool>(0.01f, loop);
+    }
+}
+
+void chai_mesh::stopAnimation(const std::string &name) {
+    auto animation = activeAnimations.find(name);
+    if (animation != activeAnimations.end()) {
+        activeAnimations.erase(animation);
+    }
+}
+
 void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader) {
     if (mesh != nullptr) {
         mesh->draw(gfx, m);
     } else {
-        size_t i = 0;
-
+       
         auto position = glm::vec3(cameraParams.at("position")[0], cameraParams.at("position")[1], cameraParams.at("position")[2]);
         auto target = glm::vec3(cameraParams.at("target")[0], cameraParams.at("target")[1], cameraParams.at("target")[2]);
         auto up = glm::vec3(cameraParams.at("up")[0], cameraParams.at("up")[1], cameraParams.at("up")[2]);
@@ -598,6 +930,14 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
         auto t2 = glm::perspective(fov, aspectRatio, nearClip, farClip);
         auto pm = glm::value_ptr(t2);
 
+        auto vmFromShader = shader->shader->getUniformInfo("viewMatrix");
+        if (vmFromShader != nullptr) {
+            auto data = vmFromShader->floats;
+            for (int i = 0; i < 16; ++i) {
+                vm[i] = data[i];
+            }
+        }
+
         std::vector<chaiscript::Boxed_Value> viewMatrix;
         for (int c = 0; c < 16; ++c) {
             viewMatrix.push_back(chaiscript::Boxed_Value(vm[c]));
@@ -608,22 +948,331 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
             projectionMatrix.push_back(chaiscript::Boxed_Value(pm[c]));
         }
 
-        shader->send("viewMatrix", viewMatrix);
-        shader->send("projectionMatrix", projectionMatrix);
+
+        currentTime += 0.01f;
+        
+        
+        // std::vector<chaiscript::Boxed_Value> jointMatrix;
+        // for (auto m : jointMatrices) {
+        //     auto j = std::pair<chaiscript::Boxed_Value, chaiscript::Boxed_Value>();
+        //     for (auto matrix : m) {
+        //         std::vector<chaiscript::Boxed_Value> jm;
+                
+        //         for (int c = 0; c < 4; ++c) {
+        //             jm.push_back(chaiscript::Boxed_Value(matrix.second[c][0]));
+        //             jm.push_back(chaiscript::Boxed_Value(matrix.second[c][1]));
+        //             jm.push_back(chaiscript::Boxed_Value(matrix.second[c][2]));
+        //             jm.push_back(chaiscript::Boxed_Value(matrix.second[c][3]));
+        //         }
+        //         j.first = chaiscript::Boxed_Value(matrix.first);
+        //         j.second = chaiscript::Boxed_Value(jm);
+        //     }
+        //     jointMatrix.push_back(chaiscript::Boxed_Value(j));
+        // }
+
+        // shader->send("viewMatrix", viewMatrix);
+
+        auto direction = std::vector<chaiscript::Boxed_Value>();
+        for (auto axis : lightParams["direction"]) {
+            direction.push_back(chaiscript::Boxed_Value(axis));            
+        }
+        shader->send("lightDirection", direction);
+
+        auto color = std::vector<chaiscript::Boxed_Value>();
+        for (auto c : lightParams["color"]) {
+            color.push_back(chaiscript::Boxed_Value(c));            
+        }
+        shader->send("lightColor", color);
+
+        auto ambientColor = std::vector<chaiscript::Boxed_Value>();
+
+        ambientColor.push_back(chaiscript::Boxed_Value(1.0f));
+        ambientColor.push_back(chaiscript::Boxed_Value(1.0f));
+        ambientColor.push_back(chaiscript::Boxed_Value(1.0f));
+        
+        shader->send("ambientColor", ambientColor);
+
+        auto intensity = std::vector<chaiscript::Boxed_Value>();
+        intensity.push_back(chaiscript::Boxed_Value(lightParams["intensity"][0]));
+
+        shader->send("lightIntensity", intensity);
+
+        // Calculate lightSpaceMatrix
+        glm::vec3 lightPos = glm::vec3(lightParams["position"][0], lightParams["position"][1], lightParams["position"][2]);
+        // glm::vec3 lightDir = glm::vec3(lightParams["direction"][0], lightParams["direction"][1], lightParams["direction"][2]);
+        glm::vec3 lightDir = glm::vec3(0.0f, -1.0f, 0.0f);
+        glm::mat4 lightView = glm::lookAt(lightPos, lightPos + lightDir, glm::vec3(0.0f, 0.0f, -1.0f));
+        glm::mat4 lightProjection = glm::ortho(-7.5f, 7.5f, -7.5f, 7.5f, 1.0f, 1000.0f);
+        glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+
+        auto lightSpaceMatrixBoxed = std::vector<chaiscript::Boxed_Value>();
+        for (int i = 0; i < 16; ++i) {
+            lightSpaceMatrixBoxed.push_back(chaiscript::Boxed_Value(glm::value_ptr(lightSpaceMatrix)[i]));
+        }
+        shader->send("lightSpaceMatrix", lightSpaceMatrixBoxed);
+
+        // shader->send("projectionMatrix", projectionMatrix);
+
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        for (auto msh : meshes) {
-            auto mat = matrices[i];
-            std::vector<chaiscript::Boxed_Value> v;
-            for (int c = 0; c < 4; ++c) {
-                v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).x));
-                v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).y));
-                v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).z));
-                v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).w));
-            }            
-            shader->send("modelMatrix", v);            
-            msh->draw(gfx, m);
-            i++;
+
+        for (int p = 0; p < 2; p++) {
+            if (p == 2) {
+                // gfx::Texture::Settings settings;
+                // settings.width = 1024;
+                // settings.height = 1024;
+                // settings.renderTarget = true;
+                // settings.debugName = "shadowMap";
+                // settings.format = PIXELFORMAT_RGBA8_UNORM;
+
+                // auto slices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
+                // slices.clear();
+                auto cg = ChaiLove::getInstance()->chai_gfx;
+                // cg.canvas = gfx->newTexture(settings, &slices);
+                // auto rt = gfx::Graphics::RenderTarget(cg.canvas, 0, 0);
+                // gfx->setRenderTarget(rt, 0);  
+
+                // Create depth texture
+                glGenFramebuffers(1, &cg.shadowMapFBO); 
+                glGenTextures(1, &cg.shadowMap);
+                glBindTexture(GL_TEXTURE_2D, cg.shadowMap);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 1440, 1080, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+                GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+                glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+                // Attach depth texture as FBO's depth buffer
+                glBindFramebuffer(GL_FRAMEBUFFER, cg.shadowMapFBO);
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, cg.shadowMap, 0);
+                glDrawBuffer(GL_NONE);
+                glReadBuffer(GL_NONE);
+                glBindFramebuffer(GL_FRAMEBUFFER, gfx->hw_render.get_current_framebuffer());
+                glBindFramebuffer(GL_FRAMEBUFFER, cg.shadowMapFBO);
+                // glViewport(0, 0, 1024, 1024);
+                glClear(GL_DEPTH_BUFFER_BIT);
+                // Set up the light's view and projection matrices
+                glm::vec3 lightPos = glm::vec3(lightParams["position"][0], lightParams["position"][1], lightParams["position"][2]);
+                // glm::vec3 lightDir = glm::vec3(lightParams["direction"][0], lightParams["direction"][1], lightParams["direction"][2]);
+                
+                // Apply rotation to the light direction
+                float angle = glm::radians(15.0f); // Rotate by 45 degrees
+                glm::vec3 lightDir = glm::vec3(0.0f, -1.0f, 0.0f);
+                // glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(-1.0f, 0.0f, 0.0f));
+                // lightDir = glm::vec3(rotationMatrix * glm::vec4(lightDir, 0.0f));
+                glm::vec3 up(0.0f, 0.0f, -1.0f);
+                // up = glm::vec3(rotationMatrix * glm::vec4(up, 0.0f));
+                
+                glm::mat4 lightView = glm::lookAt(lightPos, lightPos + lightDir, up);
+                glm::mat4 lightProjection = glm::ortho(-7.5f, 7.5f, -7.5f, 7.5f, 1.0f, 1000.0f);
+                glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+
+                lightSpaceMatrixBoxed = std::vector<chaiscript::Boxed_Value>();
+                for (int i = 0; i < 16; ++i) {
+                    lightSpaceMatrixBoxed.push_back(chaiscript::Boxed_Value(glm::value_ptr(lightSpaceMatrix)[i]));
+                }
+
+                auto boxedLightView = std::vector<chaiscript::Boxed_Value>();
+                for (int i = 0; i < 16; ++i) {
+                    boxedLightView.push_back(chaiscript::Boxed_Value(glm::value_ptr(lightView)[i]));
+                }
+                shader->send("viewMatrix", boxedLightView);
+                auto boxedLightProjection = std::vector<chaiscript::Boxed_Value>();
+                for (int i = 0; i < 16; ++i) {
+                    boxedLightProjection.push_back(chaiscript::Boxed_Value(glm::value_ptr(lightProjection)[i]));
+                }
+                shader->send("projectionMatrix", boxedLightProjection);
+                // shader->send("flip", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1) }));
+                shader->send("lightDirection", direction);
+                shader->send("lightColor", color);
+                shader->send("ambientColor", ambientColor);
+                shader->send("lightIntensity", intensity);
+                shader->send("lightSpaceMatrix", lightSpaceMatrixBoxed);
+                shader->send("shadow", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1) }));
+            } else {
+                // shader->send("flip", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+                // gfx->setRenderTarget(); 
+                // gfx->setShader(); 
+                // gfx->setShader(shader->shader); 
+                // gfx->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+                // gfx::OptionalColorD clearcolor;
+                // OptionalInt clearstencil(0);
+                // OptionalDouble cleardepth(1.0);
+                // gfx->clear(clearcolor, clearstencil, cleardepth);
+                
+                // glBindFramebuffer(GL_FRAMEBUFFER, gfx->hw_render.get_current_framebuffer());
+                
+                // glViewport(0, 0, 800, 600);
+                
+                // glDrawBuffer(GL_NONE);
+                // glReadBuffer(GL_NONE);
+                glBindFramebuffer(GL_FRAMEBUFFER, gfx->hw_render.get_current_framebuffer());
+                // glViewport(0, 0, 1440, 1080);
+                // instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+                gfx::OptionalColorD clearcolor;
+                clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
+                OptionalInt clearstencil(0);
+                OptionalDouble cleardepth(1.0);
+                instance->clear(clearcolor, clearstencil, cleardepth);
+
+                
+                
+                // glClear(GL_DEPTH_BUFFER_sBIT);
+                // auto cg = ChaiLove::getInstance()->chai_gfx;
+                // cg.createCanvas();
+                // auto rt = gfx::Graphics::RenderTarget(cg.canvas, 0, 0);
+                // gfx->setRenderTarget(rt, 0);
+
+                // shader->send("flip", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1) }));
+
+                shader->send("viewMatrix", viewMatrix);
+                shader->send("projectionMatrix", projectionMatrix);
+                // shader->send("lightSpaceMatrix", lightSpaceMatrixBoxed);
+                // shader->send("lightDirection", direction);
+                // shader->send("lightColor", color);
+                // shader->send("ambientColor", ambientColor);
+                // shader->send("lightIntensity", intensity);
+               
+            }
+            int i = 0;
+            for (auto msh : meshes) {
+                if (i == 0) {
+                    shader->send("shadow", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1) }));
+                } else {
+                    // shader->send("shadow", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+                }
+                auto node = meshToNode[i];
+                auto jointList = std::vector<int>();
+                auto jointMatrix = std::map<int, glm::mat4>();
+
+                // jointMatrix[node] = glm::mat4(1.0f); 
+
+                if (skins.find(i) != skins.end()) {
+                    auto skin = skins[i];
+                    
+                    for (auto skinMap : skin) {
+                        auto joint = skinMap.first;
+                        auto matrix = skinMap.second;
+                        // jointMatrix[joint] = glm::mat4(
+                        //     matrix[0], matrix[1], matrix[2], matrix[3],
+                        //     matrix[4], matrix[5], matrix[6], matrix[7],
+                        //     matrix[8], matrix[9], matrix[10], matrix[11],
+                        //     matrix[12], matrix[13], matrix[14], matrix[15]
+                        // );
+                        jointMatrix[joint] = glm::mat4(1.0);
+                        jointList.push_back(joint);
+                    }            
+                }          
+
+                auto animTime = 0.0f;
+                auto loop = false;
+                std::string name = "";
+                std::map<std::string, bool> eraseAnimations;
+
+                for (auto activeAnimation : activeAnimations) {
+                    name = activeAnimation.first;
+                    animTime = activeAnimation.second.first;
+                    loop = activeAnimation.second.second;
+
+                    auto animPlaying = -1;
+
+                    auto chan = 0;
+                    auto animation = animations[name];
+                    for (const auto& channel : animation) {
+                        for (const auto& keyframe : channel) {
+                            int nodeIndex = keyframe.first;
+                            
+                            if (jointMatrix.find(nodeIndex) == jointMatrix.end()) {
+                                continue;
+                            }
+                            const auto& keyframes = keyframe.second;
+
+                            // Find the two keyframes to interpolate between
+                            auto it = std::lower_bound(keyframes.begin(), keyframes.end(), animTime,
+                                [](const std::pair<float, glm::vec3>& a, float b) {
+                                    return a.first < b;
+                                });
+
+                            if (it == keyframes.end()) {
+                                // Use the last keyframe if the current time is beyond the last keyframe
+                                it = keyframes.end() - 1;
+                            }
+
+                            auto nextIt = it + 1;
+                            if (nextIt == keyframes.end()) {
+                                nextIt = it;
+                            }
+
+                            float t1 = it->first;
+                            float t2 = nextIt->first;
+                            
+                            const glm::vec3& v1 = it->second;
+                            const glm::vec3& v2 = nextIt->second;
+
+                            // Interpolate between the two keyframes
+                            float t = (animTime - t1) / (t2 - t1);
+                            glm::vec3 interpolatedValue = glm::mix(v1, v2, t);
+
+                            if (animPlaying == -1) {
+                                animPlaying = 0;
+                            }
+
+                            // Update the joint matrix
+                            if (glm::all(glm::isnan(interpolatedValue)) == false) {
+                                if (chan == 0) {
+                                    jointMatrix[nodeIndex] = glm::translate(jointMatrix[nodeIndex], interpolatedValue);
+                                    // printf("%f %f %f\n", interpolatedValue.x, interpolatedValue.y, interpolatedValue.z);
+                                } else if (chan == 1) {
+                                    glm::quat rotation = glm::quat(interpolatedValue);
+                                    jointMatrix[nodeIndex] *= glm::mat4_cast(rotation);
+                                } else if (chan == 2) {
+                                    jointMatrix[nodeIndex] = glm::scale(jointMatrix[nodeIndex], interpolatedValue);
+                                }
+                                animPlaying = 1;
+                            }
+                        }
+                        chan++;                
+                    }
+                    if (animPlaying == 1) {
+                        activeAnimations[name].first += 0.01f;
+                    } else if (animPlaying == 0) {
+                        if (loop) {
+                            activeAnimations[name].first = 0.01f;
+                        } else {
+                            eraseAnimations[name] = true;                            
+                        }
+                    }
+                } 
+
+                for (auto eraseAnimation : eraseAnimations) {
+                    activeAnimations.erase(eraseAnimation.first);
+                }
+                
+                std::vector<chaiscript::Boxed_Value> joints;
+                for (int c = 0; c < jointList.size(); ++c) {
+                    joints.push_back(chaiscript::Boxed_Value(jointList[c]));
+                }
+
+                shader->send("joints", joints);
+                shader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value((int)joints.size()) }));
+                shader->sendMap("jointMatrix", jointMatrix);  
+                
+                auto mat = matrices[i];
+                std::vector<chaiscript::Boxed_Value> v;
+                for (int c = 0; c < 4; ++c) {
+                    v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).x));
+                    v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).y));
+                    v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).z));
+                    v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).w));
+                }            
+                shader->send("modelMatrix", v);
+                // auto n = std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(node) });
+                // shader->send("node", n);            
+                msh->draw(gfx, m);
+                i++;
+            }
         }
     }
 }

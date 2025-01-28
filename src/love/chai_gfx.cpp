@@ -49,6 +49,7 @@ bool chai_gfx::init() {
     // auto cl = ChaiLove::getInstance();
     // cl->win = (SDL_Window *) win->getHandle();
     // cl->videoBuffer = (uint32_t *) cl->win;
+       
     return true;
 }
 
@@ -90,9 +91,13 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName) {
             }
 
             if (shaderFound || strstr(line.c_str(), "vec4 position(") != NULL) {
-                if (!shaderFound) {
-                    lines.push_back(line);
+                if (!shaderFound || 
+                    strstr(line.c_str(), "for (") != NULL || 
+                    strstr(line.c_str(), "if (") != NULL || 
+                    strstr(line.c_str(), "else {") != NULL || 
+                    strstr(line.c_str(), "else if (") != NULL) {
 
+                    lines.push_back(line);
                     shaderFound = true;
                 } else {
                     int delim = line.find_last_of(";");
@@ -130,10 +135,29 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName) {
         for (const auto &piece : lines) a += piece+'\n';
 
         std::vector<std::string> code;
-        std::string c = "vec4 effect( vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords ){ ";
+        std::string c = "uniform sampler2D shadowMap;";
+            c += "uniform int shadow;";
+            c += "varying vec3 lighting;";
+            c += "varying vec4 fragPosLightSpace;";
+            c += "float ShadowCalculation() {";
+            c += "vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;";
+            c += "projCoords = projCoords * 0.5 + 0.5;";
+            // c += "projCoords.z = 1.0 - projCoords.z;";
+            // c += "projCoords.y = 1.0 - projCoords.y;";
+            c += "float closestDepth = texture2D(shadowMap, projCoords.xy).r;";
+            c += "float currentDepth = projCoords.z;";
+            c += "float shadow = currentDepth > closestDepth ? 0.5 : 0.0;";
+            c += "return shadow;";
+            c += "}";
+            c += "vec4 effect( vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords ){ ";
             c += "vec4 pixel = Texel(texture, texture_coords );";
             // c += "return vec4(1.0,.0,.0,1.0);";
-            c += "return pixel * color;";
+            c += "float shadows = 0.0;";
+            c += "if (shadow == 1) {";
+            c += "shadows = ShadowCalculation();";
+            c += "}"; 
+            c += "vec3 finalColor = (1.0 - shadows) * pixel.rgb * lighting;";
+            c += "return vec4(finalColor, pixel.a) * color;";
             c += "}";
 
         code.push_back(a);
@@ -201,6 +225,7 @@ void chai_gfx::createCanvas() {
     auto slices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
     slices.clear();
     canvas = instance->newTexture(settings, &slices);
+
 }
 
 void readFBOIntoVideoBuffer(love::gfx::Graphics *instance, love::gfx::Mesh *mesh) {
