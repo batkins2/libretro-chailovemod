@@ -49,7 +49,7 @@ bool chai_gfx::init() {
     // auto cl = ChaiLove::getInstance();
     // cl->win = (SDL_Window *) win->getHandle();
     // cl->videoBuffer = (uint32_t *) cl->win;
-       
+
     return true;
 }
 
@@ -139,6 +139,12 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName) {
             c += "uniform int shadow;";
             c += "varying vec3 lighting;";
             c += "varying vec4 fragPosLightSpace;";
+            c += "float grid (vec2 vBC, float width) {";
+            c += "vec3 bary = vec3(vBC.x, vBC.y, 1.0 - vBC.x - vBC.y);";
+            c += "vec3 d = fwidth(bary);";
+            c += "vec3 a3 = smoothstep(d * (width - 0.5), d * (width + 0.5), bary);";
+            c += "return min(min(a3.x, a3.y), a3.z);";
+            c += "}";
             c += "float ShadowCalculation() {";
             c += "vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;";
             c += "projCoords = projCoords * 0.5 + 0.5;";
@@ -158,6 +164,7 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName) {
             c += "}"; 
             c += "vec3 finalColor = (1.0 - shadows) * pixel.rgb * lighting;";
             c += "return vec4(finalColor, pixel.a) * color;";
+            // c += "return vec4(vec3(grid(vec2(finalColor.x, finalColor.y), 10.0)), 1);";
             c += "}";
 
         code.push_back(a);
@@ -271,10 +278,17 @@ void chai_gfx::drawScene() {
     }
 }
 
+chai_scene *chai_gfx::wrap_newScene() {
+    if (instance->isCreated()) {
+        return new chai_scene();
+    }
+    return nullptr;
+}
+
 void chai_gfx::draw(chai_mesh *m) {
     if (instance->isCreated()) { 
         if (scene == nullptr) {
-            scene = new SceneMesh();
+            // scene = new SceneMesh();
             instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
             gfx::OptionalColorD clearcolor;
             OptionalInt clearstencil(0);

@@ -46,7 +46,7 @@ void chai_shader::newFragmentShader(love::gfx::Graphics *inst, std::vector<std::
     }
 }
 
-void chai_shader::sendMap(const std::string &uniform, const std::map<int, glm::mat4> &data) {
+void chai_shader::sendMap(const std::string &uniform, const std::map<int, glm::mat4> &data, const std::vector<int> &order) {
     if (instance->isCreated()) {
         auto info = shader->getUniformInfo(uniform);
         if (info->baseType == gfx::Shader::UNIFORM_SAMPLER || info->baseType == gfx::Shader::UNIFORM_STORAGETEXTURE
@@ -55,10 +55,9 @@ void chai_shader::sendMap(const std::string &uniform, const std::map<int, glm::m
 
 
         int startidx = 0;
-        std::vector<float> prepD;    
-        for (auto value : data) {
-            auto i = value.first;
-            auto m = value.second;
+        std::vector<float> prepD;
+        for (auto j : order) {   
+            auto m = data.find(j)->second;
             for (int c = 0; c < 4; ++c) {
                 prepD.push_back(m[c].x);
                 // printf("%f ", m[c].x);
@@ -69,7 +68,7 @@ void chai_shader::sendMap(const std::string &uniform, const std::map<int, glm::m
                 prepD.push_back(m[c].w);
                 // printf("%f\n", m[c].w);
                 startidx+=4;
-            }            
+            }          
         }
         std::memcpy(info->floats, prepD.data(), prepD.size()*sizeof(float));
 

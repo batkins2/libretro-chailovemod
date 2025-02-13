@@ -80,16 +80,17 @@ class chai_mesh {
     std::map<std::string, std::vector<float>> lightParams;
     std::map< // Animation
         std::string, // Name
-        std::vector< // Channel
+        std::map< // Channel
+            std::string,
             std::map<
                 int, // Node
                 std::vector< // Keyframe
                     std::pair< // Keyframe data
                         float, // Time
-                        glm::vec3 // Data
+                        glm::vec4 // Data
                     >
                 >
-            >
+            >        
         >
     > animations;
     float currentTime = 0.0f;
@@ -98,7 +99,10 @@ class chai_mesh {
     std::map<int, std::map<int, std::vector<float>>> skins;
     std::map<int, int> meshToNode;
     std::map<std::string, std::pair<float, bool>> activeAnimations;
-    // std::map<int, std::vector<int>> nodeChildren;
+    std::map<int, std::vector<int>> jointOrder;
+    std::map<int, std::vector<int>> nodeChildren;    
+    std::map<int, glm::mat4> nodeParentMatrix;
+    std::vector<glm::mat4> nodeMatrix;
     // float jointMinValue;
 };
 }

@@ -11,10 +11,13 @@
 #ifndef __HAVE_CHAI_MESH__
 #include "chai_mesh.h"
 #endif
+#ifndef __HAVE_CHAI_SCENE__
+#include "chai_scene.h"
+#endif
 #include "window/Window.h"
 #include "window/sdl/Window.h"
 #include <vector>
-#include "scene_mesh.h"
+// #include "scene_mesh.h"
 
 
 #ifdef __HAVE_CHAISCRIPT__
@@ -38,6 +41,7 @@ class chai_gfx {
     chai_mesh *wrap_newMeshFromFile(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type);
     void draw(chai_mesh *m);
     void drawScene();
+    chai_scene *wrap_newScene();
     void createCanvas();
     void drawCanvas();
     love::gfx::Graphics *instance; // = gfx::Graphics::createInstance();
@@ -50,7 +54,7 @@ class chai_gfx {
     std::vector<chai_mesh *> meshes;
     int width = 1440;
     int height = 1080;
-    SceneMesh *scene = nullptr;
+    void *scene = nullptr;
     GLuint shadowMapFBO;
     GLuint shadowMap;
 };

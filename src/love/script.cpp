@@ -315,6 +315,7 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_gfx::wrap_setShader), "setShader");
 	chai.add(fun(&chai_gfx::wrap_newMesh), "newMesh");
 	chai.add(fun(&chai_gfx::wrap_newMeshFromFile), "newMeshFromFile");
+	chai.add(fun(&chai_gfx::wrap_newScene), "newScene");
 	chai.add(fun(&chai_gfx::draw), "draw");
 	chai.add(fun(&chai_gfx::drawScene), "drawScene");
 	chai.add(fun(&chai_gfx::createCanvas), "createCanvas");
@@ -327,6 +328,13 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_mesh::playAnimation), "playAnimation");
 	chai.add(fun(&chai_mesh::stopAnimation), "stopAnimation");
 	chai.add(fun(&chai_shader::send), "send");
+	chai.add(user_type<chai_scene>(), "chai_scene");
+	chai.add(constructor<chai_scene(const chai_scene &)>(), "chai_scene");
+	chai.add(fun(&chai_scene::operator=), "=");
+	chai.add(fun(&chai_scene::addMesh), "addMesh");
+	chai.add(fun(&chai_scene::setShader), "setShader");
+	chai.add(fun(&chai_scene::setMatrix), "setMatrix");
+	chai.add(fun(&chai_scene::draw), "draw");
 
 	// Matrices
 	chai.add(fun(&chai_matrices::setTransformationMatrix), "setTransformationMatrix");

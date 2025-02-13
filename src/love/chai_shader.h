@@ -21,7 +21,7 @@ class chai_shader {
 	};
     void newShader(love::gfx::Graphics *inst, std::vector<std::string> lines, love::gfx::Shader::CompileOptions options);
     void newFragmentShader(love::gfx::Graphics *inst, std::vector<std::string> lines, love::gfx::Shader::CompileOptions options);
-    void sendMap(const std::string &uniform, const std::map<int, glm::mat4> &data);
+    void sendMap(const std::string &uniform, const std::map<int, glm::mat4> &data, const std::vector<int> &order);
     void send(const std::string &uniform, const std::vector<chaiscript::Boxed_Value> &data);
     love::gfx::Graphics *instance;
     gfx::Shader *shader;
