@@ -214,21 +214,7 @@ gfx::Mesh *loadMesh(int i, tinygltf::Model &model, love::gfx::Graphics *instance
                 }
                 cm->skins[node.mesh] = skinMap;
             }
-            if (node.children.size() > 0) {
-                cm->nodeChildren[index] = node.children;
-                for (auto child : node.children) {
-                    if (node.translation.size() > 0) {
-                        cm->nodeParentMatrix[child] = glm::translate(cm->nodeMatrix[index], glm::vec3(node.translation[0], node.translation[1], node.translation[2]));
-                    }
-                    if (node.rotation.size() > 0) {
-                        glm::quat rotation = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
-                        cm->nodeParentMatrix[child] *= glm::mat4_cast(rotation);
-                    }
-                    if (node.scale.size() > 0) {
-                        cm->nodeParentMatrix[child] = glm::scale(cm->nodeMatrix[index], glm::vec3(node.scale[0], node.scale[1], node.scale[2]));
-                    }
-                }
-            }
+            
             if (node.mesh != -1) {
                 // cm->meshList.push_back(index);
                 cm->meshToNode[node.mesh] = index;
@@ -243,6 +229,28 @@ gfx::Mesh *loadMesh(int i, tinygltf::Model &model, love::gfx::Graphics *instance
             }
             if (node.scale.size() > 0) {
                 cm->nodeMatrix[index] = glm::scale(cm->nodeMatrix[index], glm::vec3(node.scale[0], node.scale[1], node.scale[2]));
+            }
+
+            if (node.children.size() > 0) {
+                cm->nodeChildren[index] = node.children;
+                for (auto child : node.children) {
+                    cm->nodeParent.push_back(std::pair<int, int>(child, index));
+                    printf("%s (%d)->%s (%d)\n", model.nodes[child].name.c_str(), child, model.nodes[index].name.c_str(), index);
+                    // glm::mat4 parentMatrix = cm->nodeMatrix[index];
+
+                    // if (node.translation.size() > 0) {
+                    //     parentMatrix = glm::translate(parentMatrix, glm::vec3(node.translation[0], node.translation[1], node.translation[2]));
+                    // }
+                    // if (node.rotation.size() > 0) {
+                    //     glm::quat rotation = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
+                    //     parentMatrix *= glm::mat4_cast(rotation);
+                    // }
+                    // if (node.scale.size() > 0) {
+                    //     parentMatrix = glm::scale(parentMatrix, glm::vec3(node.scale[0], node.scale[1], node.scale[2]));
+                    // }
+
+                    // cm->nodeParentMatrix[child] = parentMatrix;
+                }
             }
             // if (node.children.size() > 0) {
             //     auto joints = std::vector<int>();
@@ -1266,7 +1274,7 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                     }
                 }
 
-                auto animTime = 0.0f;
+                auto animTime = 0.1f;
                 auto loop = false;
                 std::string name = "";
                 std::map<std::string, bool> eraseAnimations;
@@ -1333,17 +1341,44 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                                 nodes.push_back(nodeIndex);
                                 int parent = -1;
                                 int root = -1;
+                                int subroot = -1;
                                 auto offset = glm::mat4(1.0f);
+                                auto hierarchy = std::vector<int>();
+                                int np = nodeIndex;
+
+                                // Initialize the hierarchy vector with np
+                                hierarchy.push_back(np);
+
+                                // Traverse the nodeParent pairs to find the parent of the current node
+                                while (true) {
+                                    bool found = false;
+                                    for (const auto& pair : nodeParent) {
+                                        if (pair.first == np) {   
+                                            subroot = np;                                         
+                                            np = pair.second;
+                                            hierarchy.push_back(np);
+                                            found = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!found) {
+                                        root = np;
+                                        break; // Reached the root node
+                                    }
+                                }
+                                
                                 for (auto node : nodeChildren) {
                                     for (auto n : node.second) {
                                         if (n == nodeIndex) {
                                             parent = node.first;
+                                            break;
                                         }
-                                        if (nodeIndex == 0) {
-                                            root = node.first;
-                                            offset = nodeParentMatrix[node.first];
-                                        }
+                                        
                                     }
+                                    if (parent != -1) {
+                                        break;
+                                    }
+                                    
                                 }
                                 for (auto nodeChild : nodeChildren[nodeIndex]) {
                                     nodes = getChildNodes(nodeChildren, nodeChild, nodes);
@@ -1356,89 +1391,57 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                                         jointMatrix[node] = glm::translate(jointMatrix[node], v) * jointMatrix[node];
                                         // printf("Translate: %d %f %f %f\n", node, interpolatedValue.x, interpolatedValue.y, interpolatedValue.z);
                                     } else if (chan == "rotation" && t <= 1.0f && t >= 0.0f) {
-
-
                                         animPlaying = 1;
-                                        // glm::vec3 v(interpolatedValue);
                                         glm::quat rotation = glm::quat(1.0f, 1.0f, 1.0f, 1.0f);
-                                        // glm::quat rotation = glm::quat(interpolatedValue.w, interpolatedValue.x, interpolatedValue.y, interpolatedValue.z);
-                                        // auto v = new float[16] {
-                                        //     interpolatedValue.x, 0.0f, 0.0f, 0.0f,
-                                        //     0.0f, interpolatedValue.y, 0.0f, 0.0f,
-                                        //     0.0f, 0.0f, interpolatedValue.z, 0.0f,
-                                        //     0.0f, 0.0f, 0.0f, interpolatedValue.w
-                                        // };
+                                        auto bindMatrix = glm::inverse(jointIBMatrix[node]);
                                         if (node == nodes[0]) {
-                                            rotation = glm::mix(glm::quat(v1.w, v1.x, v1.y, v1.z), glm::quat(v2.w, v2.x, v2.y, v2.z), t);
+                                            rotation = glm::slerp(glm::quat(v1.w, v1.x, v1.y, v1.z), glm::quat(v2.w, v2.x, v2.y, v2.z), t);
+                                            auto parentMatrix = glm::mat4(1.0f);
+                                            if (true || parent != root) {
+                                                parentMatrix = jointIBMatrix[root];
+                                            }
+                                            
+                                            auto invMatrix = glm::inverse(nodeMatrix[node]);
+                                            
+                                            auto hierarchyRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+                                            auto hierarchyRotation2 = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+                                            for (auto h = hierarchy.rbegin(); h != hierarchy.rend(); ++h) {
+                                                if (node == subroot) {
+                                                    hierarchyRotation = hierarchyRotation * glm::quat_cast(jointMatrix[*h]);
+                                                    hierarchyRotation2 = hierarchyRotation2 * glm::quat_cast(glm::inverse(nodeMatrix[*h]));
+                                                } else {
+                                                    if (*h == node) {
+                                                        hierarchyRotation = hierarchyRotation * glm::quat_cast(jointMatrix[*h]);
+                                                        hierarchyRotation2 = hierarchyRotation2 * glm::quat_cast(glm::inverse(nodeMatrix[*h]));
+                                                    }
+                                                }
+                                            }
 
-                                            jointMatrix[node] *= glm::inverse(jointIBMatrix[node]) * glm::mat4_cast(rotation) * jointIBMatrix[node] * jointMatrix[parent];
-                                            // jointMatrix[node] = jointIBMatrix[node] * glm::mat4_cast(rotation) * glm::inverse(jointIBMatrix[node]) * jointMatrix[node];
-
-                                            // auto inverse = glm::inverse(nodeMatrix[node]);
-                                            // jointMatrix[node] = glm::translate(jointMatrix[node], glm::vec3(nodeMatrix[node][3][0], nodeMatrix[node][3][1], nodeMatrix[node][3][2]));
-                                            // jointMatrix[node] *= glm::inverse(glm::mat4_cast(rotation));
-                                            // jointMatrix[node] = glm::translate(jointMatrix[node], glm::vec3(inverse[3][0], inverse[3][1], inverse[3][2]));
-                                            // jointMatrix[node] = glm::inverse(jointMatrix[node]);
-                                            // jointMatrix[node] = glm::mat4_cast(rotation) * jointIBMatrix[node] * jointMatrix[node];
-                                            // jointMatrix[node] = glm::mat4(0.0f);
-
-                                            for (size_t x = 0; x < 4; x++) {
-                                                printf("Joint IB Matrix: %f %f %f %f\n", jointIBMatrix[node][x][0], jointIBMatrix[node][x][1], jointIBMatrix[node][x][2], jointIBMatrix[node][x][3]);
-                                            }
-                                            for (size_t x = 0; x < 4; x++) {
-                                                printf("Node Matrix: %f %f %f %f\n", nodeMatrix[node][x][0], nodeMatrix[node][x][1], nodeMatrix[node][x][2], nodeMatrix[node][x][3]);
-                                            }
-                                            for (size_t x = 0; x < 4; x++) {
-                                                printf("Rotation Matrix: %f %f %f %f\n", glm::mat4_cast(rotation)[x][0], glm::mat4_cast(rotation)[x][1], glm::mat4_cast(rotation)[x][2], glm::mat4_cast(rotation)[x][3]);
-                                            }
-                                            for (size_t x = 0; x < 4; x++) {
-                                                printf("Joint Matrix: %f %f %f %f\n", jointMatrix[node][x][0], jointMatrix[node][x][1], jointMatrix[node][x][2], jointMatrix[node][x][3]);
-                                            }
-                                            // jointMatrix[node] = jointMatrix[node] * jointIBMatrix[node];
-                                            // jointMatrix[node] = glm::rotate(jointMatrix[node], v2.w, glm::vec3(v2.z, 0.0f, 0.0f));
-                                            // jointMatrix[node] = glm::rotate(jointMatrix[node], v2.x, glm::vec3(0.0f, v2.z, 0.0f));
-                                            // jointMatrix[node] = glm::rotate(jointMatrix[node], v2.y, glm::vec3(0.0f, 0.0f, v2.z));
+                                            rotation = hierarchyRotation * rotation;
+                                            rotation = hierarchyRotation2 * rotation;
+                                                                                            
+                                            rotation = glm::normalize(rotation);
+                                            
+                                            jointMatrix[node] = bindMatrix * glm::mat4_cast(rotation) * jointIBMatrix[node] * jointMatrix[node];
                                             parent = node;
                                         } else {
                                             // Child node
-                                            jointMatrix[node] *= glm::inverse(jointIBMatrix[node]) * jointMatrix[parent] * jointIBMatrix[node];
-                                            parent = node;
-                                            // jointMatrix[node] = jointMatrix[parent] * glm::mat4_cast(rotation) * jointIBMatrix[parent] * nodeMatrix[parent] * jointMatrix[node];
-
+                                            jointMatrix[node] = jointMatrix[parent] * jointMatrix[node];
                                         }
-
-                                        // printf("Rotate: %d %f %f %f %f\n", node, interpolatedValue.x, interpolatedValue.y, interpolatedValue.z, interpolatedValue.w);
-                                        // printf("Rotate v1: %d %f %f %f %f\n", node, v1.x, v1.y, v1.z, v1.w);
-                                        // printf("Rotate v2: %d %f %f %f %f\n", node, v2.x, v2.y, v2.z, v2.w);
                                     } else if (chan == "scale") {
-
-
                                         animPlaying = 1;
                                         glm::vec3 v(interpolatedValue);
                                         jointMatrix[node] = glm::scale(jointMatrix[node], v) * jointMatrix[node];
-                                        // printf("Scale: %d %f %f %f\n", node, interpolatedValue.x, interpolatedValue.y, interpolatedValue.z);
                                     }
                                 }
-                            } else {
-                                // printf("v1: %f,%f,%f\n", v1[0],v1[1],v1[2]);
-                                // printf("v2: %f,%f,%f\n", v2[0],v2[1],v2[2]);
-                                // printf("t1: %f\n", t1);
-                                // printf("t2: %f\n", t2);
-                                // printf("t: %f\n", t);
-                                // printf("NaN: %f %f %f\n", interpolatedValue[0], interpolatedValue[1], interpolatedValue[2]);
-                            }
-
-                            // if (nodeIndex > -1 && (jointList.empty() || jointList.back() != nodeIndex)) {
-                            //     jointList.push_back(nodeIndex);
-                            // }
-                            // chan++;
+                            } 
                         }
                     }
                     if (animPlaying == 1) {
                         activeAnimations[name].first += 0.01f;
                     } else if (animPlaying == 0) {
                         if (loop) {
-                            activeAnimations[name].first = 0.01f;
+                            activeAnimations[name].first = 0.1f;
                         } else {
                             eraseAnimations[name] = true;
                         }

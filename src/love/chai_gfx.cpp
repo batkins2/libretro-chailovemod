@@ -164,7 +164,7 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName) {
             c += "}"; 
             c += "vec3 finalColor = (1.0 - shadows) * pixel.rgb * lighting;";
             c += "return vec4(finalColor, pixel.a) * color;";
-            // c += "return vec4(vec3(grid(vec2(finalColor.x, finalColor.y), 10.0)), 1);";
+            // c += "return vec4(vec3(grid(vec2(finalColor.x, finalColor.y), 1.0)), 1);";
             c += "}";
 
         code.push_back(a);

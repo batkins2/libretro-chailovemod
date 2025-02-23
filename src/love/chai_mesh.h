@@ -100,7 +100,8 @@ class chai_mesh {
     std::map<int, int> meshToNode;
     std::map<std::string, std::pair<float, bool>> activeAnimations;
     std::map<int, std::vector<int>> jointOrder;
-    std::map<int, std::vector<int>> nodeChildren;    
+    std::map<int, std::vector<int>> nodeChildren;
+    std::vector<std::pair<int, int>> nodeParent;
     std::map<int, glm::mat4> nodeParentMatrix;
     std::vector<glm::mat4> nodeMatrix;
     // float jointMinValue;
