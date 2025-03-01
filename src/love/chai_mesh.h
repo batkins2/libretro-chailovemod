@@ -63,7 +63,7 @@ class chai_mesh {
     bool wrap_setTexture(const std::string &texture);
     void playAnimation(const std::string &name, const bool loop);
     void stopAnimation(const std::string &name);
-    void draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *s);
+    void draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt);
     love::gfx::Graphics *instance;
     gfx::Mesh *mesh = nullptr;
     std::vector<gfx::Mesh *> meshes;
@@ -104,6 +104,8 @@ class chai_mesh {
     std::vector<std::pair<int, int>> nodeParent;
     std::map<int, glm::mat4> nodeParentMatrix;
     std::vector<glm::mat4> nodeMatrix;
+    std::vector<std::vector<int>> jointList;
+    std::vector<std::map<int, glm::mat4>> jointMatrix;
     // float jointMinValue;
 };
 }

@@ -55,7 +55,7 @@ class chai_gfx {
     int width = 1440;
     int height = 1080;
     void *scene = nullptr;
-    GLuint shadowMapFBO;
-    GLuint shadowMap;
+    GLuint shadowMapFBO = 0;
+    GLuint shadowMap = 0;
 };
 }

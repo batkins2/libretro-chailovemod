@@ -303,7 +303,7 @@ void chai_gfx::draw(chai_mesh *m) {
             0.0f, 1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 1.0f, 0.0f,
             0.0f, 0.0f, 0.0f, 1.0f});  
-        m->draw(instance, matrix, shader);
+        // m->draw(instance, matrix, shader);
     }
 
 //     scene->addMesh(m);

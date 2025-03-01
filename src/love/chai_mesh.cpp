@@ -993,272 +993,28 @@ std::vector<int> getChildNodes(std::map<int, std::vector<int>> nodeChildren, int
     return nodes;
 }
 
-void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader) {
+void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt) {
     if (mesh != nullptr) {
         mesh->draw(gfx, m);
     } else {
-        auto cg = ChaiLove::getInstance()->chai_gfx;
-
-
-        auto position = glm::vec3(cameraParams.at("position")[0], cameraParams.at("position")[1], cameraParams.at("position")[2]);
-        auto target = glm::vec3(cameraParams.at("target")[0], cameraParams.at("target")[1], cameraParams.at("target")[2]);
-        auto up = glm::vec3(cameraParams.at("up")[0], cameraParams.at("up")[1], cameraParams.at("up")[2]);
-        auto t = glm::lookAt(position, target, up);
-        auto vm = glm::value_ptr(t);
-
-        // float fov = cameraParams.at("fov")[0];
-        // float aspectRatio = cameraParams.at("aspectRatio")[0];
-        // float nearClip = cameraParams.at("near")[0];
-        // float farClip = cameraParams.at("far")[0];
-        // auto t2 = glm::perspective(fov, aspectRatio, nearClip, farClip);
-        // auto pm = glm::value_ptr(t2);
-
-        auto vmFromShader = shader->shader->getUniformInfo("viewMatrix");
-        if (vmFromShader != nullptr) {
-            auto data = vmFromShader->floats;
-            for (int i = 0; i < 16; ++i) {
-                vm[i] = data[i];
-            }
-        }
-
-        std::vector<chaiscript::Boxed_Value> viewMatrix;
-        for (int c = 0; c < 16; ++c) {
-            viewMatrix.push_back(chaiscript::Boxed_Value(vm[c]));
-        }
-
-        // std::vector<chaiscript::Boxed_Value> projectionMatrix;
-        // for (int c = 0; c < 16; ++c) {
-        //     projectionMatrix.push_back(chaiscript::Boxed_Value(pm[c]));
-        // }
-
-
-        currentTime += 0.01f;
-
-
-        // std::vector<chaiscript::Boxed_Value> jointMatrix;
-        // for (auto m : jointMatrices) {
-        //     auto j = std::pair<chaiscript::Boxed_Value, chaiscript::Boxed_Value>();
-        //     for (auto matrix : m) {
-        //         std::vector<chaiscript::Boxed_Value> jm;
-
-        //         for (int c = 0; c < 4; ++c) {
-        //             jm.push_back(chaiscript::Boxed_Value(matrix.second[c][0]));
-        //             jm.push_back(chaiscript::Boxed_Value(matrix.second[c][1]));
-        //             jm.push_back(chaiscript::Boxed_Value(matrix.second[c][2]));
-        //             jm.push_back(chaiscript::Boxed_Value(matrix.second[c][3]));
-        //         }
-        //         j.first = chaiscript::Boxed_Value(matrix.first);
-        //         j.second = chaiscript::Boxed_Value(jm);
-        //     }
-        //     jointMatrix.push_back(chaiscript::Boxed_Value(j));
-        // }
-
-        // shader->send("viewMatrix", viewMatrix);
-
-        auto direction = std::vector<chaiscript::Boxed_Value>();
-        for (auto axis : lightParams["direction"]) {
-            direction.push_back(chaiscript::Boxed_Value(axis));
-        }
-        shader->send("lightDirection", direction);
-
-        auto color = std::vector<chaiscript::Boxed_Value>();
-        for (auto c : lightParams["color"]) {
-            color.push_back(chaiscript::Boxed_Value(c));
-        }
-        shader->send("lightColor", color);
-
-        auto ambientColor = std::vector<chaiscript::Boxed_Value>();
-
-        ambientColor.push_back(chaiscript::Boxed_Value(1.0f));
-        ambientColor.push_back(chaiscript::Boxed_Value(1.0f));
-        ambientColor.push_back(chaiscript::Boxed_Value(1.0f));
-
-        shader->send("ambientColor", ambientColor);
-
-        auto intensity = std::vector<chaiscript::Boxed_Value>();
-        intensity.push_back(chaiscript::Boxed_Value(lightParams["intensity"][0]));
-
-        shader->send("lightIntensity", intensity);
-
-        // Calculate lightSpaceMatrix
-        glm::vec3 lightPos = glm::vec3(lightParams["position"][0], lightParams["position"][1], lightParams["position"][2]);
-        // glm::vec3 lightDir = glm::vec3(lightParams["direction"][0], lightParams["direction"][1], lightParams["direction"][2]);
-        glm::vec3 lightDir = glm::vec3(0.0f, -1.0f, 0.0f);
-        glm::mat4 lightView = glm::lookAt(lightPos, lightPos + lightDir, glm::vec3(0.0f, 0.0f, -1.0f));
-        glm::mat4 lightProjection = glm::ortho(-7.5f, 7.5f, -7.5f, 7.5f, 1.0f, 1000.0f);
-        glm::mat4 lightSpaceMatrix = lightProjection * lightView;
-
-        auto lightSpaceMatrixBoxed = std::vector<chaiscript::Boxed_Value>();
-        for (int i = 0; i < 16; ++i) {
-            lightSpaceMatrixBoxed.push_back(chaiscript::Boxed_Value(glm::value_ptr(lightSpaceMatrix)[i]));
-        }
-        shader->send("lightSpaceMatrix", lightSpaceMatrixBoxed);
-
-        // shader->send("projectionMatrix", projectionMatrix);
-
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            
+        int i = 0;
+        for (auto msh : meshes) {
+            
+            auto node = meshToNode[i];
+            
 
-        for (int p = 1; p < 2; p++) {
-            if (p == 0) {
-                // gfx::Texture::Settings settings;
-                // settings.width = 1024;
-                // settings.height = 1024;
-                // settings.renderTarget = true;
-                // settings.debugName = "shadowMap";
-                // settings.format = PIXELFORMAT_RGBA8_UNORM;
-
-                // auto slices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
-                // slices.clear();
-
-                // cg.canvas = gfx->newTexture(settings, &slices);
-                // auto rt = gfx::Graphics::RenderTarget(cg.canvas, 0, 0);
-                // gfx->setRenderTarget(rt, 0);
-
-                glDeleteTextures(1, &cg.shadowMap);
-                glDeleteFramebuffers(1, &cg.shadowMapFBO);
-
-                // Create depth texture
-                glGenFramebuffers(1, &cg.shadowMapFBO);
-                glGenTextures(1, &cg.shadowMap);
-                glBindTexture(GL_TEXTURE_2D, cg.shadowMap);
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 1420, 1060, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-                GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
-                glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-
-                // Attach depth texture as FBO's depth buffer
-                glBindFramebuffer(GL_FRAMEBUFFER, cg.shadowMapFBO);
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, cg.shadowMap, 0);
-                // glDrawBuffer(GL_NONE);
-                // glReadBuffer(GL_NONE);
-                // glBindFramebuffer(GL_FRAMEBUFFER, gfx->hw_render.get_current_framebuffer());
-                // glBindFramebuffer(GL_FRAMEBUFFER, cg.shadowMapFBO);
-                // glViewport(0, 0, 1024, 1024);
-                glClear(GL_DEPTH_BUFFER_BIT);
-
-                GLuint err = glGetError();
-                if (err != GL_NO_ERROR) {
-                    printf("ERROR: %d", err);
-                }
-
-
-                // Set up the light's view and projection matrices
-                glm::vec3 lightPos = glm::vec3(lightParams["position"][0], lightParams["position"][1], lightParams["position"][2]);
-                // glm::vec3 lightDir = glm::vec3(lightParams["direction"][0], lightParams["direction"][1], lightParams["direction"][2]);
-
-                // Apply rotation to the light direction
-                float angle = glm::radians(15.0f); // Rotate by 45 degrees
-                glm::vec3 lightDir = glm::vec3(0.0f, -1.0f, 0.0f);
-                // glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(-1.0f, 0.0f, 0.0f));
-                // lightDir = glm::vec3(rotationMatrix * glm::vec4(lightDir, 0.0f));
-                glm::vec3 up(0.0f, 0.0f, -1.0f);
-                // up = glm::vec3(rotationMatrix * glm::vec4(up, 0.0f));
-
-                glm::mat4 lightView = glm::lookAt(lightPos, lightPos + lightDir, up);
-                glm::mat4 lightProjection = glm::ortho(-7.5f, 7.5f, -7.5f, 7.5f, 1.0f, 1000.0f);
-                glm::mat4 lightSpaceMatrix = lightProjection * lightView;
-
-                lightSpaceMatrixBoxed = std::vector<chaiscript::Boxed_Value>();
-                for (int i = 0; i < 16; ++i) {
-                    lightSpaceMatrixBoxed.push_back(chaiscript::Boxed_Value(glm::value_ptr(lightSpaceMatrix)[i]));
-                }
-
-                auto boxedLightView = std::vector<chaiscript::Boxed_Value>();
-                for (int i = 0; i < 16; ++i) {
-                    boxedLightView.push_back(chaiscript::Boxed_Value(glm::value_ptr(lightView)[i]));
-                }
-                shader->send("viewMatrix", boxedLightView);
-                auto boxedLightProjection = std::vector<chaiscript::Boxed_Value>();
-                for (int i = 0; i < 16; ++i) {
-                    boxedLightProjection.push_back(chaiscript::Boxed_Value(glm::value_ptr(lightProjection)[i]));
-                }
-                shader->send("projectionMatrix", boxedLightProjection);
-                // shader->send("flip", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1) }));
-                shader->send("lightDirection", direction);
-                shader->send("lightColor", color);
-                shader->send("ambientColor", ambientColor);
-                shader->send("lightIntensity", intensity);
-                shader->send("lightSpaceMatrix", lightSpaceMatrixBoxed);
-                shader->send("shadow", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1) }));
-            } else if (0) {
-                // shader->send("flip", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
-                // gfx->setRenderTarget();
-                // gfx->setShader();
-                // gfx->setShader(shader->shader);
-                // gfx->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
-                // gfx::OptionalColorD clearcolor;
-                // OptionalInt clearstencil(0);
-                // OptionalDouble cleardepth(1.0);
-                // gfx->clear(clearcolor, clearstencil, cleardepth);
-
-                // glBindFramebuffer(GL_FRAMEBUFFER, gfx->hw_render.get_current_framebuffer());
-
-                // glViewport(0, 0, 800, 600);
-
-                // glDrawBuffer(GL_NONE);
-                // glReadBuffer(GL_NONE);
-                glBindFramebuffer(GL_FRAMEBUFFER, gfx->hw_render.get_current_framebuffer());
-                // glViewport(0, 0, 1440, 1080);
-                // instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
-                gfx::OptionalColorD clearcolor;
-                clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
-                OptionalInt clearstencil(0);
-                OptionalDouble cleardepth(1.0);
-                instance->clear(clearcolor, clearstencil, cleardepth);
-
-
-
-                // glClear(GL_DEPTH_BUFFER_sBIT);
-                // auto cg = ChaiLove::getInstance()->chai_gfx;
-                // cg.createCanvas();
-                // auto rt = gfx::Graphics::RenderTarget(cg.canvas, 0, 0);
-                // gfx->setRenderTarget(rt, 0);
-
-                // shader->send("flip", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1) }));
-
-                shader->send("viewMatrix", viewMatrix);
-                // shader->send("projectionMatrix", projectionMatrix);
-                // shader->send("lightSpaceMatrix", lightSpaceMatrixBoxed);
-                // shader->send("lightDirection", direction);
-                // shader->send("lightColor", color);
-                // shader->send("ambientColor", ambientColor);
-                // shader->send("lightIntensity", intensity);
-
-            }
-            int i = 0;
-            for (auto msh : meshes) {
-                if (i == 0) {
-                    shader->send("shadow", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1) }));
+            if (currentTime != dt) {
+                if (jointList.size() > i) {                    
+                    jointList[i] = std::vector<int>();
+                    jointMatrix[i] = std::map<int, glm::mat4>();
                 } else {
-                    // shader->send("shadow", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+                    jointList.push_back(std::vector<int>());
+                    jointMatrix.push_back(std::map<int, glm::mat4>());
                 }
-                auto node = meshToNode[i];
-                auto jointList = std::vector<int>();
-                auto jointMatrix = std::map<int, glm::mat4>();
                 auto jointIBMatrix = std::map<int, glm::mat4>();
-
-                // jointMatrix[node] = glm::mat4(1.0f);
-
-                // if (skins.find(i) != skins.end()) {
-                //     auto skin = skins[i];
-
-                //     for (auto skinMap : skin) {
-                //         auto joint = skinMap.first;
-                //         auto matrix = skinMap.second;
-                //         // jointMatrix[joint] = glm::mat4(
-                //         //     matrix[0], matrix[1], matrix[2], matrix[3],
-                //         //     matrix[4], matrix[5], matrix[6], matrix[7],
-                //         //     matrix[8], matrix[9], matrix[10], matrix[11],
-                //         //     matrix[12], matrix[13], matrix[14], matrix[15]
-                //         // );
-                //         jointMatrix[joint] = glm::mat4(1.0);
-                //         jointList.push_back(joint);
-                //     }
-                // }
 
                 if (jointOrder.find(i) != jointOrder.end()) {
                     for (auto joint : jointOrder[i]) {
@@ -1269,8 +1025,8 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                             matrix[8], matrix[9], matrix[10], matrix[11],
                             matrix[12], matrix[13], matrix[14], matrix[15]
                         );
-                        jointMatrix[joint] = glm::mat4(1.0);
-                        jointList.push_back(joint);
+                        jointMatrix[i][joint] = glm::mat4(1.0);
+                        jointList[i].push_back(joint);
                     }
                 }
 
@@ -1297,7 +1053,7 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                         for (const auto& keyframe : channel.second) {
                             nodeIndex = keyframe.first;
 
-                            if (jointMatrix.find(nodeIndex) == jointMatrix.end()) {
+                            if (jointMatrix[i].find(nodeIndex) == jointMatrix[i].end()) {
                                 continue;
                             }
                             const auto& keyframes = keyframe.second;
@@ -1388,14 +1144,14 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
 
                                         animPlaying = 1;
                                         glm::vec3 v(interpolatedValue);
-                                        jointMatrix[node] = glm::translate(jointMatrix[node], v) * jointMatrix[node];
+                                        jointMatrix[i][node] = glm::translate(jointMatrix[i][node], v) * jointMatrix[i][node];
                                         // printf("Translate: %d %f %f %f\n", node, interpolatedValue.x, interpolatedValue.y, interpolatedValue.z);
                                     } else if (chan == "rotation" && t <= 1.0f && t >= 0.0f) {
                                         animPlaying = 1;
                                         glm::quat rotation = glm::quat(1.0f, 1.0f, 1.0f, 1.0f);
                                         auto bindMatrix = glm::inverse(jointIBMatrix[node]);
                                         if (node == nodes[0]) {
-                                            rotation = glm::slerp(glm::quat(v1.w, v1.x, v1.y, v1.z), glm::quat(v2.w, v2.x, v2.y, v2.z), t);
+                                            rotation = glm::slerp(glm::quat(v2.w, v2.x, v2.y, v2.z), glm::quat(v1.w, v1.x, v1.y, v1.z), t);
                                             auto parentMatrix = glm::mat4(1.0f);
                                             if (true || parent != root) {
                                                 parentMatrix = jointIBMatrix[root];
@@ -1407,11 +1163,11 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                                             auto hierarchyRotation2 = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
                                             for (auto h = hierarchy.rbegin(); h != hierarchy.rend(); ++h) {
                                                 if (node == subroot) {
-                                                    hierarchyRotation = hierarchyRotation * glm::quat_cast(jointMatrix[*h]);
+                                                    hierarchyRotation = hierarchyRotation * glm::quat_cast(jointMatrix[i][*h]);
                                                     hierarchyRotation2 = hierarchyRotation2 * glm::quat_cast(glm::inverse(nodeMatrix[*h]));
                                                 } else {
                                                     if (*h == node) {
-                                                        hierarchyRotation = hierarchyRotation * glm::quat_cast(jointMatrix[*h]);
+                                                        hierarchyRotation = hierarchyRotation * glm::quat_cast(jointMatrix[i][*h]);
                                                         hierarchyRotation2 = hierarchyRotation2 * glm::quat_cast(glm::inverse(nodeMatrix[*h]));
                                                     }
                                                 }
@@ -1422,16 +1178,16 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                                                                                             
                                             rotation = glm::normalize(rotation);
                                             
-                                            jointMatrix[node] = bindMatrix * glm::mat4_cast(rotation) * jointIBMatrix[node] * jointMatrix[node];
+                                            jointMatrix[i][node] = bindMatrix * glm::mat4_cast(rotation) * jointIBMatrix[node] * jointMatrix[i][node];
                                             parent = node;
                                         } else {
                                             // Child node
-                                            jointMatrix[node] = jointMatrix[parent] * jointMatrix[node];
+                                            jointMatrix[i][node] = jointMatrix[i][parent] * jointMatrix[i][node];
                                         }
                                     } else if (chan == "scale") {
                                         animPlaying = 1;
                                         glm::vec3 v(interpolatedValue);
-                                        jointMatrix[node] = glm::scale(jointMatrix[node], v) * jointMatrix[node];
+                                        jointMatrix[i][node] = glm::scale(jointMatrix[i][node], v) * jointMatrix[i][node];
                                     }
                                 }
                             } 
@@ -1447,37 +1203,33 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                         }
                     }
                 }
+                
+                
 
                 for (auto eraseAnimation : eraseAnimations) {
                     activeAnimations.erase(eraseAnimation.first);
                 }
-
-                // std::vector<chaiscript::Boxed_Value> joints;
-                // for (int c = 0; c < jointList.size(); ++c) {
-                //     joints.push_back(chaiscript::Boxed_Value(jointList[c]));
-                // }
-
-                // shader->send("joints", joints);
-                shader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value((int)jointList.size()) }));
-                shader->sendMap("jointMatrix", jointMatrix, jointList);
-
-                auto mat = matrices[i] * m;
-                std::vector<chaiscript::Boxed_Value> v;
-                for (int c = 0; c < 4; ++c) {
-                    v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).x));
-                    v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).y));
-                    v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).z));
-                    v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).w));
-                }
-                shader->send("modelMatrix", v);
-                // auto n = std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(node) });
-                // shader->send("node", n);
-                if (msh != nullptr) {
-                    msh->draw(gfx, m);
-                }
-                i++;
             }
+
+            shader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value((int)jointList[i].size()) }));
+            shader->sendMap("jointMatrix", jointMatrix[i], jointList[i]);
+
+            auto mat = matrices[i] * m;
+            std::vector<chaiscript::Boxed_Value> v;
+            for (int c = 0; c < 4; ++c) {
+                v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).x));
+                v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).y));
+                v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).z));
+                v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).w));
+            }
+            shader->send("modelMatrix", v);
+            
+            if (msh != nullptr) {
+                msh->draw(gfx, m);
+            }
+            i++;            
         }
+        currentTime = dt;
     }
 }
 
