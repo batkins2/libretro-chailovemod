@@ -62,7 +62,7 @@ class chai_mesh {
     bool newMeshFromFile(love::gfx::Graphics *inst, const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type);
     bool wrap_setTexture(const std::string &texture);
     void playAnimation(const std::string &name, const bool loop);
-    void stopAnimation(const std::string &name);
+    void endAnimation(const std::string &name);
     void draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt);
     love::gfx::Graphics *instance;
     gfx::Mesh *mesh = nullptr;

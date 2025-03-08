@@ -326,7 +326,7 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_mesh::wrap_setTexture), "setTexture");
 	chai.add(fun(&chai_mesh::getCameraParams), "getCameraParams");
 	chai.add(fun(&chai_mesh::playAnimation), "playAnimation");
-	chai.add(fun(&chai_mesh::stopAnimation), "stopAnimation");
+	chai.add(fun(&chai_mesh::endAnimation), "endAnimation");
 	chai.add(fun(&chai_shader::send), "send");
 	chai.add(user_type<chai_scene>(), "chai_scene");
 	chai.add(constructor<chai_scene(const chai_scene &)>(), "chai_scene");

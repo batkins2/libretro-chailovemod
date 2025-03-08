@@ -974,11 +974,11 @@ bool chai_mesh::wrap_setTexture(const std::string &texture) {
 void chai_mesh::playAnimation(const std::string &name, const bool loop) {
     auto animation = animations.find(name);
     if (animation != animations.end()) {
-        activeAnimations[name] = std::pair<float, bool>(0.01f, loop);
+        activeAnimations[name] = std::pair<float, bool>(0.1f, loop);
     }
 }
 
-void chai_mesh::stopAnimation(const std::string &name) {
+void chai_mesh::endAnimation(const std::string &name) {
     auto animation = activeAnimations.find(name);
     if (animation != activeAnimations.end()) {
         activeAnimations.erase(animation);
