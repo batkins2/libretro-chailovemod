@@ -16,9 +16,9 @@ void chai_shader::destroy() {
 }
 
 chai_shader::~chai_shader() {
-    delete shader;
-    delete fragmentShader;
-    delete instance;
+    // delete shader;
+    // delete fragmentShader;
+    // delete instance;
 }
 
 chai_shader::chai_shader(const chai_shader &c) {
@@ -32,7 +32,7 @@ chai_shader *chai_shader::clone() const
 	return new chai_shader(*this);
 }
 
-void chai_shader::newShader(love::gfx::Graphics *inst, std::vector<std::string> lines, love::gfx::Shader::CompileOptions options) {
+void chai_shader::newVertexShader(love::gfx::Graphics *inst, std::vector<std::string> lines, love::gfx::Shader::CompileOptions options) {
     instance = inst;
     if (instance->isCreated()) {
         shader = instance->newShader(lines, options);
@@ -48,8 +48,14 @@ void chai_shader::newFragmentShader(love::gfx::Graphics *inst, std::vector<std::
 
 void chai_shader::sendMap(const std::string &uniform, const std::map<int, glm::mat4> &data, const std::vector<int> &order) {
     if (instance->isCreated()) {
-        auto info = shader->getUniformInfo(uniform);
-        if (info->baseType == gfx::Shader::UNIFORM_SAMPLER || info->baseType == gfx::Shader::UNIFORM_STORAGETEXTURE
+        const love::gfx::Shader::UniformInfo* info = nullptr;
+        try {
+            info = shader->getUniformInfo(uniform);
+        } catch (std::exception &e) {
+            printf("Error: %s\n", e.what());
+            return;
+        }
+        if (info == nullptr || info->baseType == gfx::Shader::UNIFORM_SAMPLER || info->baseType == gfx::Shader::UNIFORM_STORAGETEXTURE
             || info->baseType == gfx::Shader::UNIFORM_TEXELBUFFER || info->baseType == gfx::Shader::UNIFORM_STORAGEBUFFER)
             return;
 
@@ -78,8 +84,14 @@ void chai_shader::sendMap(const std::string &uniform, const std::map<int, glm::m
 
 void chai_shader::send(const std::string &uniform, const std::vector<chaiscript::Boxed_Value> &data) {
     if (instance->isCreated()) {
-        auto info = shader->getUniformInfo(uniform);
-        if (info->baseType == gfx::Shader::UNIFORM_SAMPLER || info->baseType == gfx::Shader::UNIFORM_STORAGETEXTURE
+        const love::gfx::Shader::UniformInfo* info = nullptr;
+        try {
+            info = shader->getUniformInfo(uniform);
+        } catch (std::exception &e) {
+            printf("Error: %s\n", e.what());
+            return;
+        }
+        if (info == nullptr || info->baseType == gfx::Shader::UNIFORM_SAMPLER || info->baseType == gfx::Shader::UNIFORM_STORAGETEXTURE
             || info->baseType == gfx::Shader::UNIFORM_TEXELBUFFER || info->baseType == gfx::Shader::UNIFORM_STORAGEBUFFER)
             return;
 
@@ -137,4 +149,8 @@ void chai_shader::send(const std::string &uniform, const std::vector<chaiscript:
         
     }
 }
+
+chai_shader *chai_shader::newShader() const {
+    return new chai_shader();
+} 
 }

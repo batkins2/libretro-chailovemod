@@ -229,14 +229,14 @@ Graphics::~Graphics()
 	// the active shader may try to activate a standard shader when deactivating
 	// itself, which will cause problems since it calls Graphics methods in the
 	// Graphics destructor.
-	for (int i = 0; i < Shader::STANDARD_MAX_ENUM; i++)
-	{
-		if (Shader::standardShaders[i])
-		{
-			Shader::standardShaders[i]->release();
-			Shader::standardShaders[i] = nullptr;
-		}
-	}
+	// for (int i = 0; i < Shader::STANDARD_MAX_ENUM; i++)
+	// {
+	// 	if (Shader::standardShaders[i])
+	// 	{
+	// 		Shader::standardShaders[i]->release();
+	// 		Shader::standardShaders[i] = nullptr;
+	// 	}
+	// }
 
 	states.clear();
 

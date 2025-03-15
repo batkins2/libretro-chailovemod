@@ -13,7 +13,13 @@ namespace love
 class chai_scene {
 public:
     chai_scene();
-    ~chai_scene();
+    ~chai_scene();    
+    chai_scene *clone() const;
+    chai_scene& operator=(const chai_scene& m) {
+		return *this;
+	};
+    chai_scene *newScene() const;
+    bool destroy();
     void addMesh(chai_mesh *mesh);
     void setShader(chai_shader *shader);
     void setMatrix(std::vector<chaiscript::Boxed_Value> matrix, int index);
@@ -23,7 +29,7 @@ public:
 
 private:
     std::vector<chai_mesh *> meshes;
-    chai_shader *sceneShader;
+    chai_shader *sceneShader = nullptr;
     std::vector<Matrix4> matrices;
     float currentTime = 0.0f;
     std::vector<chaiscript::Boxed_Value> viewMatrix;

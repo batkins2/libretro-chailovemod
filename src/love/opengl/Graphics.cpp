@@ -317,10 +317,10 @@ bool Graphics::setMode(void */*context*/, int width, int height, int pixelwidth,
 	// Okay, setup OpenGL.
 	gl.initContext();
 
-	if (true || gl.isCoreProfile())
+	if (gl.isCoreProfile())
 	{
-		// glGenVertexArrays(1, &mainVAO);
-		// glBindVertexArray(mainVAO);
+		glGenVertexArrays(1, &mainVAO);
+		glBindVertexArray(mainVAO);
 	}
 
 	
@@ -385,8 +385,8 @@ bool Graphics::setMode(void */*context*/, int width, int height, int pixelwidth,
 	}
 
 	// Reload all volatile objects.
-	if (!Volatile::loadAll())
-		::printf("Could not reload all volatile objects.\n");
+	// if (!Volatile::loadAll())
+	// 	::printf("Could not reload all volatile objects.\n");
 
 	createQuadIndexBuffer();
 
@@ -456,7 +456,7 @@ void Graphics::unSetMode()
 
 	// Unload all volatile objects. These must be reloaded after the display
 	// mode change.
-	Volatile::unloadAll();
+	// Volatile::unloadAll();
 
 	clearTemporaryResources();
 

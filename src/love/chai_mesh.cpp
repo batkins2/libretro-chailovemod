@@ -629,7 +629,7 @@ gfx::Mesh *loadMesh(int i, tinygltf::Model &model, love::gfx::Graphics *instance
             }
         }
     } else {
-        cm->cameraParams["fov"] = std::vector<float> { 1440.0f / 1080.0f };
+        cm->cameraParams["fov"] = std::vector<float> { 1920.0f / 1080.0f };
         cm->cameraParams["aspectRatio"] = std::vector<float> { 1.33f };
         cm->cameraParams["near"] = std::vector<float> { 0.01 };
         cm->cameraParams["far"] = std::vector<float> { 1000.0f };
@@ -779,6 +779,20 @@ gfx::Mesh *loadMesh(int i, tinygltf::Model &model, love::gfx::Graphics *instance
     }
 
     return nullptr;
+}
+
+void chai_mesh::reloadMesh() {
+    for (size_t i = 0; i < meshes.size(); i++) {
+        auto mesh = meshes[i];
+        auto data = mesh->getVertexData();
+        size_t size = mesh->getVertexCount() * mesh->getVertexStride();
+        auto usage = gfx::BufferDataUsage::BUFFERDATAUSAGE_DYNAMIC;
+        auto type = gfx::PrimitiveType::PRIMITIVE_TRIANGLES;
+        auto tex = mesh->getTexture();
+        auto m = instance->newMesh(vf, (const void *)data, size, type, usage);
+        m->setTexture(tex);
+        meshes[i] = m;
+    }
 }
 
 bool LoadImageData(tinygltf::Image *image, const int image_idx, std::string *err, std::string *warn, int req_width, int req_height, const unsigned char *bytes, int size, void *user_data) {

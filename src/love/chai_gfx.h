@@ -35,7 +35,8 @@ class chai_gfx {
     ~chai_gfx();
     bool init();
     bool destroy();
-    chai_shader *wrap_newShader(const std::string *FileName);
+    bool hasReinit();
+    chai_shader *wrap_newShader(const std::string *FileName, chai_shader *cshader);
     void wrap_setShader(chai_shader *s);
     chai_mesh *wrap_newMesh(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::vector<chaiscript::Boxed_Value> &data, const std::string &type);
     chai_mesh *wrap_newMeshFromFile(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type);
@@ -44,18 +45,20 @@ class chai_gfx {
     chai_scene *wrap_newScene();
     void createCanvas();
     void drawCanvas();
-    love::gfx::Graphics *instance; // = gfx::Graphics::createInstance();
+    chai_shader getShader() { return *shader; }
+    love::gfx::Graphics *instance = nullptr; // = gfx::Graphics::createInstance();
     love::windowmod::Window *win;
     love::gfx::Texture *canvas;
     inline static struct retro_hw_render_callback hw_render;
     unsigned int FRAMEBUFFER;
     unsigned int COLORATTACH;
-    chai_shader *shader;
+    chai_shader *shader = nullptr;
     std::vector<chai_mesh *> meshes;
     int width = 1440;
     int height = 1080;
     void *scene = nullptr;
     GLuint shadowMapFBO = 0;
     GLuint shadowMap = 0;
+    bool reinit = false;
 };
 }

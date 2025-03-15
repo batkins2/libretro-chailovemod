@@ -146,6 +146,7 @@ script::script(const std::string& file) {
 		love["graphics"] = var(std::ref(app->graphics));
 		love["chai_gfx"] = var(std::ref(app->chai_gfx));
 		love["chai_mesh"] = var(std::ref(app->chai_mesh));
+		love["chai_scene"] = var(std::ref(app->chai_scene));		
 		love["chai_shader"] = var(std::ref(app->chai_shader));
 		love["chai_matrices"] = var(std::ref(app->chai_matrices));
 		love["image"] = var(std::ref(app->image));
@@ -312,22 +313,29 @@ script::script(const std::string& file) {
 
 	// Gfx
 	chai.add(fun(&chai_gfx::wrap_newShader), "newShader");
-	chai.add(fun(&chai_gfx::wrap_setShader), "setShader");
-	chai.add(fun(&chai_gfx::wrap_newMesh), "newMesh");
+	// chai.add(fun(&chai_gfx::wrap_setShader), "setShader");
+	// chai.add(fun(&chai_gfx::wrap_newMesh), "newMesh");
 	chai.add(fun(&chai_gfx::wrap_newMeshFromFile), "newMeshFromFile");
-	chai.add(fun(&chai_gfx::wrap_newScene), "newScene");
-	chai.add(fun(&chai_gfx::draw), "draw");
-	chai.add(fun(&chai_gfx::drawScene), "drawScene");
-	chai.add(fun(&chai_gfx::createCanvas), "createCanvas");
-	chai.add(fun(&chai_gfx::drawCanvas), "drawCanvas");
+	// chai.add(fun(&chai_gfx::wrap_newScene), "newScene");
+	// chai.add(fun(&chai_gfx::draw), "draw");
+	// chai.add(fun(&chai_gfx::drawScene), "drawScene");
+	// chai.add(fun(&chai_gfx::createCanvas), "createCanvas");
+	// chai.add(fun(&chai_gfx::drawCanvas), "drawCanvas");
+	// chai.add(fun(&chai_gfx::hasReinit), "hasReinit");
+	// chai.add(fun(&chai_gfx::getShader), "getShader");
+	chai.add(user_type<chai_shader>(), "chai_shader");
+	chai.add(constructor<chai_shader(const chai_shader &)>(), "chai_shader");
+	chai.add(fun(&chai_shader::operator=), "=");
+	chai.add(fun(&chai_shader::newShader), "newShader");	
+	chai.add(fun(&chai_shader::send), "send");
 	chai.add(user_type<chai_mesh>(), "chai_mesh");
 	chai.add(constructor<chai_mesh(const chai_mesh &)>(), "chai_mesh");
-	chai.add(fun(&chai_mesh::operator=), "=");
+	chai.add(fun(&chai_mesh::operator=), "=");	
 	chai.add(fun(&chai_mesh::wrap_setTexture), "setTexture");
 	chai.add(fun(&chai_mesh::getCameraParams), "getCameraParams");
 	chai.add(fun(&chai_mesh::playAnimation), "playAnimation");
 	chai.add(fun(&chai_mesh::endAnimation), "endAnimation");
-	chai.add(fun(&chai_shader::send), "send");
+	chai.add(fun(&chai_mesh::reloadMesh), "reloadMesh");
 	chai.add(user_type<chai_scene>(), "chai_scene");
 	chai.add(constructor<chai_scene(const chai_scene &)>(), "chai_scene");
 	chai.add(fun(&chai_scene::operator=), "=");
@@ -335,6 +343,7 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_scene::setShader), "setShader");
 	chai.add(fun(&chai_scene::setMatrix), "setMatrix");
 	chai.add(fun(&chai_scene::draw), "draw");
+	chai.add(fun(&chai_scene::newScene), "newScene");
 
 	// Matrices
 	chai.add(fun(&chai_matrices::setTransformationMatrix), "setTransformationMatrix");

@@ -123,9 +123,9 @@ class ChaiLove {
 	love::chai_mesh chai_mesh;
 	// #endif
 	// #ifndef __HAVE_CHAI_SHADER__
-	love::chai_mesh chai_shader;
+	love::chai_shader chai_shader;
 	// #endif
-	love::chai_mesh chai_scene;
+	love::chai_scene chai_scene;
 
 	ChaiLove();
 	~ChaiLove();

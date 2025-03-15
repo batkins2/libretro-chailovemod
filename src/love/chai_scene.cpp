@@ -9,6 +9,11 @@ chai_scene::~chai_scene() {
     
 }
 
+bool chai_scene::destroy() {
+    // sceneShader->shader->~Shader();
+    return true;
+}
+
 void chai_scene::addMesh(chai_mesh *mesh) {
     meshes.push_back(mesh);
     matrices.push_back(Matrix4(new float[16] {
@@ -19,6 +24,9 @@ void chai_scene::addMesh(chai_mesh *mesh) {
 }
 
 void chai_scene::setShader(chai_shader *shader) {
+    if (sceneShader != nullptr) {
+        sceneShader->shader->~Shader();
+    }
     sceneShader = shader;   
 }
 
@@ -137,49 +145,75 @@ void chai_scene::drawMeshes(bool shadows) {
 void chai_scene::draw() {
     auto cg = ChaiLove::getInstance()->chai_gfx;
 
-    cg.instance->setShader(sceneShader->shader);
-    cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+    if (false && cg.reinit) {
+        cg.hasReinit();
+        printf("Reinit\n");
+    } else {
+        // cg.instance->setActive(true);
+        // cg.instance->setShader();
+        cg.instance->setShader(sceneShader->shader);
+        cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
 
-    glDeleteFramebuffers(1, &shadowMapFBO);
+        if (shadowMapFBO != 0) {
+            glDeleteFramebuffers(1, &shadowMapFBO);
+        }
 
-    // Create depth texture
-    glGenFramebuffers(1, &shadowMapFBO);
-    if (shadowMap == 0) {
-        glGenTextures(1, &shadowMap); 
-    }    
-    
-    glBindTexture(GL_TEXTURE_2D, shadowMap);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 1420, 1060, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
-    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-
-    // Attach depth texture as FBO's depth buffer
-    glBindFramebuffer(GL_FRAMEBUFFER, shadowMapFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
-    glClear(GL_DEPTH_BUFFER_BIT);
-
-    GLuint err = glGetError();
-    if (err != GL_NO_ERROR) {
-        printf("ERROR: %d", err);
-    }
+        // Create depth texture
+        glGenFramebuffers(1, &shadowMapFBO);
+        if (shadowMap == 0) {
+            glGenTextures(1, &shadowMap); 
+        }    
         
-    currentTime += 0.01f;
+        glBindTexture(GL_TEXTURE_2D, shadowMap);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, cg.width-5, cg.height-5, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
-    drawMeshes(true);
+        // Attach depth texture as FBO's depth buffer
+        glBindFramebuffer(cg.instance->FRAMEBUFFER, shadowMapFBO);
+        glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
+        glClear(GL_DEPTH_BUFFER_BIT);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, cg.instance->hw_render.get_current_framebuffer());
-    gfx::OptionalColorD clearcolor;
-    clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
-    OptionalInt clearstencil(0);
-    OptionalDouble cleardepth(1.0);
-    cg.instance->clear(clearcolor, clearstencil, cleardepth);
-    
-    drawMeshes(false);
-    
-    cg.instance->setShader();
+        GLuint err = glGetError();
+        if (err != GL_NO_ERROR) {
+            printf("ERROR: %d\n", err);
+            printf("shadowMapFBO: %d\n", shadowMapFBO);
+            printf("shadowMap: %d\n", shadowMap);
+            printf("cg.width: %d\n", cg.width);
+            printf("cg.height: %d\n", cg.height);
+            printf("sceneShader: %d\n", sceneShader->shader);
+            printf("cg.instance->FRAMEBUFFER: %d\n", cg.instance->FRAMEBUFFER);
+        } else {
+            
+            currentTime += 0.01f;
+
+            drawMeshes(true);
+
+            glBindFramebuffer(cg.instance->FRAMEBUFFER, cg.instance->hw_render.get_current_framebuffer());
+            gfx::OptionalColorD clearcolor;
+            clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
+            OptionalInt clearstencil(0);
+            OptionalDouble cleardepth(1.0);
+            cg.instance->clear(clearcolor, clearstencil, cleardepth);
+            
+            drawMeshes(false);
+            
+            cg.instance->setShader();
+        }
+    }
+}
+
+chai_scene *chai_scene::clone() const
+{
+	return new chai_scene(*this);
+}
+
+chai_scene *chai_scene::newScene() const
+{
+	return new chai_scene();
 }
 } // namespace love

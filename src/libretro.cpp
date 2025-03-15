@@ -240,17 +240,26 @@ void retro_get_system_av_info(struct retro_system_av_info *info) {
 	if (!ChaiLove::hasInstance()) {
 		return;
 	}
-	unsigned int width = 1440;
-	unsigned int height = 1080;
+
+	unsigned int width = 3840;
+	unsigned int height = 2160;
+
+	// GLint dims[2];
+    // glGetIntegerv(GL_MAX_VIEWPORT_DIMS, dims);
+	// LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] GL_MAX_VIEWPORT_DIMS: " << dims[0] << "x" << dims[1] << std::endl;
+    // width = dims[0];
+    // height = dims[1];
 
 	// ChaiLove* app = ChaiLove::getInstance();
+	// app->chai_gfx.width = width;
+	// app->chai_gfx.height = height;
 	// if (app != NULL) {
 	// 	width = app->config.window.width;
 	// 	height = app->config.window.height;
 	// }
 
-	info->geometry.base_width   = width;
-	info->geometry.base_height  = height;
+	info->geometry.base_width   = 1920;
+	info->geometry.base_height  = 1080;
 	info->geometry.max_width    = width;
 	info->geometry.max_height   = height;
 	info->geometry.aspect_ratio = static_cast<float>(width) / static_cast<float>(height);
@@ -459,7 +468,7 @@ static void context_reset(void)
 
 static void context_destroy(void)
 {
-	ChaiLove::getInstance()->chai_gfx.destroy();
+	ChaiLove::getInstance()->chai_gfx.~chai_gfx();
 }
 
 static bool retro_init_hw_context(void)

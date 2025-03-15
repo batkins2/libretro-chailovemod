@@ -64,6 +64,7 @@ class chai_mesh {
     void playAnimation(const std::string &name, const bool loop);
     void endAnimation(const std::string &name);
     void draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt);
+    void reloadMesh();
     love::gfx::Graphics *instance;
     gfx::Mesh *mesh = nullptr;
     std::vector<gfx::Mesh *> meshes;

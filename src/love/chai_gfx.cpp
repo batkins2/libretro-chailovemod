@@ -16,27 +16,65 @@ chai_gfx::chai_gfx() {
 }
 
 chai_gfx::~chai_gfx() {
-    // delete i;
-    // delete fs;
+    // delete shader;
+    // delete instance;
+    // delete win;
 }
 
 bool chai_gfx::init() {
-    instance = new gfx::opengl::Graphics();
+    auto init = false;
+    if (instance != nullptr) {
+        init = true; 
+        // win->setGraphics(nullptr);
+        
+        // instance->setActive(false);
+        // shader->~chai_shader();
+        // instance->unSetMode();
+        // win->setGraphics(nullptr);
+        // instance->unSetMode();
+        // instance = instance->createInstance();
+        // instance = nullptr;  
+        // instance->setShader();
+        // instance->unSetMode();
+    }
+    
+    if (!init) {
+        instance = new gfx::opengl::Graphics();
+    }
+        
     instance->hw_render = hw_render;
     instance->FRAMEBUFFER = FRAMEBUFFER;
     instance->COLORATTACH = COLORATTACH;
     // instance->setProjection(Matrix4::perspective(120000.0f, 800.0f/600.0f, 0.1f, 100.0f));
-    win = new windowmod::sdl::Window();
+    
+    if (!init) {
+        win = new windowmod::sdl::Window();   
+    }
     
     auto winset = new windowmod::WindowSettings();
     winset->displayindex = 0;
     winset->depth = 16;
     
-    width = 1440;
-    height = 1080;
+    // width = 1920;
+    // height = 1080;
 
+    GLint dims[4];
+    glGetIntegerv(GL_VIEWPORT, dims);
+    width = dims[2];
+    height = dims[3];
+    
     win->setWindow(width, height, winset);
-  
+    if (init) {
+        // shader->shader->~Shader();
+        instance->setShader();
+        instance->unSetMode();
+        instance->reset();
+        
+        instance->setMode(nullptr, width, height, width, height, true, 16, 0);
+        instance = instance->createInstance();
+        // shader->shader->updateBuiltinUniforms(instance, width, height);
+    }
+    
     win->setGraphics(instance);
 
     // instance->setMode(nullptr, 1920, 1080, 1920, 1080, true, 16, 0);
@@ -49,21 +87,34 @@ bool chai_gfx::init() {
     // auto cl = ChaiLove::getInstance();
     // cl->win = (SDL_Window *) win->getHandle();
     // cl->videoBuffer = (uint32_t *) cl->win;
-
+    // reinit = false;
     return true;
 }
 
 bool chai_gfx::destroy() {
-    delete win;
-    instance->setShader();
-    shader->destroy();
-    instance->unSetMode();
-    for_each(meshes.begin(), meshes.end(), [](chai_mesh *m) { m->destroy(); });
-    // delete instance;
+    
+    // shader->shader->~Shader();
+    // delete win;
+    // instance->setShader();
+    
+    // instance->unSetMode();
+    // for_each(meshes.begin(), meshes.end(), [](chai_mesh *m) { m->destroy(); });
+    
+    reinit = true;
+    // this->~chai_gfx();
     return true;
 }
 
-chai_shader *chai_gfx::wrap_newShader(const std::string *FileName) {
+bool chai_gfx::hasReinit() {
+    if (reinit) {
+        // init();
+        reinit = false;
+        return true;
+    }
+    return reinit;
+}
+
+chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, chai_shader *cshader) {
     // delete win;
     // delete instance;
     // init();
@@ -71,7 +122,8 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName) {
    
 
     if (instance->isCreated()) {
-        instance->bindVAO();
+        
+        // instance->bindVAO();
         auto file = new filesystem();
         std::string data = file->read(FileName->c_str());
         // auto file = Module::getInstance<filesystemmod::Filesystem>(Module::M_FILESYSTEM);
@@ -170,8 +222,13 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName) {
         code.push_back(a);
         code.push_back(c);
 
-        shader = new chai_shader();
-        shader->newShader(instance, code, options);
+        // if (shader != nullptr) {
+        //     instance->setShader();
+        //     delete shader;
+        //     instance->bindVAO();
+        // }
+        // shader = new chai_shader();
+        cshader->newVertexShader(instance, code, options);
 
         // if (!shader->fragmentShader) {
         //     shader->fragmentShader = new love::gfx::ShaderStage(
