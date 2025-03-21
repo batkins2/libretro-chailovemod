@@ -45,6 +45,7 @@ bool chai_gfx::init() {
     instance->hw_render = hw_render;
     instance->FRAMEBUFFER = FRAMEBUFFER;
     instance->COLORATTACH = COLORATTACH;
+    printf("ColorAttach: %d\n", COLORATTACH);
     // instance->setProjection(Matrix4::perspective(120000.0f, 800.0f/600.0f, 0.1f, 100.0f));
     
     if (!init) {
@@ -63,19 +64,55 @@ bool chai_gfx::init() {
     width = dims[2];
     height = dims[3];
     
-    win->setWindow(width, height, winset);
-    if (init) {
-        // shader->shader->~Shader();
-        instance->setShader();
-        instance->unSetMode();
-        instance->reset();
-        
-        instance->setMode(nullptr, width, height, width, height, true, 16, 0);
-        instance = instance->createInstance();
-        // shader->shader->updateBuiltinUniforms(instance, width, height);
+    if (!init) {
+        win->setWindow(width, height, winset);
     }
     
-    win->setGraphics(instance);
+    if (init) {
+        
+        // shader->shader->~Shader();
+        // instance->setShader();
+        // instance->unSetMode();
+        instance->reset();
+
+        
+        
+        instance->setMode(nullptr, width, height, width, height, true, 16, 0);
+        
+        // shader->shader->updateBuiltinUniforms(instance, width, height);
+        // instance->bindVAO();
+        win->setGraphics(instance);
+        win->setWindow(width, height, winset);
+        instance->setActive(true);
+        instance->present(nullptr);
+        auto gfx = Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS);
+        
+        // auto slices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
+    
+        // Rect rect = Rect();
+        // rect.w = width;
+        // rect.h = height;
+    
+        // gfx::Texture::Settings settings;
+        // settings.width = width;
+        // settings.height = height;
+        // settings.format = PIXELFORMAT_NORMAL;
+        // settings.renderTarget = true;
+
+        // auto renderTarget = instance->getRenderTargets();
+        // printf("renderTarget: %s\n", renderTarget.depthStencil.texture->SETTING_FORMAT);
+        // instance->setRenderTarget(renderTarget, gfx::Graphics::TEMPORARY_RT_STENCIL | gfx::Graphics::TEMPORARY_RT_DEPTH);
+     
+        // glDrawBuffer(COLORATTACH);
+        // GLuint texture;
+        // glGenTextures(1, &texture);
+        // glBindTexture(GL_TEXTURE_2D, texture);
+        // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+        // glFramebufferTexture2D(FRAMEBUFFER, COLORATTACH, GL_TEXTURE_2D, texture, 0);
+
+    } else {    
+        win->setGraphics(instance);
+    }
 
     // instance->setMode(nullptr, 1920, 1080, 1920, 1080, true, 16, 0);
     // instance = new gfx::opengl::Graphics();
@@ -96,10 +133,18 @@ bool chai_gfx::destroy() {
     // shader->shader->~Shader();
     // delete win;
     // instance->setShader();
+    // auto renderTarget = instance->getRenderTargets();
+    // printf("renderTarget: %s\n", renderTarget.depthStencil.texture->SETTING_FORMAT);
+    instance->unSetMode();
     
-    // instance->unSetMode();
-    // for_each(meshes.begin(), meshes.end(), [](chai_mesh *m) { m->destroy(); });
     
+    for_each(meshes.begin(), meshes.end(), [](chai_mesh *m) { 
+        m->destroy(); 
+        delete m;
+    });
+    meshes = std::vector<chai_mesh *>();
+    instance->setShader(0);
+    instance->setActive(false);
     reinit = true;
     // this->~chai_gfx();
     return true;
@@ -222,12 +267,16 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, chai_shader *
         code.push_back(a);
         code.push_back(c);
 
-        // if (shader != nullptr) {
+        auto prog = cshader->shader;
+        if (prog) {
         //     instance->setShader();
         //     delete shader;
         //     instance->bindVAO();
-        // }
+        //     shader = new chai_shader();
+            
+        }
         // shader = new chai_shader();
+        
         cshader->newVertexShader(instance, code, options);
 
         // if (!shader->fragmentShader) {
@@ -239,7 +288,7 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, chai_shader *
         //         "GL_FRAGMENT_SHADER"
         //     );
         // }
-        return shader;
+        return cshader;
         // return instance->newShader(lines, options);
     }
     return nullptr;
@@ -259,7 +308,7 @@ chai_mesh *chai_gfx::wrap_newMesh(const std::vector<chaiscript::Boxed_Value> &ve
         auto m = new chai_mesh();
         
         // instance->bindVAO();
-        m->newMesh(instance, vertexFormat, data, type);
+        // m->newMesh(instance, vertexFormat, data, type);
         meshes.push_back(m);
         return m;
     }
@@ -271,8 +320,8 @@ chai_mesh *chai_gfx::wrap_newMeshFromFile(const std::vector<chaiscript::Boxed_Va
         auto m = new chai_mesh();
         
         // instance->bindVAO();
-        m->newMeshFromFile(instance, vertexFormat, FileName, type);
-        meshes.push_back(m);
+        // m->newMeshFromFile(instance, vertexFormat, FileName, type);
+        meshes.emplace_back(m);
         return m;
     }
     return nullptr;

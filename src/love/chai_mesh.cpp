@@ -54,38 +54,43 @@ std::vector<gfx::Buffer::DataDeclaration> vertexFormatLoader(const std::vector<c
     return vf;
 }
 
-bool chai_mesh::newMesh(love::gfx::Graphics *inst, const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::vector<chaiscript::Boxed_Value> &data, const std::string &type) {
-    instance = inst;
-
-    std::vector<uint32_t> prepD;
-
-    uint32_t vc = 0xffffffff;
-
-    for (auto vectors : data) {
-        for (auto value : chaiscript::boxed_cast<std::vector<chaiscript::Boxed_Value>>(vectors)) {
-            auto v = chaiscript::boxed_cast<float>(value);
-            uint32_t fbits = 0;
-            memcpy(&fbits, &v, sizeof(fbits));
-            prepD.push_back(fbits);
-        }
-        // for (int i = 0; i < 4; i++) {
-            // size_t currentSize = prepD->size();
-            // prepD->resize(currentSize + sizeof(float));
-            // std::memcpy(prepD->data() + currentSize, &vc, sizeof(uint8_t));
-            prepD.push_back(vc);
-        // }
-    }
-
-    // std::memcpy(d, &prepD, prepD->size() * sizeof(float));
-
-    vf = vertexFormatLoader(vertexFormat);
-
-    auto usage = gfx::BufferDataUsage::BUFFERDATAUSAGE_DYNAMIC;
-    if (type == "triangles") {
-        mesh = instance->newMesh(vf, prepD.data(), prepD.size() * sizeof(uint32_t), gfx::PrimitiveType::PRIMITIVE_TRIANGLES, usage);
-    }
-    return true;
+chai_mesh *chai_mesh::newMesh() {
+    auto m = new chai_mesh();
+    return m;
 }
+
+// bool chai_mesh::newMesh(love::gfx::Graphics *inst, const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::vector<chaiscript::Boxed_Value> &data, const std::string &type) {
+//     instance = inst;
+
+//     std::vector<uint32_t> prepD;
+
+//     uint32_t vc = 0xffffffff;
+
+//     for (auto vectors : data) {
+//         for (auto value : chaiscript::boxed_cast<std::vector<chaiscript::Boxed_Value>>(vectors)) {
+//             auto v = chaiscript::boxed_cast<float>(value);
+//             uint32_t fbits = 0;
+//             memcpy(&fbits, &v, sizeof(fbits));
+//             prepD.push_back(fbits);
+//         }
+//         // for (int i = 0; i < 4; i++) {
+//             // size_t currentSize = prepD->size();
+//             // prepD->resize(currentSize + sizeof(float));
+//             // std::memcpy(prepD->data() + currentSize, &vc, sizeof(uint8_t));
+//             prepD.push_back(vc);
+//         // }
+//     }
+
+//     // std::memcpy(d, &prepD, prepD->size() * sizeof(float));
+
+//     vf = vertexFormatLoader(vertexFormat);
+
+//     auto usage = gfx::BufferDataUsage::BUFFERDATAUSAGE_DYNAMIC;
+//     if (type == "triangles") {
+//         mesh = instance->newMesh(vf, prepD.data(), prepD.size() * sizeof(uint32_t), gfx::PrimitiveType::PRIMITIVE_TRIANGLES, usage);
+//     }
+//     return true;
+// }
 
 void loadTexture(gfx::Mesh *mesh, std::string texture) {
     auto img = new Image(texture);
@@ -852,17 +857,17 @@ bool LoadImageData(tinygltf::Image *image, const int image_idx, std::string *err
 
     tex->setSamplerState(sampler);
 
-    cm->textures.push_back(tex);
+    cm->textures.emplace_back(tex);
 
     return true;
 }
 
 std::map<std::string, std::vector<float>> chai_mesh::getCameraParams() {
-    return cameraParams;
+    return this->cameraParams;
 }
 
-bool chai_mesh::newMeshFromFile(love::gfx::Graphics *inst, const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type) {
-    instance = inst;
+bool chai_mesh::loadMeshFromFile(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type) {
+    instance = Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS);
 
     auto cl = ChaiLove::getInstance();
     auto f = cl->getFSModule();
@@ -885,11 +890,11 @@ bool chai_mesh::newMeshFromFile(love::gfx::Graphics *inst, const std::vector<cha
     vf = vertexFormatLoader(vertexFormat);
 
     for (size_t i = 0; i < model.meshes.size(); i++) {
-        meshes.push_back(loadMesh(i, model, instance, type, vf, this));
+        meshes.emplace_back(loadMesh(i, model, instance, type, vf, this));
     }
 
-    if (meshes.size() == 0) {
-        meshes.push_back(loadMesh(-1, model, instance, type, vf, this));
+    if (meshes.empty()) {
+        meshes.emplace_back(loadMesh(-1, model, instance, type, vf, this));
     }
 
     return true;

@@ -10,7 +10,13 @@ chai_scene::~chai_scene() {
 }
 
 bool chai_scene::destroy() {
-    // sceneShader->shader->~Shader();
+    sceneShader->shader->~Shader();
+    sceneShader = nullptr;
+    printf("Destroying scene\n");
+    meshes = std::vector<chai_mesh *>();
+    if (shadowMapFBO != 0) {
+        glDeleteFramebuffers(1, &shadowMapFBO);
+    }
     return true;
 }
 
@@ -25,7 +31,8 @@ void chai_scene::addMesh(chai_mesh *mesh) {
 
 void chai_scene::setShader(chai_shader *shader) {
     if (sceneShader != nullptr) {
-        sceneShader->shader->~Shader();
+        // glDeleteShader(sceneShader->shader->getHandle());
+        // sceneShader->shader->~Shader();
     }
     sceneShader = shader;   
 }
@@ -152,33 +159,101 @@ void chai_scene::draw() {
         // cg.instance->setActive(true);
         // cg.instance->setShader();
         cg.instance->setShader(sceneShader->shader);
+        GLuint err = glGetError();
+        if (err != GL_NO_ERROR) {
+            GLint maxLength = 0;
+            glGetShaderiv(sceneShader->shader->getHandle(), GL_INFO_LOG_LENGTH, &maxLength);
+            std::vector<GLchar> infoLog(maxLength);
+            glGetShaderInfoLog(sceneShader->shader->getHandle(), maxLength, &maxLength, &infoLog[0]);
+            printf("ERROR::SHADER::COMPILATION_FAILED\n%s\n", infoLog);
+            printf("ERROR: %d\n", err);            
+            printf("sceneShader: %d\n", sceneShader->shader);
+        } else {            
+            printf("sceneShader: %d\n", sceneShader->shader);
+        }
+        // glBindFramebuffer(cg.instance->FRAMEBUFFER, cg.instance->hw_render.get_current_framebuffer());
         cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+
+        err = glGetError();
+        if (err != GL_NO_ERROR) {
+            printf("ERROR: 1\n");
+        }
 
         if (shadowMapFBO != 0) {
             glDeleteFramebuffers(1, &shadowMapFBO);
+
+            err = glGetError();
+            if (err != GL_NO_ERROR) {
+                printf("ERROR: 2\n");
+            }
         }
 
         // Create depth texture
         glGenFramebuffers(1, &shadowMapFBO);
-        if (shadowMap == 0) {
+        err = glGetError();
+        if (err != GL_NO_ERROR) {
+            printf("ERROR: 3\n");
+        }
+        // if (shadowMap == 0) {
             glGenTextures(1, &shadowMap); 
-        }    
+
+            err = glGetError();
+            if (err != GL_NO_ERROR) {
+                printf("ERROR: 4\n");
+            }
+        // }    
         
         glBindTexture(GL_TEXTURE_2D, shadowMap);
+        err = glGetError();
+        if (err != GL_NO_ERROR) {
+            printf("ERROR: 5\n");
+        }
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, cg.width-5, cg.height-5, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+        err = glGetError();
+        if (err != GL_NO_ERROR) {
+            printf("ERROR: 6\n");
+        }
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        err = glGetError();
+        if (err != GL_NO_ERROR) {
+            printf("ERROR: 7\n");
+        }
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        err = glGetError();
+        if (err != GL_NO_ERROR) {
+            printf("ERROR: 8\n");
+        }
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        err = glGetError();
+        if (err != GL_NO_ERROR) {
+            printf("ERROR: 9\n");
+        }
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        err = glGetError();
+        if (err != GL_NO_ERROR) {
+            printf("ERROR: 10\n");
+        }
         GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
         glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
+        err = glGetError();
+        if (err != GL_NO_ERROR) {
+            printf("ERROR: 11\n");
+        }
         // Attach depth texture as FBO's depth buffer
         glBindFramebuffer(cg.instance->FRAMEBUFFER, shadowMapFBO);
+        err = glGetError();
+        if (err != GL_NO_ERROR) {
+            printf("ERROR: 12\n");
+        }
         glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
+        err = glGetError();
+        if (err != GL_NO_ERROR) {
+            printf("ERROR: 13\n");
+        }
         glClear(GL_DEPTH_BUFFER_BIT);
 
-        GLuint err = glGetError();
+        err = glGetError();
         if (err != GL_NO_ERROR) {
             printf("ERROR: %d\n", err);
             printf("shadowMapFBO: %d\n", shadowMapFBO);
@@ -192,8 +267,9 @@ void chai_scene::draw() {
             currentTime += 0.01f;
 
             drawMeshes(true);
-
-            glBindFramebuffer(cg.instance->FRAMEBUFFER, cg.instance->hw_render.get_current_framebuffer());
+            auto fb = cg.instance->hw_render.get_current_framebuffer();
+            printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
+            glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
             gfx::OptionalColorD clearcolor;
             clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
             OptionalInt clearstencil(0);

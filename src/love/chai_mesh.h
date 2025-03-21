@@ -31,11 +31,13 @@ class chai_mesh {
                 delete i;
             }
         }
+        meshes = std::vector<gfx::Mesh *>();
         for (auto i : textures) {
             if (i != nullptr) {
                 i->~Drawable();
             }
         }
+        textures = std::vector<gfx::Texture *>();
         if (tex != nullptr) {
             tex->~Drawable();
             tex = nullptr;
@@ -52,14 +54,16 @@ class chai_mesh {
                 delete i;
             }
         }
+        cameraParams = std::map<std::string, std::vector<float>>();
     }
     chai_mesh *clone() const;
     chai_mesh& operator=(const chai_mesh& m) {
 		return *this;
 	};
     std::map<std::string, std::vector<float>> getCameraParams();
-    bool newMesh(love::gfx::Graphics *inst, const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::vector<chaiscript::Boxed_Value> &data, const std::string &type);
-    bool newMeshFromFile(love::gfx::Graphics *inst, const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type);
+    // bool newMesh(love::gfx::Graphics *inst, const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::vector<chaiscript::Boxed_Value> &data, const std::string &type);
+    chai_mesh *newMesh();
+    bool loadMeshFromFile(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type);
     bool wrap_setTexture(const std::string &texture);
     void playAnimation(const std::string &name, const bool loop);
     void endAnimation(const std::string &name);

@@ -114,6 +114,8 @@ public:
 	void *getBufferMapMemory(size_t size);
 	void releaseBufferMapMemory(void *mem);
 
+	bool firstModeSet = false;
+
 private:
 
 	struct CachedFBOHasher

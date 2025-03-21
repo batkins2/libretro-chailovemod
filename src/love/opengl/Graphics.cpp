@@ -310,7 +310,6 @@ void MessageCallback( GLenum source,
 
 bool Graphics::setMode(void */*context*/, int width, int height, int pixelwidth, int pixelheight, bool backbufferstencil, bool backbufferdepth, int msaa)
 {
-
 	gl.hw_render = hw_render;
 	gl.INT_FRAMEBUFFER = FRAMEBUFFER;
 	gl.INT_COLORATTACH = COLORATTACH;
@@ -385,8 +384,8 @@ bool Graphics::setMode(void */*context*/, int width, int height, int pixelwidth,
 	}
 
 	// Reload all volatile objects.
-	// if (!Volatile::loadAll())
-	// 	::printf("Could not reload all volatile objects.\n");
+	if (!Volatile::loadAll())
+		::printf("Could not reload all volatile objects.\n");
 
 	createQuadIndexBuffer();
 
@@ -456,7 +455,7 @@ void Graphics::unSetMode()
 
 	// Unload all volatile objects. These must be reloaded after the display
 	// mode change.
-	// Volatile::unloadAll();
+	Volatile::unloadAll();
 
 	clearTemporaryResources();
 
@@ -1728,10 +1727,10 @@ uint32 Graphics::computePixelFormatUsage(PixelFormat format, bool readable)
 			if (attachment == GL_NONE)
 				continue;
 
-			if (readable)
-				gl.framebufferTexture(attachment, TEXTURE_2D, texture, 0, 0, 0);
-			else
-				glFramebufferRenderbuffer(GL_FRAMEBUFFER, attachment, GL_RENDERBUFFER, renderbuffer);
+			// if (readable)
+			// 	gl.framebufferTexture(attachment, TEXTURE_2D, texture, 0, 0, 0);
+			// else
+			// 	glFramebufferRenderbuffer(GL_FRAMEBUFFER, attachment, GL_RENDERBUFFER, renderbuffer);
 		}
 
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)

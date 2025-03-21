@@ -328,9 +328,11 @@ bool Shader::loadVolatile()
 	if (status == GL_FALSE)
 	{
 		std::string warnings = getProgramWarnings();
+		std::vector<char> buffer(1024);
+		glGetProgramInfoLog(program, 1024, nullptr, buffer.data());
 		glDeleteProgram(program);
 		program = 0;
-		throw love::Exception("Cannot link shader program object:\n%s", warnings.c_str());
+		throw love::Exception("Cannot link shader program object:\n%s\n%s", warnings.c_str(), buffer.data());
 	}
 
 	// Get all active uniform variables in this shader from OpenGL.
