@@ -463,9 +463,9 @@ static void context_reset(void)
 	ChaiLove::getInstance()->chai_gfx.hw_render = hw_render;
 	ChaiLove::getInstance()->chai_gfx.FRAMEBUFFER = RARCH_GL_FRAMEBUFFER;
 	ChaiLove::getInstance()->chai_gfx.COLORATTACH = RARCH_GL_COLOR_ATTACHMENT0;
-	printf("context_reset\n");
-	printf("FRAMEBUFFER: %d\n", RARCH_GL_FRAMEBUFFER);
-	printf("hw_render: %d\n", hw_render.get_current_framebuffer());
+	// printf("context_reset\n");
+	// printf("FRAMEBUFFER: %d\n", RARCH_GL_FRAMEBUFFER);
+	// printf("hw_render: %d\n", hw_render.get_current_framebuffer());
 	ChaiLove::getInstance()->chai_gfx.init();
 }
 

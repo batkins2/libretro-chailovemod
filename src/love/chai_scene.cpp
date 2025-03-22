@@ -17,6 +17,9 @@ bool chai_scene::destroy() {
     if (shadowMapFBO != 0) {
         glDeleteFramebuffers(1, &shadowMapFBO);
     }
+    if (shadowMap != 0) {
+        glDeleteTextures(1, &shadowMap);
+    }
     return true;
 }
 
@@ -169,7 +172,7 @@ void chai_scene::draw() {
             printf("ERROR: %d\n", err);            
             printf("sceneShader: %d\n", sceneShader->shader);
         } else {            
-            printf("sceneShader: %d\n", sceneShader->shader);
+            // printf("sceneShader: %d\n", sceneShader->shader);
         }
         // glBindFramebuffer(cg.instance->FRAMEBUFFER, cg.instance->hw_render.get_current_framebuffer());
         cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
@@ -194,14 +197,14 @@ void chai_scene::draw() {
         if (err != GL_NO_ERROR) {
             printf("ERROR: 3\n");
         }
-        // if (shadowMap == 0) {
+        if (shadowMap == 0) {
             glGenTextures(1, &shadowMap); 
 
             err = glGetError();
             if (err != GL_NO_ERROR) {
                 printf("ERROR: 4\n");
             }
-        // }    
+        }    
         
         glBindTexture(GL_TEXTURE_2D, shadowMap);
         err = glGetError();
@@ -268,7 +271,7 @@ void chai_scene::draw() {
 
             drawMeshes(true);
             auto fb = cg.instance->hw_render.get_current_framebuffer();
-            printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
+            // printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
             glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
             gfx::OptionalColorD clearcolor;
             clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity

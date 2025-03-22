@@ -45,7 +45,7 @@ bool chai_gfx::init() {
     instance->hw_render = hw_render;
     instance->FRAMEBUFFER = FRAMEBUFFER;
     instance->COLORATTACH = COLORATTACH;
-    printf("ColorAttach: %d\n", COLORATTACH);
+    // printf("ColorAttach: %d\n", COLORATTACH);
     // instance->setProjection(Matrix4::perspective(120000.0f, 800.0f/600.0f, 0.1f, 100.0f));
     
     if (!init) {

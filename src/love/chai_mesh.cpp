@@ -187,7 +187,7 @@ gfx::Mesh *loadMesh(int i, tinygltf::Model &model, love::gfx::Graphics *instance
 
         auto skinMaps = std::vector<std::map<int, std::vector<float>>>();
         int s = 0;
-        printf("Test point");
+        // printf("Test point");
         for (auto skin : model.skins) {
             auto inverseBindMatricesAccessor = model.accessors[skin.inverseBindMatrices];
             auto inverseBindMatricesBufferView = model.bufferViews[inverseBindMatricesAccessor.bufferView];
@@ -240,7 +240,7 @@ gfx::Mesh *loadMesh(int i, tinygltf::Model &model, love::gfx::Graphics *instance
                 cm->nodeChildren[index] = node.children;
                 for (auto child : node.children) {
                     cm->nodeParent.push_back(std::pair<int, int>(child, index));
-                    printf("%s (%d)->%s (%d)\n", model.nodes[child].name.c_str(), child, model.nodes[index].name.c_str(), index);
+                    // printf("%s (%d)->%s (%d)\n", model.nodes[child].name.c_str(), child, model.nodes[index].name.c_str(), index);
                     // glm::mat4 parentMatrix = cm->nodeMatrix[index];
 
                     // if (node.translation.size() > 0) {
@@ -273,7 +273,7 @@ gfx::Mesh *loadMesh(int i, tinygltf::Model &model, love::gfx::Graphics *instance
             // }
             index++;
         }
-        printf("Test point 2");
+        // printf("Test point 2");
 
         if (indiceAccessor.componentType != TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
             const unsigned int* indices = reinterpret_cast<const unsigned int*>(&indiceBuffer.data[indiceAccessor.byteOffset + indiceBufferView.byteOffset]);
@@ -769,7 +769,7 @@ gfx::Mesh *loadMesh(int i, tinygltf::Model &model, love::gfx::Graphics *instance
                 channels[target_path].merge(keyframes);
             }
         }
-        printf("ANIM: %s", name.c_str());
+        // printf("ANIM: %s", name.c_str());
         anims[name] = channels;
         anim++;
     }
