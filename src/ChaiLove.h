@@ -65,6 +65,7 @@
 #ifndef __HAVE_CHAI_SCENE__
 #include "love/chai_scene.h"
 #endif
+#include "love/chai_collisions.h"
 #include "love/keyboard.h"
 #include "love/config.h"
 #include "love/data.h"
@@ -126,6 +127,7 @@ class ChaiLove {
 	love::chai_shader chai_shader;
 	// #endif
 	love::chai_scene chai_scene;
+	love::chai_collisions chai_collisions;
 
 	ChaiLove();
 	~ChaiLove();
