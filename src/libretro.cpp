@@ -467,11 +467,13 @@ static void context_reset(void)
 	// printf("FRAMEBUFFER: %d\n", RARCH_GL_FRAMEBUFFER);
 	// printf("hw_render: %d\n", hw_render.get_current_framebuffer());
 	ChaiLove::getInstance()->chai_gfx.init();
+	ChaiLove::getInstance()->chai_collisions.init(0);
 }
 
 static void context_destroy(void)
 {
 	ChaiLove::getInstance()->chai_gfx.destroy();
+	ChaiLove::getInstance()->chai_collisions.destroy();
 }
 
 static bool retro_init_hw_context(void)

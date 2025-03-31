@@ -353,6 +353,17 @@ script::script(const std::string& file) {
 	chai.add(constructor<chai_collisions(const chai_collisions &)>(), "chai_collisions");
 	chai.add(fun(&chai_collisions::operator=), "=");
 	chai.add(fun(&chai_collisions::test), "test");
+	chai.add(fun(&chai_collisions::init), "init");
+	chai.add(fun(&chai_collisions::destroy), "destroy");
+	chai.add(fun(&chai_collisions::process), "process");
+	chai.add(fun(&chai_collisions::addRigidMesh), "addRigidMesh");
+	chai.add(fun(&chai_collisions::addCharacterController), "addCharacterController");
+	chai.add(fun(&chai_collisions::applyForceToCharacter), "applyForceToCharacter");
+	chai.add(fun(&chai_collisions::applyForceToRigidMesh), "applyForceToRigidMesh");
+	chai.add(fun(&chai_collisions::setCharacterControllerPosition), "setCharacterControllerPosition");
+	chai.add(fun(&chai_collisions::setRigidMeshPosition), "setRigidMeshPosition");
+	chai.add(fun(&chai_collisions::getCharacterController), "getCharacterController");
+	chai.add(fun(&chai_collisions::getRigidMesh), "getRigidMesh");
 
 	// Matrices
 	chai.add(fun(&chai_matrices::setTransformationMatrix), "setTransformationMatrix");

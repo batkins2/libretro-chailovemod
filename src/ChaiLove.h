@@ -65,7 +65,9 @@
 #ifndef __HAVE_CHAI_SCENE__
 #include "love/chai_scene.h"
 #endif
+#ifndef __HAVE_CHAI_COLLISIONS__
 #include "love/chai_collisions.h"
+#endif
 #include "love/keyboard.h"
 #include "love/config.h"
 #include "love/data.h"
