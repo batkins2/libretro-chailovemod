@@ -364,6 +364,7 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_collisions::setRigidMeshPosition), "setRigidMeshPosition");
 	chai.add(fun(&chai_collisions::getCharacterController), "getCharacterController");
 	chai.add(fun(&chai_collisions::getRigidMesh), "getRigidMesh");
+	chai.add(fun(&chai_collisions::addBox), "addBox");
 
 	// Matrices
 	chai.add(fun(&chai_matrices::setTransformationMatrix), "setTransformationMatrix");

@@ -467,6 +467,7 @@ static void context_reset(void)
 	// printf("FRAMEBUFFER: %d\n", RARCH_GL_FRAMEBUFFER);
 	// printf("hw_render: %d\n", hw_render.get_current_framebuffer());
 	ChaiLove::getInstance()->chai_gfx.init();
+	ChaiLove::getInstance()->chai_collisions.clearWorlds();
 	ChaiLove::getInstance()->chai_collisions.init(0);
 }
 
