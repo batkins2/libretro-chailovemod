@@ -336,6 +336,8 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_mesh::loadMeshFromFile), "loadMeshFromFile");
 	chai.add(fun(&chai_mesh::wrap_setTexture), "setTexture");
 	chai.add(fun(&chai_mesh::getCameraParams), "getCameraParams");
+	chai.add(fun(&chai_mesh::getLightParams), "getLightParams");
+	chai.add(fun(&chai_mesh::setLightParams), "setLightParams");
 	chai.add(fun(&chai_mesh::playAnimation), "playAnimation");
 	chai.add(fun(&chai_mesh::endAnimation), "endAnimation");
 	chai.add(fun(&chai_mesh::reloadMesh), "reloadMesh");

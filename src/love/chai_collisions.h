@@ -74,21 +74,36 @@ class chai_collisions
             this->rigidBody = rigidBody;
             this->group = {};
         }
+        RigidMesh(btCompoundShape *compoundMesh = nullptr, btRigidBody *rigidBody = nullptr)
+        {
+            this->compoundMesh = compoundMesh;
+            this->rigidBody = rigidBody;
+            this->group = {};
+        }
         ~RigidMesh()
         {
             if (mesh != nullptr)
             {
                 delete mesh;
             }
+            if (box != nullptr)
+            {
+                delete box;
+            }
             if (rigidBody != nullptr)
             {
                 delete rigidBody;
             }
+            if (compoundMesh != nullptr)
+            {
+                delete compoundMesh;
+            }
             group.clear();
         }
-        btTriangleMesh *mesh;
-        btBoxShape *box;
-        btRigidBody *rigidBody;
+        btTriangleMesh *mesh = nullptr;
+        btBoxShape *box = nullptr;
+        btCompoundShape *compoundMesh = nullptr;
+        btRigidBody *rigidBody = nullptr;
         std::vector<int> group;
     };
     class World

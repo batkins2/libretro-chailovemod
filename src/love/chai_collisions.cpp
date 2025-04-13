@@ -1,5 +1,9 @@
 #include "../ChaiLove.h"
+#include <cmath> // For M_PI
 #ifndef TINY_GLTF_H_
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 #define TINYGLTF_USE_RAPIDJSON
 #define TINYGLTF_NO_FS
 #define TINYGLTF_NO_STB_IMAGE
@@ -281,15 +285,17 @@ int chai_collisions::addCharacterController()
     ghostObject->setCollisionFlags(btCollisionObject::CF_CHARACTER_OBJECT);
     btScalar stepHeight = btScalar(0.35);
     btKinematicCharacterController *character = new btKinematicCharacterController(ghostObject, capsule, stepHeight, btVector3(0, 1, 0));
-    character->setGravity(btVector3(0, -0.01, 0));
+    character->setGravity(btVector3(0, -0.01, 0));    
     
-
     btTransform startTransform;
     startTransform.setIdentity();
     startTransform.setOrigin(btVector3(0, 1, 0));
 
     ghostObject->setWorldTransform(startTransform);
 
+    ghostObject->setUserPointer(character); // Set the user pointer to the character controller
+
+    ghostObject->setUserIndex(0); // Set the user pointer to the character controller
     characterControllers.emplace_back(new CharacterController(ghostObject, character));
     return characterControllers.size() - 1;
 }
@@ -335,12 +341,101 @@ std::vector<float> chai_collisions::getRigidMesh(int ref)
 }
 int chai_collisions::addBox(float x, float y, float z, float width, float height, float depth, std::vector<int> group = {0})
 {
-    btBoxShape *box = new btBoxShape(btVector3(width / 2.0f, height / 2.0f, depth / 2.0f));
+    btTriangleMesh *mesh = new btTriangleMesh();
+
+    // Define the vertices of an inner and outer wall box
+    btVector3 vertices[8] = {
+        btVector3(-width / 2, -height / 2, -depth / 2),
+        btVector3(width / 2, -height / 2, -depth / 2),
+        btVector3(width / 2, height / 2, -depth / 2),
+        btVector3(-width / 2, height / 2, -depth / 2),
+        btVector3(-width / 2, -height / 2, depth / 2),
+        btVector3(width / 2, -height / 2, depth / 2),
+        btVector3(width / 2, height / 2, depth / 2),
+        btVector3(-width / 2, height / 2, depth / 2)
+    };
+
+    // Define the triangles of the box (6 faces, 2 triangles per face)
+    int indices[12][3] = {
+        {0, 1, 2}, {0, 2, 3}, // Front face
+        {4, 5, 6}, {4, 6, 7}, // Back face
+        {0, 1, 5}, {0, 5, 4}, // Bottom face
+        {2, 3, 7}, {2, 7, 6}, // Top face
+        {0, 3, 7}, {0, 7, 4}, // Left face
+        {1, 2, 6}, {1, 6, 5}  // Right face
+    };
+
+    // Add the triangles to the mesh
+    for (int i = 0; i < 12; ++i) {
+        mesh->addTriangle(vertices[indices[i][0]], vertices[indices[i][1]], vertices[indices[i][2]]);
+    }
+
+    // Create the convex triangle mesh shape
+    btCompoundShape *shape = new btCompoundShape();
+    shape->addChildShape(btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, 0, 0)), new btBvhTriangleMeshShape(mesh, true));
+
+    // Set a non-zero mass to make the box dynamic
+    // btScalar mass = 1.0f; // Adjust mass as needed
+    // btVector3 inertia(0, 0, 0);
+    // shape->calculateLocalInertia(mass, inertia);
     btDefaultMotionState *motionState = new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(x, y, z)));
-    btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(0, motionState, box, btVector3(0, 0, 0));
+    btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(0.01f, motionState, shape, btVector3(0, 0, 0));
     btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
     rigidBody->setGravity(btVector3(0, 0, 0));
-    rigidMeshes.emplace_back(new RigidMesh(box, rigidBody));    
+    rigidBody->setLinearFactor(btVector3(1.9f, 0, 0));
+    // Set friction and damping properties suitable for 1:1 character control
+    rigidBody->setFriction(0.45f); // Set a small positive friction value
+    rigidBody->setDamping(0.45f, 0.01f); // Set small positive damping values for stability
+    rigidBody->setRestitution(1.0f); // Set a small positive restitution value
+
+    rigidBody->setUserPointer(rigidBody); // Set the user pointer to the character controller  
+    rigidBody->setUserIndex(0);
+
+    rigidMeshes.emplace_back(new RigidMesh(shape, rigidBody));   
+    for (auto i : group) {
+        if (worlds->worlds.find(i) == worlds->worlds.end()) {
+            init(i);
+        }
+        rigidMeshes.back()->group.push_back(i);
+        worlds->worlds[i]->dynamicsWorld->addRigidBody(rigidBody, btBroadphaseProxy::DefaultFilter, btBroadphaseProxy::DefaultFilter | btBroadphaseProxy::CharacterFilter);
+        worlds->worlds[i]->dynamicsWorld->setInternalTickCallback([](btDynamicsWorld *world, btScalar timeStep) {
+            btDispatcher *dispatcher = world->getDispatcher();
+            const int numManifolds = dispatcher->getNumManifolds();
+            btVector3 vel0 = btVector3(0, 0, 0);
+            btVector3 vel1 = btVector3(0, 0, 0);
+            for (int m = 0; m < numManifolds; ++m) {
+                auto *manifold = dispatcher->getManifoldByIndexInternal(m);
+                const btRigidBody *body0 = static_cast<const btRigidBody *>(manifold->getBody0());
+                const btRigidBody *body1 = static_cast<const btRigidBody *>(manifold->getBody1());
+                auto numContacts = manifold->getNumContacts();
+                if (numContacts == 0) {
+                    auto b = (btRigidBody *)body1->getUserPointer();
+                    auto v = body1->getLinearVelocity();
+                    if (b) {
+                        b->setLinearVelocity(btVector3(v.getX()/1.05f, 0, 0));
+                    }
+                    continue;
+                }
+                vel0 = body0->getLinearVelocity();
+                vel1 = body1->getLinearVelocity();
+                if (body0->getUserIndex() == body1->getUserIndex()) {
+                    // btKinematicCharacterController *character = static_cast<btKinematicCharacterController *>(body0->getUserPointer());
+                    // btVector3 velocity = character->getLinearVelocity();
+                    // btVector3 pos0 = body0->getWorldTransform().getOrigin();
+                    // btVector3 pos1 = body1->getWorldTransform().getOrigin();                    
+                    // printf("Collision detected between objects at positions: (%f, %f, %f) and (%f, %f, %f)\n", vel0.getX(), vel0.getY(), vel0.getZ(), vel1.getX(), vel1.getY(), vel1.getZ());
+                    if (vel1.getX() > 0) {
+                        auto b = (btRigidBody *)body1->getUserPointer();
+                        b->setLinearVelocity(btVector3(10.0f, 0, 0));
+                    } else if (vel1.getX() < 0) {
+                        auto b = (btRigidBody *)body1->getUserPointer();
+                        b->setLinearVelocity(btVector3(-10.0f, 0, 0));
+                    }
+                }
+            }
+        }, nullptr);
+        
+    }
     return rigidMeshes.size() - 1;
 }
 void chai_collisions::init(int group = 0)
@@ -360,11 +455,11 @@ void chai_collisions::init(int group = 0)
     worlds->worlds[group]->dynamicsWorld->setGravity(btVector3(0, -0.01, 0));   
 
     // Initialize the debug drawer
-    // if (!debugDrawer) {
-    //     debugDrawer = new OpenGLDebugDrawer();
-    //     debugDrawer->setDebugMode(btIDebugDraw::DBG_DrawWireframe | btIDebugDraw::DBG_DrawAabb);
-    // }
-    // worlds->worlds[group]->dynamicsWorld->setDebugDrawer(debugDrawer);
+    if (!debugDrawer) {
+        debugDrawer = new OpenGLDebugDrawer();
+        debugDrawer->setDebugMode(btIDebugDraw::DBG_DrawWireframe | btIDebugDraw::DBG_DrawAabb);
+    }
+    worlds->worlds[group]->dynamicsWorld->setDebugDrawer(debugDrawer);
 
 }
 void chai_collisions::destroy()
@@ -403,65 +498,67 @@ void chai_collisions::process()
             // printf("ghost pos: %f, %f, %f\n", pos.getX(), pos.getY(), pos.getZ());
         }
         dw.second->dynamicsWorld->stepSimulation(1 / 60.f, 10);  
-        // btVector3 gravity = dw.second->dynamicsWorld->getGravity();
-        // printf("Gravity: %f, %f, %f\n", gravity.getX(), gravity.getY(), gravity.getZ());   
+        if (debugDrawer) {
+            btVector3 gravity = dw.second->dynamicsWorld->getGravity();
+            // printf("Gravity: %f, %f, %f\n", gravity.getX(), gravity.getY(), gravity.getZ());   
 
-        // btVector3 min, max;
-        // min.setValue(FLT_MAX, FLT_MAX, FLT_MAX);
-        // max.setValue(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+            btVector3 min, max;
+            min.setValue(FLT_MAX, FLT_MAX, FLT_MAX);
+            max.setValue(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 
-        // for (int i = 0; i < dw.second->dynamicsWorld->getNumCollisionObjects(); i++) {
-        //     btCollisionObject *obj = dw.second->dynamicsWorld->getCollisionObjectArray()[i];
-        //     btVector3 aabbMin, aabbMax;
-        //     obj->getCollisionShape()->getAabb(obj->getWorldTransform(), aabbMin, aabbMax);
+            for (int i = 0; i < dw.second->dynamicsWorld->getNumCollisionObjects(); i++) {
+                btCollisionObject *obj = dw.second->dynamicsWorld->getCollisionObjectArray()[i];
+                btVector3 aabbMin, aabbMax;
+                obj->getCollisionShape()->getAabb(obj->getWorldTransform(), aabbMin, aabbMax);
 
-        //     min.setMin(aabbMin);
-        //     max.setMax(aabbMax);
-        // }
+                min.setMin(aabbMin);
+                max.setMax(aabbMax);
+            }
 
-        // Calculate the center and size of the bounding box
-        // btVector3 center = (min + max) * 0.5;
-        // btVector3 size = max - min;
+            // Calculate the center and size of the bounding box
+            btVector3 center = (min + max) * 0.5;
+            btVector3 size = max - min;
 
-        // // Set the camera target to the center of the geometry
-        // debugDrawer->cameraTarget = glm::vec3(center.getX(), center.getY(), center.getZ());
+            // Set the camera target to the center of the geometry
+            debugDrawer->cameraTarget = glm::vec3(center.getX(), center.getY(), center.getZ());
 
-        // // Position the camera far enough to fit the geometry
-        // float maxDimension = std::max(size.getX(), std::max(size.getY(), size.getZ()));
-        // float horizontalFOV = 2.0f * atan(tan(glm::radians(debugDrawer->fov) / 2.0f) * debugDrawer->aspectRatio);
-        // float distance = maxDimension / (2.0f * tan(horizontalFOV / 2.0f)) / 6.0f; // Adjust the divisor to control the distance
-        // debugDrawer->cameraPosition = glm::vec3(center.getX(), center.getY(), center.getZ() + distance);
+            // Position the camera far enough to fit the geometry
+            float maxDimension = std::max(size.getX(), std::max(size.getY(), size.getZ()));
+            float horizontalFOV = 2.0f * atan(tan(glm::radians(debugDrawer->fov) / 2.0f) * debugDrawer->aspectRatio);
+            float distance = maxDimension / (2.0f * tan(horizontalFOV / 2.0f)) / 2.0f; // Adjust the divisor to control the distance
+            debugDrawer->cameraPosition = glm::vec3(center.getX(), center.getY(), center.getZ() + distance);
 
-        // // Ensure the up vector is correct
-        // debugDrawer->upVector = glm::vec3(0.0f, 1.0f, 0.0f);
+            // Ensure the up vector is correct
+            debugDrawer->upVector = glm::vec3(0.0f, 1.0f, 0.0f);
 
-        // // Adjust the near and far planes
-        // debugDrawer->nearPlane = 0.1f;
-        // debugDrawer->farPlane = distance + maxDimension * 2.0f;
+            // Adjust the near and far planes
+            debugDrawer->nearPlane = 0.1f;
+            debugDrawer->farPlane = distance + maxDimension * 2.0f;
 
-        // // Set the projection matrix
-        // glMatrixMode(GL_PROJECTION);
-        // glLoadIdentity();
-        // glm::mat4 projection = glm::perspective(glm::radians(debugDrawer->fov), debugDrawer->aspectRatio, debugDrawer->nearPlane, debugDrawer->farPlane);
-        // glLoadMatrixf(glm::value_ptr(projection));
+            // Set the projection matrix
+            glMatrixMode(GL_PROJECTION);
+            glLoadIdentity();
+            glm::mat4 projection = glm::perspective(glm::radians(debugDrawer->fov), debugDrawer->aspectRatio, debugDrawer->nearPlane, debugDrawer->farPlane);
+            glLoadMatrixf(glm::value_ptr(projection));
 
-        // // Set the view matrix
-        // glMatrixMode(GL_MODELVIEW);
-        // glLoadIdentity();
-        // glm::mat4 view = glm::lookAt(debugDrawer->cameraPosition, debugDrawer->cameraTarget, debugDrawer->upVector);
-        // glLoadMatrixf(glm::value_ptr(view));
-        
-        // printf("Camera Position: %f, %f, %f\n", debugDrawer->cameraPosition.x, debugDrawer->cameraPosition.y, debugDrawer->cameraPosition.z);
-        // printf("Camera Target: %f, %f, %f\n", debugDrawer->cameraTarget.x, debugDrawer->cameraTarget.y, debugDrawer->cameraTarget.z);
-        // printf("Up Vector: %f, %f, %f\n", debugDrawer->upVector.x, debugDrawer->upVector.y, debugDrawer->upVector.z);
+            // Set the view matrix
+            glMatrixMode(GL_MODELVIEW);
+            glLoadIdentity();
+            glm::mat4 view = glm::lookAt(debugDrawer->cameraPosition, debugDrawer->cameraTarget, debugDrawer->upVector);
+            glLoadMatrixf(glm::value_ptr(view));
+            
+            // printf("Camera Position: %f, %f, %f\n", debugDrawer->cameraPosition.x, debugDrawer->cameraPosition.y, debugDrawer->cameraPosition.z);
+            // printf("Camera Target: %f, %f, %f\n", debugDrawer->cameraTarget.x, debugDrawer->cameraTarget.y, debugDrawer->cameraTarget.z);
+            // printf("Up Vector: %f, %f, %f\n", debugDrawer->upVector.x, debugDrawer->upVector.y, debugDrawer->upVector.z);
 
-        // printf("Bounding Box Min: %f, %f, %f\n", min.getX(), min.getY(), min.getZ());
-        // printf("Bounding Box Max: %f, %f, %f\n", max.getX(), max.getY(), max.getZ());
+            // printf("Bounding Box Min: %f, %f, %f\n", min.getX(), min.getY(), min.getZ());
+            // printf("Bounding Box Max: %f, %f, %f\n", max.getX(), max.getY(), max.getZ());
 
-        // Perform debug drawing
-        // dw.second->dynamicsWorld->debugDrawWorld();
+            // Perform debug drawing
+            dw.second->dynamicsWorld->debugDrawWorld();
 
-        // test();
+            // test();
+        }
     }
 }
 void chai_collisions::test() {

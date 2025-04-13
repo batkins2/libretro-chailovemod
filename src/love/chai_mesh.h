@@ -61,6 +61,8 @@ class chai_mesh {
 		return *this;
 	};
     std::map<std::string, std::vector<float>> getCameraParams();
+    std::map<std::string, std::vector<float>> getLightParams();
+    void setLightParams(const std::map<std::string, std::vector<float>> &params);
     // bool newMesh(love::gfx::Graphics *inst, const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::vector<chaiscript::Boxed_Value> &data, const std::string &type);
     chai_mesh *newMesh();
     bool loadMeshFromFile(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type);

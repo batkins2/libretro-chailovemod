@@ -866,6 +866,14 @@ std::map<std::string, std::vector<float>> chai_mesh::getCameraParams() {
     return this->cameraParams;
 }
 
+std::map<std::string, std::vector<float>> chai_mesh::getLightParams() {
+    return this->lightParams;
+}
+
+void chai_mesh::setLightParams(const std::map<std::string, std::vector<float>> &params) {
+    this->lightParams = params;
+}
+
 bool chai_mesh::loadMeshFromFile(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type) {
     instance = Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS);
 
