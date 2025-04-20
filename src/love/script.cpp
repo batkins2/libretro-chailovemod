@@ -327,8 +327,9 @@ script::script(const std::string& file) {
 	chai.add(user_type<chai_shader>(), "chai_shader");
 	chai.add(constructor<chai_shader(const chai_shader &)>(), "chai_shader");
 	chai.add(fun(&chai_shader::operator=), "=");
-	chai.add(fun(&chai_shader::newShader), "newShader");	
+	chai.add(fun(&chai_shader::newShader), "newShader");
 	chai.add(fun(&chai_shader::send), "send");
+	chai.add(fun(&chai_shader::sendInt), "sendInt");
 	chai.add(user_type<chai_mesh>(), "chai_mesh");
 	chai.add(constructor<chai_mesh(const chai_mesh &)>(), "chai_mesh");
 	chai.add(fun(&chai_mesh::operator=), "=");	

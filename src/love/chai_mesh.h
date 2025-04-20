@@ -54,15 +54,15 @@ class chai_mesh {
                 delete i;
             }
         }
-        cameraParams = std::map<std::string, std::vector<float>>();
+        // cameraParams = std::map<std::string, std::vector<float>>();
     }
     chai_mesh *clone() const;
     chai_mesh& operator=(const chai_mesh& m) {
 		return *this;
 	};
-    std::map<std::string, std::vector<float>> getCameraParams();
-    std::map<std::string, std::vector<float>> getLightParams();
-    void setLightParams(const std::map<std::string, std::vector<float>> &params);
+    std::map<std::string, std::vector<float>> getCameraParams(int index);
+    std::map<std::string, std::vector<float>> getLightParams(int index);
+    void setLightParams(const std::map<std::string, std::vector<float>> &params, int index);
     // bool newMesh(love::gfx::Graphics *inst, const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::vector<chaiscript::Boxed_Value> &data, const std::string &type);
     chai_mesh *newMesh();
     bool loadMeshFromFile(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type);
@@ -83,8 +83,8 @@ class chai_mesh {
     chai_gfx *chaigfx;
     std::vector<gfx::Texture *> textures;
     std::vector<gfx::Buffer::DataDeclaration> vf;
-    std::map<std::string, std::vector<float>> cameraParams;
-    std::map<std::string, std::vector<float>> lightParams;
+    std::vector<std::map<std::string, std::vector<float>>> cameraParams;
+    std::vector<std::map<std::string, std::vector<float>>> lightParams;
     std::map< // Animation
         std::string, // Name
         std::map< // Channel

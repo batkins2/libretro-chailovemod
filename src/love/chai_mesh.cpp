@@ -600,90 +600,92 @@ gfx::Mesh *loadMesh(int i, tinygltf::Model &model, love::gfx::Graphics *instance
 
     cm->matrices.push_back(matrix);
 
+    for (int count = 0; count < 4; count++) {
+        cm->cameraParams.push_back(std::map<std::string, std::vector<float>>());
+        cm->lightParams.push_back(std::map<std::string, std::vector<float>>());
+        if (model.cameras.size() > 0) {
+            auto camera = model.cameras[0];
 
-    if (model.cameras.size() > 0) {
-        auto camera = model.cameras[0];
+            if (camera.type == "perspective") {
+                cm->cameraParams[count]["fov"] = std::vector<float> { camera.perspective.yfov };
+                cm->cameraParams[count]["aspectRatio"] = std::vector<float> { camera.perspective.aspectRatio };
+                cm->cameraParams[count]["near"] = std::vector<float> { camera.perspective.znear };
+                cm->cameraParams[count]["far"] = std::vector<float> { camera.perspective.zfar };
+            }
 
-        if (camera.type == "perspective") {
-            cm->cameraParams["fov"] = std::vector<float> { camera.perspective.yfov };
-            cm->cameraParams["aspectRatio"] = std::vector<float> { camera.perspective.aspectRatio };
-            cm->cameraParams["near"] = std::vector<float> { camera.perspective.znear };
-            cm->cameraParams["far"] = std::vector<float> { camera.perspective.zfar };
+            // Retrieve the camera position
+            for (auto node : model.nodes) {
+                if (node.camera == 0) {
+                    glm::vec3 cameraPosition(0.0f);
+                    glm::vec3 cameraUp(0.0f, 1.0f, 0.0f); // Default up vector
+                    glm::vec3 cameraDirection(0.0f, 0.0f, -1.0f); // Default target vector
+                    if (!node.translation.empty()) {
+                        cameraPosition = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
+                    }
+                    if (!node.rotation.empty()) {
+                        glm::quat rotation = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
+                        glm::mat4 rotationMatrix = glm::mat4_cast(rotation);
+                        cameraUp = glm::vec3(rotationMatrix * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f));
+                        cameraDirection = glm::vec3(rotationMatrix * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f));
+                    }
+                    glm::vec3 cameraTarget = cameraPosition + cameraDirection;
+                    cm->cameraParams[count]["position"] = std::vector<float> { cameraPosition.x, cameraPosition.y, cameraPosition.z };
+                    cm->cameraParams[count]["up"] = std::vector<float> { cameraUp.x, cameraUp.y, cameraUp.z };
+                    cm->cameraParams[count]["target"] = std::vector<float> { cameraTarget.x, cameraTarget.y, cameraTarget.z };
+                    break;
+                }
+            }
+        } else {
+            cm->cameraParams[count]["fov"] = std::vector<float> { 1920.0f / 1080.0f };
+            cm->cameraParams[count]["aspectRatio"] = std::vector<float> { 1.33f };
+            cm->cameraParams[count]["near"] = std::vector<float> { 0.01 };
+            cm->cameraParams[count]["far"] = std::vector<float> { 1000.0f };
+
+            glm::vec3 cameraPosition(0.0f);
+            glm::vec3 cameraUp(0.0f, 1.0f, 0.0f); // Default up vector
+            glm::vec3 cameraDirection(0.0f, 0.0f, -1.0f); // Default target vector
+
+            glm::vec3 cameraTarget = cameraPosition + cameraDirection;
+            cm->cameraParams[count]["position"] = std::vector<float> { cameraPosition.x, cameraPosition.y, cameraPosition.z };
+            cm->cameraParams[count]["up"] = std::vector<float> { cameraUp.x, cameraUp.y, cameraUp.z };
+            cm->cameraParams[count]["target"] = std::vector<float> { cameraTarget.x, cameraTarget.y, cameraTarget.z };
         }
 
-        // Retrieve the camera position
+
+        glm::vec3 lightPosition(0.0f);
+        glm::vec3 lightDirection(0.0f, -1.0f, 0.0f); // Default direction
+
+        cm->lightParams[count]["position"] = std::vector<float> { lightPosition.x, lightPosition.y, lightPosition.z };
+        cm->lightParams[count]["color"] = std::vector<float> { 1.0f, 1.0f, 1.0f };
+        cm->lightParams[count]["intensity"] = std::vector<float> { 1.0f };
+        cm->lightParams[count]["direction"] = std::vector<float> { lightDirection.x, lightDirection.y, lightDirection.z };
+
+        // Retrieve the light position
         for (auto node : model.nodes) {
-            if (node.camera == 0) {
-                glm::vec3 cameraPosition(0.0f);
-                glm::vec3 cameraUp(0.0f, 1.0f, 0.0f); // Default up vector
-                glm::vec3 cameraDirection(0.0f, 0.0f, -1.0f); // Default target vector
+            if (node.extensions.find("KHR_lights_punctual") != node.extensions.end()) {
+                auto light = node.extensions["KHR_lights_punctual"];
+                auto lightNode = model.lights[0];
+                // glm::vec3 lightPosition(0.0f);
                 if (!node.translation.empty()) {
-                    cameraPosition = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
+                    lightPosition = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
                 }
-                if (!node.rotation.empty()) {
-                    glm::quat rotation = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
-                    glm::mat4 rotationMatrix = glm::mat4_cast(rotation);
-                    cameraUp = glm::vec3(rotationMatrix * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f));
-                    cameraDirection = glm::vec3(rotationMatrix * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f));
+                cm->lightParams[count]["position"] = std::vector<float> { lightPosition.x, lightPosition.y, lightPosition.z };
+                cm->lightParams[count]["color"] = std::vector<float> { lightNode.color[0], lightNode.color[1], lightNode.color[2] };
+                cm->lightParams[count]["intensity"] = std::vector<float> { lightNode.intensity/900.0f };
+
+                if (lightNode.type == "directional") {
+                    // glm::vec3 lightDirection(0.0f, -1.0f, 0.0f); // Default direction
+                    if (!node.rotation.empty()) {
+                        glm::quat rotation = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
+                        glm::mat4 rotationMatrix = glm::mat4_cast(rotation);
+                        lightDirection = glm::vec3(rotationMatrix * glm::vec4(lightDirection, 0.0f));
+                    }
+                    cm->lightParams[count]["direction"] = std::vector<float> { lightDirection.x, lightDirection.y, lightDirection.z };
                 }
-                glm::vec3 cameraTarget = cameraPosition + cameraDirection;
-                cm->cameraParams["position"] = std::vector<float> { cameraPosition.x, cameraPosition.y, cameraPosition.z };
-                cm->cameraParams["up"] = std::vector<float> { cameraUp.x, cameraUp.y, cameraUp.z };
-                cm->cameraParams["target"] = std::vector<float> { cameraTarget.x, cameraTarget.y, cameraTarget.z };
                 break;
             }
         }
-    } else {
-        cm->cameraParams["fov"] = std::vector<float> { 1920.0f / 1080.0f };
-        cm->cameraParams["aspectRatio"] = std::vector<float> { 1.33f };
-        cm->cameraParams["near"] = std::vector<float> { 0.01 };
-        cm->cameraParams["far"] = std::vector<float> { 1000.0f };
-
-        glm::vec3 cameraPosition(0.0f);
-        glm::vec3 cameraUp(0.0f, 1.0f, 0.0f); // Default up vector
-        glm::vec3 cameraDirection(0.0f, 0.0f, -1.0f); // Default target vector
-
-        glm::vec3 cameraTarget = cameraPosition + cameraDirection;
-        cm->cameraParams["position"] = std::vector<float> { cameraPosition.x, cameraPosition.y, cameraPosition.z };
-        cm->cameraParams["up"] = std::vector<float> { cameraUp.x, cameraUp.y, cameraUp.z };
-        cm->cameraParams["target"] = std::vector<float> { cameraTarget.x, cameraTarget.y, cameraTarget.z };
     }
-
-
-    glm::vec3 lightPosition(0.0f);
-    glm::vec3 lightDirection(0.0f, -1.0f, 0.0f); // Default direction
-
-    cm->lightParams["position"] = std::vector<float> { lightPosition.x, lightPosition.y, lightPosition.z };
-    cm->lightParams["color"] = std::vector<float> { 1.0f, 1.0f, 1.0f };
-    cm->lightParams["intensity"] = std::vector<float> { 1.0f };
-    cm->lightParams["direction"] = std::vector<float> { lightDirection.x, lightDirection.y, lightDirection.z };
-
-    // Retrieve the light position
-    for (auto node : model.nodes) {
-        if (node.extensions.find("KHR_lights_punctual") != node.extensions.end()) {
-            auto light = node.extensions["KHR_lights_punctual"];
-            auto lightNode = model.lights[0];
-            // glm::vec3 lightPosition(0.0f);
-            if (!node.translation.empty()) {
-                lightPosition = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
-            }
-            cm->lightParams["position"] = std::vector<float> { lightPosition.x, lightPosition.y, lightPosition.z };
-            cm->lightParams["color"] = std::vector<float> { lightNode.color[0], lightNode.color[1], lightNode.color[2] };
-            cm->lightParams["intensity"] = std::vector<float> { lightNode.intensity/900.0f };
-
-            if (lightNode.type == "directional") {
-                // glm::vec3 lightDirection(0.0f, -1.0f, 0.0f); // Default direction
-                if (!node.rotation.empty()) {
-                    glm::quat rotation = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
-                    glm::mat4 rotationMatrix = glm::mat4_cast(rotation);
-                    lightDirection = glm::vec3(rotationMatrix * glm::vec4(lightDirection, 0.0f));
-                }
-                cm->lightParams["direction"] = std::vector<float> { lightDirection.x, lightDirection.y, lightDirection.z };
-            }
-            break;
-        }
-    }
-
 
     // Load animations
     std::map< // Animation
@@ -862,16 +864,16 @@ bool LoadImageData(tinygltf::Image *image, const int image_idx, std::string *err
     return true;
 }
 
-std::map<std::string, std::vector<float>> chai_mesh::getCameraParams() {
-    return this->cameraParams;
+std::map<std::string, std::vector<float>> chai_mesh::getCameraParams(int index) {
+    return this->cameraParams[index];
 }
 
-std::map<std::string, std::vector<float>> chai_mesh::getLightParams() {
-    return this->lightParams;
+std::map<std::string, std::vector<float>> chai_mesh::getLightParams(int index) {
+    return this->lightParams[index];
 }
 
-void chai_mesh::setLightParams(const std::map<std::string, std::vector<float>> &params) {
-    this->lightParams = params;
+void chai_mesh::setLightParams(const std::map<std::string, std::vector<float>> &params, int index) {
+    this->lightParams[index] = params;
 }
 
 bool chai_mesh::loadMeshFromFile(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type) {

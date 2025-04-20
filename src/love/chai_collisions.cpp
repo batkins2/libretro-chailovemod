@@ -277,7 +277,7 @@ void chai_collisions::setRigidMeshPosition(std::vector<int> rigidMeshIndex, floa
         rigidMeshes[i]->rigidBody->setWorldTransform(btTransform(btQuaternion(0, 0, 0, 1), btVector3(x, y, z)));
     }              
 }
-int chai_collisions::addCharacterController()
+int chai_collisions::addCharacterController(int index)
 {
     btPairCachingGhostObject *ghostObject = new btPairCachingGhostObject();
     btConvexShape *capsule = new btCapsuleShape(1.2f, 2.0f);
@@ -295,7 +295,7 @@ int chai_collisions::addCharacterController()
 
     ghostObject->setUserPointer(character); // Set the user pointer to the character controller
 
-    ghostObject->setUserIndex(0); // Set the user pointer to the character controller
+    ghostObject->setUserIndex(index); // Set the user pointer to the character controller
     characterControllers.emplace_back(new CharacterController(ghostObject, character));
     return characterControllers.size() - 1;
 }
@@ -339,7 +339,7 @@ std::vector<float> chai_collisions::getRigidMesh(int ref)
         rigidMeshes[ref]->rigidBody->getWorldTransform().getOrigin().getZ()
     };
 }
-int chai_collisions::addBox(float x, float y, float z, float width, float height, float depth, std::vector<int> group = {0})
+int chai_collisions::addBox(float x, float y, float z, float width, float height, float depth, std::vector<int> group = {0}, int index = 0)
 {
     btTriangleMesh *mesh = new btTriangleMesh();
 
@@ -379,18 +379,22 @@ int chai_collisions::addBox(float x, float y, float z, float width, float height
     // btVector3 inertia(0, 0, 0);
     // shape->calculateLocalInertia(mass, inertia);
     btDefaultMotionState *motionState = new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(x, y, z)));
-    btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(0.01f, motionState, shape, btVector3(0, 0, 0));
+    btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(1.0f, motionState, shape, btVector3(0, 0, 0));
     btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
     rigidBody->setGravity(btVector3(0, 0, 0));
-    rigidBody->setLinearFactor(btVector3(1.9f, 0, 0));
+    // rigidBody->setLinearFactor(btVector3(1.9f, 0, 0));
     // Set friction and damping properties suitable for 1:1 character control
-    rigidBody->setFriction(0.45f); // Set a small positive friction value
-    rigidBody->setDamping(0.45f, 0.01f); // Set small positive damping values for stability
-    rigidBody->setRestitution(1.0f); // Set a small positive restitution value
+    // rigidBody->setFriction(0.45f); // Set a small positive friction value
+    // rigidBody->setDamping(0.45f, 0.01f); // Set small positive damping values for stability
+    // rigidBody->setRestitution(1.0f); // Set a small positive restitution value
 
     rigidBody->setUserPointer(rigidBody); // Set the user pointer to the character controller  
-    rigidBody->setUserIndex(0);
-
+    rigidBody->setUserIndex(index);
+    rigidBody->setUserIndex2(1);
+    // Disable deactivation to keep the object active
+    rigidBody->setActivationState(DISABLE_DEACTIVATION);
+    rigidBody->setCollisionFlags(btCollisionObject::CF_NO_CONTACT_RESPONSE);
+    cameraBox.emplace_back(rigidBody);
     rigidMeshes.emplace_back(new RigidMesh(shape, rigidBody));   
     for (auto i : group) {
         if (worlds->worlds.find(i) == worlds->worlds.end()) {
@@ -398,43 +402,6 @@ int chai_collisions::addBox(float x, float y, float z, float width, float height
         }
         rigidMeshes.back()->group.push_back(i);
         worlds->worlds[i]->dynamicsWorld->addRigidBody(rigidBody, btBroadphaseProxy::DefaultFilter, btBroadphaseProxy::DefaultFilter | btBroadphaseProxy::CharacterFilter);
-        worlds->worlds[i]->dynamicsWorld->setInternalTickCallback([](btDynamicsWorld *world, btScalar timeStep) {
-            btDispatcher *dispatcher = world->getDispatcher();
-            const int numManifolds = dispatcher->getNumManifolds();
-            btVector3 vel0 = btVector3(0, 0, 0);
-            btVector3 vel1 = btVector3(0, 0, 0);
-            for (int m = 0; m < numManifolds; ++m) {
-                auto *manifold = dispatcher->getManifoldByIndexInternal(m);
-                const btRigidBody *body0 = static_cast<const btRigidBody *>(manifold->getBody0());
-                const btRigidBody *body1 = static_cast<const btRigidBody *>(manifold->getBody1());
-                auto numContacts = manifold->getNumContacts();
-                if (numContacts == 0) {
-                    auto b = (btRigidBody *)body1->getUserPointer();
-                    auto v = body1->getLinearVelocity();
-                    if (b) {
-                        b->setLinearVelocity(btVector3(v.getX()/1.05f, 0, 0));
-                    }
-                    continue;
-                }
-                vel0 = body0->getLinearVelocity();
-                vel1 = body1->getLinearVelocity();
-                if (body0->getUserIndex() == body1->getUserIndex()) {
-                    // btKinematicCharacterController *character = static_cast<btKinematicCharacterController *>(body0->getUserPointer());
-                    // btVector3 velocity = character->getLinearVelocity();
-                    // btVector3 pos0 = body0->getWorldTransform().getOrigin();
-                    // btVector3 pos1 = body1->getWorldTransform().getOrigin();                    
-                    // printf("Collision detected between objects at positions: (%f, %f, %f) and (%f, %f, %f)\n", vel0.getX(), vel0.getY(), vel0.getZ(), vel1.getX(), vel1.getY(), vel1.getZ());
-                    if (vel1.getX() > 0) {
-                        auto b = (btRigidBody *)body1->getUserPointer();
-                        b->setLinearVelocity(btVector3(10.0f, 0, 0));
-                    } else if (vel1.getX() < 0) {
-                        auto b = (btRigidBody *)body1->getUserPointer();
-                        b->setLinearVelocity(btVector3(-10.0f, 0, 0));
-                    }
-                }
-            }
-        }, nullptr);
-        
     }
     return rigidMeshes.size() - 1;
 }
@@ -452,7 +419,52 @@ void chai_collisions::init(int group = 0)
     }
     worlds->worlds[group] = w;
     
-    worlds->worlds[group]->dynamicsWorld->setGravity(btVector3(0, -0.01, 0));   
+    worlds->worlds[group]->dynamicsWorld->setGravity(btVector3(0, -0.01, 0)); 
+    
+    worlds->worlds[group]->dynamicsWorld->setInternalTickCallback([](btDynamicsWorld *world, btScalar timeStep) {
+        chai_collisions *self = static_cast<chai_collisions *>(world->getWorldUserInfo());
+        btDispatcher *dispatcher = world->getDispatcher();
+        const int numManifolds = dispatcher->getNumManifolds();
+        btVector3 vel0 = btVector3(0, 0, 0);
+        btVector3 vel1 = btVector3(0, 0, 0);
+        std::map<int, bool> contact;
+        std::map<int, btRigidBody*> body;
+        for (int i = 0; i < self->cameraBox.size(); ++i) {
+            contact[i] = false;
+        }
+        for (int m = 0; m < numManifolds; ++m) {
+            auto *manifold = dispatcher->getManifoldByIndexInternal(m);
+            const btRigidBody *body0 = static_cast<const btRigidBody *>(manifold->getBody0());
+            const btRigidBody *body1 = static_cast<const btRigidBody *>(manifold->getBody1());
+            
+            auto numContacts = manifold->getNumContacts();
+           
+            if (body0->getUserIndex() == body1->getUserIndex() && numContacts > 0) {
+                contact[body1->getUserIndex()] = true;
+               
+                btVector3 pos0 = body0->getWorldTransform().getOrigin();
+                btVector3 pos1 = body1->getWorldTransform().getOrigin();
+
+                // Calculate the collision direction
+                btVector3 collisionDirection = pos1 - pos0;
+
+                // Optional: Normalize the direction vector
+                collisionDirection.normalize();
+
+                auto b = self->cameraBox[body1->getUserIndex()];
+                b->setLinearVelocity(btVector3(-collisionDirection.getX() * 6.0f, 0.0f, 0.0f));
+            }
+        }
+        for (int i = 0; i < self->cameraBox.size(); ++i) {            
+            if (!contact[i]) {
+                auto b = self->cameraBox[i];                
+                if (b != nullptr) {
+                    auto v = b->getLinearVelocity();
+                    b->setLinearVelocity(btVector3(v.getX()/1.5f, 0, 0));
+                }
+            }
+        }
+    }, this);
 
     // Initialize the debug drawer
     if (!debugDrawer) {

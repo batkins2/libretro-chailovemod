@@ -46,6 +46,24 @@ void chai_shader::newFragmentShader(love::gfx::Graphics *inst, std::vector<std::
     }
 }
 
+void chai_shader::sendInt(const std::string &uniform, int data) {
+    if (instance->isCreated()) {
+        const love::gfx::Shader::UniformInfo* info = nullptr;
+        try {
+            info = shader->getUniformInfo(uniform);
+        } catch (std::exception &e) {
+            printf("Error: %s\n", e.what());
+            return;
+        }
+        if (info == nullptr || info->baseType == gfx::Shader::UNIFORM_SAMPLER || info->baseType == gfx::Shader::UNIFORM_STORAGETEXTURE
+            || info->baseType == gfx::Shader::UNIFORM_TEXELBUFFER || info->baseType == gfx::Shader::UNIFORM_STORAGEBUFFER)
+            return;
+
+        std::memcpy(info->ints, &data, sizeof(int));
+        shader->updateUniform(info, 1);
+    }
+}
+
 void chai_shader::sendMap(const std::string &uniform, const std::map<int, glm::mat4> &data, const std::vector<int> &order) {
     if (instance->isCreated()) {
         const love::gfx::Shader::UniformInfo* info = nullptr;

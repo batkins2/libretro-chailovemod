@@ -24,8 +24,8 @@ public:
     void setShader(chai_shader *shader);
     void setMatrix(std::vector<chaiscript::Boxed_Value> matrix, int index);
     void finalize();    
-    void drawMeshes(bool shadows);
-    void draw();
+    void drawMeshes(bool shadows, int view);
+    void draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vector<chaiscript::Boxed_Value> viewMatrix2, std::vector<chaiscript::Boxed_Value> viewMatrix3, std::vector<chaiscript::Boxed_Value> viewMatrix4, int viewCount);
 
 private:
     std::vector<chai_mesh *> meshes;

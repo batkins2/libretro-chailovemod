@@ -21,12 +21,12 @@ class chai_collisions
     std::vector<int> addRigidMesh(std::string meshPath);
     void setCharacterControllerPosition(int characterIndex, float x, float y, float z, std::vector<int> group);
     void setRigidMeshPosition(std::vector<int> rigidMeshIndex, float x, float y, float z, std::vector<int> group);
-    int addCharacterController();
+    int addCharacterController(int index);
     void applyForceToCharacter(int characterIndex, float x, float y, float z);
     void applyForceToRigidMesh(int rigidMeshIndex, float x, float y, float z);
     std::vector<float> getCharacterController(int ref);
     std::vector<float> getRigidMesh(int ref);
-    int addBox(float x, float y, float z, float width, float height, float depth, std::vector<int> group);
+    int addBox(float x, float y, float z, float width, float height, float depth, std::vector<int> group, int index);
     
     void clearWorlds()
     {
@@ -164,6 +164,7 @@ class chai_collisions
         std::map<int, World *> worlds;
     };
     std::vector<RigidMesh *> rigidMeshes;
+    std::vector<btRigidBody *> cameraBox;
     std::vector<CharacterController *> characterControllers;    
     WorldMap *worlds = nullptr;    
 

@@ -56,7 +56,7 @@ void chai_scene::finalize() {
     // Perform any finalization steps if needed
 }
 
-void chai_scene::drawMeshes(bool shadows) {
+void chai_scene::drawMeshes(bool shadows, int view) {
     int i = 0;
     gfx::OptionalColorD clearcolor;
     OptionalInt clearstencil(0);
@@ -66,7 +66,7 @@ void chai_scene::drawMeshes(bool shadows) {
     for (auto mesh : meshes) {
         
         if (i == 0) { 
-            auto cameraParams = mesh->cameraParams;
+            auto cameraParams = mesh->cameraParams[view];
 
             float fov = cameraParams.at("fov")[0];
             float aspectRatio = cameraParams.at("aspectRatio")[0];
@@ -75,7 +75,7 @@ void chai_scene::drawMeshes(bool shadows) {
             auto t2 = glm::perspective(fov, aspectRatio, nearClip, farClip);
             auto pm = glm::value_ptr(t2);
 
-            auto lightParams = mesh->lightParams;
+            auto lightParams = mesh->lightParams[view];
 
             auto direction = std::vector<chaiscript::Boxed_Value>();
             for (auto axis : lightParams["direction"]) {
@@ -152,7 +152,7 @@ void chai_scene::drawMeshes(bool shadows) {
     }
 }
 
-void chai_scene::draw() {
+void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vector<chaiscript::Boxed_Value> viewMatrix2, std::vector<chaiscript::Boxed_Value> viewMatrix3, std::vector<chaiscript::Boxed_Value> viewMatrix4, int viewCount) {
     auto cg = ChaiLove::getInstance()->chai_gfx;
 
     if (false && cg.reinit) {
@@ -211,7 +211,9 @@ void chai_scene::draw() {
         if (err != GL_NO_ERROR) {
             printf("ERROR: 5\n");
         }
+       
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, cg.width-5, cg.height-5, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+        
         err = glGetError();
         if (err != GL_NO_ERROR) {
             printf("ERROR: 6\n");
@@ -268,19 +270,259 @@ void chai_scene::draw() {
         } else {
             
             currentTime += 0.01f;
+            
+            if (viewCount == 2) {
+                glViewport(0, 0, cg.width, cg.height);
+                sceneShader->send("viewMatrix", viewMatrix1);                
+                drawMeshes(true, 0);
+                glViewport(0, cg.height*0.5, cg.width, cg.height*0.5);
+                auto fb = cg.instance->hw_render.get_current_framebuffer();
+                glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+                drawMeshes(false, 0);
+                cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
 
-            drawMeshes(true);
-            auto fb = cg.instance->hw_render.get_current_framebuffer();
-            // printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
-            glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
-            gfx::OptionalColorD clearcolor;
-            clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
-            OptionalInt clearstencil(0);
-            OptionalDouble cleardepth(1.0);
-            cg.instance->clear(clearcolor, clearstencil, cleardepth);
+
+                if (shadowMapFBO != 0) {
+                    glDeleteFramebuffers(1, &shadowMapFBO);
+                }
+
+                // Create depth texture
+                glGenFramebuffers(1, &shadowMapFBO);
+                
+                if (shadowMap == 0) {
+                    glGenTextures(1, &shadowMap); 
+
+                }    
+                
+                glBindTexture(GL_TEXTURE_2D, shadowMap);
+                
             
-            drawMeshes(false);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, cg.width-5, cg.height-5, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+                
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+                
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
             
+                // GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+                glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+                // Attach depth texture as FBO's depth buffer
+                glBindFramebuffer(cg.instance->FRAMEBUFFER, shadowMapFBO);
+                
+                glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
+                glClear(GL_DEPTH_BUFFER_BIT);
+                glViewport(0, 0, cg.width, cg.height);
+                sceneShader->send("viewMatrix", viewMatrix2);
+                drawMeshes(true, 1);
+                glViewport(0, 0, cg.width, cg.height*0.5);
+                fb = cg.instance->hw_render.get_current_framebuffer();
+                glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+                drawMeshes(false, 1);
+                // auto fb = cg.instance->hw_render.get_current_framebuffer();
+                // printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
+                
+                // glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+                // gfx::OptionalColorD clearcolor;
+                // clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
+                // OptionalInt clearstencil(0);
+                // OptionalDouble cleardepth(1.0);
+                // cg.instance->clear(clearcolor, clearstencil, cleardepth);
+                // sceneShader->send("viewMatrix", viewMatrix1);  
+               
+                
+                // fb = cg.instance->hw_render.get_current_framebuffer();
+                
+                // printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
+                // glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+                // gfx::OptionalColorD clearcolor;
+                // clearcolor = ColorD(0.0, 0.0, 0.0, 0.0); // Set the clear color to black with full opacity
+                // OptionalInt clearstencil(0);
+                // OptionalDouble cleardepth(1.0);
+                // cg.instance->clear(clearcolor, clearstencil, cleardepth);
+                // sceneShader->send("viewMatrix", viewMatrix2);  
+               
+            } else if (viewCount == 4) {
+                glViewport(0, 0, cg.width, cg.height);
+                
+                sceneShader->send("viewMatrix", viewMatrix1);  
+                drawMeshes(true, 0);
+                glViewport(0, 0, cg.width*0.5, cg.height*0.5); 
+                auto fb = cg.instance->hw_render.get_current_framebuffer();
+                glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+                drawMeshes(false, 0);
+                
+        
+                cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+
+
+                if (shadowMapFBO != 0) {
+                    glDeleteFramebuffers(1, &shadowMapFBO);
+                }
+
+                // Create depth texture
+                glGenFramebuffers(1, &shadowMapFBO);
+                
+                if (shadowMap == 0) {
+                    glGenTextures(1, &shadowMap); 
+
+                }    
+                
+                glBindTexture(GL_TEXTURE_2D, shadowMap);
+                
+            
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, cg.width-5, cg.height-5, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+                
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+                
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+            
+                // GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+                glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+                // Attach depth texture as FBO's depth buffer
+                glBindFramebuffer(cg.instance->FRAMEBUFFER, shadowMapFBO);
+                
+                glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
+                glClear(GL_DEPTH_BUFFER_BIT);                
+                glViewport(0, 0, cg.width, cg.height);
+                sceneShader->send("viewMatrix", viewMatrix2);
+                drawMeshes(true, 1);
+                glViewport(cg.width*0.5, 0, cg.width*0.5, cg.height*0.5);
+                fb = cg.instance->hw_render.get_current_framebuffer();
+                glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+                drawMeshes(false, 1);
+                cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+
+
+                if (shadowMapFBO != 0) {
+                    glDeleteFramebuffers(1, &shadowMapFBO);
+                }
+
+                // Create depth texture
+                glGenFramebuffers(1, &shadowMapFBO);
+                
+                if (shadowMap == 0) {
+                    glGenTextures(1, &shadowMap); 
+
+                }    
+                
+                glBindTexture(GL_TEXTURE_2D, shadowMap);
+                
+            
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, cg.width-5, cg.height-5, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+                
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+                
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+            
+                // GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+                glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+                // Attach depth texture as FBO's depth buffer
+                glBindFramebuffer(cg.instance->FRAMEBUFFER, shadowMapFBO);
+                
+                glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
+                glClear(GL_DEPTH_BUFFER_BIT);
+                glViewport(0, 0, cg.width, cg.height);
+                sceneShader->send("viewMatrix", viewMatrix3);
+                drawMeshes(true, 2);
+                glViewport(0, cg.height*0.5, cg.width*0.5, cg.height*0.5);
+                fb = cg.instance->hw_render.get_current_framebuffer();
+                glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+                drawMeshes(false, 2);
+                cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+
+
+                if (shadowMapFBO != 0) {
+                    glDeleteFramebuffers(1, &shadowMapFBO);
+                }
+
+                // Create depth texture
+                glGenFramebuffers(1, &shadowMapFBO);
+                
+                if (shadowMap == 0) {
+                    glGenTextures(1, &shadowMap); 
+
+                }    
+                
+                glBindTexture(GL_TEXTURE_2D, shadowMap);
+                
+            
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, cg.width-5, cg.height-5, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+                
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+                
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+            
+                // GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+                glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+                // Attach depth texture as FBO's depth buffer
+                glBindFramebuffer(cg.instance->FRAMEBUFFER, shadowMapFBO);
+                
+                glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
+                glClear(GL_DEPTH_BUFFER_BIT);
+                glViewport(0, 0, cg.width, cg.height);
+                sceneShader->send("viewMatrix", viewMatrix4);
+                drawMeshes(true, 3);
+                glViewport(cg.width*0.5, cg.height*0.5, cg.width*0.5, cg.height*0.5);
+                fb = cg.instance->hw_render.get_current_framebuffer();
+                glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+                drawMeshes(false, 3);
+
+                // auto fb = cg.instance->hw_render.get_current_framebuffer();
+                // glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+                // gfx::OptionalColorD clearcolor;
+                // clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
+                // OptionalInt clearstencil(0);
+                // OptionalDouble cleardepth(1.0);
+                // cg.instance->clear(clearcolor, clearstencil, cleardepth);
+                
+                // glViewport(0, 0, cg.width*0.5, cg.height*0.5);                
+                // sceneShader->send("viewMatrix", viewMatrix1);  
+                // drawMeshes(false);
+                
+                // glViewport(cg.width*0.5, 0, cg.width*0.5, cg.height*0.5);
+                // sceneShader->send("viewMatrix", viewMatrix2);  
+                // drawMeshes(false);
+
+                // glViewport(0, cg.height*0.5, cg.width*0.5, cg.height*0.5);
+                // sceneShader->send("viewMatrix", viewMatrix3);
+                // drawMeshes(false);
+
+                // glViewport(cg.width*0.5, cg.height*0.5, cg.width*0.5, cg.height*0.5);
+                // sceneShader->send("viewMatrix", viewMatrix4);
+                // drawMeshes(false);
+            } else {
+                sceneShader->send("viewMatrix", viewMatrix1);
+                drawMeshes(true, 0);
+                auto fb = cg.instance->hw_render.get_current_framebuffer();
+                // printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
+                glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+                gfx::OptionalColorD clearcolor;
+                clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
+                OptionalInt clearstencil(0);
+                OptionalDouble cleardepth(1.0);
+                cg.instance->clear(clearcolor, clearstencil, cleardepth);
+                
+                drawMeshes(false, 0);
+            }            
             cg.instance->setShader();
         }
     }
