@@ -287,11 +287,13 @@ int chai_collisions::addCharacterController(int index)
     btKinematicCharacterController *character = new btKinematicCharacterController(ghostObject, capsule, stepHeight, btVector3(0, 1, 0));
     character->setGravity(btVector3(0, -0.01, 0));    
     
-    btTransform startTransform;
-    startTransform.setIdentity();
-    startTransform.setOrigin(btVector3(0, 1, 0));
+    // btTransform startTransform;
+    // startTransform.setIdentity();
+    // startTransform.setOrigin(btVector3(0, 0, 0));
 
-    ghostObject->setWorldTransform(startTransform);
+    // ghostObject->setWorldTransform(startTransform);
+    // character->setLinearVelocity(btVector3(0, 0, 0));
+    // character->setAngularVelocity(btVector3(0, 0, 0));
 
     ghostObject->setUserPointer(character); // Set the user pointer to the character controller
 
@@ -326,16 +328,16 @@ void chai_collisions::applyForceToRigidMesh(int rigidMeshIndex, float x, float y
 std::vector<float> chai_collisions::getCharacterController(int ref)
 {
     return std::vector<float>{
-        characterControllers[ref]->ghostObject->getWorldTransform().getOrigin().getX(), 
-        characterControllers[ref]->ghostObject->getWorldTransform().getOrigin().getY()-2.0f, 
+        characterControllers[ref]->ghostObject->getWorldTransform().getOrigin().getX(),
+        characterControllers[ref]->ghostObject->getWorldTransform().getOrigin().getY(),
         characterControllers[ref]->ghostObject->getWorldTransform().getOrigin().getZ()
     };
 }
 std::vector<float> chai_collisions::getRigidMesh(int ref)
 {
     return std::vector<float>{
-        rigidMeshes[ref]->rigidBody->getWorldTransform().getOrigin().getX(), 
-        rigidMeshes[ref]->rigidBody->getWorldTransform().getOrigin().getY(), 
+        rigidMeshes[ref]->rigidBody->getWorldTransform().getOrigin().getX(),
+        rigidMeshes[ref]->rigidBody->getWorldTransform().getOrigin().getY(),
         rigidMeshes[ref]->rigidBody->getWorldTransform().getOrigin().getZ()
     };
 }
@@ -382,6 +384,8 @@ int chai_collisions::addBox(float x, float y, float z, float width, float height
     btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(1.0f, motionState, shape, btVector3(0, 0, 0));
     btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
     rigidBody->setGravity(btVector3(0, 0, 0));
+    // rigidBody->setLinearVelocity(btVector3(0, 0, 0));
+    // rigidBody->setAngularVelocity(btVector3(0, 0, 0));
     // rigidBody->setLinearFactor(btVector3(1.9f, 0, 0));
     // Set friction and damping properties suitable for 1:1 character control
     // rigidBody->setFriction(0.45f); // Set a small positive friction value
@@ -453,6 +457,10 @@ void chai_collisions::init(int group = 0)
 
                 auto b = self->cameraBox[body1->getUserIndex()];
                 b->setLinearVelocity(btVector3(-collisionDirection.getX() * 6.0f, 0.0f, 0.0f));
+                auto c = self->characterControllers[body1->getUserIndex()]->character;
+                // auto v = c->getLinearVelocity();
+                // c->getGhostObject()->setLinearVelocity(btVector3(v.getX(), v.getY(), 0.0f));
+                c->getGhostObject()->setUserIndex2(collisionDirection.getZ() > 0 ? 1 : collisionDirection.getZ() < 0 ? -1 : 0);                
             }
         }
         for (int i = 0; i < self->cameraBox.size(); ++i) {            
@@ -461,17 +469,20 @@ void chai_collisions::init(int group = 0)
                 if (b != nullptr) {
                     auto v = b->getLinearVelocity();
                     b->setLinearVelocity(btVector3(v.getX()/1.5f, 0, 0));
+                    auto c = self->characterControllers[i]->character->getGhostObject();
+                    c->setUserIndex2(0);
                 }
             }
         }
     }, this);
 
     // Initialize the debug drawer
-    if (!debugDrawer) {
+    if (debugDrawer == nullptr) { 
         debugDrawer = new OpenGLDebugDrawer();
         debugDrawer->setDebugMode(btIDebugDraw::DBG_DrawWireframe | btIDebugDraw::DBG_DrawAabb);
+        worlds->worlds[group]->dynamicsWorld->setDebugDrawer(debugDrawer);
     }
-    worlds->worlds[group]->dynamicsWorld->setDebugDrawer(debugDrawer);
+    
 
 }
 void chai_collisions::destroy()
@@ -484,6 +495,7 @@ void chai_collisions::destroy()
         delete rm;
     }
     rigidMeshes.clear();
+    rigidMeshes = std::vector<RigidMesh*>();
     for (auto &cc : characterControllers) {
         for (int i = 0; i < cc->group.size(); i++) {
             worlds->worlds[cc->group[i]]->dynamicsWorld->removeAction(cc->character);
@@ -492,14 +504,27 @@ void chai_collisions::destroy()
         delete cc;
     }
     characterControllers.clear();
+    characterControllers = std::vector<CharacterController*>();
 
-    // delete debugDrawer;
+    cameraBox.clear();
+    cameraBox = std::vector<btRigidBody*>();
+
+    delete debugDrawer;
+    debugDrawer = nullptr;
     delete worlds;
 }
 void chai_collisions::process()
 {    
     for (auto &dw : worlds->worlds) {
         for (auto &cc : characterControllers) {
+            auto stopZ = cc->ghostObject->getUserIndex2();
+            auto v = cc->character->getLinearVelocity();
+            if (stopZ > 0 && v.getZ() < 0) {                
+                cc->character->setWalkDirection(btVector3(v.getX(), v.getY(), 0.0f));
+            }
+            if (stopZ < 0 && v.getZ() > 0) {                
+                cc->character->setWalkDirection(btVector3(v.getX(), v.getY(), 0.0f));
+            }
             cc->character->preStep(dw.second->dynamicsWorld);
             cc->character->playerStep(dw.second->dynamicsWorld, 1);
             

@@ -334,6 +334,7 @@ script::script(const std::string& file) {
 	chai.add(constructor<chai_mesh(const chai_mesh &)>(), "chai_mesh");
 	chai.add(fun(&chai_mesh::operator=), "=");	
 	chai.add(fun(&chai_mesh::newMesh), "newMesh");
+	chai.add(fun(&chai_mesh::newMeshWithData), "newMeshWithData");
 	chai.add(fun(&chai_mesh::loadMeshFromFile), "loadMeshFromFile");
 	chai.add(fun(&chai_mesh::wrap_setTexture), "setTexture");
 	chai.add(fun(&chai_mesh::getCameraParams), "getCameraParams");
@@ -342,11 +343,15 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_mesh::playAnimation), "playAnimation");
 	chai.add(fun(&chai_mesh::endAnimation), "endAnimation");
 	chai.add(fun(&chai_mesh::reloadMesh), "reloadMesh");
-	chai.add(fun(&chai_mesh::destroy), "destroy");
+	chai.add(fun(&chai_mesh::destroy), "destroy");	
+	chai.add(user_type<chai_meshData>(), "chai_meshData");
+	chai.add(fun(&chai_meshData::clone), "clone");
 	chai.add(user_type<chai_scene>(), "chai_scene");
 	chai.add(constructor<chai_scene(const chai_scene &)>(), "chai_scene");
 	chai.add(fun(&chai_scene::operator=), "=");
 	chai.add(fun(&chai_scene::addMesh), "addMesh");
+	chai.add(fun(&chai_scene::hideMesh), "hideMesh");
+	chai.add(fun(&chai_scene::showMesh), "showMesh");
 	chai.add(fun(&chai_scene::setShader), "setShader");
 	chai.add(fun(&chai_scene::setMatrix), "setMatrix");
 	chai.add(fun(&chai_scene::draw), "draw");
@@ -367,8 +372,8 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_collisions::setRigidMeshPosition), "setRigidMeshPosition");
 	chai.add(fun(&chai_collisions::getCharacterController), "getCharacterController");
 	chai.add(fun(&chai_collisions::getRigidMesh), "getRigidMesh");
-	chai.add(fun(&chai_collisions::addBox), "addBox");
-
+	chai.add(fun(&chai_collisions::addBox), "addBox");	
+	
 	// Matrices
 	chai.add(fun(&chai_matrices::setTransformationMatrix), "setTransformationMatrix");
 	chai.add(fun(&chai_matrices::setProjectionMatrix), "setProjectionMatrix");

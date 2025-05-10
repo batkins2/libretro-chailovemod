@@ -154,7 +154,7 @@ class chai_collisions
             worlds = std::map<int, World *>();
         }
         ~WorldMap()
-        {
+        {            
             for (auto &dw : worlds)
             {
                 delete dw.second;

@@ -359,6 +359,25 @@ FLAGS += -I$(CORE_DIR)/vendor/TinySHA1
 # cppcodec
 FLAGS += -I$(CORE_DIR)/vendor/cppcodec
 
+# Bullet3
+FLAGS += -I$(CORE_DIR)/vendor/bullet3/src
+SOURCES_CXX += $(wildcard \
+	$(CORE_DIR)/vendor/bullet3/src/BulletCollision/*.cpp \
+	$(CORE_DIR)/vendor/bullet3/src/BulletCollision/BroadphaseCollision/*.cpp \
+	$(CORE_DIR)/vendor/bullet3/src/BulletCollision/CollisionDispatch/*.cpp \
+	$(CORE_DIR)/vendor/bullet3/src/BulletCollision/CollisionShapes/*.cpp \
+	$(CORE_DIR)/vendor/bullet3/src/BulletCollision/Gimpact/*.cpp \
+	$(CORE_DIR)/vendor/bullet3/src/BulletCollision/NarrowPhaseCollision/*.cpp \
+	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/*.cpp \
+	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/Character/*.cpp \
+	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/ConstraintSolver/*.cpp \
+	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/Dynamics/*.cpp \
+	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/Featherstone/*.cpp \
+	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/MLCPSolvers/*.cpp \
+	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/Vehicle/*.cpp \
+	$(CORE_DIR)/vendor/bullet3/src/LinearMath/*.cpp \
+)
+
 # Magnum
 #FLAGS += -I$(CORE_DIR)/vendor/magnum/src/Magnum/Trade
 #FLAGS += -I$(CORE_DIR)/vendor/corrade/src/Corrade/PluginManager

@@ -21,6 +21,8 @@ public:
     chai_scene *newScene() const;
     bool destroy();
     void addMesh(chai_mesh *mesh);
+    void hideMesh(chai_mesh *mesh);
+    void showMesh(chai_mesh *mesh);
     void setShader(chai_shader *shader);
     void setMatrix(std::vector<chaiscript::Boxed_Value> matrix, int index);
     void finalize();    

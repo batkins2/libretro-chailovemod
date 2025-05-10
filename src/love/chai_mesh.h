@@ -1,5 +1,6 @@
 #define __HAVE_CHAI_MESH__
 
+#include "chai_meshData.h"
 #include "Image.h"
 #include "filesystem/FileData.h"
 #include "filesystem.h"
@@ -18,7 +19,9 @@ namespace love {
 class chai_gfx;
 class chai_mesh {
     public:
-    chai_mesh();
+    std::vector<chai_meshData*> data = std::vector<chai_meshData*>();
+    chai_mesh() {};
+    chai_mesh(std::vector<chai_meshData*> &data);
     chai_mesh(const chai_mesh &c);
     ~chai_mesh();
     void destroy() {
@@ -27,13 +30,16 @@ class chai_mesh {
             mesh = nullptr;
         }
         for (auto i : meshes) {
+            if (cloned) {
+                i = nullptr;
+            }
             if (i != nullptr) {
                 delete i;
             }
         }
         meshes = std::vector<gfx::Mesh *>();
-        for (auto i : textures) {
-            if (i != nullptr) {
+        if (!cloned) {
+            for (auto i : textures) {
                 i->~Drawable();
             }
         }
@@ -56,6 +62,7 @@ class chai_mesh {
         }
         // cameraParams = std::map<std::string, std::vector<float>>();
     }
+    bool cloned = false;
     chai_mesh *clone() const;
     chai_mesh& operator=(const chai_mesh& m) {
 		return *this;
@@ -64,12 +71,14 @@ class chai_mesh {
     std::map<std::string, std::vector<float>> getLightParams(int index);
     void setLightParams(const std::map<std::string, std::vector<float>> &params, int index);
     // bool newMesh(love::gfx::Graphics *inst, const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::vector<chaiscript::Boxed_Value> &data, const std::string &type);
+    chai_mesh *newMeshWithData(std::vector<chai_meshData*> &data);
     chai_mesh *newMesh();
-    bool loadMeshFromFile(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type);
+    std::vector<chai_meshData*> loadMeshFromFile(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type);
     bool wrap_setTexture(const std::string &texture);
     void playAnimation(const std::string &name, const bool loop);
     void endAnimation(const std::string &name);
     void draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt);
+    void setVisible(bool visible);
     void reloadMesh();
     love::gfx::Graphics *instance;
     gfx::Mesh *mesh = nullptr;
@@ -113,6 +122,7 @@ class chai_mesh {
     std::vector<glm::mat4> nodeMatrix;
     std::vector<std::vector<int>> jointList;
     std::vector<std::map<int, glm::mat4>> jointMatrix;
+    bool visible = true;
     // float jointMinValue;
 };
 }

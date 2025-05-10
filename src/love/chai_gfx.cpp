@@ -304,26 +304,26 @@ void chai_gfx::wrap_setShader(chai_shader *s) {
 }
 
 chai_mesh *chai_gfx::wrap_newMesh(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::vector<chaiscript::Boxed_Value> &data, const std::string &type) {
-    if (instance->isCreated()) {
-        auto m = new chai_mesh();
+    // if (instance->isCreated()) {
+    //     auto m = new chai_mesh();
         
-        // instance->bindVAO();
-        // m->newMesh(instance, vertexFormat, data, type);
-        meshes.push_back(m);
-        return m;
-    }
+    //     // instance->bindVAO();
+    //     // m->newMesh(instance, vertexFormat, data, type);
+    //     meshes.push_back(m);
+    //     return m;
+    // }
     return nullptr;
 }
 
 chai_mesh *chai_gfx::wrap_newMeshFromFile(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type) {
-    if (instance->isCreated()) {
-        auto m = new chai_mesh();
+    // if (instance->isCreated()) {
+    //     auto m = new chai_mesh();
         
-        // instance->bindVAO();
-        // m->newMeshFromFile(instance, vertexFormat, FileName, type);
-        meshes.emplace_back(m);
-        return m;
-    }
+    //     // instance->bindVAO();
+    //     // m->newMeshFromFile(instance, vertexFormat, FileName, type);
+    //     meshes.emplace_back(m);
+    //     return m;
+    // }
     return nullptr;
 }
 

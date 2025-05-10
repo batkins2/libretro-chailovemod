@@ -32,6 +32,20 @@ void chai_scene::addMesh(chai_mesh *mesh) {
         0.0f, 0.0f, 0.0f, 1.0f}));   
 }
 
+void chai_scene::hideMesh(chai_mesh *mesh) {
+    auto it = std::find(meshes.begin(), meshes.end(), mesh);
+    if (it != meshes.end()) {
+        meshes[it - meshes.begin()]->setVisible(false);
+    }
+}
+
+void chai_scene::showMesh(chai_mesh *mesh) {
+    auto it = std::find(meshes.begin(), meshes.end(), mesh);
+    if (it != meshes.end()) {
+        meshes[it - meshes.begin()]->setVisible(true);
+    }
+}
+
 void chai_scene::setShader(chai_shader *shader) {
     if (sceneShader != nullptr) {
         // glDeleteShader(sceneShader->shader->getHandle());
@@ -64,7 +78,11 @@ void chai_scene::drawMeshes(bool shadows, int view) {
     auto cg = ChaiLove::getInstance()->chai_gfx;
     cg.instance->clear(clearcolor, clearstencil, cleardepth);
     for (auto mesh : meshes) {
-        
+        if (mesh->visible == false) {
+            i++;
+            continue;
+        }
+
         if (i == 0) { 
             auto cameraParams = mesh->cameraParams[view];
 
@@ -345,7 +363,7 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
                 // cg.instance->clear(clearcolor, clearstencil, cleardepth);
                 // sceneShader->send("viewMatrix", viewMatrix2);  
                
-            } else if (viewCount == 4) {
+            } else if (viewCount > 2) {
                 glViewport(0, 0, cg.width, cg.height);
                 
                 sceneShader->send("viewMatrix", viewMatrix1);  
@@ -438,7 +456,11 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
                 glViewport(0, 0, cg.width, cg.height);
                 sceneShader->send("viewMatrix", viewMatrix3);
                 drawMeshes(true, 2);
-                glViewport(0, cg.height*0.5, cg.width*0.5, cg.height*0.5);
+                if (viewCount > 3) {                    
+                    glViewport(0, cg.height*0.5, cg.width*0.5, cg.height*0.5);
+                } else {
+                    glViewport(0, cg.height*0.5, cg.width, cg.height*0.5);
+                }
                 fb = cg.instance->hw_render.get_current_framebuffer();
                 glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
                 drawMeshes(false, 2);
@@ -478,13 +500,15 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
                 
                 glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
                 glClear(GL_DEPTH_BUFFER_BIT);
-                glViewport(0, 0, cg.width, cg.height);
-                sceneShader->send("viewMatrix", viewMatrix4);
-                drawMeshes(true, 3);
-                glViewport(cg.width*0.5, cg.height*0.5, cg.width*0.5, cg.height*0.5);
-                fb = cg.instance->hw_render.get_current_framebuffer();
-                glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
-                drawMeshes(false, 3);
+                if (viewCount > 3) {                        
+                    glViewport(0, 0, cg.width, cg.height);
+                    sceneShader->send("viewMatrix", viewMatrix4);
+                    drawMeshes(true, 3);
+                    glViewport(cg.width*0.5, cg.height*0.5, cg.width*0.5, cg.height*0.5);
+                    fb = cg.instance->hw_render.get_current_framebuffer();
+                    glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+                    drawMeshes(false, 3);
+                }
 
                 // auto fb = cg.instance->hw_render.get_current_framebuffer();
                 // glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
@@ -510,6 +534,7 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
                 // sceneShader->send("viewMatrix", viewMatrix4);
                 // drawMeshes(false);
             } else {
+                glViewport(0, 0, cg.width, cg.height);
                 sceneShader->send("viewMatrix", viewMatrix1);
                 drawMeshes(true, 0);
                 auto fb = cg.instance->hw_render.get_current_framebuffer();

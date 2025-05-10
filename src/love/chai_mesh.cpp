@@ -15,8 +15,8 @@
 
 namespace love
 {
-chai_mesh::chai_mesh() {
-
+chai_mesh::chai_mesh(std::vector<chai_meshData*> &data) {
+    this->data = data;
 }
 
 std::vector<gfx::Buffer::DataDeclaration> vertexFormatLoader(const std::vector<chaiscript::Boxed_Value> &vertexFormat) {
@@ -54,7 +54,24 @@ std::vector<gfx::Buffer::DataDeclaration> vertexFormatLoader(const std::vector<c
     return vf;
 }
 
+chai_mesh *chai_mesh::newMeshWithData(std::vector<chai_meshData*> &data) {
+    // auto d = std::vector<chai_meshData*>();
+    // for (auto i : data) {
+    //     auto d1 = chaiscript::boxed_cast<chai_meshData*>(i);
+    //     d.push_back(d1);
+    // }
+    // auto m = new chai_mesh(d);
+    auto m = new chai_mesh(data);
+    return m;
+}
+
 chai_mesh *chai_mesh::newMesh() {
+    // auto d = std::vector<chai_meshData*>();
+    // for (auto i : data) {
+    //     auto d1 = chaiscript::boxed_cast<chai_meshData*>(i);
+    //     d.push_back(d1);
+    // }
+    // auto m = new chai_mesh(d);
     auto m = new chai_mesh();
     return m;
 }
@@ -143,7 +160,7 @@ void loadTexture(gfx::Mesh *mesh, std::string texture) {
     mesh->setTexture(tex);
 }
 
-gfx::Mesh *loadMesh(int i, tinygltf::Model &model, love::gfx::Graphics *instance, const std::string &type, std::vector<gfx::Buffer::DataDeclaration> &vf, chai_mesh *cm) {
+std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, love::gfx::Graphics *instance, const std::string &type, std::vector<gfx::Buffer::DataDeclaration> &vf, chai_mesh *cm, chai_meshData *readyData = nullptr) {
     std::vector<uint32_t> prepD;
     gfx::Texture *tex = nullptr;
     if (i >= 0) {
@@ -275,7 +292,7 @@ gfx::Mesh *loadMesh(int i, tinygltf::Model &model, love::gfx::Graphics *instance
         }
         // printf("Test point 2");
 
-        if (indiceAccessor.componentType != TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+        if (readyData == nullptr && indiceAccessor.componentType != TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
             const unsigned int* indices = reinterpret_cast<const unsigned int*>(&indiceBuffer.data[indiceAccessor.byteOffset + indiceBufferView.byteOffset]);
             uint32_t fbits = 0xffffffff;
             for (size_t i = 0; i < indiceAccessor.count; ++i) {
@@ -417,7 +434,7 @@ gfx::Mesh *loadMesh(int i, tinygltf::Model &model, love::gfx::Graphics *instance
 
                 prepD.push_back(0xffffffff); // Placeholder for any additional data
             }
-        } else {
+        } else if (readyData == nullptr) {
             const unsigned short* indices = reinterpret_cast<const unsigned short*>(&indiceBuffer.data[indiceAccessor.byteOffset + indiceBufferView.byteOffset]);
             uint32_t fbits = 0xffffffff;
             for (size_t i = 0; i < indiceAccessor.count; ++i) {
@@ -703,89 +720,103 @@ gfx::Mesh *loadMesh(int i, tinygltf::Model &model, love::gfx::Graphics *instance
             >
         >
     > anims;
-    size_t anim = 0;
-    for (auto animation : model.animations) {
-        auto name = animation.name;
-        std::map< // Channel
-            std::string,
-            std::map<
-                int, // Node
-                std::vector< // Keyframe
-                    std::pair< // Keyframe data
-                        float, // Time
-                        glm::vec4 // Data
+    if (readyData == nullptr) {
+        
+        size_t anim = 0;
+        for (auto animation : model.animations) {
+            auto name = animation.name;
+            std::map< // Channel
+                std::string,
+                std::map<
+                    int, // Node
+                    std::vector< // Keyframe
+                        std::pair< // Keyframe data
+                            float, // Time
+                            glm::vec4 // Data
+                        >
                     >
                 >
-            >
-        > channels;
+            > channels;
 
-        size_t chan = 0;
-        for (auto channel : animation.channels) {
-            auto target_node = channel.target_node;
-            auto target_path = channel.target_path;
+            size_t chan = 0;
+            for (auto channel : animation.channels) {
+                auto target_node = channel.target_node;
+                auto target_path = channel.target_path;
 
-            auto sampler = animation.samplers[channel.sampler];
-            auto inputAccessor = model.accessors[sampler.input];
-            auto outputAccessor = model.accessors[sampler.output];
+                auto sampler = animation.samplers[channel.sampler];
+                auto inputAccessor = model.accessors[sampler.input];
+                auto outputAccessor = model.accessors[sampler.output];
 
-            auto inputBufferView = model.bufferViews[inputAccessor.bufferView];
-            auto outputBufferView = model.bufferViews[outputAccessor.bufferView];
+                auto inputBufferView = model.bufferViews[inputAccessor.bufferView];
+                auto outputBufferView = model.bufferViews[outputAccessor.bufferView];
 
-            auto inputBuffer = model.buffers[inputBufferView.buffer];
-            auto outputBuffer = model.buffers[outputBufferView.buffer];
+                auto inputBuffer = model.buffers[inputBufferView.buffer];
+                auto outputBuffer = model.buffers[outputBufferView.buffer];
 
-            const float* inputData = reinterpret_cast<const float*>(&inputBuffer.data[inputAccessor.byteOffset + inputBufferView.byteOffset]);
-            const float* outputData = reinterpret_cast<const float*>(&outputBuffer.data[outputAccessor.byteOffset + outputBufferView.byteOffset]);
+                const float* inputData = reinterpret_cast<const float*>(&inputBuffer.data[inputAccessor.byteOffset + inputBufferView.byteOffset]);
+                const float* outputData = reinterpret_cast<const float*>(&outputBuffer.data[outputAccessor.byteOffset + outputBufferView.byteOffset]);
 
-            auto keyframes = std::map<int, std::vector<std::pair<float, glm::vec4>>>({
-                { target_node, std::vector<std::pair<float, glm::vec4>>() }
-            });
+                auto keyframes = std::map<int, std::vector<std::pair<float, glm::vec4>>>({
+                    { target_node, std::vector<std::pair<float, glm::vec4>>() }
+                });
 
-            size_t keyframe = 0;
+                size_t keyframe = 0;
 
-            // Apply animation data to nodes
-            for (size_t i = 0; i < inputAccessor.count; ++i) {
-                float time = inputData[i];
+                // Apply animation data to nodes
+                for (size_t i = 0; i < inputAccessor.count; ++i) {
+                    float time = inputData[i];
 
-                // Apply transformation based on the target path (translation, rotation, scale)
-                if (target_path == "translation") {
-                    glm::vec4 translation(outputData[i * 3], outputData[i * 3 + 1], outputData[i * 3 + 2], 1.0f);
-                    auto x = std::pair<float, glm::vec4> { time, translation };
-                    keyframes[target_node].push_back(x);
-                } else if (target_path == "rotation") {
-                    glm::vec4 rotation(outputData[i * 4], outputData[i * 4 + 1], outputData[i * 4 + 2], outputData[i * 4 + 3]);
-                    auto x = std::pair<float, glm::vec4>  { time, rotation };
-                    keyframes[target_node].push_back(x);
-                } else if (target_path == "scale") {
-                    glm::vec4 scale(outputData[i * 3], outputData[i * 3 + 1], outputData[i * 3 + 2], 1.0f);
-                    auto x = std::pair<float, glm::vec4> { time, scale };
-                    keyframes[target_node].push_back(x);
+                    // Apply transformation based on the target path (translation, rotation, scale)
+                    if (target_path == "translation") {
+                        glm::vec4 translation(outputData[i * 3], outputData[i * 3 + 1], outputData[i * 3 + 2], 1.0f);
+                        auto x = std::pair<float, glm::vec4> { time, translation };
+                        keyframes[target_node].push_back(x);
+                    } else if (target_path == "rotation") {
+                        glm::vec4 rotation(outputData[i * 4], outputData[i * 4 + 1], outputData[i * 4 + 2], outputData[i * 4 + 3]);
+                        auto x = std::pair<float, glm::vec4>  { time, rotation };
+                        keyframes[target_node].push_back(x);
+                    } else if (target_path == "scale") {
+                        glm::vec4 scale(outputData[i * 3], outputData[i * 3 + 1], outputData[i * 3 + 2], 1.0f);
+                        auto x = std::pair<float, glm::vec4> { time, scale };
+                        keyframes[target_node].push_back(x);
+                    }
+
+                    keyframe++;
                 }
 
-                keyframe++;
+                if (channels.find(target_path) == channels.end()) {
+                    channels[target_path] = keyframes;
+                } else {
+                    channels[target_path].merge(keyframes);
+                }
             }
-
-            if (channels.find(target_path) == channels.end()) {
-                channels[target_path] = keyframes;
-            } else {
-                channels[target_path].merge(keyframes);
-            }
+            // printf("ANIM: %s", name.c_str());
+            anims[name] = channels;
+            anim++;
         }
-        // printf("ANIM: %s", name.c_str());
-        anims[name] = channels;
-        anim++;
-    }
 
-    cm->animations = anims;
+        cm->animations = anims;
+    } else {
+        cm->animations = readyData->anims;;
+    }
 
     if (type == "triangles" && i >= 0) {
         auto usage = gfx::BufferDataUsage::BUFFERDATAUSAGE_DYNAMIC;
-        auto m = instance->newMesh(vf, prepD.data(), prepD.size() * sizeof(float), gfx::PrimitiveType::PRIMITIVE_TRIANGLES, usage);
-        m->setTexture(tex);
-        return m;
+        if (readyData != nullptr) {
+            auto m = instance->newMesh(vf, readyData->prepD.data(), readyData->prepD.size() * sizeof(float), gfx::PrimitiveType::PRIMITIVE_TRIANGLES, usage);
+            m->setTexture(tex);
+            std::pair<gfx::Mesh*, chai_meshData*> p = std::pair<gfx::Mesh*, chai_meshData*>(m, readyData);
+            return p;
+        } else {
+            auto m = instance->newMesh(vf, prepD.data(), prepD.size() * sizeof(float), gfx::PrimitiveType::PRIMITIVE_TRIANGLES, usage);
+            m->setTexture(tex);
+            auto d = new chai_meshData(prepD, anims);
+            std::pair<gfx::Mesh*, chai_meshData*> p = std::pair<gfx::Mesh*, chai_meshData*>(m, d);
+            return p;
+        }
     }
 
-    return nullptr;
+    return std::pair<gfx::Mesh*, chai_meshData*>(nullptr, nullptr);
 }
 
 void chai_mesh::reloadMesh() {
@@ -876,7 +907,7 @@ void chai_mesh::setLightParams(const std::map<std::string, std::vector<float>> &
     this->lightParams[index] = params;
 }
 
-bool chai_mesh::loadMeshFromFile(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type) {
+std::vector<chai_meshData*> chai_mesh::loadMeshFromFile(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type) {
     instance = Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS);
 
     auto cl = ChaiLove::getInstance();
@@ -899,15 +930,27 @@ bool chai_mesh::loadMeshFromFile(const std::vector<chaiscript::Boxed_Value> &ver
 
     vf = vertexFormatLoader(vertexFormat);
 
+    std::vector<chai_meshData*> meshData;
+
     for (size_t i = 0; i < model.meshes.size(); i++) {
-        meshes.emplace_back(loadMesh(i, model, instance, type, vf, this));
+        if (this->data.size() > i) {
+            auto d = loadMesh(i, model, instance, type, vf, this, this->data[i]);
+            meshes.emplace_back(d.first);
+            meshData.emplace_back(d.second);
+        } else {
+            auto d = loadMesh(i, model, instance, type, vf, this);
+            meshes.emplace_back(d.first);
+            meshData.emplace_back(d.second);
+        }        
     }
 
     if (meshes.empty()) {
-        meshes.emplace_back(loadMesh(-1, model, instance, type, vf, this));
+        auto d = loadMesh(-1, model, instance, type, vf, this);
+        meshes.emplace_back(d.first);
+        meshData.emplace_back(d.second);
     }
 
-    return true;
+    return meshData;
 }
 
 bool chai_mesh::wrap_setTexture(const std::string &texture) {
@@ -1262,6 +1305,10 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
     }
 }
 
+void chai_mesh::setVisible(bool visible) {
+    this->visible = visible;
+}
+
 chai_mesh::~chai_mesh() {
     // delete mesh;
     // delete instance;
@@ -1277,6 +1324,27 @@ chai_mesh::~chai_mesh() {
 }
 
 chai_mesh::chai_mesh(const chai_mesh &c) {
+    meshes = c.meshes;
+    nodeMatrix = c.nodeMatrix;
+    nodeParent = c.nodeParent;
+    nodeChildren = c.nodeChildren;
+    jointOrder = c.jointOrder;
+    skins = c.skins;
+    meshToNode = c.meshToNode;
+    jointList = c.jointList;
+    jointMatrix = c.jointMatrix;
+    activeAnimations = c.activeAnimations;
+    animations = c.animations;
+
+    matrices = c.matrices;
+
+    cameraParams = c.cameraParams;
+    lightParams = c.lightParams;
+    textures = c.textures;
+    vf = c.vf;
+    visible = c.visible;
+    currentTime = c.currentTime;
+    
     mesh = c.mesh;
     instance = c.instance;
 
@@ -1286,6 +1354,7 @@ chai_mesh::chai_mesh(const chai_mesh &c) {
 
     slices = c.slices;
     buf = c.buf;
+    cloned = true;
 }
 
 chai_mesh *chai_mesh::clone() const
