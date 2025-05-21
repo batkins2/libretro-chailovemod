@@ -3,8 +3,13 @@
 #include "../../vendor/bullet3/src/BulletCollision/CollisionDispatch/btGhostObject.h"
 #include "../../vendor/bullet3/src/BulletDynamics/Character/btKinematicCharacterController.h"
 #include <vector>
+#ifndef __HAVE_CHAI_MESH__
+#include "chai_mesh.h"
+#endif
 
- #include <LinearMath/btIDebugDraw.h>
+#include <LinearMath/btIDebugDraw.h>
+
+#include "glm/glm.hpp"
 
 namespace love
 {
@@ -18,16 +23,17 @@ class chai_collisions
     void init(int group);
     void destroy();
     void process();
-    std::vector<int> addRigidMesh(std::string meshPath);
+    std::vector<int> addRigidMesh(std::string meshPath, int mesh);
     void setCharacterControllerPosition(int characterIndex, float x, float y, float z, std::vector<int> group);
     void setRigidMeshPosition(std::vector<int> rigidMeshIndex, float x, float y, float z, std::vector<int> group);
-    int addCharacterController(int index);
+    int addCharacterController(int index, int meshRef, std::string charId);
     void applyForceToCharacter(int characterIndex, float x, float y, float z);
     void applyForceToRigidMesh(int rigidMeshIndex, float x, float y, float z);
     std::vector<float> getCharacterController(int ref);
     std::vector<float> getRigidMesh(int ref);
     int addBox(float x, float y, float z, float width, float height, float depth, std::vector<int> group, int index);
-    
+    std::vector<std::pair<glm::vec3, glm::vec3>> getBoundingBox(int mesh);
+
     void clearWorlds()
     {
         worlds = nullptr;
@@ -37,10 +43,12 @@ class chai_collisions
     class CharacterController
     {
         public:
-        CharacterController(btPairCachingGhostObject *ghostObject = nullptr, btKinematicCharacterController *character = nullptr)
+        CharacterController(btPairCachingGhostObject *ghostObject = nullptr, btKinematicCharacterController *character = nullptr, int meshRef = 0, std::string charId = "")
         {
             this->ghostObject = ghostObject;
             this->character = character;
+            this->meshRef.push_back(meshRef);
+            this->charId = charId;
             this->group = {};
         }
         ~CharacterController()
@@ -55,18 +63,25 @@ class chai_collisions
             }
             group.clear();
         }
+        void addMesh(int meshRef)
+        {
+            this->meshRef.push_back(meshRef);
+        }
         btPairCachingGhostObject *ghostObject;
         btKinematicCharacterController *character;
         std::vector<int> group;
+        std::vector<int> meshRef;
+        std::string charId;
     };
     class RigidMesh
     {
         public:
-        RigidMesh(btTriangleMesh *mesh = nullptr, btRigidBody *rigidBody = nullptr)
+        RigidMesh(btTriangleMesh *mesh = nullptr, btRigidBody *rigidBody = nullptr, int meshRef = 0)
         {
             this->mesh = mesh;
             this->rigidBody = rigidBody;
             this->group = {};
+            this->meshRef = meshRef;
         }
         RigidMesh(btBoxShape *box = nullptr, btRigidBody *rigidBody = nullptr)
         {
@@ -105,6 +120,7 @@ class chai_collisions
         btCompoundShape *compoundMesh = nullptr;
         btRigidBody *rigidBody = nullptr;
         std::vector<int> group;
+        int meshRef;
     };
     class World
     {

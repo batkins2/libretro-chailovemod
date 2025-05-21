@@ -70,6 +70,65 @@ void chai_scene::finalize() {
     // Perform any finalization steps if needed
 }
 
+bool isMeshInFrustum(chai_mesh *mesh, const glm::mat4 &viewProjectionMatrix) {
+    // Get the mesh's bounding box
+    auto bounds = mesh->getBoundingBox(viewProjectionMatrix);
+    auto minBounds = bounds.first;
+    auto maxBounds = bounds.second;
+
+    // Extract frustum planes from the view-projection matrix
+    glm::vec4 planes[6];
+    planes[0] = glm::vec4(viewProjectionMatrix[0][3] + viewProjectionMatrix[0][0], // Left
+                          viewProjectionMatrix[1][3] + viewProjectionMatrix[1][0],
+                          viewProjectionMatrix[2][3] + viewProjectionMatrix[2][0],
+                          viewProjectionMatrix[3][3] + viewProjectionMatrix[3][0]);
+    planes[1] = glm::vec4(viewProjectionMatrix[0][3] - viewProjectionMatrix[0][0], // Right
+                          viewProjectionMatrix[1][3] - viewProjectionMatrix[1][0],
+                          viewProjectionMatrix[2][3] - viewProjectionMatrix[2][0],
+                          viewProjectionMatrix[3][3] - viewProjectionMatrix[3][0]);
+    planes[2] = glm::vec4(viewProjectionMatrix[0][3] - viewProjectionMatrix[0][1], // Top
+                          viewProjectionMatrix[1][3] - viewProjectionMatrix[1][1],
+                          viewProjectionMatrix[2][3] - viewProjectionMatrix[2][1],
+                          viewProjectionMatrix[3][3] - viewProjectionMatrix[3][1]);
+    planes[3] = glm::vec4(viewProjectionMatrix[0][3] + viewProjectionMatrix[0][1], // Bottom
+                          viewProjectionMatrix[1][3] + viewProjectionMatrix[1][1],
+                          viewProjectionMatrix[2][3] + viewProjectionMatrix[2][1],
+                          viewProjectionMatrix[3][3] + viewProjectionMatrix[3][1]);
+    planes[4] = glm::vec4(viewProjectionMatrix[0][3] + viewProjectionMatrix[0][2], // Near
+                          viewProjectionMatrix[1][3] + viewProjectionMatrix[1][2],
+                          viewProjectionMatrix[2][3] + viewProjectionMatrix[2][2],
+                          viewProjectionMatrix[3][3] + viewProjectionMatrix[3][2]);
+    planes[5] = glm::vec4(viewProjectionMatrix[0][3] - viewProjectionMatrix[0][2], // Far
+                          viewProjectionMatrix[1][3] - viewProjectionMatrix[1][2],
+                          viewProjectionMatrix[2][3] - viewProjectionMatrix[2][2],
+                          viewProjectionMatrix[3][3] - viewProjectionMatrix[3][2]);
+
+    // Normalize the planes
+    for (int i = 0; i < 6; i++) {
+        float length = glm::length(glm::vec3(planes[i]));
+        planes[i] /= length;
+    }
+
+    // Check if the bounding box is outside any plane
+    for (int i = 0; i < 6; i++) {
+        glm::vec3 normal = glm::vec3(planes[i]);
+        float distance = planes[i].w;
+
+        // Find the farthest point in the direction of the plane normal
+        glm::vec3 farPoint = glm::vec3(
+            (normal.x > 0) ? maxBounds.x : minBounds.x,
+            (normal.y > 0) ? maxBounds.y : minBounds.y,
+            (normal.z > 0) ? maxBounds.z : minBounds.z);
+
+        // If the farthest point is outside the plane, the box is outside the frustum
+        if (glm::dot(normal, farPoint) + distance < 0) {
+            return false; // Completely outside
+        }
+    }
+
+    return true; // Inside or intersecting
+}
+
 void chai_scene::drawMeshes(bool shadows, int view) {
     int i = 0;
     gfx::OptionalColorD clearcolor;
@@ -77,6 +136,8 @@ void chai_scene::drawMeshes(bool shadows, int view) {
     OptionalDouble cleardepth(1.0);
     auto cg = ChaiLove::getInstance()->chai_gfx;
     cg.instance->clear(clearcolor, clearstencil, cleardepth);
+    glm::mat4 vMatrix = glm::mat4(1.0f);
+    glm::mat4 t2 = glm::mat4(1.0f);
     for (auto mesh : meshes) {
         if (mesh->visible == false) {
             i++;
@@ -90,7 +151,7 @@ void chai_scene::drawMeshes(bool shadows, int view) {
             float aspectRatio = cameraParams.at("aspectRatio")[0];
             float nearClip = cameraParams.at("near")[0];
             float farClip = cameraParams.at("far")[0];
-            auto t2 = glm::perspective(fov, aspectRatio, nearClip, farClip);
+            t2 = glm::perspective(fov, aspectRatio, nearClip, farClip);
             auto pm = glm::value_ptr(t2);
 
             auto lightParams = mesh->lightParams[view];
@@ -150,8 +211,14 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                 sceneShader->send("shadow", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1) }));
                 auto mat = sceneShader->shader->getUniformInfo("viewMatrix");
                 auto data = mat->floats;
+                vMatrix = glm::mat4(
+                    data[0], data[1], data[2], data[3],
+                    data[4], data[5], data[6], data[7],
+                    data[8], data[9], data[10], data[11],
+                    data[12], data[13], data[14], data[15]
+                );
                 for (int i = 0; i < 16; ++i) {
-                    viewMatrix.push_back(chaiscript::Boxed_Value(data[i]));
+                    viewMatrix.push_back(chaiscript::Boxed_Value(data[i]));                    
                 }
                 std::vector<chaiscript::Boxed_Value> vm;
                 for (int i = 0; i < 16; ++i) {
@@ -161,9 +228,16 @@ void chai_scene::drawMeshes(bool shadows, int view) {
             } else {
                 sceneShader->send("viewMatrix", viewMatrix);
                 viewMatrix.clear();
-            }            
+            }
         }
                 
+        // Perform frustum culling
+        glm::mat4 viewProjectionMatrix = t2;
+        if (!isMeshInFrustum(mesh, viewProjectionMatrix)) {
+            // printf("Mesh %d is outside the frustum\n", i);
+            i++;
+            continue; // Skip meshes outside the frustum
+        }
         auto matrix = matrices[i];
         mesh->draw(cg.instance, matrix, sceneShader, currentTime);
         i++;

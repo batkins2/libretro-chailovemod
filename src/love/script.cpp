@@ -342,8 +342,13 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_mesh::setLightParams), "setLightParams");
 	chai.add(fun(&chai_mesh::playAnimation), "playAnimation");
 	chai.add(fun(&chai_mesh::endAnimation), "endAnimation");
+	chai.add(fun(&chai_mesh::isAnimationPlaying), "isAnimationPlaying");
+	chai.add(fun(&chai_mesh::getAnimationPercent), "getAnimationPercent");
 	chai.add(fun(&chai_mesh::reloadMesh), "reloadMesh");
-	chai.add(fun(&chai_mesh::destroy), "destroy");	
+	chai.add(fun(&chai_mesh::destroy), "destroy");
+	chai.add(fun(&chai_mesh::getId), "getId");
+	chai.add(fun(&chai_mesh::getMeshBoundingBox), "getMeshBoundingBox");
+	chai.add(fun(&chai_mesh::isVisible), "isVisible");
 	chai.add(user_type<chai_meshData>(), "chai_meshData");
 	chai.add(fun(&chai_meshData::clone), "clone");
 	chai.add(user_type<chai_scene>(), "chai_scene");

@@ -1,4 +1,11 @@
+#define __HAVE_CHAI_MESH_DATA__
 #include <vector>
+
+#include <map>
+
+#include <string>
+
+#include "glm/glm.hpp"
 
 namespace love 
 {

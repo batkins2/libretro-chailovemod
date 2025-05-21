@@ -941,13 +941,15 @@ std::vector<chai_meshData*> chai_mesh::loadMeshFromFile(const std::vector<chaisc
             auto d = loadMesh(i, model, instance, type, vf, this);
             meshes.emplace_back(d.first);
             meshData.emplace_back(d.second);
-        }        
+        } 
+        subVisible.push_back(true);       
     }
 
     if (meshes.empty()) {
         auto d = loadMesh(-1, model, instance, type, vf, this);
         meshes.emplace_back(d.first);
         meshData.emplace_back(d.second);
+        subVisible.push_back(true);
     }
 
     return meshData;
@@ -1057,6 +1059,37 @@ void chai_mesh::endAnimation(const std::string &name) {
     }
 }
 
+bool chai_mesh::isAnimationPlaying(const std::string &name) {
+    auto animation = activeAnimations.find(name);
+    if (animation != activeAnimations.end()) {
+        return true;
+    }
+    return false;
+}
+
+float chai_mesh::getAnimationPercent(const std::string &name) {
+    auto animation = activeAnimations.find(name);
+    if (animation != activeAnimations.end()) {
+        auto totalTime = 0.0f;
+        auto channel = animations[name].find("translation");
+        if (channel == animations[name].end()) {
+            channel = animations[name].find("rotation");
+        }
+        for (auto nodes : channel->second) {
+            auto keyframes = nodes.second;
+            for (auto keyframe : keyframes) {
+                auto time = keyframe.first;
+                if (time > totalTime) {
+                    totalTime = time;
+                }
+            }
+        }
+                
+        return animation->second.first / totalTime;
+    }
+    return 0.0f;
+}
+
 std::vector<int> getChildNodes(std::map<int, std::vector<int>> nodeChildren, int nodeChild, std::vector<int> nodes) {
     nodes.push_back(nodeChild);
     for (auto nc: nodeChildren[nodeChild]) {
@@ -1073,7 +1106,11 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             
         int i = 0;
-        for (auto msh : meshes) {
+        for (int j = 0; j < meshes.size(); j++) {
+            if (subVisible[j] == false) {
+                continue;
+            }
+            auto msh = meshes[j];
             
             auto node = meshToNode[i];
             
@@ -1309,6 +1346,108 @@ void chai_mesh::setVisible(bool visible) {
     this->visible = visible;
 }
 
+std::pair<glm::vec3, glm::vec3> chai_mesh::getBoundingBox(const glm::mat4 &viewProjectionMatrix) {
+    glm::vec3 boundingBoxMin(0.0f);
+    glm::vec3 boundingBoxMax(0.0f);
+
+    auto cc = ChaiLove::getInstance()->chai_collisions;
+
+    auto bb = cc.getBoundingBox(id);
+    // printf("BB: %d\n", bb.size());
+    // printf("Mesh: %d\n", meshes.size());    
+    if (bb.size() == meshes.size()) {       
+        for (int x = 0; x < meshes.size(); x++) {
+            auto min = bb[x].first;
+            auto max = bb[x].second;
+            if (min.x < boundingBoxMin.x) {
+                boundingBoxMin.x = min.x;
+            }
+            if (min.y < boundingBoxMin.y) {
+                boundingBoxMin.y = min.y;
+            }
+            if (min.z < boundingBoxMin.z) {
+                boundingBoxMin.z = min.z;
+            }
+
+            if (max.x > boundingBoxMax.x) {
+                boundingBoxMax.x = max.x;
+            }
+            if (max.y > boundingBoxMax.y) {
+                boundingBoxMax.y = max.y;
+            }
+            if (max.z > boundingBoxMax.z) {
+                boundingBoxMax.z = max.z;
+            }
+
+            auto minBounds = glm::vec3(min.x, min.y, min.z);
+            auto maxBounds = glm::vec3(max.x, max.y, max.z);
+
+            // Extract frustum planes from the view-projection matrix
+            glm::vec4 planes[6];
+            planes[0] = glm::vec4(viewProjectionMatrix[0][3] + viewProjectionMatrix[0][0], // Left
+                                viewProjectionMatrix[1][3] + viewProjectionMatrix[1][0],
+                                viewProjectionMatrix[2][3] + viewProjectionMatrix[2][0],
+                                viewProjectionMatrix[3][3] + viewProjectionMatrix[3][0]);
+            planes[1] = glm::vec4(viewProjectionMatrix[0][3] - viewProjectionMatrix[0][0], // Right
+                                viewProjectionMatrix[1][3] - viewProjectionMatrix[1][0],
+                                viewProjectionMatrix[2][3] - viewProjectionMatrix[2][0],
+                                viewProjectionMatrix[3][3] - viewProjectionMatrix[3][0]);
+            planes[2] = glm::vec4(viewProjectionMatrix[0][3] - viewProjectionMatrix[0][1], // Top
+                                viewProjectionMatrix[1][3] - viewProjectionMatrix[1][1],
+                                viewProjectionMatrix[2][3] - viewProjectionMatrix[2][1],
+                                viewProjectionMatrix[3][3] - viewProjectionMatrix[3][1]);
+            planes[3] = glm::vec4(viewProjectionMatrix[0][3] + viewProjectionMatrix[0][1], // Bottom
+                                viewProjectionMatrix[1][3] + viewProjectionMatrix[1][1],
+                                viewProjectionMatrix[2][3] + viewProjectionMatrix[2][1],
+                                viewProjectionMatrix[3][3] + viewProjectionMatrix[3][1]);
+            planes[4] = glm::vec4(viewProjectionMatrix[0][3] + viewProjectionMatrix[0][2], // Near
+                                viewProjectionMatrix[1][3] + viewProjectionMatrix[1][2],
+                                viewProjectionMatrix[2][3] + viewProjectionMatrix[2][2],
+                                viewProjectionMatrix[3][3] + viewProjectionMatrix[3][2]);
+            planes[5] = glm::vec4(viewProjectionMatrix[0][3] - viewProjectionMatrix[0][2], // Far
+                                viewProjectionMatrix[1][3] - viewProjectionMatrix[1][2],
+                                viewProjectionMatrix[2][3] - viewProjectionMatrix[2][2],
+                                viewProjectionMatrix[3][3] - viewProjectionMatrix[3][2]);
+
+            // Normalize the planes
+            for (int i = 0; i < 6; i++) {
+                float length = glm::length(glm::vec3(planes[i]));
+                planes[i] /= length;
+            }
+
+            // Check if the bounding box is outside any plane
+            for (int i = 0; i < 6; i++) {
+                glm::vec3 normal = glm::vec3(planes[i]);
+                float distance = planes[i].w;
+
+                // Find the farthest point in the direction of the plane normal
+                glm::vec3 farPoint = glm::vec3(
+                    (normal.x > 0) ? maxBounds.x : minBounds.x,
+                    (normal.y > 0) ? maxBounds.y : minBounds.y,
+                    (normal.z > 0) ? maxBounds.z : minBounds.z);
+
+                // If the farthest point is outside the plane, the box is outside the frustum
+                if (glm::dot(normal, farPoint) + distance < 0) {
+                    subVisible[x] = false; // Completely outside
+                }
+            }
+
+            subVisible[x] = true; // Inside or intersecting
+        }
+    }
+    
+    // printf("Bounding Box: %f %f %f %f %f %f\n", boundingBoxMin.x, boundingBoxMin.y, boundingBoxMin.z, boundingBoxMax.x, boundingBoxMax.y, boundingBoxMax.z);
+    return std::pair<glm::vec3, glm::vec3>(boundingBoxMin, boundingBoxMax);
+}
+
+std::vector<float> chai_mesh::getMeshBoundingBox() {
+    auto cc = ChaiLove::getInstance()->chai_collisions;
+
+    auto bb = cc.getBoundingBox(id);
+    
+    return std::vector<float>({bb[0].first.x, bb[0].first.y, bb[0].first.z, bb[0].second.x, bb[0].second.y, bb[0].second.z});
+}
+
 chai_mesh::~chai_mesh() {
     // delete mesh;
     // delete instance;
@@ -1324,6 +1463,8 @@ chai_mesh::~chai_mesh() {
 }
 
 chai_mesh::chai_mesh(const chai_mesh &c) {
+    std::random_device rd;
+    id = rd();
     meshes = c.meshes;
     nodeMatrix = c.nodeMatrix;
     nodeParent = c.nodeParent;
@@ -1342,7 +1483,10 @@ chai_mesh::chai_mesh(const chai_mesh &c) {
     lightParams = c.lightParams;
     textures = c.textures;
     vf = c.vf;
+
     visible = c.visible;
+    subVisible = c.subVisible;
+
     currentTime = c.currentTime;
     
     mesh = c.mesh;

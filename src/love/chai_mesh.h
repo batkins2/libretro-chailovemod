@@ -1,6 +1,8 @@
 #define __HAVE_CHAI_MESH__
 
+#ifndef __HAVE_CHAI_MESH_DATA__
 #include "chai_meshData.h"
+#endif
 #include "Image.h"
 #include "filesystem/FileData.h"
 #include "filesystem.h"
@@ -15,12 +17,17 @@
 
 #include <glm/glm.hpp>
 
+#include <random>
+
 namespace love {
 class chai_gfx;
 class chai_mesh {
     public:
     std::vector<chai_meshData*> data = std::vector<chai_meshData*>();
-    chai_mesh() {};
+    chai_mesh() { 
+        std::random_device rd;
+        id = rd();
+    };
     chai_mesh(std::vector<chai_meshData*> &data);
     chai_mesh(const chai_mesh &c);
     ~chai_mesh();
@@ -67,6 +74,9 @@ class chai_mesh {
     chai_mesh& operator=(const chai_mesh& m) {
 		return *this;
 	};
+    int getId() {
+        return id;
+    };
     std::map<std::string, std::vector<float>> getCameraParams(int index);
     std::map<std::string, std::vector<float>> getLightParams(int index);
     void setLightParams(const std::map<std::string, std::vector<float>> &params, int index);
@@ -77,9 +87,16 @@ class chai_mesh {
     bool wrap_setTexture(const std::string &texture);
     void playAnimation(const std::string &name, const bool loop);
     void endAnimation(const std::string &name);
+    bool isAnimationPlaying(const std::string &name);
+    float getAnimationPercent(const std::string &name);
     void draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt);
     void setVisible(bool visible);
     void reloadMesh();
+    std::pair<glm::vec3, glm::vec3> getBoundingBox(const glm::mat4 &viewProjectionMatrix);
+    std::vector<float> getMeshBoundingBox();
+    bool isVisible() {
+        return visible;
+    };
     love::gfx::Graphics *instance;
     gfx::Mesh *mesh = nullptr;
     std::vector<gfx::Mesh *> meshes;
@@ -123,6 +140,9 @@ class chai_mesh {
     std::vector<std::vector<int>> jointList;
     std::vector<std::map<int, glm::mat4>> jointMatrix;
     bool visible = true;
+    std::vector<bool> subVisible;
+    protected:
+    int id;
     // float jointMinValue;
 };
 }

@@ -21,7 +21,7 @@ chai_collisions::chai_collisions()
 chai_collisions::~chai_collisions()
 {
 }
-std::vector<int> chai_collisions::addRigidMesh(std::string meshPath) 
+std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef) 
 {
     auto cl = ChaiLove::getInstance();
     auto f = cl->getFSModule();
@@ -254,7 +254,7 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath)
         btDefaultMotionState *motionState = new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, 0, 0)));
         btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(0, motionState, shape, btVector3(0, 0, 0));
         btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
-        rigidMeshes.emplace_back(new RigidMesh(mesh, rigidBody));     
+        rigidMeshes.emplace_back(new RigidMesh(mesh, rigidBody, meshRef));     
         refs.push_back(count);
         count++;
     }
@@ -277,8 +277,16 @@ void chai_collisions::setRigidMeshPosition(std::vector<int> rigidMeshIndex, floa
         rigidMeshes[i]->rigidBody->setWorldTransform(btTransform(btQuaternion(0, 0, 0, 1), btVector3(x, y, z)));
     }              
 }
-int chai_collisions::addCharacterController(int index)
+int chai_collisions::addCharacterController(int index, int meshRef, std::string charId)
 {
+    if (characterControllers.size() > 0) {
+        for (int i = 0; i < characterControllers.size(); i++) {
+            if (characterControllers[i]->charId == charId) {
+                characterControllers[i]->addMesh(meshRef);
+                return -1;
+            }
+        }
+    }
     btPairCachingGhostObject *ghostObject = new btPairCachingGhostObject();
     btConvexShape *capsule = new btCapsuleShape(1.2f, 2.0f);
     ghostObject->setCollisionShape(capsule);
@@ -298,7 +306,7 @@ int chai_collisions::addCharacterController(int index)
     ghostObject->setUserPointer(character); // Set the user pointer to the character controller
 
     ghostObject->setUserIndex(index); // Set the user pointer to the character controller
-    characterControllers.emplace_back(new CharacterController(ghostObject, character));
+    characterControllers.emplace_back(new CharacterController(ghostObject, character, meshRef, charId));
     return characterControllers.size() - 1;
 }
 void chai_collisions::setCharacterControllerPosition(int characterIndex, float x, float y, float z, std::vector<int> group = {0})
@@ -409,6 +417,40 @@ int chai_collisions::addBox(float x, float y, float z, float width, float height
     }
     return rigidMeshes.size() - 1;
 }
+
+std::vector<std::pair<glm::vec3, glm::vec3>> chai_collisions::getBoundingBox(int mesh)
+{
+    std::vector<std::pair<glm::vec3, glm::vec3>> bb;
+    for (auto &m : rigidMeshes) {
+        // printf("Mesh: %d, %d\n", m->meshRef, mesh);
+        if (m->meshRef == mesh) {
+            btVector3 minV, maxV;
+            
+            m->rigidBody->getAabb(minV, maxV);
+
+            // minV = m->rigidBody->getWorldTransform().inverse() * minV;
+            // maxV = m->rigidBody->getWorldTransform().inverse() * maxV;
+            
+            bb.push_back(std::make_pair(glm::vec3(minV.getX(), minV.getY(), minV.getZ()), glm::vec3(maxV.getX(), maxV.getY(), maxV.getZ())));
+        }
+    }
+    for (auto &c : characterControllers) {
+        for (auto &m : c->meshRef) {
+            // printf("Mesh: %d, %d\n", m, mesh);
+            if (m == mesh) {
+                btVector3 minV, maxV;
+                c->ghostObject->getCollisionShape()->getAabb(c->ghostObject->getWorldTransform(), minV, maxV);
+                bb.push_back(std::make_pair(glm::vec3(minV.getX(), minV.getY(), minV.getZ()), glm::vec3(maxV.getX(), maxV.getY(), maxV.getZ())));
+                break;
+            }
+            if (bb.size() > 0) {
+                break;
+            }
+        }
+    }
+    return bb;
+}
+
 void chai_collisions::init(int group = 0)
 {    
     btBroadphaseInterface *broadphase = new btDbvtBroadphase();
