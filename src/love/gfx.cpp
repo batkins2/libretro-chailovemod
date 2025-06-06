@@ -240,7 +240,8 @@ Graphics::~Graphics()
 
 	states.clear();
 
-	defaultFont.set(nullptr);
+	// defaultFont.set(nullptr);
+	delete defaultFont;
 
 	if (batchedDrawState.vb[0])
 		batchedDrawState.vb[0]->release();
@@ -304,11 +305,11 @@ FontMod *Graphics::newFont(love::fontmod::Rasterizer *data)
 
 FontMod *Graphics::newDefaultFont(int size, const fontmod::TrueTypeRasterizer::Settings &settings)
 {
-	auto fontmodule = Module::getInstance<fontmod::FontMod>(M_FONT);
+	auto fontmodule = Module::getInstance<love::fontmod::FontMod>(M_FONT);
 	if (!fontmodule)
 		throw love::Exception("Font module has not been loaded.");
 
-	StrongRef<fontmod::Rasterizer> r(fontmodule->newTrueTypeRasterizer(size, settings), Acquire::NORETAIN);
+	StrongRef<love::fontmod::Rasterizer> r(fontmodule->newTrueTypeRasterizer(size, settings), Acquire::NORETAIN);
 	return newFont(r.get());
 }
 

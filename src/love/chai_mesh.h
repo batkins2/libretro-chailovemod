@@ -87,6 +87,7 @@ class chai_mesh {
     bool wrap_setTexture(const std::string &texture);
     void playAnimation(const std::string &name, const bool loop);
     void endAnimation(const std::string &name);
+    void stopAnimations();
     bool isAnimationPlaying(const std::string &name);
     float getAnimationPercent(const std::string &name);
     void draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt);

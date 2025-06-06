@@ -36,7 +36,7 @@ class chai_gfx {
     bool init();
     bool destroy();
     bool hasReinit();
-    chai_shader *wrap_newShader(const std::string *FileName, chai_shader *cshader);
+    chai_shader *wrap_newShader(const std::string *FileName, const std::string *PixFileName, chai_shader *cshader);
     void wrap_setShader(chai_shader *s);
     chai_mesh *wrap_newMesh(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::vector<chaiscript::Boxed_Value> &data, const std::string &type);
     chai_mesh *wrap_newMeshFromFile(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type);
@@ -45,6 +45,7 @@ class chai_gfx {
     chai_scene *wrap_newScene();
     void createCanvas();
     void drawCanvas();
+    void print(const std::string &text, int x, int y, int r, int g, int b, int a);
     chai_shader getShader() { return *shader; }
     love::gfx::Graphics *instance = nullptr; // = gfx::Graphics::createInstance();
     love::windowmod::Window *win;

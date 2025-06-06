@@ -720,7 +720,7 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
             >
         >
     > anims;
-    if (readyData == nullptr) {
+    if (readyData == nullptr && cm->animations.empty()) {
         
         size_t anim = 0;
         for (auto animation : model.animations) {
@@ -796,8 +796,49 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
         }
 
         cm->animations = anims;
+        // Write the animations to json file using rapidjson
+        std::ofstream animFile("animations.json");
+        rapidjson::Document animDoc;
+        animDoc.SetObject();
+        rapidjson::Document::AllocatorType& allocator = animDoc.GetAllocator();
+        for (const auto& anim : anims) {
+            rapidjson::Value animName(rapidjson::kStringType);
+            animName.SetString(anim.first.c_str(), allocator);
+            rapidjson::Value channels(rapidjson::kObjectType);
+            for (const auto& channel : anim.second) {
+                rapidjson::Value channelName(rapidjson::kStringType);
+                channelName.SetString(channel.first.c_str(), allocator);
+                rapidjson::Value nodes(rapidjson::kObjectType);
+                for (const auto& node : channel.second) {
+                    std::string nodeIndexStr = std::to_string(node.first);
+                    rapidjson::Value nodeIndex(nodeIndexStr.c_str(), allocator);
+                    rapidjson::Value keyframes(rapidjson::kArrayType);
+                    for (const auto& keyframe : node.second) {
+                        rapidjson::Value keyframeData(rapidjson::kObjectType);
+                        keyframeData.AddMember("time", keyframe.first, allocator);
+                        rapidjson::Value dataArray(rapidjson::kArrayType);
+                        dataArray.PushBack(keyframe.second.x, allocator);
+                        dataArray.PushBack(keyframe.second.y, allocator);
+                        dataArray.PushBack(keyframe.second.z, allocator);
+                        dataArray.PushBack(keyframe.second.w, allocator);
+                        keyframeData.AddMember("data", dataArray, allocator); // Store full vec4
+                        keyframes.PushBack(keyframeData, allocator);
+                    }
+                    nodes.AddMember(nodeIndex, keyframes, allocator);
+                }
+                channels.AddMember(channelName, nodes, allocator);
+            }
+            animDoc.AddMember(animName, channels, allocator);
+        }
+        rapidjson::StringBuffer buffer;
+        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+        animDoc.Accept(writer);
+        animFile << buffer.GetString();
+        
     } else {
-        cm->animations = readyData->anims;;
+        if (readyData != nullptr) {
+            cm->animations = readyData->anims;
+        }        
     }
 
     if (type == "triangles" && i >= 0) {
@@ -810,7 +851,7 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
         } else {
             auto m = instance->newMesh(vf, prepD.data(), prepD.size() * sizeof(float), gfx::PrimitiveType::PRIMITIVE_TRIANGLES, usage);
             m->setTexture(tex);
-            auto d = new chai_meshData(prepD, anims);
+            auto d = new chai_meshData(prepD, cm->animations);
             std::pair<gfx::Mesh*, chai_meshData*> p = std::pair<gfx::Mesh*, chai_meshData*>(m, d);
             return p;
         }
@@ -918,6 +959,61 @@ std::vector<chai_meshData*> chai_mesh::loadMeshFromFile(const std::vector<chaisc
     // Allocate a character array and copy the file data into it
     unsigned char* data = new unsigned char[s];
     std::memcpy(data, file, s);
+
+    // Check for file with .anim extension
+    std::string animFileName = *FileName + ".anim";
+    if (f.exists(animFileName)) {
+        auto animFileSize = f.getSize(animFileName);
+        auto animFile = f.readBuffer(animFileName, animFileSize);
+        // Load the animation data from the json file using rapidjson
+        rapidjson::Document animDoc;
+        animDoc.Parse(reinterpret_cast<const char*>(animFile), animFileSize);
+        if (animDoc.HasParseError()) {
+            std::cerr << "Error parsing animation file: " << animDoc.GetParseError() << std::endl;
+        } else {
+            // Process the animation data
+            auto anims = std::map<std::string, std::map<std::string, std::map<int, std::vector<std::pair<float, glm::vec4>>>>>();
+            if (animDoc.IsObject()) {
+                for (auto animIt = animDoc.MemberBegin(); animIt != animDoc.MemberEnd(); ++animIt) {
+                    std::string animName = animIt->name.GetString();
+                    const rapidjson::Value& channelsObj = animIt->value;
+                    std::map<std::string, std::map<int, std::vector<std::pair<float, glm::vec4>>>> channels;
+
+                    for (auto chanIt = channelsObj.MemberBegin(); chanIt != channelsObj.MemberEnd(); ++chanIt) {
+                        std::string channelName = chanIt->name.GetString();
+                        const rapidjson::Value& nodesObj = chanIt->value;
+                        std::map<int, std::vector<std::pair<float, glm::vec4>>> nodes;
+
+                        for (auto nodeIt = nodesObj.MemberBegin(); nodeIt != nodesObj.MemberEnd(); ++nodeIt) {
+                            int nodeIndex = std::stoi(nodeIt->name.GetString());
+                            const rapidjson::Value& keyframesArr = nodeIt->value;
+                            std::vector<std::pair<float, glm::vec4>> keyframes;
+
+                            for (auto& keyframe : keyframesArr.GetArray()) {
+                                float time = keyframe["time"].GetFloat();
+                                glm::vec4 data(0.0f);
+                                if (keyframe.HasMember("data") && keyframe["data"].IsArray() && keyframe["data"].Size() == 4) {
+                                    data.x = keyframe["data"][0].GetFloat();
+                                    data.y = keyframe["data"][1].GetFloat();
+                                    data.z = keyframe["data"][2].GetFloat();
+                                    data.w = keyframe["data"][3].GetFloat();
+                                } else if (keyframe.HasMember("data") && keyframe["data"].IsNumber()) {
+                                    // fallback for single float data
+                                    data.x = keyframe["data"].GetFloat();
+                                }
+                                keyframes.emplace_back(time, data);
+                            }
+                            nodes[nodeIndex] = keyframes;
+                        }
+                        channels[channelName] = nodes;
+                    }
+                    anims[animName] = channels;
+                }
+            }
+            this->animations = anims;
+        }
+
+    }
 
     tinygltf::Model model;
     tinygltf::TinyGLTF loader;
@@ -1057,6 +1153,10 @@ void chai_mesh::endAnimation(const std::string &name) {
     if (animation != activeAnimations.end()) {
         activeAnimations.erase(animation);
     }
+}
+
+void chai_mesh::stopAnimations() {
+    activeAnimations.clear();
 }
 
 bool chai_mesh::isAnimationPlaying(const std::string &name) {
@@ -1444,6 +1544,10 @@ std::vector<float> chai_mesh::getMeshBoundingBox() {
     auto cc = ChaiLove::getInstance()->chai_collisions;
 
     auto bb = cc.getBoundingBox(id);
+
+    if (bb.size() == 0) {
+        return std::vector<float>({0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f});
+    }
     
     return std::vector<float>({bb[0].first.x, bb[0].first.y, bb[0].first.z, bb[0].second.x, bb[0].second.y, bb[0].second.z});
 }

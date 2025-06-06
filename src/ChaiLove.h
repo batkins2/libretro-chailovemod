@@ -73,13 +73,14 @@
 #include "love/data.h"
 #include "love/script.h"
 #include "love/filesystem.h"
+#include "love/filesystem/Filesystem.h"
 #include "love/graphics.h"
 #include "love/image.h"
 #include "love/system.h"
 #include "love/sound.h"
-#include "love/font.h"
+// #include "love/font.h"
 #include "love/fontmod.h"
-#include "love/font/BMFontRasterizer.h"
+#include "love/font/freetype/Font.h"
 #include "love/timer.h"
 #include "love/audio.h"
 #include "love/joystick.h"
@@ -110,7 +111,10 @@ class ChaiLove {
 	love::image image;
 	love::system system;
 	love::sound sound;
-	love::font font;
+	// love::font font;
+	love::gfx::FontMod *fm = nullptr;
+	// love::fontmod::Rasterizer rasterizer;
+	// love::fontmod::freetype::FontMod freetype_font;
 	love::timer timer;
 	love::audio audio;
 	love::joystick joystick;
@@ -159,29 +163,49 @@ class ChaiLove {
 		t.push_back(cs);
 		
 		 // Load the font definition and image list
-        love::filesystemmod::FileData* fontdef = new love::filesystemmod::FileData(8331, "./love/font/Unnamed.fnt");
-        std::vector<love::imagemod::ImageData*> imagelist;
+		// love::filesystemmod::Filesystem::Filesystem("love.filesystemmod.Filesystem");
+		// auto fsm = love::Module::getInstance<love::filesystemmod::Filesystem>(love::Module::M_FILESYSTEM);
+		// auto fs = fsm->openFile("/assets/font/Unnamed.fnt", love::filesystemmod::File::Mode::MODE_READ);
+		// auto fontdef = fs->read();
+        // love::filesystemmod::FileData* fontdef = new love::filesystemmod::FileData(s, "/assets/font/Unnamed.fnt");
+        // std::vector<love::imagemod::ImageData*> imagelist;
 		
-		auto imgFile = new love::filesystemmod::FileData(52762, "./love/font/Unnamed.png");
-		auto d = imgFile->getData();
+		// fs = fsm->openFile("/assets/font/Unnamed.png", love::filesystemmod::File::Mode::MODE_READ);
+		// auto d = fs->read();
 
-		auto img = love::imagemod::ImageData(426, 434, love::PIXELFORMAT_RGBA8_UNORM, d, false);
-        imagelist.push_back(&img);
+		// auto img = new love::imagemod::ImageData(426, 434, love::PIXELFORMAT_RGBA8_UNORM, d, false);
+		// imagelist.push_back(img);
 
-        // Instantiate the BMFontRasterizer
-        float dpiscale = 1.0f; // Adjust as needed
-        auto rasterizer = new love::fontmod::BMFontRasterizer(fontdef, imagelist, dpiscale);
-
-		auto sampler = love::gfx::SamplerState { love::gfx::SamplerState::FILTER_NEAREST, love::gfx::SamplerState::FILTER_NEAREST, love::gfx::SamplerState::MIPMAP_FILTER_NONE };
-		auto fontmod = love::gfx::FontMod(rasterizer, sampler);
+		// Instantiate the BMFontRasterizer
+		// float dpiscale = 1.0f; // Adjust as needed
+		// auto rasterizer = new love::fontmod::BMFontRasterizer(fontdef, imagelist, dpiscale);
+		// auto rasterizer = love::fontmod::TrueTypeRasterizer();
 		auto i = love::Module::getInstance<love::gfx::Graphics>(love::Module::M_GRAPHICS);
-		fontmod.print(i, t, love::Matrix4(), cs.color);
-
-		delete rasterizer; // Clean up the rasterizer
-        delete fontdef; // Clean up the font definition
-        for (auto img : imagelist) {
-            delete img; // Clean up the image data
-        }
+		if (fm == nullptr) {	
+			// fm = i->newFont(rasterizer);
+		// 	auto sampler = love::gfx::SamplerState { love::gfx::SamplerState::FILTER_NEAREST, love::gfx::SamplerState::FILTER_NEAREST, love::gfx::SamplerState::MIPMAP_FILTER_NONE };
+		// 	// auto rasterizer = love::fontmod::FontMod::newTrueTypeRasterizer(1, love::fontmod::TrueTypeRasterizer::Settings());
+		// 	// fm = new love::gfx::FontMod(rasterizer, sampler);
+		// 	love::gfx::FontMod::FontMod("love.gfx.fontmod"); // Create a FontMod with no rasterizer initially
+		
+			
+			love::fontmod::TrueTypeRasterizer::Settings settings;
+			settings.hinting = love::fontmod::TrueTypeRasterizer::HINTING_NONE; // Set hinting to normal
+		// 	fm = i->newDefaultFont(1, settings);
+			fm = i->newDefaultFont(18, settings);
+		}
+		
+		love::Matrix4 m;
+		m.setTranslation((float)x, (float)y);
+		auto vcs = std::vector<love::fontmod::ColoredString>({cs});
+		i->print(vcs, fm, m);
+		
+		// delete rasterizer; // Clean up the rasterizer
+		// delete fontdef; // Clean up the font definition
+		// for (auto img : imagelist) {
+		// 	delete img; // Clean up the image data
+		// }
+		// delete imgFile; // Clean up the file data
 	}
 };
 

@@ -12,7 +12,7 @@ using namespace chaiscript;
 using ::ChaiLove;
 using love::Types::Graphics::Point;
 using love::Types::Graphics::Image;
-using love::Types::Graphics::Font;
+// using love::Types::Graphics::Font;
 using love::Types::Graphics::Point;
 using love::Types::Graphics::Color;
 using love::Types::Input::Joystick;
@@ -142,7 +142,7 @@ script::script(const std::string& file) {
 		love["data"] = var(std::ref(app->data));
 		love["event"] = var(std::ref(app->event));
 		love["filesystem"] = var(std::ref(app->filesystem));
-		love["font"] = var(std::ref(app->font));
+		// love["font"] = var(std::ref(app->font));
 		love["graphics"] = var(std::ref(app->graphics));
 		love["chai_gfx"] = var(std::ref(app->chai_gfx));
 		love["chai_mesh"] = var(std::ref(app->chai_mesh));
@@ -226,11 +226,11 @@ script::script(const std::string& file) {
 	chai.add(fun(&SoundData::getVolume), "getVolume");
 
 	// Font.
-	chai.add(user_type<Font>(), "Font");
-	chai.add(fun(&Font::loaded), "loaded");
-	chai.add(fun<int, Font>(&Font::getHeight), "getHeight");
-	chai.add(fun<int, Font, const std::string&>(&Font::getHeight), "getHeight");
-	chai.add(fun<int, Font, const std::string&>(&Font::getWidth), "getWidth");
+	// chai.add(user_type<Font>(), "Font");
+	// chai.add(fun(&Font::loaded), "loaded");
+	// chai.add(fun<int, Font>(&Font::getHeight), "getHeight");
+	// chai.add(fun<int, Font, const std::string&>(&Font::getHeight), "getHeight");
+	// chai.add(fun<int, Font, const std::string&>(&Font::getWidth), "getWidth");
 
 	// Config
 	chai.add(user_type<WindowConfig>(), "WindowConfig");
@@ -285,13 +285,13 @@ script::script(const std::string& file) {
 	chai.add(fun(&graphics::newQuad), "newQuad");
 	chai.add(fun(&graphics::setDefaultFilter), "setDefaultFilter");
 	chai.add(fun(&graphics::getDefaultFilter), "getDefaultFilter");
-	chai.add(fun<Font*, graphics, const std::string&, int>(&graphics::newFont), "newFont");
-	chai.add(fun<Font*, graphics, const std::string&>(&graphics::newFont), "newFont");
-	chai.add(fun<Font*, graphics, const std::string&, int, int, const std::string&>(&graphics::newFont), "newFont");
-	chai.add(fun<Font*, graphics>(&graphics::newFont), "newFont");
-	chai.add(fun<love::graphics&, graphics, Font*>(&graphics::setFont), "setFont");
-	chai.add(fun<love::graphics&, graphics>(&graphics::setFont), "setFont");
-	chai.add(fun<Font*, graphics>(&graphics::getFont), "getFont");
+	// chai.add(fun<Font*, graphics, const std::string&, int>(&graphics::newFont), "newFont");
+	// chai.add(fun<Font*, graphics, const std::string&>(&graphics::newFont), "newFont");
+	// chai.add(fun<Font*, graphics, const std::string&, int, int, const std::string&>(&graphics::newFont), "newFont");
+	// chai.add(fun<Font*, graphics>(&graphics::newFont), "newFont");
+	// chai.add(fun<love::graphics&, graphics, Font*>(&graphics::setFont), "setFont");
+	// chai.add(fun<love::graphics&, graphics>(&graphics::setFont), "setFont");
+	// chai.add(fun<Font*, graphics>(&graphics::getFont), "getFont");
 	chai.add(fun<love::graphics&, graphics, int, int, int, int>(&graphics::setColor), "setColor");
 	chai.add(fun<love::graphics&, graphics, int, int, int>(&graphics::setColor), "setColor");
 	chai.add(fun<love::graphics&, graphics, int, int, int, int>(&graphics::setBackgroundColor), "setBackgroundColor");
@@ -323,6 +323,7 @@ script::script(const std::string& file) {
 	// chai.add(fun(&chai_gfx::createCanvas), "createCanvas");
 	// chai.add(fun(&chai_gfx::drawCanvas), "drawCanvas");
 	chai.add(fun(&chai_gfx::hasReinit), "hasReinit");
+	chai.add(fun(&chai_gfx::print), "print");
 	// chai.add(fun(&chai_gfx::getShader), "getShader");
 	chai.add(user_type<chai_shader>(), "chai_shader");
 	chai.add(constructor<chai_shader(const chai_shader &)>(), "chai_shader");
@@ -342,6 +343,7 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_mesh::setLightParams), "setLightParams");
 	chai.add(fun(&chai_mesh::playAnimation), "playAnimation");
 	chai.add(fun(&chai_mesh::endAnimation), "endAnimation");
+	chai.add(fun(&chai_mesh::stopAnimations), "stopAnimations");
 	chai.add(fun(&chai_mesh::isAnimationPlaying), "isAnimationPlaying");
 	chai.add(fun(&chai_mesh::getAnimationPercent), "getAnimationPercent");
 	chai.add(fun(&chai_mesh::reloadMesh), "reloadMesh");
@@ -353,7 +355,7 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_meshData::clone), "clone");
 	chai.add(user_type<chai_scene>(), "chai_scene");
 	chai.add(constructor<chai_scene(const chai_scene &)>(), "chai_scene");
-	chai.add(fun(&chai_scene::operator=), "=");
+	chai.add(fun(&chai_scene::operator=), "=");	
 	chai.add(fun(&chai_scene::addMesh), "addMesh");
 	chai.add(fun(&chai_scene::hideMesh), "hideMesh");
 	chai.add(fun(&chai_scene::showMesh), "showMesh");
@@ -362,6 +364,7 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_scene::draw), "draw");
 	chai.add(fun(&chai_scene::newScene), "newScene");
 	chai.add(fun(&chai_scene::destroy), "destroy");
+	chai.add(fun(&chai_scene::loadingScreen), "loadingScreen");
 	chai.add(user_type<chai_collisions>(), "chai_collisions");
 	chai.add(constructor<chai_collisions(const chai_collisions &)>(), "chai_collisions");
 	chai.add(fun(&chai_collisions::operator=), "=");
@@ -386,7 +389,7 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_matrices::setOrthographicMatrix), "setOrthographicMatrix");
 	
 	// Font
-	chai.add(fun(&font::isOpen), "isOpen");
+	// chai.add(fun(&font::isOpen), "isOpen");
 
 	// Keyboard
 	chai.add(fun<bool, keyboard, const std::string&>(&keyboard::isDown), "isDown");

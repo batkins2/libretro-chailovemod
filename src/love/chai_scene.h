@@ -28,6 +28,7 @@ public:
     void finalize();    
     void drawMeshes(bool shadows, int view);
     void draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vector<chaiscript::Boxed_Value> viewMatrix2, std::vector<chaiscript::Boxed_Value> viewMatrix3, std::vector<chaiscript::Boxed_Value> viewMatrix4, int viewCount);
+    void loadingScreen();
 
 private:
     std::vector<chai_mesh *> meshes;

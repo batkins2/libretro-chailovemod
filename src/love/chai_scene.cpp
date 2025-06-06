@@ -269,6 +269,8 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
         // glBindFramebuffer(cg.instance->FRAMEBUFFER, cg.instance->hw_render.get_current_framebuffer());
         cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
 
+        glEnable(GL_DEPTH_TEST);
+
         err = glGetError();
         if (err != GL_NO_ERROR) {
             printf("ERROR: 1\n");
@@ -625,6 +627,94 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
             cg.instance->setShader();
         }
     }
+}
+
+void chai_scene::loadingScreen() {
+    auto cg = ChaiLove::getInstance()->chai_gfx;
+    cg.instance->setActive(true);
+    cg.instance->setShader(sceneShader->shader);
+    cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+
+    // Create a framebuffer for the loading screen
+    auto fb = cg.instance->hw_render.get_current_framebuffer();
+    glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+    
+    // Bind the shadow map texture to texture unit 0
+    // glActiveTexture(GL_TEXTURE0);
+    // glBindTexture(GL_TEXTURE_2D, shadowMap);
+
+    // // Set the sampler uniform in your shader to use texture unit 0
+    // GLint shadowMapLoc = glGetUniformLocation(sceneShader->shader->getHandle(), "shadowMap");
+    // if (shadowMapLoc >= 0) {
+    //     glUniform1i(shadowMapLoc, 0); // 0 = GL_TEXTURE0
+    // }
+    
+    // gfx::OptionalColorD clearcolor;
+    // clearcolor = ColorD(1.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
+    // OptionalInt clearstencil(0);
+    // OptionalDouble cleardepth(1.0);
+    // cg.instance->clear(clearcolor, clearstencil, cleardepth);
+
+    glViewport(0, 0, cg.width, cg.height);
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    
+
+    // Set the projection matrix for the loading screen to an orthographic projection
+    glm::mat4 projectionMatrix = glm::ortho(0.0f, static_cast<float>(cg.width), static_cast<float>(cg.height), 0.0f, -1.0f, 1.0f);
+    
+    std::vector<chaiscript::Boxed_Value> projectionMatrixBoxed;
+    for (int i = 0; i < 16; ++i) {
+        projectionMatrixBoxed.push_back(chaiscript::Boxed_Value(glm::value_ptr(projectionMatrix)[i]));
+    }
+    sceneShader->send("projectionMatrix", projectionMatrixBoxed);
+    // Set the view matrix for the loading screen
+    glm::mat4 viewMatrix = glm::mat4(1.0f); // Identity matrix for the loading screen
+    
+    std::vector<chaiscript::Boxed_Value> viewMatrixBoxed;
+    for (int i = 0; i < 16; ++i) {
+        viewMatrixBoxed.push_back(chaiscript::Boxed_Value(glm::value_ptr(viewMatrix)[i]));
+    }
+    sceneShader->send("viewMatrix", viewMatrixBoxed);
+    // Set the light direction and color for the loading screen
+    // std::vector<chaiscript::Boxed_Value> lightDirection = { chaiscript::Boxed_Value(0.0f), chaiscript::Boxed_Value(-1.0f), chaiscript::Boxed_Value(0.0f) };
+    // sceneShader->send("lightDirection", lightDirection);
+    // std::vector<chaiscript::Boxed_Value> lightColor = { chaiscript::Boxed_Value(1.0f), chaiscript::Boxed_Value(1.0f), chaiscript::Boxed_Value(1.0f) };
+    // sceneShader->send("lightColor", lightColor);
+    // std::vector<chaiscript::Boxed_Value> ambientColor = { chaiscript::Boxed_Value(1.0f), chaiscript::Boxed_Value(1.0f), chaiscript::Boxed_Value(1.0f) };
+    // sceneShader->send("ambientColor", ambientColor);
+    // std::vector<chaiscript::Boxed_Value> lightIntensity = { chaiscript::Boxed_Value(1.0f) };
+    // sceneShader->send("lightIntensity", lightIntensity);
+    // std::vector<chaiscript::Boxed_Value> lightSpaceMatrixBoxed;
+    // glm::mat4 lightSpaceMatrix = glm::mat4(1.0f); // Identity matrix for the loading screen
+    // for (int i = 0; i < 16; ++i) {
+    //     lightSpaceMatrixBoxed.push_back(chaiscript::Boxed_Value(glm::value_ptr(lightSpaceMatrix)[i]));
+    // }
+    // sceneShader->send("lightSpaceMatrix", lightSpaceMatrixBoxed);
+    // sceneShader->send("shadow", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+    // // Set the model matrix for the loading screen
+    // Matrix4 modelMatrix(new float[16] {
+    //     1.0f, 0.0f, 0.0f, 0.0f,
+    //     0.0f, 1.0f, 0.0f, 0.0f,
+    //     0.0f, 0.0f, 1.0f, 0.0f,
+    //     0.0f, 0.0f, 0.0f, 1.0f});
+    // std::vector<chaiscript::Boxed_Value> modelMatrixBoxed;
+    // // Assuming Matrix4 has a public 'data' member or similar
+  
+    // for (int i = 0; i < 4; ++i) {        
+    //     modelMatrixBoxed.push_back(chaiscript::Boxed_Value(modelMatrix.getColumn(i).x));
+    //     modelMatrixBoxed.push_back(chaiscript::Boxed_Value(modelMatrix.getColumn(i).y));
+    //     modelMatrixBoxed.push_back(chaiscript::Boxed_Value(modelMatrix.getColumn(i).z));
+    //     modelMatrixBoxed.push_back(chaiscript::Boxed_Value(modelMatrix.getColumn(i).w));
+    // }
+    // sceneShader->send("modelMatrix", modelMatrixBoxed);
+
+    // Draw LOADING 3D text model at the center of the screen
+   
+    // ChaiLove::getInstance()->printNew("LOADING", 0.0f, 0.0f, 255.0f, 255.0f, 255.0f, 255.0f);
+    // cg.instance->setShader();
 }
 
 chai_scene *chai_scene::clone() const

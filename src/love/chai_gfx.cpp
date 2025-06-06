@@ -125,10 +125,21 @@ bool chai_gfx::init() {
     // cl->win = (SDL_Window *) win->getHandle();
     // cl->videoBuffer = (uint32_t *) cl->win;
     // reinit = false;
+
+    // auto shader = ChaiLove::getInstance()->chai_shader.newShader();
+    // auto scene = ChaiLove::getInstance()->chai_scene.newScene();
+    // std::string vertFile = "g3d/g3d/font.vert";
+    // std::string pixFile = "g3d/g3d/font.pix";
+    // wrap_newShader(&vertFile, &pixFile, shader);
+    // scene->setShader(shader);
+    // scene->loadingScreen();
+
+    // print("LOADING...", 0, 0, 255, 255, 255, 255);
     return true;
 }
 
 bool chai_gfx::destroy() {
+    // delete ChaiLove::getInstance()->fm;
     
     // shader->shader->~Shader();
     // delete win;
@@ -159,7 +170,7 @@ bool chai_gfx::hasReinit() {
     return reinit;
 }
 
-chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, chai_shader *cshader) {
+chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, const std::string *PixFileName, chai_shader *cshader) {
     // delete win;
     // delete instance;
     // init();
@@ -187,7 +198,7 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, chai_shader *
                 continue;
             }
 
-            if (shaderFound || strstr(line.c_str(), "vec4 position(") != NULL) {
+            if (shaderFound || strstr(line.c_str(), "vec4 position(") != NULL || strstr(line.c_str(), "void vertexmain(") != NULL) {
                 if (!shaderFound || 
                     strstr(line.c_str(), "for (") != NULL || 
                     strstr(line.c_str(), "if (") != NULL || 
@@ -230,7 +241,7 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, chai_shader *
 
         std::string a;
         for (const auto &piece : lines) a += piece+'\n';
-
+       
         std::vector<std::string> code;
         std::string c = "uniform sampler2D shadowMap;";
             c += "uniform int shadow;";
@@ -264,6 +275,64 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, chai_shader *
             // c += "return vec4(vec3(grid(vec2(finalColor.x, finalColor.y), 1.0)), 1);";
             c += "}";
 
+        if (PixFileName && PixFileName->length() > 0) {
+            file = new filesystem();
+            data = file->read(PixFileName->c_str());
+            std::stringstream s(data);
+            lines = std::vector<std::string>();
+            shaderFunc = "";
+            line = "";
+            shaderFound = false;
+            while (std::getline(s, line)) {
+                if (!line.length() || (line[0] == '/' && line[1] == '/')) {
+                    continue;
+                }
+
+                if (shaderFound || strstr(line.c_str(), "void pixelmain(") != NULL) {
+                    if (!shaderFound || 
+                        strstr(line.c_str(), "for (") != NULL || 
+                        strstr(line.c_str(), "if (") != NULL || 
+                        strstr(line.c_str(), "else {") != NULL || 
+                        strstr(line.c_str(), "else if (") != NULL) {
+
+                        lines.push_back(line);
+                        shaderFound = true;
+                    } else {
+                        int delim = line.find_last_of(";");
+                        if (delim > 0 && delim < line.length()) {
+                            std::string trimmed = line.substr(0, delim+1);
+                            shaderFunc.append(trimmed);
+                        }
+                        delim = line.find_last_of("{");
+                        if (delim > 0 && delim < line.length()) {
+                            std::string trimmed = line.substr(0, delim+1);
+                            shaderFunc.append(trimmed);
+                        }
+                        delim = line.find_last_of("}");
+                        if (delim >= 0 && delim < line.length()) {
+                            std::string trimmed = line.substr(0, delim+1);
+                            shaderFunc.append(trimmed);
+                        }
+                        lines.push_back(shaderFunc);
+                        shaderFunc = "";
+                    }
+                } else {
+                    int delim = line.find_last_of(";");
+                    if (delim > 0 && delim < line.length()) {
+                        std::string trimmed = line.substr(0, delim+1);
+                        lines.push_back(trimmed);
+                        // delim = trimmed.find_last_of(" ");
+                        // std::string last = trimmed.substr(0, delim);
+                        // std::string first = trimmed.substr(delim+1,trimmed.length()-1);
+                        // options.defines.emplace(first, last);
+                    }
+                }
+            }
+
+            c = "";
+            for (const auto &piece : lines) c += piece+'\n';
+        }
+        
         code.push_back(a);
         code.push_back(c);
 
@@ -430,6 +499,23 @@ void chai_gfx::drawCanvas() {
     // dstrect.y = 0;
     // SDL_BlitSurface(surf, NULL, cl->screen, &dstrect);
     memcpy(cl->videoBuffer, img->getData(), img->getSize());
+}
+
+void chai_gfx::print(const std::string &text, int x, int y, int r, int g, int b, int a) {
+    if (instance->isCreated()) {
+        auto t = std::vector<love::fontmod::ColoredString>();
+        auto cs = love::fontmod::ColoredString();
+        cs.str = text;
+        cs.color = love::toColorf(love::Color32(r, g, b, a));
+        t.push_back(cs);
+        love::Matrix4 m;
+		m.setTranslation((float)x, (float)y);
+        m.setScale(20.0f, 20.0f);
+		auto vcs = std::vector<love::fontmod::ColoredString>({cs});
+		instance->print(vcs, m);
+        instance->setShader();
+    }
+
 }
 
 }

@@ -53,7 +53,9 @@ void ChaiLove::quit(void) {
 
 	// Unload all the other sub-systems.
 	joystick.unload();
-	font.unload();
+	// font.unload();
+	// delete fm;
+	// freetype_font.~FontMod();
 	image.unload();
 	sound.unload();
 	filesystem.unload();
@@ -99,7 +101,7 @@ bool ChaiLove::load(const std::string& file, const void* data) {
 	joystick.load();
 	math.load();
 	mouse.load();
-	font.load();
+	// font.load();
 
 	// Now that all subsystems are loaded, start the script.
 	script->load();

@@ -582,6 +582,9 @@ void FontMod::printv(Graphics *gfx, const Matrix4 &t, const std::vector<DrawComm
 
 void FontMod::print(Graphics *gfx, const std::vector<love::fontmod::ColoredString> &text, const Matrix4 &m, const Colorf &constantcolor)
 {
+	glyphs.clear();
+	textures.clear();
+	createTexture();
 	love::fontmod::ColoredCodepoints codepoints;
 	love::fontmod::getCodepointsFromString(text, codepoints);
 
@@ -593,6 +596,9 @@ void FontMod::print(Graphics *gfx, const std::vector<love::fontmod::ColoredStrin
 
 void FontMod::printf(Graphics *gfx, const std::vector<love::fontmod::ColoredString> &text, float wrap, AlignMode align, const Matrix4 &m, const Colorf &constantcolor)
 {
+	glyphs.clear();
+	textures.clear();
+	createTexture();
 	love::fontmod::ColoredCodepoints codepoints;
 	love::fontmod::getCodepointsFromString(text, codepoints);
 

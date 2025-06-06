@@ -43,6 +43,7 @@
 #include "math/Transform.h"
 #include "font/Rasterizer.h"
 #include "font/FontMod.h"
+#include "font/freetype/Font.h"
 #include "video/VideoStream.h"
 #include "data/HashFunction.h"
 
@@ -1068,6 +1069,7 @@ protected:
 	bool active;
 
 	StrongRef<love::gfx::FontMod> defaultFont;
+	love::fontmod::freetype::FontMod freetype_font;
 
 	std::vector<ScreenshotInfo> pendingScreenshotCallbacks;
 	std::vector<StrongRef<GraphicsReadback>> pendingReadbacks;
