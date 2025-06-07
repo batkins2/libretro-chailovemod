@@ -150,6 +150,7 @@ script::script(const std::string& file) {
 		love["chai_shader"] = var(std::ref(app->chai_shader));
 		love["chai_matrices"] = var(std::ref(app->chai_matrices));
 		love["chai_collisions"] = var(std::ref(app->chai_collisions));
+		love["chai_particles"] = var(std::ref(app->chai_particles));
 		love["image"] = var(std::ref(app->image));
 		love["joystick"] = var(std::ref(app->joystick));
 		love["keyboard"] = var(std::ref(app->keyboard));
@@ -331,6 +332,15 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_shader::newShader), "newShader");
 	chai.add(fun(&chai_shader::send), "send");
 	chai.add(fun(&chai_shader::sendInt), "sendInt");
+	chai.add(user_type<chai_particles>(), "chai_particles");
+	chai.add(constructor<chai_particles(const chai_particles &)>(), "chai_particles");
+	chai.add(fun(&chai_particles::operator=), "=");	
+	chai.add(fun(&chai_particles::clone), "clone");
+	chai.add(fun(&chai_particles::newParticles), "newParticles");
+	chai.add(fun(&chai_particles::setParticleSystem), "setParticleSystem");
+	chai.add(fun(&chai_particles::updateParticleSystem), "updateParticleSystem");
+	chai.add(fun(&chai_particles::setParameter), "setParameter");
+	chai.add(fun(&chai_particles::draw), "draw");
 	chai.add(user_type<chai_mesh>(), "chai_mesh");
 	chai.add(constructor<chai_mesh(const chai_mesh &)>(), "chai_mesh");
 	chai.add(fun(&chai_mesh::operator=), "=");	
