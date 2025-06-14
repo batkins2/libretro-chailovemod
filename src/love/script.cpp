@@ -367,6 +367,7 @@ script::script(const std::string& file) {
 	chai.add(constructor<chai_scene(const chai_scene &)>(), "chai_scene");
 	chai.add(fun(&chai_scene::operator=), "=");	
 	chai.add(fun(&chai_scene::addMesh), "addMesh");
+	chai.add(fun(&chai_scene::addParticleSystem), "addParticleSystem");
 	chai.add(fun(&chai_scene::hideMesh), "hideMesh");
 	chai.add(fun(&chai_scene::showMesh), "showMesh");
 	chai.add(fun(&chai_scene::setShader), "setShader");

@@ -259,6 +259,8 @@ public:
 	 **/
 	void draw(Graphics *gfx, Quad *quad, const Matrix4 &m);
 
+	void draw3D(Graphics *gfx, const Matrix4 &m, const Colorf &c);
+
 	void drawLayer(Graphics *gfx, int layer, const Matrix4 &m);
 	void drawLayer(Graphics *gfx, int layer, Quad *quad, const Matrix4 &m);
 

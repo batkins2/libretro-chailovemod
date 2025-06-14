@@ -99,8 +99,8 @@ ParticleSystem::ParticleSystem(Texture *texture, uint32 size)
 	if (size == 0 || size > MAX_PARTICLES)
 		throw love::Exception("Invalid ParticleSystem size.");
 
-	if (texture->getTextureType() != TEXTURE_2D)
-		throw love::Exception("Only 2D textures can be used with ParticleSystems.");
+	// if (texture->getTextureType() != TEXTURE_2D)
+	// 	throw love::Exception("Only 2D textures can be used with ParticleSystems.");
 
 	sizes.push_back(1.0f);
 	colors.push_back(Colorf(1.0f, 1.0f, 1.0f, 1.0f));
@@ -500,8 +500,8 @@ ParticleSystem::Particle *ParticleSystem::removeParticle(Particle *p)
 
 void ParticleSystem::setTexture(Texture *tex)
 {
-	if (texture->getTextureType() != TEXTURE_2D)
-		throw love::Exception("Only 2D textures can be used with ParticleSystems.");
+	// if (texture->getTextureType() != TEXTURE_2D)
+	// 	throw love::Exception("Only 2D textures can be used with ParticleSystems.");
 
 	texture.set(tex);
 
@@ -1031,7 +1031,7 @@ void ParticleSystem::draw(Graphics *gfx, const Matrix4 &m)
 
 	if (pCount == 0 || texture.get() == nullptr || pMem == nullptr || buffer == nullptr)
 		return;
-
+	
 	gfx->flushBatchedDraws();
 
 	if (Shader::isDefaultActive())
@@ -1048,9 +1048,11 @@ void ParticleSystem::draw(Graphics *gfx, const Matrix4 &m)
 
 	bool useQuads = !quads.empty();
 
-	Matrix3 t;
+	// Matrix3 t;
 
 	// set the vertex data for each particle (transformation, texcoords, color)
+	
+	auto z = (float) rng.random(-0.0001f, 0.0001f);
 	while (p)
 	{
 		if (useQuads)
@@ -1060,26 +1062,43 @@ void ParticleSystem::draw(Graphics *gfx, const Matrix4 &m)
 		}
 
 		// particle vertices are image vertices transformed by particle info
-		t.setTransformation(p->position.x, p->position.y, p->angle, p->size, p->size, offset.x, offset.y, 0.0f, 0.0f);
-		t.transformXY(pVerts, positions, 4);
+		// t.setTransformation(p->position.x, p->position.y, p->angle, p->size, p->size, offset.x, offset.y, 0.0f, 0.0f);
+		// t.transformXY(pVerts, positions, 4);
 
 		// Particle colors are stored as floats (0-1) but vertex colors are
 		// unsigned bytes (0-255).
-		Color32 c = toColor32(p->color);
+		// Color32 c = toColor32(p->color);
 
 		// set the texture coordinate and color data for particle vertices
-		for (int v = 0; v < 4; v++)
-		{
-			pVerts[v].s = texcoords[v].x;
-			pVerts[v].t = texcoords[v].y;
-			pVerts[v].color = c;
-		}
+		// for (int v = 0; v < 4; v++)
+		// {
+		// 	pVerts[v].s = texcoords[v].x;
+		// 	pVerts[v].t = texcoords[v].y;
+		// 	pVerts[v].color = c;
+		// }
 
+		Texture *tex = gfx->getTextureOrDefaultForActiveShader(texture);
+		// Random small Z value to prevent z-fighting.
+		// Convert Matrix3 to Matrix4 for 3D drawing.
+		Matrix4 b = Matrix4(new float[16]{
+			p->size * cos(p->angle), -p->size * sin(p->angle), 0.0f, 0.0f,
+            p->size * sin(p->angle), p->size * cos(p->angle), 0.0f, 0.0f,
+            0.0f, 0.0f, 1.0f, 0.0f,
+            p->position.x, p->position.y, z, 1.0f			
+		});		
+
+		
+		Matrix4 a = m*b;
+		
+		tex->draw3D(gfx, a, p->color);
 		pVerts += 4;
+		z+= 0.0001f; // Increment Z value slightly to prevent z-fighting.
 		p = p->next;
 	}
 
 	buffer->unmap(0, pCount * sizeof(Vertex) * 4);
+
+	return;
 
 	Graphics::TempTransform transform(gfx, m);
 

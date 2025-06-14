@@ -32,6 +32,10 @@ void chai_scene::addMesh(chai_mesh *mesh) {
         0.0f, 0.0f, 0.0f, 1.0f}));   
 }
 
+void chai_scene::addParticleSystem(chai_particles *ps) {
+    particleSystems.push_back(ps);
+}
+
 void chai_scene::hideMesh(chai_mesh *mesh) {
     auto it = std::find(meshes.begin(), meshes.end(), mesh);
     if (it != meshes.end()) {
@@ -241,6 +245,14 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         auto matrix = matrices[i];
         mesh->draw(cg.instance, matrix, sceneShader, currentTime);
         i++;
+    }
+    if (shadows == false) {
+        for (auto ps : particleSystems) {
+            // if (ps->visible == false) {
+            //     continue;
+            // }
+            ps->draw(0.0f, 5.3f, -2.0f, 0.0f, 2.25f, 2.25f, 2.25f);
+        }
     }
 }
 

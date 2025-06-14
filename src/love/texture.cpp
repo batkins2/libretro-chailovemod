@@ -496,6 +496,86 @@ void Texture::draw(Graphics *gfx, const Matrix4 &m)
 	draw(gfx, quad, m);
 }
 
+void Texture::draw3D(Graphics *gfx, const Matrix4 &m, const Colorf &c)
+{
+	// Set shader modelMatrix uniform to the provided matrix.
+	const love::gfx::Shader::UniformInfo* info = nullptr;
+	if (gfx->getShader() != nullptr) {
+		info = gfx->getShader()->getUniformInfo("modelMatrix");
+		if (info == nullptr)
+			throw love::Exception("Shader does not have a 'modelMatrix' uniform.");
+		std::memcpy(info->data, m.getElements(), info->matrix.columns*info->matrix.rows * sizeof(float));
+		gfx->getShader()->updateUniform(info, 1);
+
+		info = gfx->getShader()->getUniformInfo("jointCount");
+		if (info == nullptr)
+			throw love::Exception("Shader does not have a 'modelMatrix' uniform.");
+		int jointCount = 0;
+		std::memcpy(info->data, &jointCount, sizeof(int));
+		gfx->getShader()->updateUniform(info, 1);
+	}
+	
+	// Define quad vertices (XYZUVRGBA)
+    static const float quadVerts[4][9] = {
+        {-0.5f, -0.5f, 0.0f, 0.0f, 1.0f, c.r, c.g, c.b, c.a}, // Bottom-left
+		{ 0.5f, -0.5f, 0.0f, 1.0f, 1.0f, c.r, c.g, c.b, c.a}, // Bottom-right
+		{ 0.5f,  0.5f, 0.0f, 1.0f, 0.0f, c.r, c.g, c.b, c.a}, // Top-right
+		{-0.5f,  0.5f, 0.0f, 0.0f, 0.0f, c.r, c.g, c.b, c.a}  // Top-left
+	};
+    static const uint16_t quadIndices[6] = {0, 1, 2, 0, 2, 3};
+
+	// Create vertex buffer
+	std::vector<Buffer::DataDeclaration> vertexFormat = std::vector<gfx::Buffer::DataDeclaration>();
+
+	Buffer::Settings vbSettings(BUFFERUSAGEFLAG_VERTEX, BUFFERDATAUSAGE_STATIC);
+
+	vertexFormat.push_back(gfx::Buffer::DataDeclaration("VertexPosition", gfx::DATAFORMAT_FLOAT_VEC3, sizeof(float) * 3)); // XYZ
+	vertexFormat.push_back(gfx::Buffer::DataDeclaration("VertexTexCoord", gfx::DATAFORMAT_FLOAT_VEC2, sizeof(float) * 2)); // UV
+	StrongRef<Buffer> vertexBuffer(gfx->newBuffer(
+		vbSettings,
+		vertexFormat,
+		quadVerts,
+		sizeof(quadVerts),
+		4
+	), Acquire::NORETAIN);
+
+    // Create index buffer
+    Buffer::Settings ibSettings(BUFFERUSAGEFLAG_INDEX, BUFFERDATAUSAGE_STATIC);
+    StrongRef<Buffer> indexBuffer(gfx->newBuffer(
+        ibSettings,
+        gfx::DATAFORMAT_UINT16,
+        quadIndices,
+        sizeof(quadIndices),
+        6
+    ), Acquire::NORETAIN);
+
+    // Set up attributes and bindings
+    VertexAttributes attributes;
+    BufferBindings buffers;
+
+    attributes.set(0, gfx::DATAFORMAT_FLOAT_VEC3, 0, 0); // VertexPosition
+	attributes.set(1, gfx::DATAFORMAT_FLOAT_VEC2, sizeof(float) * 3, 0); // VertexTexCoord
+	attributes.set(2, gfx::DATAFORMAT_FLOAT_VEC4, sizeof(float) * 5, 0); // VertexColor
+    attributes.setBufferLayout(0, sizeof(float) * 9, STEP_PER_VERTEX);
+
+    buffers.set(0, vertexBuffer, 0);
+
+    // Apply transformation
+    Graphics::TempTransform transform(gfx, m);
+
+    // Draw command
+    Graphics::DrawIndexedCommand cmd(&attributes, &buffers, indexBuffer);
+    cmd.primitiveType = PRIMITIVE_TRIANGLES;
+    cmd.indexType = INDEX_UINT16;
+    cmd.instanceCount = 1;
+    cmd.texture = this;
+    cmd.cullMode = gfx->getMeshCullMode();
+    cmd.indexBufferOffset = 0;
+    cmd.indexCount = 6;
+
+    gfx->draw(cmd);
+}
+
 void Texture::draw(Graphics *gfx, Quad *q, const Matrix4 &localTransform)
 {
 	if (texType == TEXTURE_2D_ARRAY)

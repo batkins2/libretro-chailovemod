@@ -87,6 +87,13 @@ void chai_particles::setParameter(const std::string &name, const std::vector<flo
             ps->setParticleLifetime(values[0], values[1]);
         } else if (name.find("sizeVariation") == 0) {
             ps->setSizeVariation(values[0]);
+        } else if (name.find("sizes") == 0) {
+            if (values.size() < 4) {
+                printf("Invalid number of size values provided.\n");
+                return;
+            }
+            std::vector<float> newSizes = std::vector<float>({values[0], values[1], values[2], values[3]});
+            ps->setSizes(newSizes);
         } else if (name.find("linearAcceleration") == 0) {
             ps->setLinearAcceleration(values[0], values[1], values[2], values[3]);
         // Add more cases for other parameters as needed
@@ -98,6 +105,8 @@ void chai_particles::setParameter(const std::string &name, const std::vector<flo
             ps->setRotation(values[0], values[1]);
         } else if (name.find("spin") == 0) {
             ps->setSpin(values[0], values[1]);
+        } else if (name.find("direction") == 0) {
+            ps->setDirection(values[0]);
         } else if (name.find("color") == 0) {
             std::vector<Colorf> newColors = std::vector<Colorf>();
             for (size_t i = 0; i < values.size(); i += 4) {
@@ -123,15 +132,20 @@ void chai_particles::draw(float x, float y, float z, float angle, float scaleX, 
     // Draw the particle system at the specified position and angle
     // This is a placeholder implementation
     if (ps) {
-        // printf("Drawing particle system at position (%f, %f) with angle %f and scale (%f, %f)\n", x, y, angle, scaleX, scaleY);
+        
+        angle = glm::radians(angle);
         auto mat = Matrix4(new float[16]{
             scaleX * cos(angle), -scaleY * sin(angle), 0.0f, 0.0f,
             scaleX * sin(angle), scaleY * cos(angle), 0.0f, 0.0f,
             0.0f, 0.0f, scaleZ, 0.0f,
             x, y, z, 1.0f
         });
+        // auto mat = Matrix4();
+        // mat.setIdentity();
         // setParticleSystem(tex, sz);
-        ps->draw(ChaiLove::getInstance()->chai_gfx.instance, mat);
+        auto cg = ChaiLove::getInstance()->chai_gfx;
+        ps->draw(cg.instance, mat);
+        // cg.instance->setShader(); // Reset shader after drawing
     } else {
         printf("Particle system not initialized.\n");
     }

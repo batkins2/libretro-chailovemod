@@ -699,22 +699,21 @@ void Graphics::drawQuads(int start, int count, const VertexAttributes &attribute
 	}
 	else
 	{
-		// BufferBindings bufferscopy = buffers;
-		// if (start > 0)
-		// 	advanceVertexOffsets(attributes, bufferscopy, start * 4);
+		BufferBindings bufferscopy = buffers;
+		if (start > 0)
+			advanceVertexOffsets(attributes, bufferscopy, start * 4);
 
-		// for (int quadindex = 0; quadindex < count; quadindex += MAX_QUADS_PER_DRAW)
-		// {
-		// 	gl.setVertexAttributes(attributes, bufferscopy);
+		for (int quadindex = 0; quadindex < count; quadindex += MAX_QUADS_PER_DRAW)
+		{
+			gl.setVertexAttributes(attributes, bufferscopy);
 
-		// 	int quadcount = std::min(MAX_QUADS_PER_DRAW, count - quadindex);
+			int quadcount = std::min(MAX_QUADS_PER_DRAW, count - quadindex);
+			glDrawElements(GL_TRIANGLES, quadcount * 6, GL_UNSIGNED_SHORT, BUFFER_OFFSET(0));
+			++drawCalls;
 
-		// 	glDrawElements(GL_TRIANGLES, quadcount * 6, GL_UNSIGNED_SHORT, BUFFER_OFFSET(0));
-		// 	++drawCalls;
-
-		// 	if (count > MAX_QUADS_PER_DRAW)
-		// 		advanceVertexOffsets(attributes, bufferscopy, quadcount * 4);
-		// }
+			if (count > MAX_QUADS_PER_DRAW)
+				advanceVertexOffsets(attributes, bufferscopy, quadcount * 4);
+		}
 	}
 }
 

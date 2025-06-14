@@ -5,6 +5,9 @@
 #ifndef __HAVE_CHAI_SHADER__
 #include "chai_shader.h"
 #endif
+#ifndef __HAVE_CHAI_PARTICLES__
+#include "chai_particles.h"
+#endif
 #include "opengl/Graphics.h"
 // #include "gfx.h" // Assuming you have a Graphics class for rendering
 
@@ -21,6 +24,7 @@ public:
     chai_scene *newScene() const;
     bool destroy();
     void addMesh(chai_mesh *mesh);
+    void addParticleSystem(chai_particles *ps);
     void hideMesh(chai_mesh *mesh);
     void showMesh(chai_mesh *mesh);
     void setShader(chai_shader *shader);
@@ -32,6 +36,7 @@ public:
 
 private:
     std::vector<chai_mesh *> meshes;
+    std::vector<chai_particles *> particleSystems;
     chai_shader *sceneShader = nullptr;
     std::vector<Matrix4> matrices;
     float currentTime = 0.0f;
