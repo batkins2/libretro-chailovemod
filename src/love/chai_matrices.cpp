@@ -10,10 +10,9 @@ chai_matrices::~chai_matrices()
 }
 glm::mat4 chai_matrices::setTransformationMatrixInternal(glm::vec3 translation, glm::vec3 rotation, glm::vec3 scale, glm::mat4 mat)
 {
+    glm::quat q = glm::quat(glm::radians(rotation));
     mat = glm::translate(mat, translation);
-    mat = glm::rotate(mat, glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-    mat = glm::rotate(mat, glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-    mat = glm::rotate(mat, glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+    mat *= glm::mat4_cast(q);
     mat = glm::scale(mat, scale);
     return mat;
 }

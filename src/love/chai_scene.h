@@ -32,7 +32,7 @@ public:
     void finalize();    
     void drawMeshes(bool shadows, int view);
     void draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vector<chaiscript::Boxed_Value> viewMatrix2, std::vector<chaiscript::Boxed_Value> viewMatrix3, std::vector<chaiscript::Boxed_Value> viewMatrix4, int viewCount);
-    void loadingScreen();
+    void prepareScreen();
 
 private:
     std::vector<chai_mesh *> meshes;
@@ -43,5 +43,6 @@ private:
     std::vector<chaiscript::Boxed_Value> viewMatrix;
     GLuint shadowMapFBO = 0;
     GLuint shadowMap = 0;
+    love::gfx::Texture *background_tex = nullptr;
 };
 } // namespace love

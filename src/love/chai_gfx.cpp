@@ -288,7 +288,7 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, const std::st
                     continue;
                 }
 
-                if (shaderFound || strstr(line.c_str(), "void pixelmain(") != NULL) {
+                if (shaderFound || strstr(line.c_str(), "void pixelmain(") != NULL || strstr(line.c_str(), "vec4 effect(") != NULL || strstr(line.c_str(), ") {") != NULL) {
                     if (!shaderFound || 
                         strstr(line.c_str(), "for (") != NULL || 
                         strstr(line.c_str(), "if (") != NULL || 
@@ -510,10 +510,10 @@ void chai_gfx::print(const std::string &text, int x, int y, int r, int g, int b,
         t.push_back(cs);
         love::Matrix4 m;
 		m.setTranslation((float)x, (float)y);
-        m.setScale(20.0f, 20.0f);
+        m.setScale(1.0f, 1.0f);
 		auto vcs = std::vector<love::fontmod::ColoredString>({cs});
 		instance->print(vcs, m);
-        instance->setShader();
+        // instance->setShader();
     }
 
 }

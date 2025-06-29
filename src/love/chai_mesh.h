@@ -19,6 +19,7 @@
 
 #include <random>
 
+#include "opengl/Graphics.h"
 namespace love {
 class chai_gfx;
 class chai_mesh {
@@ -98,6 +99,7 @@ class chai_mesh {
     bool isVisible() {
         return visible;
     };
+    void loadSpecular();
     love::gfx::Graphics *instance;
     gfx::Mesh *mesh = nullptr;
     std::vector<gfx::Mesh *> meshes;
@@ -141,7 +143,12 @@ class chai_mesh {
     std::vector<std::vector<int>> jointList;
     std::vector<std::map<int, glm::mat4>> jointMatrix;
     bool visible = true;
-    std::vector<bool> subVisible;
+    std::vector<bool> subVisible;    
+    std::vector<bool> specular;
+    int specularW = 0;
+    int specularH = 0;
+    uint8_t* specData = nullptr;
+    GLuint specularMap = 0;
     protected:
     int id;
     // float jointMinValue;

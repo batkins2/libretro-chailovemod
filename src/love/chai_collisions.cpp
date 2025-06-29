@@ -519,7 +519,7 @@ void chai_collisions::init(int group = 0)
     }, this);
 
     // Initialize the debug drawer
-    if (debugDrawer == nullptr) { 
+    if (false && debugDrawer == nullptr) { 
         debugDrawer = new OpenGLDebugDrawer();
         debugDrawer->setDebugMode(btIDebugDraw::DBG_DrawWireframe | btIDebugDraw::DBG_DrawAabb);
         worlds->worlds[group]->dynamicsWorld->setDebugDrawer(debugDrawer);

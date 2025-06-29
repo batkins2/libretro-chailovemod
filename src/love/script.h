@@ -432,6 +432,7 @@ class script {
 
 	chaiscript::Boxed_Value eval(const std::string& code, const std::string& filename);
 	std::string evalString(const std::string& code, const std::string& filename);
+	void debugbreak();
 
 	#ifdef __HAVE_CHAISCRIPT__
 	chaiscript::ChaiScript chai;

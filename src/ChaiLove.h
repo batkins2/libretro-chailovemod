@@ -71,6 +71,9 @@
 #ifndef __HAVE_CHAI_PARTICLES__
 #include "love/chai_particles.h"
 #endif
+#ifndef __HAVE_CHAI_GUI__
+#include "love/chai_gui.h"
+#endif
 #include "love/keyboard.h"
 #include "love/config.h"
 #include "love/data.h"
@@ -138,6 +141,7 @@ class ChaiLove {
 	love::chai_scene chai_scene;
 	love::chai_collisions chai_collisions;
 	love::chai_particles chai_particles;
+	love::chai_gui chai_gui;
 
 	ChaiLove();
 	~ChaiLove();
@@ -158,58 +162,26 @@ class ChaiLove {
 	SDL_Texture* texture = NULL;
 	love::imagemod::Image *getImageModule() { return love::Module::getInstance<love::imagemod::Image>(love::Module::M_IMAGE); };
 	love::filesystem getFSModule() { return filesystem; };
-	void printNew(const std::string& text, int x, int y, int r, int g, int b, int a) {
-		// return;
+	void printNew(const std::string& text, int x, int y, int r, int g, int b, int a, int size = 24) {
 		auto t = std::vector<love::fontmod::ColoredString>();
 		auto cs = love::fontmod::ColoredString();
 		cs.str = text;
 		cs.color = love::toColorf(love::Color32(r, g, b, a));
 		t.push_back(cs);
 		
-		 // Load the font definition and image list
-		// love::filesystemmod::Filesystem::Filesystem("love.filesystemmod.Filesystem");
-		// auto fsm = love::Module::getInstance<love::filesystemmod::Filesystem>(love::Module::M_FILESYSTEM);
-		// auto fs = fsm->openFile("/assets/font/Unnamed.fnt", love::filesystemmod::File::Mode::MODE_READ);
-		// auto fontdef = fs->read();
-        // love::filesystemmod::FileData* fontdef = new love::filesystemmod::FileData(s, "/assets/font/Unnamed.fnt");
-        // std::vector<love::imagemod::ImageData*> imagelist;
-		
-		// fs = fsm->openFile("/assets/font/Unnamed.png", love::filesystemmod::File::Mode::MODE_READ);
-		// auto d = fs->read();
-
-		// auto img = new love::imagemod::ImageData(426, 434, love::PIXELFORMAT_RGBA8_UNORM, d, false);
-		// imagelist.push_back(img);
-
-		// Instantiate the BMFontRasterizer
-		// float dpiscale = 1.0f; // Adjust as needed
-		// auto rasterizer = new love::fontmod::BMFontRasterizer(fontdef, imagelist, dpiscale);
-		// auto rasterizer = love::fontmod::TrueTypeRasterizer();
 		auto i = love::Module::getInstance<love::gfx::Graphics>(love::Module::M_GRAPHICS);
 		if (fm == nullptr) {	
-			// fm = i->newFont(rasterizer);
-		// 	auto sampler = love::gfx::SamplerState { love::gfx::SamplerState::FILTER_NEAREST, love::gfx::SamplerState::FILTER_NEAREST, love::gfx::SamplerState::MIPMAP_FILTER_NONE };
-		// 	// auto rasterizer = love::fontmod::FontMod::newTrueTypeRasterizer(1, love::fontmod::TrueTypeRasterizer::Settings());
-		// 	// fm = new love::gfx::FontMod(rasterizer, sampler);
-		// 	love::gfx::FontMod::FontMod("love.gfx.fontmod"); // Create a FontMod with no rasterizer initially
-		
-			
 			love::fontmod::TrueTypeRasterizer::Settings settings;
 			settings.hinting = love::fontmod::TrueTypeRasterizer::HINTING_NONE; // Set hinting to normal
-		// 	fm = i->newDefaultFont(1, settings);
-			fm = i->newDefaultFont(18, settings);
+			fm = i->newDefaultFont(size, settings);
 		}
 		
 		love::Matrix4 m;
 		m.setTranslation((float)x, (float)y);
 		auto vcs = std::vector<love::fontmod::ColoredString>({cs});
+		float wrap = 0.0f; // No wrapping
+		love::gfx::FontMod::AlignMode align = love::gfx::FontMod::AlignMode::ALIGN_LEFT;
 		i->print(vcs, fm, m);
-		
-		// delete rasterizer; // Clean up the rasterizer
-		// delete fontdef; // Clean up the font definition
-		// for (auto img : imagelist) {
-		// 	delete img; // Clean up the image data
-		// }
-		// delete imgFile; // Clean up the file data
 	}
 };
 

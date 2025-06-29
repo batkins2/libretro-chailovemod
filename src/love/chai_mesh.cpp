@@ -257,7 +257,7 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
                 cm->nodeChildren[index] = node.children;
                 for (auto child : node.children) {
                     cm->nodeParent.push_back(std::pair<int, int>(child, index));
-                    // printf("%s (%d)->%s (%d)\n", model.nodes[child].name.c_str(), child, model.nodes[index].name.c_str(), index);
+                    printf("%s (%d)->%s (%d)\n", model.nodes[child].name.c_str(), child, model.nodes[index].name.c_str(), index);
                     // glm::mat4 parentMatrix = cm->nodeMatrix[index];
 
                     // if (node.translation.size() > 0) {
@@ -579,8 +579,63 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
         }
 
         auto material = model.materials[primitive.material];
-        auto texture = model.textures[material.pbrMetallicRoughness.baseColorTexture.index];
-        tex = cm->textures[texture.source];
+        // tex = nullptr;
+        if (material.pbrMetallicRoughness.baseColorTexture.index > -1) {
+        // #ifdef _WIN32
+        // __debugbreak();
+        // #else
+        // raise(SIGTRAP);
+        // #endif
+            auto texture = model.textures[material.pbrMetallicRoughness.baseColorTexture.index];
+            tex = cm->textures[texture.source] ?: nullptr;
+        }
+        
+        if (false && tex == nullptr) {
+            // Set the texture to a single color texture if no texture is found  
+            gfx::Texture::Settings settings;
+            settings.width = 64;
+            settings.height = 64;
+            settings.format = PIXELFORMAT_RGBA8_UNORM;
+            auto slices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
+
+            uint8_t* blackPixel = new uint8_t[64*64*4];
+            // Fill the pixel data with a solid color (e.g., blue)
+            // This will create a blue texture
+           
+            for (int j = 0; j < 64*64*4; j+=4) {
+                blackPixel[j] = 255; // Red
+                blackPixel[j + 1] = 0; // Green
+                blackPixel[j + 2] = 255; // Blue
+                blackPixel[j + 3] = 255; // Alpha
+            }
+            auto gfxInstance = Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS);
+            tex = gfxInstance->newTexture(settings, &slices);        
+            Rect rect;
+            rect.w = 64;
+            rect.h = 64;
+            tex->replacePixels(blackPixel, 4*64*64, 0, 0, rect, true);
+            gfx::SamplerState sampler = gfx::SamplerState();
+
+            sampler.wrapU = gfx::SamplerState::WrapMode::WRAP_REPEAT;
+            sampler.wrapV = gfx::SamplerState::WrapMode::WRAP_REPEAT;
+            sampler.wrapW = gfx::SamplerState::WrapMode::WRAP_REPEAT;
+
+            tex->setSamplerState(sampler);
+            
+        }
+        printf("Material: %s\n", material.name.c_str());
+        // #ifdef _WIN32
+        // __debugbreak();
+        // #else
+        // raise(SIGTRAP);
+        // #endif
+               
+        if (material.extensions.find("KHR_materials_clearcoat") != material.extensions.end()) {
+            auto clearcoatFactor = material.extensions.at("KHR_materials_clearcoat").Get("clearcoatFactor");
+            if (clearcoatFactor.GetNumberAsDouble() > 0.0) {
+                cm->specular[i] = true;
+            } 
+        }
     }
     // auto imageBufferView = model.bufferViews[image->bufferView];
     // auto imageBuffer = model.buffers[imageBufferView.buffer];
@@ -670,7 +725,7 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
 
 
         glm::vec3 lightPosition(0.0f);
-        glm::vec3 lightDirection(0.0f, -1.0f, 0.0f); // Default direction
+        glm::vec3 lightDirection(0.0f, 0.0f, 1.0f); // Default direction
 
         cm->lightParams[count]["position"] = std::vector<float> { lightPosition.x, lightPosition.y, lightPosition.z };
         cm->lightParams[count]["color"] = std::vector<float> { 1.0f, 1.0f, 1.0f };
@@ -688,7 +743,7 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
                 }
                 cm->lightParams[count]["position"] = std::vector<float> { lightPosition.x, lightPosition.y, lightPosition.z };
                 cm->lightParams[count]["color"] = std::vector<float> { lightNode.color[0], lightNode.color[1], lightNode.color[2] };
-                cm->lightParams[count]["intensity"] = std::vector<float> { lightNode.intensity/900.0f };
+                cm->lightParams[count]["intensity"] = std::vector<float> { lightNode.intensity/1800.0f };
 
                 if (lightNode.type == "directional") {
                     // glm::vec3 lightDirection(0.0f, -1.0f, 0.0f); // Default direction
@@ -1028,7 +1083,10 @@ std::vector<chai_meshData*> chai_mesh::loadMeshFromFile(const std::vector<chaisc
 
     std::vector<chai_meshData*> meshData;
 
+    specular = std::vector<bool>();
+
     for (size_t i = 0; i < model.meshes.size(); i++) {
+        specular.push_back(false);
         if (this->data.size() > i) {
             auto d = loadMesh(i, model, instance, type, vf, this, this->data[i]);
             meshes.emplace_back(d.first);
@@ -1202,9 +1260,8 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
     if (mesh != nullptr) {
         mesh->draw(gfx, m);
     } else {
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            
+        
+        
         int i = 0;
         for (int j = 0; j < meshes.size(); j++) {
             if (subVisible[j] == false) {
@@ -1328,9 +1385,14 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                                     }
                                     if (!found) {
                                         root = np;
+                                        // root = 61;
+                                        // subroot = np; // Set subroot to the last node in hierarchy
+                                        // root = 0; // Set root to the current nodeIndex
                                         break; // Reached the root node
                                     }
                                 }
+
+                                // subroot = 61;
                                 
                                 for (auto node : nodeChildren) {
                                     for (auto n : node.second) {
@@ -1349,54 +1411,86 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                                     nodes = getChildNodes(nodeChildren, nodeChild, nodes);
                                 }
                                 for (auto node : nodes) {
-                                    if (chan == "translation") {
+                                    if (false && node == root) {
+                                        glm::mat4 trs = jointMatrix[i][node];
 
-                                        animPlaying = 1;
-                                        glm::vec3 v(interpolatedValue);
-                                        jointMatrix[i][node] = glm::translate(jointMatrix[i][node], v) * jointMatrix[i][node];
-                                        // printf("Translate: %d %f %f %f\n", node, interpolatedValue.x, interpolatedValue.y, interpolatedValue.z);
-                                    } else if (chan == "rotation" && t <= 1.0f && t >= 0.0f) {
-                                        animPlaying = 1;
-                                        glm::quat rotation = glm::quat(1.0f, 1.0f, 1.0f, 1.0f);
-                                        auto bindMatrix = glm::inverse(jointIBMatrix[node]);
-                                        if (node == nodes[0]) {
-                                            rotation = glm::slerp(glm::quat(v2.w, v2.x, v2.y, v2.z), glm::quat(v1.w, v1.x, v1.y, v1.z), t);
-                                            auto parentMatrix = glm::mat4(1.0f);
-                                            if (true || parent != root) {
-                                                parentMatrix = jointIBMatrix[root];
-                                            }
-                                            
-                                            auto invMatrix = glm::inverse(nodeMatrix[node]);
-                                            
-                                            auto hierarchyRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-                                            auto hierarchyRotation2 = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-                                            for (auto h = hierarchy.rbegin(); h != hierarchy.rend(); ++h) {
-                                                if (node == subroot) {
-                                                    hierarchyRotation = hierarchyRotation * glm::quat_cast(jointMatrix[i][*h]);
-                                                    hierarchyRotation2 = hierarchyRotation2 * glm::quat_cast(glm::inverse(nodeMatrix[*h]));
-                                                } else {
-                                                    if (*h == node) {
+                                        // Apply translation
+                                        if (chan == "translation") {
+                                            animPlaying = 1;
+                                            printf("NodeIndex: %d\n", nodeIndex);
+                                            printf("AnimTime: %f\n", animTime);
+                                            printf("t1: %f, t2: %f, t: %f\n", t1, t2, t);
+                                            printf("v1: %f %f %f %f\n", v1.x, v1.y, v1.z, v1.w);
+                                            printf("v2: %f %f %f %f\n", v2.x, v2.y, v2.z, v2.w);
+                                            printf("Translate: %d %f %f %f\n", node, interpolatedValue.x, interpolatedValue.y, interpolatedValue.z);
+                                            jointMatrix[i][node] = glm::translate(glm::mat4(1.0f), glm::vec3(interpolatedValue.w, interpolatedValue.z, interpolatedValue.y)) * jointMatrix[i][node];
+                                        }
+
+                                        // Apply rotation
+                                        if (chan == "rotation" && t <= 1.0f && t >= 0.0f) {
+                                            // glm::quat rotation = glm::slerp(glm::quat(v2.w, v2.x, v2.y, v2.z), glm::quat(v1.w, v1.x, v1.y, v1.z), t);
+                                            // trs *= glm::mat4_cast(rotation);
+                                        }
+
+                                        // Apply scale
+                                        if (chan == "scale") {
+                                            // glm::vec3 v(interpolatedValue);
+                                            // trs = glm::scale(trs, v);
+                                        }
+
+                                        // Combine with inverse bind matrix if needed
+                                        // jointMatrix[i][node] = trs;
+                                    } else if (true) {
+                                        if (chan == "translation") {
+
+                                            animPlaying = 1;
+                                            jointMatrix[i][node] = glm::translate(glm::mat4(1.0f), glm::vec3(interpolatedValue.x, interpolatedValue.z, interpolatedValue.y)) * jointMatrix[i][node];
+                                            // glm::vec3 v(interpolatedValue);
+                                            // jointMatrix[i][node] = glm::translate(jointMatrix[i][node], v) * jointMatrix[i][node];
+                                            // printf("Translate: %d %f %f %f\n", node, interpolatedValue.x, interpolatedValue.y, interpolatedValue.z);
+                                        } else if (chan == "rotation" && t <= 1.0f && t >= 0.0f) {
+                                            animPlaying = 1;
+                                            glm::quat rotation = glm::quat(1.0f, 1.0f, 1.0f, 1.0f);
+                                            auto bindMatrix = glm::inverse(jointIBMatrix[node]);
+                                            if (node == nodes[0]) {
+                                                rotation = glm::slerp(glm::quat(v2.w, v2.x, v2.y, v2.z), glm::quat(v1.w, v1.x, v1.y, v1.z), t);
+                                                auto parentMatrix = glm::mat4(1.0f);
+                                                if (true || parent != root) {
+                                                    parentMatrix = jointIBMatrix[root];
+                                                }
+                                                
+                                                auto invMatrix = glm::inverse(nodeMatrix[node]);
+                                                
+                                                auto hierarchyRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+                                                auto hierarchyRotation2 = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+                                                for (auto h = hierarchy.rbegin(); h != hierarchy.rend(); ++h) {
+                                                    if (node == subroot) {
                                                         hierarchyRotation = hierarchyRotation * glm::quat_cast(jointMatrix[i][*h]);
                                                         hierarchyRotation2 = hierarchyRotation2 * glm::quat_cast(glm::inverse(nodeMatrix[*h]));
+                                                    } else {
+                                                        if (*h == node) {
+                                                            hierarchyRotation = hierarchyRotation * glm::quat_cast(jointMatrix[i][*h]);
+                                                            hierarchyRotation2 = hierarchyRotation2 * glm::quat_cast(glm::inverse(nodeMatrix[*h]));
+                                                        }
                                                     }
                                                 }
-                                            }
 
-                                            rotation = hierarchyRotation * rotation;
-                                            rotation = hierarchyRotation2 * rotation;
-                                                                                            
-                                            rotation = glm::normalize(rotation);
-                                            
-                                            jointMatrix[i][node] = bindMatrix * glm::mat4_cast(rotation) * jointIBMatrix[node] * jointMatrix[i][node];
-                                            parent = node;
-                                        } else {
-                                            // Child node
-                                            jointMatrix[i][node] = jointMatrix[i][parent] * jointMatrix[i][node];
+                                                rotation = hierarchyRotation * rotation;
+                                                rotation = hierarchyRotation2 * rotation;
+                                                                                                
+                                                rotation = glm::normalize(rotation);
+                                                
+                                                jointMatrix[i][node] = bindMatrix * glm::mat4_cast(rotation) * jointIBMatrix[node] * jointMatrix[i][node];
+                                                parent = node;
+                                            } else {
+                                                // Child node
+                                                jointMatrix[i][node] = jointMatrix[i][parent] * jointMatrix[i][node];
+                                            }
+                                        } else if (chan == "scale") {
+                                            animPlaying = 1;
+                                            glm::vec3 v(interpolatedValue);
+                                            jointMatrix[i][node] = glm::scale(jointMatrix[i][node], v) * jointMatrix[i][node];
                                         }
-                                    } else if (chan == "scale") {
-                                        animPlaying = 1;
-                                        glm::vec3 v(interpolatedValue);
-                                        jointMatrix[i][node] = glm::scale(jointMatrix[i][node], v) * jointMatrix[i][node];
                                     }
                                 }
                             } 
@@ -1433,6 +1527,12 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
             }
             shader->send("modelMatrix", v);
             
+            if (specular.size() > j && specular[j]) {               
+                shader->send("isSpecular", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1) }));
+            } else {
+                shader->send("isSpecular", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+            }
+           
             if (msh != nullptr) {
                 msh->draw(gfx, m);
             }
@@ -1440,6 +1540,51 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
         }
         currentTime = dt;
     }
+}
+
+void chai_mesh::loadSpecular() {
+    auto texture = "/cartridges/test/assets/particles/sunrise.jpg";
+            
+    auto cg = ChaiLove::getInstance()->chai_gfx;
+    SDL_RWops* rw = ChaiLove::getInstance()->filesystem.openRW(texture);
+    auto img = new Image(rw);
+
+    auto w = img->getWidth();
+    auto h = img->getHeight();
+    gfx::Texture::Settings settings;
+    settings.width = w;
+    settings.height = h;
+    settings.format = PIXELFORMAT_RGBA8_UNORM;
+    auto slices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
+
+    size_t dataSize = w*h;
+
+    SDL_LockSurface(img->surface);
+    // Assuming pixelData is a byte array containing the ARGB data.
+    uint8_t* pixelData = static_cast<uint8_t*>(img->surface->pixels);
+    uint8_t* copyOfPixelData = new uint8_t[dataSize * 4];
+    for (size_t i = 0; i < dataSize * 4; i += 4) {
+        uint8_t alpha = pixelData[i];        // ARGB - Alpha at index 0
+        uint8_t blue = pixelData[i + 1];      // ARGB - Red at index 1
+        uint8_t green = pixelData[i + 2];    // ARGB - Green at index 2
+        uint8_t red = pixelData[i + 3];     // ARGB - Blue at index 3
+
+        // Swap to RGBA format
+        copyOfPixelData[i] = red;                 // RGBA - Red at index 0
+        copyOfPixelData[i + 1] = green;           // RGBA - Green at index 1
+        copyOfPixelData[i + 2] = blue;            // RGBA - Blue at index 2
+        copyOfPixelData[i + 3] = alpha;           // RGBA - Alpha at index 3
+    }
+
+    SDL_UnlockSurface(img->surface);
+
+    img->~Image();
+
+    img = NULL;
+
+    specularW = w;
+    specularH = h;
+    specData = copyOfPixelData;
 }
 
 void chai_mesh::setVisible(bool visible) {

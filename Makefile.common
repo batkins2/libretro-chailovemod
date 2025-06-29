@@ -392,6 +392,8 @@ SOURCES_CXX += $(wildcard \
 # RapidJSON
 FLAGS += -I$(CORE_DIR)/vendor/rapidjson/include/rapidjson
 
+FLAGS += -DLOAD_PNG
+
 # ChaiScript
 ifeq ($(HAVE_CHAISCRIPT),)
 	FLAGS += -I$(CORE_DIR)/vendor/chaiscript/include

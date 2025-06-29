@@ -142,7 +142,124 @@ void chai_scene::drawMeshes(bool shadows, int view) {
     cg.instance->clear(clearcolor, clearstencil, cleardepth);
     glm::mat4 vMatrix = glm::mat4(1.0f);
     glm::mat4 t2 = glm::mat4(1.0f);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    if (!shadows) {
+        auto mesh = meshes[0];
+        if (mesh->specData == nullptr) {
+            mesh->loadSpecular();
+        }
+
+        // tex = cg.instance->newTexture(settings, &slices);
+        // tex->replacePixels(copyOfPixelData, dataSize*4, 0, 0, rect, false);
+        
+        if (mesh->specularMap == 0) {
+        
+            // Create sampler2d specularMap
+            glGenTextures(1, &mesh->specularMap);
+        }
+        
+        // Bind the specular map texture
+        glActiveTexture(GL_TEXTURE2); // Use texture unit 2 for specular map                        
+        glBindTexture(GL_TEXTURE_2D, mesh->specularMap);
+
+        // Set the sampler uniform in your shader to use texture unit 0
+        // GLint specularMapLoc = glGetUniformLocation(sceneShader->shader->getHandle(), "specularMap");
+        // if (specularMapLoc >= 0) {
+        //     glUniform1i(specularMapLoc, 2);
+        // }
+        // Set texture parameters (adjust as needed)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        // Load your specular map image data here (replace with your actual loading code)
+        
+        if (mesh->specData) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, mesh->specularW, mesh->specularH, 0, GL_RGBA, GL_UNSIGNED_BYTE, mesh->specData);
+            glGenerateMipmap(GL_TEXTURE_2D);
+            // Free specData if needed
+        }
+
+        // Set the sampler uniform in your shader to use texture unit 2
+        GLint specularMapLoc = glGetUniformLocation(sceneShader->shader->getHandle(), "specularMap");
+        if (specularMapLoc >= 0) {
+            glUniform1i(specularMapLoc, 2); // 2 = GL_TEXTURE2
+        }
+
+        // sceneShader->send("isSpecular", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1) }));
+
+        
+        // Unbind the texture
+        // glBindTexture(GL_TEXTURE_2D, 0);
+        glActiveTexture(GL_TEXTURE0); // Switch back to texture unit 0 for the main texture
+        glDisable(GL_DEPTH_TEST);
+        auto mat = Matrix4(new float[16] {
+            1.0f, 0.0f, 0.0f, 0.0f,
+            0.0f, 1.0f, 0.0f, 0.0f,
+            0.0f, 0.0f, 1.0f, 0.0f,
+            0.0f, 0.0f, -1.0f, 1.0f
+        });
+        auto v = std::vector<chaiscript::Boxed_Value>();
+        for (int c = 0; c < 4; ++c) {
+            v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).x));
+            v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).y));
+            v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).z));
+            v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).w));
+        }
+        sceneShader->send("modelMatrix", v);
+
+        sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+
+        sceneShader->send("lightIntensity", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1.2f) }));
+
+        sceneShader->send("ambientColor", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0.9f), chaiscript::Boxed_Value(0.9f), chaiscript::Boxed_Value(0.9f) }));
+
+        // Ortho projection matrix for fullscreen quad
+        // This assumes the quad covers the entire screen, adjust as needed
+        auto t2 = glm::ortho(0.0f, static_cast<float>(mesh->specularW),
+            static_cast<float>(mesh->specularH), 0.0f, -1.0f, 1.0f);
+        auto pm = glm::value_ptr(t2);
+        std::vector<chaiscript::Boxed_Value> projectionMatrix;
+        for (int c = 0; c < 16; ++c) {
+            projectionMatrix.push_back(chaiscript::Boxed_Value(pm[c]));
+        }
+        sceneShader->send("projectionMatrix", projectionMatrix);
+
+        // Set the view matrix to identity for fullscreen quad
+        auto vMatrix = glm::mat4(1.0f);
+        auto vm = glm::value_ptr(vMatrix);
+        std::vector<chaiscript::Boxed_Value> viewMatrix;
+        for (int c = 0; c < 16; ++c) {
+            viewMatrix.push_back(chaiscript::Boxed_Value(vm[c]));
+        }
+        sceneShader->send("viewMatrix", viewMatrix);
+
+        // Draw a fullscreen quad (replace with your engine's quad draw if needed)
+        gfx::Texture::Settings settings;
+        settings.width = mesh->specularW;
+        settings.height = mesh->specularH;
+        settings.format = PIXELFORMAT_RGBA8_UNORM;
+        auto slices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
+        auto gfx = Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS);
+        if (background_tex == nullptr) {
+            background_tex = gfx->newTexture(settings, &slices);
+        
+        
+            Rect rect = Rect();
+            rect.w = mesh->specularW;
+            rect.h = mesh->specularH;
+            background_tex->replacePixels(mesh->specData, mesh->specularW*mesh->specularH*4, 0, 0, rect, false);
+        }
+        background_tex->draw(gfx, mat);
+        glEnable(GL_DEPTH_TEST);
+    }
+
     for (auto mesh : meshes) {
+       
         if (mesh->visible == false) {
             i++;
             continue;
@@ -242,6 +359,8 @@ void chai_scene::drawMeshes(bool shadows, int view) {
             i++;
             continue; // Skip meshes outside the frustum
         }
+
+        
         auto matrix = matrices[i];
         mesh->draw(cg.instance, matrix, sceneShader, currentTime);
         i++;
@@ -279,7 +398,7 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
             // printf("sceneShader: %d\n", sceneShader->shader);
         }
         // glBindFramebuffer(cg.instance->FRAMEBUFFER, cg.instance->hw_render.get_current_framebuffer());
-        cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+        cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);  
 
         glEnable(GL_DEPTH_TEST);
 
@@ -312,7 +431,12 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
             }
         }    
         
+        glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, shadowMap);
+        GLint shadowMapLoc = glGetUniformLocation(sceneShader->shader->getHandle(), "shadowMap");
+        if (shadowMapLoc >= 0) {
+            glUniform1i(shadowMapLoc, 1); // 1 = GL_TEXTURE1
+        }
         err = glGetError();
         if (err != GL_NO_ERROR) {
             printf("ERROR: 5\n");
@@ -379,11 +503,13 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
             
             if (viewCount == 2) {
                 glViewport(0, 0, cg.width, cg.height);
-                sceneShader->send("viewMatrix", viewMatrix1);                
+                sceneShader->send("viewMatrix", viewMatrix1); 
+                glActiveTexture(GL_TEXTURE0);               
                 drawMeshes(true, 0);
                 glViewport(0, cg.height*0.5, cg.width, cg.height*0.5);
                 auto fb = cg.instance->hw_render.get_current_framebuffer();
                 glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+                glActiveTexture(GL_TEXTURE0);
                 drawMeshes(false, 0);
                 cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
 
@@ -423,10 +549,12 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
                 glClear(GL_DEPTH_BUFFER_BIT);
                 glViewport(0, 0, cg.width, cg.height);
                 sceneShader->send("viewMatrix", viewMatrix2);
+                glActiveTexture(GL_TEXTURE0);
                 drawMeshes(true, 1);
                 glViewport(0, 0, cg.width, cg.height*0.5);
                 fb = cg.instance->hw_render.get_current_framebuffer();
                 glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+                glActiveTexture(GL_TEXTURE0);
                 drawMeshes(false, 1);
                 // auto fb = cg.instance->hw_render.get_current_framebuffer();
                 // printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
@@ -455,10 +583,12 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
                 glViewport(0, 0, cg.width, cg.height);
                 
                 sceneShader->send("viewMatrix", viewMatrix1);  
+                glActiveTexture(GL_TEXTURE0);
                 drawMeshes(true, 0);
                 glViewport(0, 0, cg.width*0.5, cg.height*0.5); 
                 auto fb = cg.instance->hw_render.get_current_framebuffer();
                 glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+                glActiveTexture(GL_TEXTURE0);
                 drawMeshes(false, 0);
                 
         
@@ -500,10 +630,12 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
                 glClear(GL_DEPTH_BUFFER_BIT);                
                 glViewport(0, 0, cg.width, cg.height);
                 sceneShader->send("viewMatrix", viewMatrix2);
+                glActiveTexture(GL_TEXTURE0);
                 drawMeshes(true, 1);
                 glViewport(cg.width*0.5, 0, cg.width*0.5, cg.height*0.5);
                 fb = cg.instance->hw_render.get_current_framebuffer();
                 glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+                glActiveTexture(GL_TEXTURE0);
                 drawMeshes(false, 1);
                 cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
 
@@ -543,6 +675,7 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
                 glClear(GL_DEPTH_BUFFER_BIT);
                 glViewport(0, 0, cg.width, cg.height);
                 sceneShader->send("viewMatrix", viewMatrix3);
+                glActiveTexture(GL_TEXTURE0);
                 drawMeshes(true, 2);
                 if (viewCount > 3) {                    
                     glViewport(0, cg.height*0.5, cg.width*0.5, cg.height*0.5);
@@ -551,6 +684,7 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
                 }
                 fb = cg.instance->hw_render.get_current_framebuffer();
                 glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+                glActiveTexture(GL_TEXTURE0);
                 drawMeshes(false, 2);
                 cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
 
@@ -591,10 +725,12 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
                 if (viewCount > 3) {                        
                     glViewport(0, 0, cg.width, cg.height);
                     sceneShader->send("viewMatrix", viewMatrix4);
+                    glActiveTexture(GL_TEXTURE0);
                     drawMeshes(true, 3);
                     glViewport(cg.width*0.5, cg.height*0.5, cg.width*0.5, cg.height*0.5);
                     fb = cg.instance->hw_render.get_current_framebuffer();
                     glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+                    glActiveTexture(GL_TEXTURE0);
                     drawMeshes(false, 3);
                 }
 
@@ -624,6 +760,7 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
             } else {
                 glViewport(0, 0, cg.width, cg.height);
                 sceneShader->send("viewMatrix", viewMatrix1);
+                glActiveTexture(GL_TEXTURE0);
                 drawMeshes(true, 0);
                 auto fb = cg.instance->hw_render.get_current_framebuffer();
                 // printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
@@ -634,6 +771,7 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
                 OptionalDouble cleardepth(1.0);
                 cg.instance->clear(clearcolor, clearstencil, cleardepth);
                 
+                glActiveTexture(GL_TEXTURE0);
                 drawMeshes(false, 0);
             }            
             cg.instance->setShader();
@@ -641,7 +779,7 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
     }
 }
 
-void chai_scene::loadingScreen() {
+void chai_scene::prepareScreen() {
     auto cg = ChaiLove::getInstance()->chai_gfx;
     cg.instance->setActive(true);
     cg.instance->setShader(sceneShader->shader);
@@ -651,22 +789,6 @@ void chai_scene::loadingScreen() {
     auto fb = cg.instance->hw_render.get_current_framebuffer();
     glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
     
-    // Bind the shadow map texture to texture unit 0
-    // glActiveTexture(GL_TEXTURE0);
-    // glBindTexture(GL_TEXTURE_2D, shadowMap);
-
-    // // Set the sampler uniform in your shader to use texture unit 0
-    // GLint shadowMapLoc = glGetUniformLocation(sceneShader->shader->getHandle(), "shadowMap");
-    // if (shadowMapLoc >= 0) {
-    //     glUniform1i(shadowMapLoc, 0); // 0 = GL_TEXTURE0
-    // }
-    
-    // gfx::OptionalColorD clearcolor;
-    // clearcolor = ColorD(1.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
-    // OptionalInt clearstencil(0);
-    // OptionalDouble cleardepth(1.0);
-    // cg.instance->clear(clearcolor, clearstencil, cleardepth);
-
     glViewport(0, 0, cg.width, cg.height);
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
@@ -690,43 +812,7 @@ void chai_scene::loadingScreen() {
         viewMatrixBoxed.push_back(chaiscript::Boxed_Value(glm::value_ptr(viewMatrix)[i]));
     }
     sceneShader->send("viewMatrix", viewMatrixBoxed);
-    // Set the light direction and color for the loading screen
-    // std::vector<chaiscript::Boxed_Value> lightDirection = { chaiscript::Boxed_Value(0.0f), chaiscript::Boxed_Value(-1.0f), chaiscript::Boxed_Value(0.0f) };
-    // sceneShader->send("lightDirection", lightDirection);
-    // std::vector<chaiscript::Boxed_Value> lightColor = { chaiscript::Boxed_Value(1.0f), chaiscript::Boxed_Value(1.0f), chaiscript::Boxed_Value(1.0f) };
-    // sceneShader->send("lightColor", lightColor);
-    // std::vector<chaiscript::Boxed_Value> ambientColor = { chaiscript::Boxed_Value(1.0f), chaiscript::Boxed_Value(1.0f), chaiscript::Boxed_Value(1.0f) };
-    // sceneShader->send("ambientColor", ambientColor);
-    // std::vector<chaiscript::Boxed_Value> lightIntensity = { chaiscript::Boxed_Value(1.0f) };
-    // sceneShader->send("lightIntensity", lightIntensity);
-    // std::vector<chaiscript::Boxed_Value> lightSpaceMatrixBoxed;
-    // glm::mat4 lightSpaceMatrix = glm::mat4(1.0f); // Identity matrix for the loading screen
-    // for (int i = 0; i < 16; ++i) {
-    //     lightSpaceMatrixBoxed.push_back(chaiscript::Boxed_Value(glm::value_ptr(lightSpaceMatrix)[i]));
-    // }
-    // sceneShader->send("lightSpaceMatrix", lightSpaceMatrixBoxed);
-    // sceneShader->send("shadow", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
-    // // Set the model matrix for the loading screen
-    // Matrix4 modelMatrix(new float[16] {
-    //     1.0f, 0.0f, 0.0f, 0.0f,
-    //     0.0f, 1.0f, 0.0f, 0.0f,
-    //     0.0f, 0.0f, 1.0f, 0.0f,
-    //     0.0f, 0.0f, 0.0f, 1.0f});
-    // std::vector<chaiscript::Boxed_Value> modelMatrixBoxed;
-    // // Assuming Matrix4 has a public 'data' member or similar
-  
-    // for (int i = 0; i < 4; ++i) {        
-    //     modelMatrixBoxed.push_back(chaiscript::Boxed_Value(modelMatrix.getColumn(i).x));
-    //     modelMatrixBoxed.push_back(chaiscript::Boxed_Value(modelMatrix.getColumn(i).y));
-    //     modelMatrixBoxed.push_back(chaiscript::Boxed_Value(modelMatrix.getColumn(i).z));
-    //     modelMatrixBoxed.push_back(chaiscript::Boxed_Value(modelMatrix.getColumn(i).w));
-    // }
-    // sceneShader->send("modelMatrix", modelMatrixBoxed);
-
-    // Draw LOADING 3D text model at the center of the screen
-   
-    // ChaiLove::getInstance()->printNew("LOADING", 0.0f, 0.0f, 255.0f, 255.0f, 255.0f, 255.0f);
-    // cg.instance->setShader();
+    
 }
 
 chai_scene *chai_scene::clone() const

@@ -110,6 +110,14 @@ std::string script::evalString(const std::string& code, const std::string& filen
 	return chai.eval<std::string>(contents, Exception_Handler(), filename);
 }
 
+void script::debugbreak() {
+	#ifdef _WIN32
+	__debugbreak();
+	#else
+	raise(SIGTRAP);
+	#endif
+}
+
 script::script(const std::string& file) {
 	#ifdef __HAVE_CHAISCRIPT__
 	ChaiLove* app = ChaiLove::getInstance();
@@ -151,6 +159,7 @@ script::script(const std::string& file) {
 		love["chai_matrices"] = var(std::ref(app->chai_matrices));
 		love["chai_collisions"] = var(std::ref(app->chai_collisions));
 		love["chai_particles"] = var(std::ref(app->chai_particles));
+		love["chai_gui"] = var(std::ref(app->chai_gui));
 		love["image"] = var(std::ref(app->image));
 		love["joystick"] = var(std::ref(app->joystick));
 		love["keyboard"] = var(std::ref(app->keyboard));
@@ -251,6 +260,9 @@ script::script(const std::string& file) {
 	chai.add(fun(&config::modules), "modules");
 	chai.add(fun(&config::options), "options");
 	chai.add(fun(&config::console), "console");
+
+	// Debug
+	chai.add(fun(&script::debugbreak, this), "debugbreak");
 
 	// Console
 	chai.add(fun(&console::isEnabled), "isEnabled");
@@ -375,7 +387,7 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_scene::draw), "draw");
 	chai.add(fun(&chai_scene::newScene), "newScene");
 	chai.add(fun(&chai_scene::destroy), "destroy");
-	chai.add(fun(&chai_scene::loadingScreen), "loadingScreen");
+	chai.add(fun(&chai_scene::prepareScreen), "prepareScreen");
 	chai.add(user_type<chai_collisions>(), "chai_collisions");
 	chai.add(constructor<chai_collisions(const chai_collisions &)>(), "chai_collisions");
 	chai.add(fun(&chai_collisions::operator=), "=");
@@ -392,6 +404,11 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_collisions::getCharacterController), "getCharacterController");
 	chai.add(fun(&chai_collisions::getRigidMesh), "getRigidMesh");
 	chai.add(fun(&chai_collisions::addBox), "addBox");	
+	chai.add(user_type<chai_gui>(), "chai_gui");
+	chai.add(constructor<chai_gui(const chai_gui &)>(), "chai_gui");
+	chai.add(fun(&chai_gui::operator=), "=");
+	chai.add(fun(&chai_gui::addElement), "addElement");
+	chai.add(fun(&chai_gui::draw), "draw");
 	
 	// Matrices
 	chai.add(fun(&chai_matrices::setTransformationMatrix), "setTransformationMatrix");
