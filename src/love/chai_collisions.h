@@ -22,10 +22,11 @@ class chai_collisions
     void test();
     void init(int group);
     void destroy();
-    void process();
-    std::vector<int> addRigidMesh(std::string meshPath, int mesh);
+    void process(float deltaTime);
+    std::vector<int> addRigidMesh(std::string meshPath, int mesh, bool makeConvex);
     void setCharacterControllerPosition(int characterIndex, float x, float y, float z, std::vector<int> group);
     void setRigidMeshPosition(std::vector<int> rigidMeshIndex, float x, float y, float z, std::vector<int> group);
+    void togglePhysics(std::vector<int> rigidMeshIndex, bool enable);
     int addCharacterController(int index, int meshRef, std::string charId);
     void applyForceToCharacter(int characterIndex, float x, float y, float z);
     void applyForceToRigidMesh(int rigidMeshIndex, float x, float y, float z);
@@ -33,6 +34,7 @@ class chai_collisions
     std::vector<float> getRigidMesh(int ref);
     int addBox(float x, float y, float z, float width, float height, float depth, std::vector<int> group, int index);
     std::vector<std::pair<glm::vec3, glm::vec3>> getBoundingBox(int mesh);
+    std::vector<Matrix4> getPhysicsObjects(int mesh);
 
     void clearWorlds()
     {

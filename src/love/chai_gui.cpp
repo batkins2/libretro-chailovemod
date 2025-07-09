@@ -40,8 +40,10 @@ void chai_gui::draw(chai_shader *shader)
     
     for (const auto &element : guiElements)
     {
-        // Example: Render each element based on its type, image, text, etc.
-        // This is where you would integrate with your graphics library to draw the GUI.
+        if (!element->visible)
+        {
+            continue; // Skip drawing if the element is not visible
+        }
         if (element->type == "text")
         {
             shader->send("scale", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(stof(element->options[6])) }));
@@ -123,5 +125,22 @@ void chai_gui::draw(chai_shader *shader)
     }
     glEnable(GL_DEPTH_TEST);
     cg.instance->setShader();
+}
+
+void chai_gui::setElementVisible(int id, bool visible)
+{
+    if (id < 0 || id >= guiElements.size())
+    {
+        return; // Invalid ID
+    }
+    guiElements[id]->visible = visible;
+}
+void chai_gui::setElementText(int id, const std::string &text)
+{
+    if (id < 0 || id >= guiElements.size())
+    {
+        return; // Invalid ID
+    }
+    guiElements[id]->text = text;
 }
 } // namespace love

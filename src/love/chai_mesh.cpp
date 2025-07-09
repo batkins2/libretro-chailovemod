@@ -1256,6 +1256,108 @@ std::vector<int> getChildNodes(std::map<int, std::vector<int>> nodeChildren, int
     return nodes;
 }
 
+void chai_mesh::update(std::vector<float> position, std::vector<float> rotation, std::vector<float> scale) {
+    auto cc = ChaiLove::getInstance()->chai_collisions;
+
+    auto po = cc.getPhysicsObjects(id);
+    for (int i = 0; i < po.size(); i++) {
+        auto physicsObjectMatrix = po[i];
+        printf("Replacing Object Matrix: %d\n", i);
+        printf("Matrix: %f %f %f %f\n", matrices[i].getColumn(0).x, matrices[i].getColumn(0).y, matrices[i].getColumn(0).z, matrices[i].getColumn(0).w);
+        printf("Matrix: %f %f %f %f\n", matrices[i].getColumn(1).x, matrices[i].getColumn(1).y, matrices[i].getColumn(1).z, matrices[i].getColumn(1).w);
+        printf("Matrix: %f %f %f %f\n", matrices[i].getColumn(2).x, matrices[i].getColumn(2).y, matrices[i].getColumn(2).z, matrices[i].getColumn(2).w);
+        printf("Matrix: %f %f %f %f\n", matrices[i].getColumn(3).x, matrices[i].getColumn(3).y, matrices[i].getColumn(3).z, matrices[i].getColumn(3).w);
+
+        glm::mat4 matrix = glm::mat4(
+            matrices[i].getColumn(0).x, matrices[i].getColumn(0).y, matrices[i].getColumn(0).z, matrices[i].getColumn(0).w,
+            matrices[i].getColumn(1).x, matrices[i].getColumn(1).y, matrices[i].getColumn(1).z, matrices[i].getColumn(1).w,
+            matrices[i].getColumn(2).x, matrices[i].getColumn(2).y, matrices[i].getColumn(2).z, matrices[i].getColumn(2).w,
+            matrices[i].getColumn(3).x, matrices[i].getColumn(3).y, matrices[i].getColumn(3).z, matrices[i].getColumn(3).w
+        );
+        glm::vec3 rot = glm::vec3(
+            glm::degrees(atan2(matrix[1][2], matrix[2][2])), // Yaw
+            glm::degrees(atan2(-matrix[0][2], sqrt(matrix[1][2] * matrix[1][2] + matrix[2][2] * matrix[2][2]))), // Pitch
+            glm::degrees(atan2(matrix[0][1], matrix[0][0]))  // Roll
+        );
+        printf("Rotation: %f %f %f\n", rot[0], rot[1], rot[2]);
+        // printf("Scale: %f %f %f\n", matrices[i].getColumn(0).w, matrices[i].getColumn(1).w, matrices[i].getColumn(2).w);
+
+        printf("Position: %f %f %f\n", position[0], position[1], position[2]);
+
+        // Compose transformation: scale -> rotation -> translation
+        glm::mat4 physMat = glm::mat4(
+            physicsObjectMatrix.getColumn(0).x, physicsObjectMatrix.getColumn(0).y, physicsObjectMatrix.getColumn(0).z, physicsObjectMatrix.getColumn(0).w,
+            physicsObjectMatrix.getColumn(1).x, physicsObjectMatrix.getColumn(1).y, physicsObjectMatrix.getColumn(1).z, physicsObjectMatrix.getColumn(1).w,
+            physicsObjectMatrix.getColumn(2).x, physicsObjectMatrix.getColumn(2).y, physicsObjectMatrix.getColumn(2).z, physicsObjectMatrix.getColumn(2).w,
+            physicsObjectMatrix.getColumn(3).x, physicsObjectMatrix.getColumn(3).y, physicsObjectMatrix.getColumn(3).z, physicsObjectMatrix.getColumn(3).w
+        );
+
+        // Conversion matrix: swap Y and Z axes (Z-up <-> Y-up)
+        glm::mat4 convert = glm::mat4(
+            1, 0, 0, 0,
+            0, 0, 1, 0,
+            0, 1, 0, 0,
+            0, 0, 0, 1
+        );
+
+        // To convert Bullet's Y-up to model's Z-up:
+        physMat = physMat * convert;
+
+        // Get the current position and rotation from the physics object
+        glm::vec3 currentPosition = glm::vec3(physMat[3][0]/0.4, physMat[3][2]/0.4, physMat[3][1]/-0.4); // Scale the position by 1.6 to match the original scale
+        glm::vec3 currentRotation = glm::vec3(
+            glm::degrees(atan2(physMat[1][2], physMat[2][2])), // Yaw
+            glm::degrees(atan2(-physMat[0][2], sqrt(physMat[1][2] * physMat[1][2] + physMat[2][2] * physMat[2][2]))), // Pitch
+            glm::degrees(atan2(physMat[0][1], physMat[0][0]))  // Roll
+        );
+        printf("Phys Rotation: %f %f %f\n", currentRotation[0], currentRotation[1], currentRotation[2]);
+        auto temp = currentRotation[2];
+        currentRotation[2] = currentRotation[1] * -1.0f;
+        currentRotation[1] = temp * -1.0f;
+        currentRotation[0] = currentRotation[0] * -1.0f;
+        // current position to mat4
+        glm::mat4 currentPositionMat = glm::translate(glm::mat4(1.0f), currentPosition);
+        printf("Phys Position: %f %f %f\n", currentPositionMat[3][0], currentPositionMat[3][1], currentPositionMat[3][2]);
+        // current rotation to mat4
+        glm::quat currentQuat = glm::quat(glm::vec3(glm::radians(currentRotation[0]), glm::radians(currentRotation[1]), glm::radians(currentRotation[2])));
+        glm::mat4 currentRotationMat = glm::mat4_cast(currentQuat);
+        // current scale to mat4
+        glm::mat4 currentScaleMat = glm::scale(glm::mat4(1.0f), glm::vec3(physMat[0][0], physMat[1][1], physMat[2][2]));
+        printf("Phys Scale: %f %f %f\n", currentScaleMat[0][0], currentScaleMat[1][1], currentScaleMat[2][2]);
+
+
+        // Compose transformation: scale -> rotation -> translation
+        glm::mat4 scaleMat2 = glm::scale(glm::mat4(1.0f), glm::vec3(scale[0], scale[1], scale[2]));
+        glm::quat q2 = glm::quat(glm::vec3(rotation[0], rotation[1], rotation[2])); // Pitch, Yaw, Roll (X, Y, Z)
+        glm::mat4 rotMat2 = glm::mat4_cast(q2);
+        auto o0 = position[0];
+        auto o1 = position[1];
+        auto o2 = position[2];
+        auto p0 = currentPosition[0];
+        auto p1 = currentPosition[1];
+        auto p2 = currentPosition[2];
+        auto b0 = matrix[3][0];
+        auto b1 = matrix[3][1];
+        auto b2 = matrix[3][2];
+        printf("Calc: %f \n", p1-o1-b1);
+        glm::vec3 translate = glm::vec3((o0-p0), (o1-p1), (o2-p2));
+        printf("Translate: %f %f %f\n", translate[0], translate[1], translate[2]);
+        glm::mat4 modelMat = glm::translate(matrix, translate); // Adjust for Z-up to Y-up conversion
+
+        // Compose: physics * user translation * user rotation * user scale
+        // glm::mat4 modelMat = transMat2 * matrix;
+
+        Matrix4 m = Matrix4(new float[16] {
+            currentRotationMat[0][0]*0.35f, currentRotationMat[0][1]*0.35f, currentRotationMat[0][2]*0.35f, modelMat[0][3],
+            currentRotationMat[1][0]*0.35f, currentRotationMat[1][1]*0.35f, currentRotationMat[1][2]*0.35f, modelMat[1][3],
+            currentRotationMat[2][0]*0.35f, currentRotationMat[2][1]*0.35f, currentRotationMat[2][2]*0.35f, modelMat[2][3],
+            translate[0]*0.35f, translate[2]*0.35f, translate[1]*0.35f, modelMat[3][3]
+        });
+
+        matrices[i] = m;
+    }
+}
+
 void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt) {
     if (mesh != nullptr) {
         mesh->draw(gfx, m);
@@ -1497,7 +1599,7 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                         }
                     }
                     if (animPlaying == 1) {
-                        activeAnimations[name].first += 0.01f;
+                        activeAnimations[name].first += dt; // Increment animation time
                     } else if (animPlaying == 0) {
                         if (loop) {
                             activeAnimations[name].first = 0.1f;

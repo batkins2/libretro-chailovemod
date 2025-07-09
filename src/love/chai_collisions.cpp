@@ -21,7 +21,7 @@ chai_collisions::chai_collisions()
 chai_collisions::~chai_collisions()
 {
 }
-std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef) 
+std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef, bool makeConvex) 
 {
     auto cl = ChaiLove::getInstance();
     auto f = cl->getFSModule();
@@ -120,6 +120,7 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
         printf("Model Matrix: %f, %f, %f, %f\n", modelMatrix[3][0], modelMatrix[3][1], modelMatrix[3][2], modelMatrix[3][3]);
 
         btTriangleMesh *mesh = new btTriangleMesh();
+        btConvexHullShape *convexShape = new btConvexHullShape();            
     
         auto primitive = model.meshes[i].primitives[0];
         auto positionAccessor = model.accessors[primitive.attributes["POSITION"]];
@@ -182,7 +183,24 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
                     // printf("vertices: %f, %f, %f\n", vertices[0], vertices[1], vertices[2]);
                     // printf("vertices: %f, %f, %f\n", vertices[3], vertices[4], vertices[5]);
                     // printf("vertices: %f, %f, %f\n", vertices[6], vertices[7], vertices[8]);
-                    mesh->addTriangle(btVector3(vertices[0], vertices[1], vertices[2]), btVector3(vertices[3], vertices[4], vertices[5]), btVector3(vertices[6], vertices[7], vertices[8]));
+                    if (makeConvex) {
+                        if (!isfinite(vertices[0]) || !isfinite(vertices[1]) || !isfinite(vertices[2]) ||
+                            !isfinite(vertices[3]) || !isfinite(vertices[4]) || !isfinite(vertices[5]) ||
+                            !isfinite(vertices[6]) || !isfinite(vertices[7]) || !isfinite(vertices[8])) {
+                            // Skip adding vertices if they are not finite
+                            printf("Skipping non-finite vertices: %f, %f, %f\n", vertices[0], vertices[1], vertices[2]);
+                            printf("Skipping non-finite vertices: %f, %f, %f\n", vertices[3], vertices[4], vertices[5]);
+                            printf("Skipping non-finite vertices: %f, %f, %f\n", vertices[6], vertices[7], vertices[8]);
+                            
+                        } else {
+                            // Add the vertices to the convex shape
+                            convexShape->addPoint(btVector3(vertices[0], vertices[1], vertices[2]));
+                            convexShape->addPoint(btVector3(vertices[3], vertices[4], vertices[5]));
+                            convexShape->addPoint(btVector3(vertices[6], vertices[7], vertices[8]));
+                        }
+                    } else {
+                        mesh->addTriangle(btVector3(vertices[0], vertices[1], vertices[2]), btVector3(vertices[3], vertices[4], vertices[5]), btVector3(vertices[6], vertices[7], vertices[8]));
+                    }
                     vertices.clear();
                 }
                 // printf("vertices: %f, %f, %f\n", vertices[0], vertices[1], vertices[2]);
@@ -241,7 +259,24 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
                     // printf("vertices: %f, %f, %f\n", vertices[0], vertices[1], vertices[2]);
                     // printf("vertices: %f, %f, %f\n", vertices[3], vertices[4], vertices[5]);
                     // printf("vertices: %f, %f, %f\n", vertices[6], vertices[7], vertices[8]);
-                    mesh->addTriangle(btVector3(vertices[0], vertices[1], vertices[2]), btVector3(vertices[3], vertices[4], vertices[5]), btVector3(vertices[6], vertices[7], vertices[8]));
+                    if (makeConvex) {
+                        if (!isfinite(vertices[0]) || !isfinite(vertices[1]) || !isfinite(vertices[2]) ||
+                            !isfinite(vertices[3]) || !isfinite(vertices[4]) || !isfinite(vertices[5]) ||
+                            !isfinite(vertices[6]) || !isfinite(vertices[7]) || !isfinite(vertices[8])) {
+                            // Skip adding vertices if they are not finite
+                            printf("Skipping non-finite vertices: %f, %f, %f\n", vertices[0], vertices[1], vertices[2]);
+                            printf("Skipping non-finite vertices: %f, %f, %f\n", vertices[3], vertices[4], vertices[5]);
+                            printf("Skipping non-finite vertices: %f, %f, %f\n", vertices[6], vertices[7], vertices[8]);
+                            
+                        } else {
+                            // Add the vertices to the convex shape
+                            convexShape->addPoint(btVector3(vertices[0], vertices[1], vertices[2]));
+                            convexShape->addPoint(btVector3(vertices[3], vertices[4], vertices[5]));
+                            convexShape->addPoint(btVector3(vertices[6], vertices[7], vertices[8]));
+                        }
+                    } else {
+                        mesh->addTriangle(btVector3(vertices[0], vertices[1], vertices[2]), btVector3(vertices[3], vertices[4], vertices[5]), btVector3(vertices[6], vertices[7], vertices[8]));
+                    }
                     vertices.clear();
                 }
                 // printf("vertices: %f, %f, %f\n", vertices[0], vertices[1], vertices[2]);
@@ -250,11 +285,18 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
             }
         }
 
-        btBvhTriangleMeshShape *shape = new btBvhTriangleMeshShape(mesh, true);
-        btDefaultMotionState *motionState = new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, 0, 0)));
-        btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(0, motionState, shape, btVector3(0, 0, 0));
-        btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
-        rigidMeshes.emplace_back(new RigidMesh(mesh, rigidBody, meshRef));     
+        if (makeConvex) {
+            btDefaultMotionState *motionState = new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, 0, 0)));
+            btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(0, motionState, convexShape, btVector3(0, 0, 0));    
+            btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
+            rigidMeshes.emplace_back(new RigidMesh(mesh, rigidBody, meshRef));  
+        } else {
+            btBvhTriangleMeshShape *shape = new btBvhTriangleMeshShape(mesh, true);
+            btDefaultMotionState *motionState = new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, 0, 0)));
+            btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(0, motionState, shape, btVector3(0, 0, 0));    
+            btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
+            rigidMeshes.emplace_back(new RigidMesh(mesh, rigidBody, meshRef));   
+        }  
         refs.push_back(count);
         count++;
     }
@@ -274,8 +316,44 @@ void chai_collisions::setRigidMeshPosition(std::vector<int> rigidMeshIndex, floa
             worlds->worlds[g]->dynamicsWorld->addRigidBody(r, btBroadphaseProxy::StaticFilter, btBroadphaseProxy::DefaultFilter | btBroadphaseProxy::CharacterFilter);
         }
         rigidMeshes[i]->rigidBody->setCollisionFlags(btCollisionObject::CF_STATIC_OBJECT);
-        rigidMeshes[i]->rigidBody->setWorldTransform(btTransform(btQuaternion(0, 0, 0, 1), btVector3(x, y, z)));
+        rigidMeshes[i]->rigidBody->setWorldTransform(btTransform(btQuaternion(0, 0, 0, 1), btVector3(x, y, z) * 0.4f));
     }              
+}
+void chai_collisions::togglePhysics(std::vector<int> rigidMeshIndex, bool enable)
+{
+    for (auto i : rigidMeshIndex) {
+        auto r = rigidMeshes[i]->rigidBody;
+        if (enable) {
+            worlds->worlds[0]->dynamicsWorld->removeRigidBody(r);
+            
+            r->setCollisionFlags(btCollisionObject::CF_DYNAMIC_OBJECT);
+            r->setActivationState(DISABLE_DEACTIVATION); // Disable deactivation to keep the rigid body active
+            btVector3 inertia;
+            btScalar mass = 1000.0f; // Set mass to 1.0f for the rigid body
+            r->getCollisionShape()->calculateLocalInertia(mass, inertia); 
+            r->setMassProps(mass, inertia);
+            // r->setCollisionFlags(r->getCollisionFlags() & ~btCollisionObject::CF_STATIC_OBJECT);
+            // r->setLinearFactor(btVector3(0.1, 0.1, 0.1)); // Enable movement in all directions
+            r->setGravity(btVector3(0, -200.0f, 0));
+            r->setLinearVelocity(btVector3(0, 0, 0)); // Reset linear velocity
+            r->setAngularVelocity(btVector3(0, 0, 0)); // Reset angular velocity
+            r->setFriction(0.1f); // Set friction to a reasonable value
+            r->setRestitution(0.0f); // Set restitution to a reasonable value
+            r->setRollingFriction(0.1f); // Set rolling friction to a
+            r->setSpinningFriction(0.1f); // Set spinning friction to a reasonable value
+            r->setDamping(0.1f, 0.1f);       
+
+            // applyForceToRigidMesh(i, 0, 5, 0); // Reset any previous forces applied to the rigid body
+           
+            worlds->worlds[0]->dynamicsWorld->addRigidBody(r); 
+            // Set the collision flags to dynamic
+
+        } else {
+            // Turn off gravity and set the rigid body to static
+            r->setCollisionFlags(r->getCollisionFlags() | btCollisionObject::CF_STATIC_OBJECT);
+            r->setGravity(btVector3(0, 0, 0));
+        }
+    }
 }
 int chai_collisions::addCharacterController(int index, int meshRef, std::string charId)
 {
@@ -451,6 +529,28 @@ std::vector<std::pair<glm::vec3, glm::vec3>> chai_collisions::getBoundingBox(int
     return bb;
 }
 
+std::vector<Matrix4> chai_collisions::getPhysicsObjects(int mesh)
+{
+    std::vector<Matrix4> objects;
+    for (auto &m : rigidMeshes) {
+        if (m->meshRef == mesh) {
+            btTransform transform = m->rigidBody->getWorldTransform();
+            Matrix4 mat = Matrix4(new float[16]{
+                (float)transform.getBasis()[0][0], (float)transform.getBasis()[0][1], (float)transform.getBasis()[0][2], 0.0f,
+                (float)transform.getBasis()[1][0], (float)transform.getBasis()[1][1], (float)transform.getBasis()[1][2], 0.0f,
+                (float)transform.getBasis()[2][0], (float)transform.getBasis()[2][1], (float)transform.getBasis()[2][2], 0.0f,
+                (float)transform.getOrigin().getX(), (float)transform.getOrigin().getY(), (float)transform.getOrigin().getZ(), 1.0f
+            });
+            printf("Origin: %f, %f, %f\n", 
+                transform.getOrigin().getX(), 
+                transform.getOrigin().getY(), 
+                transform.getOrigin().getZ());
+            objects.push_back(mat);
+        }
+    }
+    return objects;
+}
+
 void chai_collisions::init(int group = 0)
 {    
     btBroadphaseInterface *broadphase = new btDbvtBroadphase();
@@ -465,7 +565,7 @@ void chai_collisions::init(int group = 0)
     }
     worlds->worlds[group] = w;
     
-    worlds->worlds[group]->dynamicsWorld->setGravity(btVector3(0, -0.01, 0)); 
+    worlds->worlds[group]->dynamicsWorld->setGravity(btVector3(0, -9.81f, 0)); 
     
     worlds->worlds[group]->dynamicsWorld->setInternalTickCallback([](btDynamicsWorld *world, btScalar timeStep) {
         chai_collisions *self = static_cast<chai_collisions *>(world->getWorldUserInfo());
@@ -497,12 +597,14 @@ void chai_collisions::init(int group = 0)
                 // Optional: Normalize the direction vector
                 collisionDirection.normalize();
 
-                auto b = self->cameraBox[body1->getUserIndex()];
-                b->setLinearVelocity(btVector3(-collisionDirection.getX() * 6.0f, 0.0f, 0.0f));
-                auto c = self->characterControllers[body1->getUserIndex()]->character;
-                // auto v = c->getLinearVelocity();
-                // c->getGhostObject()->setLinearVelocity(btVector3(v.getX(), v.getY(), 0.0f));
-                c->getGhostObject()->setUserIndex2(collisionDirection.getZ() > 0 ? 1 : collisionDirection.getZ() < 0 ? -1 : 0);                
+                if (body1->getUserIndex() != -1) {
+                    auto b = self->cameraBox[body1->getUserIndex()];
+                    b->setLinearVelocity(btVector3(-collisionDirection.getX() * 6.0f, 0.0f, 0.0f));
+                    auto c = self->characterControllers[body1->getUserIndex()]->character;
+                    // auto v = c->getLinearVelocity();
+                    // c->getGhostObject()->setLinearVelocity(btVector3(v.getX(), v.getY(), 0.0f));
+                    c->getGhostObject()->setUserIndex2(collisionDirection.getZ() > 0 ? 1 : collisionDirection.getZ() < 0 ? -1 : 0);       
+                }         
             }
         }
         for (int i = 0; i < self->cameraBox.size(); ++i) {            
@@ -519,7 +621,7 @@ void chai_collisions::init(int group = 0)
     }, this);
 
     // Initialize the debug drawer
-    if (false && debugDrawer == nullptr) { 
+    if (debugDrawer == nullptr) { 
         debugDrawer = new OpenGLDebugDrawer();
         debugDrawer->setDebugMode(btIDebugDraw::DBG_DrawWireframe | btIDebugDraw::DBG_DrawAabb);
         worlds->worlds[group]->dynamicsWorld->setDebugDrawer(debugDrawer);
@@ -555,7 +657,7 @@ void chai_collisions::destroy()
     debugDrawer = nullptr;
     delete worlds;
 }
-void chai_collisions::process()
+void chai_collisions::process(float deltaTime)
 {    
     for (auto &dw : worlds->worlds) {
         for (auto &cc : characterControllers) {
@@ -576,7 +678,7 @@ void chai_collisions::process()
             
             // printf("ghost pos: %f, %f, %f\n", pos.getX(), pos.getY(), pos.getZ());
         }
-        dw.second->dynamicsWorld->stepSimulation(1 / 60.f, 10);  
+        dw.second->dynamicsWorld->stepSimulation(deltaTime, 10);  
         if (debugDrawer) {
             btVector3 gravity = dw.second->dynamicsWorld->getGravity();
             // printf("Gravity: %f, %f, %f\n", gravity.getX(), gravity.getY(), gravity.getZ());   

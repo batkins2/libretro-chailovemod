@@ -22,6 +22,7 @@ public:
         std::string text;
         std::vector<std::string> options;
         gfx::Texture *texture = nullptr;
+        bool visible = true; // Added visibility flag
     };
     
 
@@ -31,6 +32,8 @@ public:
     chai_gui *newGui() const;
     int addElement(std::string type, std::string image, std::string text, const std::vector<std::string> options);
     void draw(chai_shader *shader);
+    void setElementVisible(int id, bool visible);
+    void setElementText(int id, const std::string &text);
     std::vector<chai_guiData*> guiElements;
 };
 }

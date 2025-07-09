@@ -33,13 +33,15 @@ public:
     void drawMeshes(bool shadows, int view);
     void draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vector<chaiscript::Boxed_Value> viewMatrix2, std::vector<chaiscript::Boxed_Value> viewMatrix3, std::vector<chaiscript::Boxed_Value> viewMatrix4, int viewCount);
     void prepareScreen();
+    void update(float dt);
 
 private:
     std::vector<chai_mesh *> meshes;
     std::vector<chai_particles *> particleSystems;
     chai_shader *sceneShader = nullptr;
     std::vector<Matrix4> matrices;
-    float currentTime = 0.0f;
+    float currentTime = 0.01f;
+    float deltaTime = 0.01f;
     std::vector<chaiscript::Boxed_Value> viewMatrix;
     GLuint shadowMapFBO = 0;
     GLuint shadowMap = 0;

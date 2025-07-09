@@ -362,7 +362,7 @@ void chai_scene::drawMeshes(bool shadows, int view) {
 
         
         auto matrix = matrices[i];
-        mesh->draw(cg.instance, matrix, sceneShader, currentTime);
+        mesh->draw(cg.instance, matrix, sceneShader, deltaTime);
         i++;
     }
     if (shadows == false) {
@@ -499,7 +499,7 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
             printf("cg.instance->FRAMEBUFFER: %d\n", cg.instance->FRAMEBUFFER);
         } else {
             
-            currentTime += 0.01f;
+            // currentTime += 500.0f;
             
             if (viewCount == 2) {
                 glViewport(0, 0, cg.width, cg.height);
@@ -582,14 +582,14 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
             } else if (viewCount > 2) {
                 glViewport(0, 0, cg.width, cg.height);
                 
-                sceneShader->send("viewMatrix", viewMatrix1);  
+                sceneShader->send("viewMatrix", viewCount > 3 ? viewMatrix3 : viewMatrix2);  
                 glActiveTexture(GL_TEXTURE0);
-                drawMeshes(true, 0);
+                drawMeshes(true, viewCount > 3 ? 2 : 1);
                 glViewport(0, 0, cg.width*0.5, cg.height*0.5); 
                 auto fb = cg.instance->hw_render.get_current_framebuffer();
                 glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
                 glActiveTexture(GL_TEXTURE0);
-                drawMeshes(false, 0);
+                drawMeshes(false, viewCount > 3 ? 2 : 1);
                 
         
                 cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
@@ -629,14 +629,14 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
                 glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
                 glClear(GL_DEPTH_BUFFER_BIT);                
                 glViewport(0, 0, cg.width, cg.height);
-                sceneShader->send("viewMatrix", viewMatrix2);
+                sceneShader->send("viewMatrix", viewCount > 3 ? viewMatrix4 : viewMatrix3);
                 glActiveTexture(GL_TEXTURE0);
-                drawMeshes(true, 1);
+                drawMeshes(true, viewCount > 3 ? 3 : 2);
                 glViewport(cg.width*0.5, 0, cg.width*0.5, cg.height*0.5);
                 fb = cg.instance->hw_render.get_current_framebuffer();
                 glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
                 glActiveTexture(GL_TEXTURE0);
-                drawMeshes(false, 1);
+                drawMeshes(false, viewCount > 3 ? 3 : 2);
                 cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
 
 
@@ -674,9 +674,9 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
                 glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
                 glClear(GL_DEPTH_BUFFER_BIT);
                 glViewport(0, 0, cg.width, cg.height);
-                sceneShader->send("viewMatrix", viewMatrix3);
+                sceneShader->send("viewMatrix", viewMatrix1);
                 glActiveTexture(GL_TEXTURE0);
-                drawMeshes(true, 2);
+                drawMeshes(true, 0);
                 if (viewCount > 3) {                    
                     glViewport(0, cg.height*0.5, cg.width*0.5, cg.height*0.5);
                 } else {
@@ -685,7 +685,7 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
                 fb = cg.instance->hw_render.get_current_framebuffer();
                 glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
                 glActiveTexture(GL_TEXTURE0);
-                drawMeshes(false, 2);
+                drawMeshes(false, 0);
                 cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
 
 
@@ -724,14 +724,14 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
                 glClear(GL_DEPTH_BUFFER_BIT);
                 if (viewCount > 3) {                        
                     glViewport(0, 0, cg.width, cg.height);
-                    sceneShader->send("viewMatrix", viewMatrix4);
+                    sceneShader->send("viewMatrix", viewMatrix2);
                     glActiveTexture(GL_TEXTURE0);
-                    drawMeshes(true, 3);
+                    drawMeshes(true, 1);
                     glViewport(cg.width*0.5, cg.height*0.5, cg.width*0.5, cg.height*0.5);
                     fb = cg.instance->hw_render.get_current_framebuffer();
                     glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
                     glActiveTexture(GL_TEXTURE0);
-                    drawMeshes(false, 3);
+                    drawMeshes(false, 1);
                 }
 
                 // auto fb = cg.instance->hw_render.get_current_framebuffer();
@@ -813,6 +813,11 @@ void chai_scene::prepareScreen() {
     }
     sceneShader->send("viewMatrix", viewMatrixBoxed);
     
+}
+
+void chai_scene::update(float dt) {
+    currentTime += dt;
+    deltaTime = dt;
 }
 
 chai_scene *chai_scene::clone() const

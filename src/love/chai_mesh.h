@@ -94,6 +94,7 @@ class chai_mesh {
     void draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt);
     void setVisible(bool visible);
     void reloadMesh();
+    void update(std::vector<float> position, std::vector<float> rotation, std::vector<float> scale);
     std::pair<glm::vec3, glm::vec3> getBoundingBox(const glm::mat4 &viewProjectionMatrix);
     std::vector<float> getMeshBoundingBox();
     bool isVisible() {
