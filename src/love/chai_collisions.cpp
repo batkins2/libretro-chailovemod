@@ -1,5 +1,6 @@
 #include "../ChaiLove.h"
 #include <cmath> // For M_PI
+#include <GL/gl.h> // For OpenGL functions like glOrtho
 #ifndef TINY_GLTF_H_
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -114,10 +115,10 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
             }
         }
 
-        printf("Model Matrix: %f, %f, %f, %f\n", modelMatrix[0][0], modelMatrix[0][1], modelMatrix[0][2], modelMatrix[0][3]);
-        printf("Model Matrix: %f, %f, %f, %f\n", modelMatrix[1][0], modelMatrix[1][1], modelMatrix[1][2], modelMatrix[1][3]);
-        printf("Model Matrix: %f, %f, %f, %f\n", modelMatrix[2][0], modelMatrix[2][1], modelMatrix[2][2], modelMatrix[2][3]);
-        printf("Model Matrix: %f, %f, %f, %f\n", modelMatrix[3][0], modelMatrix[3][1], modelMatrix[3][2], modelMatrix[3][3]);
+        // printf("Model Matrix: %f, %f, %f, %f\n", modelMatrix[0][0], modelMatrix[0][1], modelMatrix[0][2], modelMatrix[0][3]);
+        // printf("Model Matrix: %f, %f, %f, %f\n", modelMatrix[1][0], modelMatrix[1][1], modelMatrix[1][2], modelMatrix[1][3]);
+        // printf("Model Matrix: %f, %f, %f, %f\n", modelMatrix[2][0], modelMatrix[2][1], modelMatrix[2][2], modelMatrix[2][3]);
+        // printf("Model Matrix: %f, %f, %f, %f\n", modelMatrix[3][0], modelMatrix[3][1], modelMatrix[3][2], modelMatrix[3][3]);
 
         btTriangleMesh *mesh = new btTriangleMesh();
         btConvexHullShape *convexShape = new btConvexHullShape();            
@@ -161,17 +162,17 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
                 // }
                 if (vertices.size() == 9) {
                     auto m = modelMatrix * glm::vec4(vertices[0], vertices[1], vertices[2], 1.0f);
-                    vertices[0] = m.x;
-                    vertices[1] = m.y;
-                    vertices[2] = m.z;
+                    // vertices[0] = m.x;
+                    // vertices[1] = m.y;
+                    // vertices[2] = m.z;
                     m = modelMatrix * glm::vec4(vertices[3], vertices[4], vertices[5], 1.0f);
-                    vertices[3] = m.x;
-                    vertices[4] = m.y;
-                    vertices[5] = m.z;
+                    // vertices[3] = m.x;
+                    // vertices[4] = m.y;
+                    // vertices[5] = m.z;
                     m = modelMatrix * glm::vec4(vertices[6], vertices[7], vertices[8], 1.0f);
-                    vertices[6] = m.x;
-                    vertices[7] = m.y;
-                    vertices[8] = m.z;
+                    // vertices[6] = m.x;
+                    // vertices[7] = m.y;
+                    // vertices[8] = m.z;
                     if (false) {
                         // Define the vertices of the triangle
                         glBegin(GL_TRIANGLES);
@@ -237,17 +238,17 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
                 // }
                 if (vertices.size() == 9) {
                     auto m = modelMatrix * glm::vec4(vertices[0], vertices[1], vertices[2], 1.0f);
-                    vertices[0] = m.x;
-                    vertices[1] = m.y;
-                    vertices[2] = m.z;
+                    // vertices[0] = m.x;
+                    // vertices[1] = m.y;
+                    // vertices[2] = m.z;
                     m = modelMatrix * glm::vec4(vertices[3], vertices[4], vertices[5], 1.0f);
-                    vertices[3] = m.x;
-                    vertices[4] = m.y;
-                    vertices[5] = m.z;
+                    // vertices[3] = m.x;
+                    // vertices[4] = m.y;
+                    // vertices[5] = m.z;
                     m = modelMatrix * glm::vec4(vertices[6], vertices[7], vertices[8], 1.0f);
-                    vertices[6] = m.x;
-                    vertices[7] = m.y;
-                    vertices[8] = m.z;
+                    // vertices[6] = m.x;
+                    // vertices[7] = m.y;
+                    // vertices[8] = m.z;
                     if (false) {
                         // Define the vertices of the triangle
                         glBegin(GL_TRIANGLES);
@@ -289,12 +290,14 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
             btDefaultMotionState *motionState = new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, 0, 0)));
             btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(0, motionState, convexShape, btVector3(0, 0, 0));    
             btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
+            rigidBody->setWorldTransform(btTransform(btQuaternion(0, 0, 0, 1), btVector3(modelMatrix[3][0], modelMatrix[3][1], modelMatrix[3][2])));
             rigidMeshes.emplace_back(new RigidMesh(mesh, rigidBody, meshRef));  
         } else {
             btBvhTriangleMeshShape *shape = new btBvhTriangleMeshShape(mesh, true);
             btDefaultMotionState *motionState = new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, 0, 0)));
             btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(0, motionState, shape, btVector3(0, 0, 0));    
             btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
+            rigidBody->setWorldTransform(btTransform(btQuaternion(0, 0, 0, 1), btVector3(modelMatrix[3][0], modelMatrix[3][1], modelMatrix[3][2])));
             rigidMeshes.emplace_back(new RigidMesh(mesh, rigidBody, meshRef));   
         }  
         refs.push_back(count);
@@ -306,6 +309,8 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
 }
 void chai_collisions::setRigidMeshPosition(std::vector<int> rigidMeshIndex, float x, float y, float z, std::vector<int> group = {0})
 {
+    int idx = 0;
+    btTransform transform;
     for (auto i : rigidMeshIndex) {        
         auto r = rigidMeshes[i]->rigidBody;
         for (auto g : group) {
@@ -316,7 +321,13 @@ void chai_collisions::setRigidMeshPosition(std::vector<int> rigidMeshIndex, floa
             worlds->worlds[g]->dynamicsWorld->addRigidBody(r, btBroadphaseProxy::StaticFilter, btBroadphaseProxy::DefaultFilter | btBroadphaseProxy::CharacterFilter);
         }
         rigidMeshes[i]->rigidBody->setCollisionFlags(btCollisionObject::CF_STATIC_OBJECT);
-        rigidMeshes[i]->rigidBody->setWorldTransform(btTransform(btQuaternion(0, 0, 0, 1), btVector3(x, y, z) * 0.4f));
+
+        if (true || idx == 0) {
+            transform = rigidMeshes[i]->rigidBody->getWorldTransform();
+        }
+        printf("x,y,z: %f,%f,%f\n", transform.getOrigin().getX(), transform.getOrigin().getY(), transform.getOrigin().getZ());
+        rigidMeshes[i]->rigidBody->setWorldTransform(btTransform(btQuaternion(0, 0, 0, 1), (btVector3(x, y, z) + btVector3(transform.getOrigin().getX(), transform.getOrigin().getY(), transform.getOrigin().getZ()))));
+        idx++;
     }              
 }
 void chai_collisions::togglePhysics(std::vector<int> rigidMeshIndex, bool enable)
@@ -334,7 +345,7 @@ void chai_collisions::togglePhysics(std::vector<int> rigidMeshIndex, bool enable
             r->setMassProps(mass, inertia);
             // r->setCollisionFlags(r->getCollisionFlags() & ~btCollisionObject::CF_STATIC_OBJECT);
             // r->setLinearFactor(btVector3(0.1, 0.1, 0.1)); // Enable movement in all directions
-            r->setGravity(btVector3(0, -200.0f, 0));
+            r->setGravity(btVector3(0, -9.81f, 0));
             r->setLinearVelocity(btVector3(0, 0, 0)); // Reset linear velocity
             r->setAngularVelocity(btVector3(0, 0, 0)); // Reset angular velocity
             r->setFriction(0.1f); // Set friction to a reasonable value
@@ -532,21 +543,56 @@ std::vector<std::pair<glm::vec3, glm::vec3>> chai_collisions::getBoundingBox(int
 std::vector<Matrix4> chai_collisions::getPhysicsObjects(int mesh)
 {
     std::vector<Matrix4> objects;
+    int idx = 0;
     for (auto &m : rigidMeshes) {
         if (m->meshRef == mesh) {
             btTransform transform = m->rigidBody->getWorldTransform();
-            Matrix4 mat = Matrix4(new float[16]{
+            glm::mat4 modelMat(
                 (float)transform.getBasis()[0][0], (float)transform.getBasis()[0][1], (float)transform.getBasis()[0][2], 0.0f,
                 (float)transform.getBasis()[1][0], (float)transform.getBasis()[1][1], (float)transform.getBasis()[1][2], 0.0f,
                 (float)transform.getBasis()[2][0], (float)transform.getBasis()[2][1], (float)transform.getBasis()[2][2], 0.0f,
                 (float)transform.getOrigin().getX(), (float)transform.getOrigin().getY(), (float)transform.getOrigin().getZ(), 1.0f
+            );
+
+            glm::mat4 projection = glm::perspective(
+                glm::radians(26.0f), 
+                debugDrawer->aspectRatio, 
+                debugDrawer->nearPlane, 
+                debugDrawer->farPlane
+            );
+            glm::vec3 vec(1.0f,1.0f,1.0f);
+            glm::vec3 up(0.0f,1.0f,0.0f);
+            glm::mat4 view = glm::lookAt(
+                vec, 
+                vec, 
+                up
+            );
+
+            glm::mat4 reflect = glm::mat4(
+                1,  0,  0, 0,
+                0, 1,  0, 0,
+                0,  0,  1, 0,
+                0,  0,  0, 1
+            );
+
+            // modelMat *= reflect;
+
+            // modelMat = view * modelMat;
+            // modelMat = 20.0f;
+
+            Matrix4 mat = Matrix4(new float[16] {
+                modelMat[0][0], modelMat[0][1], modelMat[0][2], modelMat[0][3],
+                modelMat[1][0], modelMat[1][1], modelMat[1][2], modelMat[1][3],
+                modelMat[2][0], modelMat[2][1], modelMat[2][2], modelMat[2][3],
+                modelMat[3][0], modelMat[3][1], modelMat[3][2], modelMat[3][3],
             });
-            printf("Origin: %f, %f, %f\n", 
-                transform.getOrigin().getX(), 
-                transform.getOrigin().getY(), 
-                transform.getOrigin().getZ());
+            // printf("Origin: %f, %f, %f\n", 
+                // transform.getOrigin().getX(), 
+                // transform.getOrigin().getY(), 
+                // transform.getOrigin().getZ());
             objects.push_back(mat);
         }
+        idx++;
     }
     return objects;
 }
@@ -607,7 +653,8 @@ void chai_collisions::init(int group = 0)
                 }         
             }
         }
-        for (int i = 0; i < self->cameraBox.size(); ++i) {            
+        for (int i = 0; i < self->cameraBox.size(); ++i) { 
+            self->cameraBox[i]->setGravity(btVector3(0, 0, 0));           
             if (!contact[i]) {
                 auto b = self->cameraBox[i];                
                 if (b != nullptr) {
@@ -657,6 +704,176 @@ void chai_collisions::destroy()
     debugDrawer = nullptr;
     delete worlds;
 }
+
+uint8_t* chai_collisions::processDebug(float deltaTime, std::vector<chaiscript::Boxed_Value> viewMatrix)
+{
+    auto width = 1920; // Set your desired width
+    auto height = 1080; // Set your desired height
+    if (!debugDrawer->debugTexture) {
+        glGenTextures(1, &debugDrawer->debugTexture);
+    }
+
+    glBindTexture(GL_TEXTURE_2D, debugDrawer->debugTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    if (!debugDrawer->debugFBO) {
+        glGenFramebuffers(1, &debugDrawer->debugFBO);
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, debugDrawer->debugFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, debugDrawer->debugTexture, 0);
+
+    glViewport(0, 0, width, height);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+
+    for (auto &dw : worlds->worlds) {
+        for (auto &cc : characterControllers) {
+            auto stopZ = cc->ghostObject->getUserIndex2();
+            auto v = cc->character->getLinearVelocity();
+            if (stopZ > 0 && v.getZ() < 0) {                
+                cc->character->setWalkDirection(btVector3(v.getX(), v.getY(), 0.0f));
+            }
+            if (stopZ < 0 && v.getZ() > 0) {                
+                cc->character->setWalkDirection(btVector3(v.getX(), v.getY(), 0.0f));
+            }
+            cc->character->preStep(dw.second->dynamicsWorld);
+            cc->character->playerStep(dw.second->dynamicsWorld, 1);
+            
+            cc->character->setWalkDirection(btVector3(0.0f, 0.0f, 0.0f));
+
+            btVector3 pos = cc->ghostObject->getWorldTransform().getOrigin();
+            
+            // printf("ghost pos: %f, %f, %f\n", pos.getX(), pos.getY(), pos.getZ());
+        }
+        dw.second->dynamicsWorld->stepSimulation(deltaTime, 10);  
+        if (debugDrawer) {
+            std::vector<float> prepD;
+            for (auto d : viewMatrix) {
+                auto v = chaiscript::boxed_cast<float>(d);
+                prepD.push_back(v);
+            }
+
+            btVector3 gravity = dw.second->dynamicsWorld->getGravity();
+            // printf("Gravity: %f, %f, %f\n", gravity.getX(), gravity.getY(), gravity.getZ());   
+
+            btVector3 min, max;
+            min.setValue(FLT_MAX, FLT_MAX, FLT_MAX);
+            max.setValue(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+
+            for (int i = 0; i < dw.second->dynamicsWorld->getNumCollisionObjects(); i++) {
+                btCollisionObject *obj = dw.second->dynamicsWorld->getCollisionObjectArray()[i];
+                btVector3 aabbMin, aabbMax;
+                obj->getCollisionShape()->getAabb(obj->getWorldTransform(), aabbMin, aabbMax);
+
+                min.setMin(aabbMin);
+                max.setMax(aabbMax);
+            }
+
+            // Calculate the center and size of the bounding box
+            btVector3 center = (min + max) * 0.5;
+            btVector3 size = max - min;
+
+            // Set the camera target to the center of the geometry
+            debugDrawer->cameraTarget = glm::vec3(-prepD[12], prepD[13]*0.4f, prepD[14]*2.0f);
+
+            // Position the camera far enough to fit the geometry
+            float maxDimension = std::max(size.getX(), std::max(size.getY(), size.getZ()));
+            float horizontalFOV = 2.0f * atan(tan(glm::radians(debugDrawer->fov) / 2.0f) * debugDrawer->aspectRatio);
+            float distance = maxDimension / (2.0f * tan(horizontalFOV / 2.0f)) / 2.0f; // Adjust the divisor to control the distance
+            debugDrawer->cameraPosition = glm::vec3(-prepD[12], -prepD[13]*2.4f, -prepD[14]/0.4f);
+            
+            debugDrawer->fov = 7.0f; // Set the field of view
+
+            // Ensure the up vector is correct
+            debugDrawer->upVector = glm::vec3(0.0f, 1.0f, 0.0f);
+
+            // Adjust the near and far planes
+            debugDrawer->nearPlane = 0.1f;
+            // debugDrawer->farPlane = distance + maxDimension * 2.0f;
+            debugDrawer->farPlane = 100.0f;
+
+            // Set the projection matrix
+            glMatrixMode(GL_PROJECTION);
+            glLoadIdentity();
+            glm::mat4 projection = glm::perspective(glm::radians(debugDrawer->fov), debugDrawer->aspectRatio, debugDrawer->nearPlane, debugDrawer->farPlane);
+            glLoadMatrixf(glm::value_ptr(projection));
+
+            // Set the view matrix
+            glMatrixMode(GL_MODELVIEW);
+            glLoadIdentity();
+            glm::mat4 view = glm::lookAt(debugDrawer->cameraPosition, debugDrawer->cameraTarget, debugDrawer->upVector);
+            glLoadMatrixf(glm::value_ptr(view));
+            
+            // printf("Camera Position: %f, %f, %f\n", debugDrawer->cameraPosition.x, debugDrawer->cameraPosition.y, debugDrawer->cameraPosition.z);
+            // printf("Camera Target: %f, %f, %f\n", debugDrawer->cameraTarget.x, debugDrawer->cameraTarget.y, debugDrawer->cameraTarget.z);
+            // printf("Up Vector: %f, %f, %f\n", debugDrawer->upVector.x, debugDrawer->upVector.y, debugDrawer->upVector.z);
+
+            // printf("Bounding Box Min: %f, %f, %f\n", min.getX(), min.getY(), min.getZ());
+            // printf("Bounding Box Max: %f, %f, %f\n", max.getX(), max.getY(), max.getZ());
+
+            // Perform debug drawing
+            dw.second->dynamicsWorld->debugDrawWorld();
+
+            // test();
+        }
+    }    
+
+    if (buffer == nullptr) {       
+        buffer = new uint8_t[width * height * 4];
+    }
+    // Read the pixels from the framebuffer
+    // glBindFramebuffer(GL_FRAMEBUFFER, debugDrawer->debugFBO);
+    // glReadBuffer(ChaiLove::getInstance()->chai_gfx.COLORATTACH);
+    
+    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+
+    // Flip framebuffer vertically
+    for (int y = 0; y < height / 2; ++y) {
+        int oppositeY = height - 1 - y;
+        for (int x = 0; x < width * 4; ++x) {
+            std::swap(buffer[y * width * 4 + x], buffer[oppositeY * width * 4 + x]);
+        }
+    }
+    // glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    return buffer;
+}
+
+void chai_collisions::debugDraw()
+{    
+    printf("Debug Draw Texture: %d\n", debugDrawer->debugTexture);
+    // Render texture
+    // auto cg = ChaiLove::getInstance()->chai_gfx;
+    // auto fb = cg.instance->hw_render.get_current_framebuffer();
+    // glBindFramebuffer(GL_FRAMEBUFFER, 0); // Switch to window framebuffer
+    glViewport(0, 0, 1920, 1080);
+    // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, debugDrawer->debugTexture);
+
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glOrtho(0, 1920, 0, 1080, -1, 1);
+
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    glBegin(GL_QUADS);
+    glTexCoord2f(0.0f, 0.0f); glVertex2f(0.0f, 0.0f);
+    glTexCoord2f(1.0f, 0.0f); glVertex2f(1920.0f, 0.0f);
+    glTexCoord2f(1.0f, 1.0f); glVertex2f(1920.0f, 1080.0f);
+    glTexCoord2f(0.0f, 1.0f); glVertex2f(0.0f, 1080.0f);
+    glEnd();   
+    glDisable(GL_TEXTURE_2D);
+}
+
 void chai_collisions::process(float deltaTime)
 {    
     for (auto &dw : worlds->worlds) {

@@ -377,7 +377,8 @@ void chai_scene::drawMeshes(bool shadows, int view) {
 
 void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vector<chaiscript::Boxed_Value> viewMatrix2, std::vector<chaiscript::Boxed_Value> viewMatrix3, std::vector<chaiscript::Boxed_Value> viewMatrix4, int viewCount) {
     auto cg = ChaiLove::getInstance()->chai_gfx;
-
+    ChaiLove::getInstance()->chai_collisions.processDebug(1.0f / 60.0f, viewMatrix1);
+                
     if (false && cg.reinit) {
         cg.hasReinit();
         printf("Reinit\n");
@@ -773,7 +774,7 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
                 
                 glActiveTexture(GL_TEXTURE0);
                 drawMeshes(false, 0);
-            }            
+            }
             cg.instance->setShader();
         }
     }

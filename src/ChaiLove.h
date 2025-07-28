@@ -74,6 +74,12 @@
 #ifndef __HAVE_CHAI_GUI__
 #include "love/chai_gui.h"
 #endif
+#ifndef __HAVE_CHAI_DEBUG__
+#include "love/chai_debug.h"
+#endif
+#ifndef __HAVE_CHAI_EDITOR__
+#include "love/chai_editor.h"
+#endif
 #include "love/keyboard.h"
 #include "love/config.h"
 #include "love/data.h"
@@ -142,7 +148,9 @@ class ChaiLove {
 	love::chai_collisions chai_collisions;
 	love::chai_particles chai_particles;
 	love::chai_gui chai_gui;
-
+	love::chai_debug chai_debug;
+	love::chai_editor chai_editor;
+	
 	ChaiLove();
 	~ChaiLove();
 	void quit(void);

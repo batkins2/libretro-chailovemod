@@ -3,6 +3,9 @@
 #ifndef __HAVE_CHAI_MESH_DATA__
 #include "chai_meshData.h"
 #endif
+#ifndef __HAVE_CHAI_DEBUG__
+#include "chai_debug.h"
+#endif
 #include "Image.h"
 #include "filesystem/FileData.h"
 #include "filesystem.h"
@@ -94,7 +97,7 @@ class chai_mesh {
     void draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt);
     void setVisible(bool visible);
     void reloadMesh();
-    void update(std::vector<float> position, std::vector<float> rotation, std::vector<float> scale);
+    void update(std::vector<float> position, std::vector<float> rotation, std::vector<float> scale, chai_debug *debug);
     std::pair<glm::vec3, glm::vec3> getBoundingBox(const glm::mat4 &viewProjectionMatrix);
     std::vector<float> getMeshBoundingBox();
     bool isVisible() {
@@ -105,6 +108,7 @@ class chai_mesh {
     gfx::Mesh *mesh = nullptr;
     std::vector<gfx::Mesh *> meshes;
     std::vector<Matrix4> matrices;
+    std::vector<Matrix4> offsetMatrices;
     gfx::Texture *tex = nullptr;
     // std::vector<imagemod::ImageData *> image;
     Image *img = nullptr;

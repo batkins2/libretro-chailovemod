@@ -671,6 +671,12 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
     });
 
     cm->matrices.push_back(matrix);
+    cm->offsetMatrices.push_back(Matrix4(new float[16] {
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
+    }));
 
     for (int count = 0; count < 4; count++) {
         cm->cameraParams.push_back(std::map<std::string, std::vector<float>>());
@@ -1256,106 +1262,224 @@ std::vector<int> getChildNodes(std::map<int, std::vector<int>> nodeChildren, int
     return nodes;
 }
 
-void chai_mesh::update(std::vector<float> position, std::vector<float> rotation, std::vector<float> scale) {
+void chai_mesh::update(std::vector<float> position, std::vector<float> rotation, std::vector<float> scale, chai_debug *debug) {
     auto cc = ChaiLove::getInstance()->chai_collisions;
-
     auto po = cc.getPhysicsObjects(id);
     for (int i = 0; i < po.size(); i++) {
         auto physicsObjectMatrix = po[i];
-        printf("Replacing Object Matrix: %d\n", i);
-        printf("Matrix: %f %f %f %f\n", matrices[i].getColumn(0).x, matrices[i].getColumn(0).y, matrices[i].getColumn(0).z, matrices[i].getColumn(0).w);
-        printf("Matrix: %f %f %f %f\n", matrices[i].getColumn(1).x, matrices[i].getColumn(1).y, matrices[i].getColumn(1).z, matrices[i].getColumn(1).w);
-        printf("Matrix: %f %f %f %f\n", matrices[i].getColumn(2).x, matrices[i].getColumn(2).y, matrices[i].getColumn(2).z, matrices[i].getColumn(2).w);
-        printf("Matrix: %f %f %f %f\n", matrices[i].getColumn(3).x, matrices[i].getColumn(3).y, matrices[i].getColumn(3).z, matrices[i].getColumn(3).w);
+        debug->pushDebugMessagef("Replacing Object Matrix: %d\n", i);
+        debug->pushDebugMessagef("Matrix: %f %f %f %f\n", matrices[i].getColumn(0).x, matrices[i].getColumn(0).y, matrices[i].getColumn(0).z, matrices[i].getColumn(0).w);
+        debug->pushDebugMessagef("Matrix: %f %f %f %f\n", matrices[i].getColumn(1).x, matrices[i].getColumn(1).y, matrices[i].getColumn(1).z, matrices[i].getColumn(1).w);
+        debug->pushDebugMessagef("Matrix: %f %f %f %f\n", matrices[i].getColumn(2).x, matrices[i].getColumn(2).y, matrices[i].getColumn(2).z, matrices[i].getColumn(2).w);
+        debug->pushDebugMessagef("Matrix: %f %f %f %f\n", matrices[i].getColumn(3).x, matrices[i].getColumn(3).y, matrices[i].getColumn(3).z, matrices[i].getColumn(3).w);
 
+        // matrices[i] = matrices[i].inverse();
         glm::mat4 matrix = glm::mat4(
             matrices[i].getColumn(0).x, matrices[i].getColumn(0).y, matrices[i].getColumn(0).z, matrices[i].getColumn(0).w,
             matrices[i].getColumn(1).x, matrices[i].getColumn(1).y, matrices[i].getColumn(1).z, matrices[i].getColumn(1).w,
             matrices[i].getColumn(2).x, matrices[i].getColumn(2).y, matrices[i].getColumn(2).z, matrices[i].getColumn(2).w,
             matrices[i].getColumn(3).x, matrices[i].getColumn(3).y, matrices[i].getColumn(3).z, matrices[i].getColumn(3).w
         );
-        glm::vec3 rot = glm::vec3(
-            glm::degrees(atan2(matrix[1][2], matrix[2][2])), // Yaw
-            glm::degrees(atan2(-matrix[0][2], sqrt(matrix[1][2] * matrix[1][2] + matrix[2][2] * matrix[2][2]))), // Pitch
-            glm::degrees(atan2(matrix[0][1], matrix[0][0]))  // Roll
-        );
-        printf("Rotation: %f %f %f\n", rot[0], rot[1], rot[2]);
+        // glm::vec3 rot = glm::vec3(
+        //     glm::degrees(atan2(matrix[1][2], matrix[2][2])), // Yaw
+        //     glm::degrees(atan2(-matrix[0][2], sqrt(matrix[1][2] * matrix[1][2] + matrix[2][2] * matrix[2][2]))), // Pitch
+        //     glm::degrees(atan2(matrix[0][1], matrix[0][0]))  // Roll
+        // );
+        // debug->pushDebugMessagef("Rotation: %f %f %f\n", rot[0], rot[1], rot[2]);
         // printf("Scale: %f %f %f\n", matrices[i].getColumn(0).w, matrices[i].getColumn(1).w, matrices[i].getColumn(2).w);
 
-        printf("Position: %f %f %f\n", position[0], position[1], position[2]);
+        // debug->pushDebugMessagef("Position: %f %f %f\n", position[0], position[1], position[2]);
 
         // Compose transformation: scale -> rotation -> translation
-        glm::mat4 physMat = glm::mat4(
+
+
+        // glm::mat3 rotation = glm::mat3(
+        //     physicsObjectMatrix.getColumn(0).x, physicsObjectMatrix.getColumn(0).y, physicsObjectMatrix.getColumn(0).z,
+        //     physicsObjectMatrix.getColumn(1).x, physicsObjectMatrix.getColumn(1).y, physicsObjectMatrix.getColumn(1).z,
+        //     physicsObjectMatrix.getColumn(2).x, physicsObjectMatrix.getColumn(2).y, physicsObjectMatrix.getColumn(2).z
+        // );
+
+        // glm::mat3 matrix3 = glm::mat3(
+        //     matrix[0][0], matrix[0][1], matrix[0][2],
+        //     matrix[1][0], matrix[1][1], matrix[1][2],
+        //     matrix[2][0], matrix[2][1], matrix[2][2]
+        // );
+
+        // rotation = rotation * matrix3; // Apply the transformation matrix to the physics matrix
+
+        // glm::mat4 physMat;
+        // physMat[0] = glm::vec4(
+        //     rotation[0][0],
+        //     rotation[0][1],
+        //     rotation[0][2],
+        //     physicsObjectMatrix.getColumn(0).w // Use the original scale from the physics object matrix
+        // );
+        // physMat[1] = glm::vec4(
+        //     rotation[1][0],
+        //     rotation[1][1],
+        //     rotation[1][2],
+        //     physicsObjectMatrix.getColumn(1).w // Use the original scale from the physics object matrix
+        // );
+        // physMat[2] = glm::vec4(
+        //     rotation[2][0],
+        //     rotation[2][1],
+        //     rotation[2][2],
+        //     physicsObjectMatrix.getColumn(2).w // Use the original scale from the physics object matrix
+        // );
+        // if (offsetMatrices[i].getColumn(0).x == 1.0f && offsetMatrices[i].getColumn(0).y == 0.0f && offsetMatrices[i].getColumn(0).z == 0.0f && offsetMatrices[i].getColumn(0).w == 0.0f &&
+        //     offsetMatrices[i].getColumn(1).x == 0.0f && offsetMatrices[i].getColumn(1).y == 1.0f && offsetMatrices[i].getColumn(1).z == 0.0f && offsetMatrices[i].getColumn(1).w == 0.0f &&
+        //     offsetMatrices[i].getColumn(2).x == 0.0f && offsetMatrices[i].getColumn(2).y == 0.0f && offsetMatrices[i].getColumn(2).z == 1.0f && offsetMatrices[i].getColumn(2).w == 0.0f &&
+        //     offsetMatrices[i].getColumn(3).x == 0.0f && offsetMatrices[i].getColumn(3).y == 0.0f && offsetMatrices[i].getColumn(3).z == 0.0f && offsetMatrices[i].getColumn(3).w == 1.0f) {
+            
+            // matrices[i].setColumn(3, Vector4(physicsObjectMatrix.getColumn(3).x,
+            //                                      physicsObjectMatrix.getColumn(3).y,
+            //                                      physicsObjectMatrix.getColumn(3).z,
+            //                                      1.0f));
+        // }
+        //     matrices[i].setColumn(3, Vector4(physicsObjectMatrix.getColumn(3).x,
+        //                                          physicsObjectMatrix.getColumn(3).y,
+        //                                          physicsObjectMatrix.getColumn(3).z,
+        //                                          1.0f));
+        // }
+        // physMat[3] = glm::vec4(
+        //     matrices[i].getColumn(3).x, // Scale the X position by 0.76 to match the original scale and add 1.0f for offset
+        //     matrices[i].getColumn(3).y, // Scale the Y position by 0.4 to match the original scale
+        //     matrices[i].getColumn(3).z, // Scale the Z position by 0.4 to match the original scale
+        //     physicsObjectMatrix.getColumn(3).w
+        // );
+
+        // printf("physicsObjectMatrix: %f\n", physicsObjectMatrix.getColumn(3).y);
+        // printf("matrices[i]: %f\n", matrices[i].getColumn(3).y);
+
+        // Conversion matrix: swap Y and Z axes (Z-up <-> Y-up)
+        // glm::mat4 convert = glm::mat4(
+        //     1, 0, 0, 0,
+        //     0, 0, 1, 0,
+        //     0, 1, 0, 0,
+        //     0, 0, 0, 1
+        // );
+
+        // physMat = glm::scale(physMat, glm::vec3(0.8f, 0.8f, 0.8f)); // Scale the physics matrix to match the original scale
+
+        
+
+        // Extract physics position
+        glm::vec3 physicsPos(
+            physicsObjectMatrix.getColumn(3).x,
+            physicsObjectMatrix.getColumn(3).y,
+            physicsObjectMatrix.getColumn(3).z
+        );
+
+        // Extract render/model position
+        glm::vec3 renderPos(
+            matrices[i].getColumn(3).x,
+            matrices[i].getColumn(3).y,
+            matrices[i].getColumn(3).z
+        );
+        // renderPos[0] -= renderPos[0] * 0.3f;
+        // renderPos[1] += renderPos[1] * 0.4f;
+        // renderPos[2] -= renderPos[2] * 0.3f;
+        auto p = glm::vec3(position[0], position[1], position[2]);
+        auto hp = glm::vec3(position[0]/2.0f, position[1]/2.0f, position[2]/2.0f);
+        // Calculate offset
+        glm::vec3 offset = physicsPos;
+
+        auto physMat = glm::mat4(
             physicsObjectMatrix.getColumn(0).x, physicsObjectMatrix.getColumn(0).y, physicsObjectMatrix.getColumn(0).z, physicsObjectMatrix.getColumn(0).w,
             physicsObjectMatrix.getColumn(1).x, physicsObjectMatrix.getColumn(1).y, physicsObjectMatrix.getColumn(1).z, physicsObjectMatrix.getColumn(1).w,
             physicsObjectMatrix.getColumn(2).x, physicsObjectMatrix.getColumn(2).y, physicsObjectMatrix.getColumn(2).z, physicsObjectMatrix.getColumn(2).w,
-            physicsObjectMatrix.getColumn(3).x, physicsObjectMatrix.getColumn(3).y, physicsObjectMatrix.getColumn(3).z, physicsObjectMatrix.getColumn(3).w
+            offset.x, offset.y, offset.z, physicsObjectMatrix.getColumn(3).w
         );
 
-        // Conversion matrix: swap Y and Z axes (Z-up <-> Y-up)
-        glm::mat4 convert = glm::mat4(
-            1, 0, 0, 0,
-            0, 0, 1, 0,
-            0, 1, 0, 0,
-            0, 0, 0, 1
-        );
+        // physMat *= reflectY;
 
-        // To convert Bullet's Y-up to model's Z-up:
-        physMat = physMat * convert;
+
+
+        // physMat = matrix * physMat;
+        // physMat = glm::scale(physMat, glm::vec3(0.8f, 0.8f, 0.8f));
+       
+          // To convert Bullet's Y-up to model's Z-up:
+        // physMat = physMat * convert;
+
+        // physMat = glm::rotate(physMat, glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 
         // Get the current position and rotation from the physics object
-        glm::vec3 currentPosition = glm::vec3(physMat[3][0]/0.4, physMat[3][2]/0.4, physMat[3][1]/-0.4); // Scale the position by 1.6 to match the original scale
-        glm::vec3 currentRotation = glm::vec3(
-            glm::degrees(atan2(physMat[1][2], physMat[2][2])), // Yaw
-            glm::degrees(atan2(-physMat[0][2], sqrt(physMat[1][2] * physMat[1][2] + physMat[2][2] * physMat[2][2]))), // Pitch
-            glm::degrees(atan2(physMat[0][1], physMat[0][0]))  // Roll
-        );
-        printf("Phys Rotation: %f %f %f\n", currentRotation[0], currentRotation[1], currentRotation[2]);
-        auto temp = currentRotation[2];
-        currentRotation[2] = currentRotation[1] * -1.0f;
-        currentRotation[1] = temp * -1.0f;
-        currentRotation[0] = currentRotation[0] * -1.0f;
+        // glm::vec3 currentPosition = glm::vec3(physMat[3][0]/0.4f, physMat[3][2]/0.4f, physMat[3][1]/-0.4f); // Scale the position by 1.6 to match the original scale
+        // glm::vec3 currentRotation = glm::vec3(
+        //     glm::degrees(atan2(physMat[1][2], physMat[2][2])), // Yaw
+        //     glm::degrees(atan2(-physMat[0][2], sqrt(physMat[1][2] * physMat[1][2] + physMat[2][2] * physMat[2][2]))), // Pitch
+        //     glm::degrees(atan2(physMat[0][1], physMat[0][0]))  // Roll
+        // );
+        // debug->pushDebugMessagef("Phys Rotation: %f %f %f\n", currentRotation[0], currentRotation[1], currentRotation[2]);
+        // auto temp = currentRotation[2];
+        // currentRotation[1] = currentRotation[1] + 180.0f;
+        // currentRotation[1] = temp + 180.0f;
+        // currentRotation[0] = currentRotation[0] * -1.0f;
         // current position to mat4
-        glm::mat4 currentPositionMat = glm::translate(glm::mat4(1.0f), currentPosition);
-        printf("Phys Position: %f %f %f\n", currentPositionMat[3][0], currentPositionMat[3][1], currentPositionMat[3][2]);
+        // glm::mat4 currentPositionMat = glm::translate(glm::mat4(1.0f), currentPosition);
+        // debug->pushDebugMessagef("Phys Position: %f %f %f\n", currentPositionMat[3][0], currentPositionMat[3][1], currentPositionMat[3][2]);
         // current rotation to mat4
-        glm::quat currentQuat = glm::quat(glm::vec3(glm::radians(currentRotation[0]), glm::radians(currentRotation[1]), glm::radians(currentRotation[2])));
-        glm::mat4 currentRotationMat = glm::mat4_cast(currentQuat);
+        // glm::quat currentQuat = glm::quat(glm::vec3(glm::radians(currentRotation[0]), glm::radians(currentRotation[2]), glm::radians(currentRotation[1])));
+        // glm::mat4 currentRotationMat = glm::mat4_cast(currentQuat);
+        // Rotate Y by 180 degrees
+        // currentRotationMat = glm::rotate(currentRotationMat, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 1.0f));
         // current scale to mat4
-        glm::mat4 currentScaleMat = glm::scale(glm::mat4(1.0f), glm::vec3(physMat[0][0], physMat[1][1], physMat[2][2]));
-        printf("Phys Scale: %f %f %f\n", currentScaleMat[0][0], currentScaleMat[1][1], currentScaleMat[2][2]);
+        // glm::mat4 currentScaleMat = glm::scale(glm::mat4(1.0f), glm::vec3(physMat[0][0], physMat[1][1], physMat[2][2]));
+        // debug->pushDebugMessagef("Phys Scale: %f %f %f\n", currentScaleMat[0][0], currentScaleMat[1][1], currentScaleMat[2][2]);
 
 
         // Compose transformation: scale -> rotation -> translation
-        glm::mat4 scaleMat2 = glm::scale(glm::mat4(1.0f), glm::vec3(scale[0], scale[1], scale[2]));
-        glm::quat q2 = glm::quat(glm::vec3(rotation[0], rotation[1], rotation[2])); // Pitch, Yaw, Roll (X, Y, Z)
-        glm::mat4 rotMat2 = glm::mat4_cast(q2);
-        auto o0 = position[0];
-        auto o1 = position[1];
-        auto o2 = position[2];
-        auto p0 = currentPosition[0];
-        auto p1 = currentPosition[1];
-        auto p2 = currentPosition[2];
-        auto b0 = matrix[3][0];
-        auto b1 = matrix[3][1];
-        auto b2 = matrix[3][2];
-        printf("Calc: %f \n", p1-o1-b1);
-        glm::vec3 translate = glm::vec3((o0-p0), (o1-p1), (o2-p2));
-        printf("Translate: %f %f %f\n", translate[0], translate[1], translate[2]);
-        glm::mat4 modelMat = glm::translate(matrix, translate); // Adjust for Z-up to Y-up conversion
+        // glm::mat4 scaleMat2 = glm::scale(glm::mat4(1.0f), glm::vec3(scale[0], scale[1], scale[2]));
+        // glm::quat q2 = glm::quat(glm::vec3(rotation[0], rotation[1], rotation[2])); // Pitch, Yaw, Roll (X, Y, Z)
+        // glm::mat4 rotMat2 = glm::mat4_cast(q2);
+        // auto o0 = position[0];
+        // auto o1 = position[1];
+        // auto o2 = position[2];
+        // auto p0 = currentPosition[0];
+        // auto p1 = currentPosition[1];
+        // auto p2 = currentPosition[2];
+        // auto b0 = matrix[3][0];
+        // auto b1 = matrix[3][1];
+        // auto b2 = matrix[3][2];
+        // debug->pushDebugMessagef("Calc: %f \n", p1-o1-b1);
+        // glm::vec3 translate = glm::vec3((o0-p0), (o1-p1), (o2-p2));
+        // debug->pushDebugMessagef("Translate: %f %f %f\n", translate[0], translate[1], translate[2]);
+        // glm::mat4 modelMat = glm::translate(matrix, translate); // Adjust for Z-up to Y-up conversion
+        // // Rotate the model matrix by the current rotation
+        // modelMat = currentRotationMat * modelMat; // Apply the current rotation
 
         // Compose: physics * user translation * user rotation * user scale
         // glm::mat4 modelMat = transMat2 * matrix;
 
-        Matrix4 m = Matrix4(new float[16] {
-            currentRotationMat[0][0]*0.35f, currentRotationMat[0][1]*0.35f, currentRotationMat[0][2]*0.35f, modelMat[0][3],
-            currentRotationMat[1][0]*0.35f, currentRotationMat[1][1]*0.35f, currentRotationMat[1][2]*0.35f, modelMat[1][3],
-            currentRotationMat[2][0]*0.35f, currentRotationMat[2][1]*0.35f, currentRotationMat[2][2]*0.35f, modelMat[2][3],
-            translate[0]*0.35f, translate[2]*0.35f, translate[1]*0.35f, modelMat[3][3]
+        // Matrix4 m = Matrix4(new float[16] {
+        //     modelMat[0][0], modelMat[0][1], modelMat[0][2], modelMat[0][3],
+        //     modelMat[1][0], modelMat[1][1], modelMat[1][2], modelMat[1][3],
+        //     modelMat[2][0], modelMat[2][1], modelMat[2][2], modelMat[2][3],
+        //     translate[0], translate[1], translate[2], modelMat[3][3]
+        // });
+
+        // physMat = glm::translate(physMat, glm::vec3(0.0f, 1.0f, 0.0f)); // Scale the physics matrix to match the original scale
+ 
+        // matrix = glm::scale(matrix, glm::vec3(0.4f, 0.4f, 0.4f)); // Scale the model matrix to match the original scale
+        auto diff = physMat;
+        offsetMatrices[i] = Matrix4(new float[16] {
+            diff[0][0], diff[0][1], diff[0][2], diff[0][3],
+            diff[1][0], diff[1][1], diff[1][2], diff[1][3],
+            diff[2][0], diff[2][1], diff[2][2], diff[2][3],
+            diff[3][0], diff[3][1], diff[3][2], diff[3][3]
         });
 
-        matrices[i] = m;
+        debug->visualizeMatrix(physMat);
+
+        debug->pushDebugMessagef("New Object Matrix: %d\n", i);
+        debug->pushDebugMessagef("Matrix: %f %f %f %f\n", offsetMatrices[i].getColumn(0).x, offsetMatrices[i].getColumn(0).y, offsetMatrices[i].getColumn(0).z, offsetMatrices[i].getColumn(0).w);
+        debug->pushDebugMessagef("Matrix: %f %f %f %f\n", offsetMatrices[i].getColumn(1).x, offsetMatrices[i].getColumn(1).y, offsetMatrices[i].getColumn(1).z, offsetMatrices[i].getColumn(1).w);
+        debug->pushDebugMessagef("Matrix: %f %f %f %f\n", offsetMatrices[i].getColumn(2).x, offsetMatrices[i].getColumn(2).y, offsetMatrices[i].getColumn(2).z, offsetMatrices[i].getColumn(2).w);
+        debug->pushDebugMessagef("Matrix: %f %f %f %f\n", offsetMatrices[i].getColumn(3).x, offsetMatrices[i].getColumn(3).y, offsetMatrices[i].getColumn(3).z, offsetMatrices[i].getColumn(3).w);
+        // debug->displayDebugMessages();
+        // ChaiLove::getInstance()->script->debugbreak();
     }
+
 }
 
 void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt) {
@@ -1618,8 +1742,25 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
 
             shader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value((int)jointList[i].size()) }));
             shader->sendMap("jointMatrix", jointMatrix[i], jointList[i]);
-
-            auto mat = matrices[i] * m;
+            auto tempMat = matrices[i] * m;
+            // printf("Matrix: %f %f %f %f\n", tempMat.getColumn(0).x, tempMat.getColumn(0).y, tempMat.getColumn(0).z, tempMat.getColumn(0).w);
+            // printf("Matrix: %f %f %f %f\n", tempMat.getColumn(1).x, tempMat.getColumn(1).y, tempMat.getColumn(1).z, tempMat.getColumn(1).w);
+            // printf("Matrix: %f %f %f %f\n", tempMat.getColumn(2).x, tempMat.getColumn(2).y, tempMat.getColumn(2).z, tempMat.getColumn(2).w);
+            // printf("Matrix: %f %f %f %f\n", tempMat.getColumn(3).x, tempMat.getColumn(3).y, tempMat.getColumn(3).z, tempMat.getColumn(3).w);
+            auto mat = offsetMatrices[i];
+            if (offsetMatrices[i].getColumn(0).x == 1.0f && offsetMatrices[i].getColumn(0).y == 0.0f && offsetMatrices[i].getColumn(0).z == 0.0f && offsetMatrices[i].getColumn(0).w == 0.0f &&
+                offsetMatrices[i].getColumn(1).x == 0.0f && offsetMatrices[i].getColumn(1).y == 1.0f && offsetMatrices[i].getColumn(1).z == 0.0f && offsetMatrices[i].getColumn(1).w == 0.0f &&
+                offsetMatrices[i].getColumn(2).x == 0.0f && offsetMatrices[i].getColumn(2).y == 0.0f && offsetMatrices[i].getColumn(2).z == 1.0f && offsetMatrices[i].getColumn(2).w == 0.0f &&
+                offsetMatrices[i].getColumn(3).x == 0.0f && offsetMatrices[i].getColumn(3).y == 0.0f && offsetMatrices[i].getColumn(3).z == 0.0f && offsetMatrices[i].getColumn(3).w == 1.0f) {
+                mat = matrices[i] * m;
+            } else {
+                // matrices[i] = offsetMatrices[i];
+            }
+            
+            // printf("Matrix: %f %f %f %f\n", mat.getColumn(0).x, mat.getColumn(0).y, mat.getColumn(0).z, mat.getColumn(0).w);
+            // printf("Matrix: %f %f %f %f\n", mat.getColumn(1).x, mat.getColumn(1).y, mat.getColumn(1).z, mat.getColumn(1).w);
+            // printf("Matrix: %f %f %f %f\n", mat.getColumn(2).x, mat.getColumn(2).y, mat.getColumn(2).z, mat.getColumn(2).w);
+            // printf("Matrix: %f %f %f %f\n", mat.getColumn(3).x, mat.getColumn(3).y, mat.getColumn(3).z, mat.getColumn(3).w);
             std::vector<chaiscript::Boxed_Value> v;
             for (int c = 0; c < 4; ++c) {
                 v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).x));
@@ -1829,6 +1970,7 @@ chai_mesh::chai_mesh(const chai_mesh &c) {
     animations = c.animations;
 
     matrices = c.matrices;
+    offsetMatrices = c.offsetMatrices;
 
     cameraParams = c.cameraParams;
     lightParams = c.lightParams;

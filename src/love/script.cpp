@@ -160,6 +160,8 @@ script::script(const std::string& file) {
 		love["chai_collisions"] = var(std::ref(app->chai_collisions));
 		love["chai_particles"] = var(std::ref(app->chai_particles));
 		love["chai_gui"] = var(std::ref(app->chai_gui));
+		love["chai_debug"] = var(std::ref(app->chai_debug));
+		love["chai_editor"] = var(std::ref(app->chai_editor));
 		love["image"] = var(std::ref(app->image));
 		love["joystick"] = var(std::ref(app->joystick));
 		love["keyboard"] = var(std::ref(app->keyboard));
@@ -414,7 +416,22 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_gui::draw), "draw");
 	chai.add(fun(&chai_gui::setElementVisible), "setElementVisible");
 	chai.add(fun(&chai_gui::setElementText), "setElementText");
-	
+	chai.add(fun(&chai_gui::writeConsole), "writeConsole");
+	chai.add(fun(&chai_gui::executeConsole), "executeConsole");
+	chai.add(user_type<chai_debug>(), "chai_debug");
+	chai.add(constructor<chai_debug(const chai_debug &)>(), "chai_debug");
+	chai.add(fun(&chai_debug::operator=), "=");
+	chai.add(fun(&chai_debug::clone), "clone");
+	chai.add(fun(&chai_debug::newDebug), "newDebug");
+	chai.add(fun(&chai_debug::init), "init");
+	chai.add(fun(&chai_debug::update), "update");
+	chai.add(fun(&chai_debug::pushDebugMessage), "pushDebugMessage");
+	chai.add(fun(&chai_debug::displayDebugMessages), "displayDebugMessages");
+	chai.add(fun(&chai_debug::displayMatrix), "displayMatrix");
+	chai.add(user_type<chai_editor>(), "chai_editor");
+	chai.add(constructor<chai_editor(const chai_editor &)>(), "chai_editor");
+	chai.add(fun(&chai_editor::isEditMode), "isEditMode");
+
 	// Matrices
 	chai.add(fun(&chai_matrices::setTransformationMatrix), "setTransformationMatrix");
 	chai.add(fun(&chai_matrices::setProjectionMatrix), "setProjectionMatrix");

@@ -22,6 +22,7 @@ class chai_collisions
     void test();
     void init(int group);
     void destroy();
+    uint8_t* processDebug(float deltaTime, std::vector<chaiscript::Boxed_Value> viewMatrix);
     void process(float deltaTime);
     std::vector<int> addRigidMesh(std::string meshPath, int mesh, bool makeConvex);
     void setCharacterControllerPosition(int characterIndex, float x, float y, float z, std::vector<int> group);
@@ -41,6 +42,8 @@ class chai_collisions
         worlds = nullptr;
     }
 
+    void debugDraw();
+    uint8_t* buffer = nullptr;
     private:
     class CharacterController
     {
@@ -214,7 +217,7 @@ class chai_collisions
             void drawTriangle(const btVector3 &v0, const btVector3 &v1, const btVector3 &v2, const btVector3 &color, btScalar alpha) override {
                 glColor4f(color.getX(), color.getY(), color.getZ(), alpha);
                 // Set triangle line thickness if needed
-                glLineWidth(1.0f);
+                glLineWidth(8.0f);
                 glBegin(GL_LINE_LOOP);
                 glVertex3f(v0.getX(), v0.getY(), v0.getZ());
                 glVertex3f(v1.getX(), v1.getY(), v1.getZ());
@@ -242,12 +245,15 @@ class chai_collisions
             glm::vec3 cameraPosition = glm::vec3(0.0f, 5.0f, 10.0f); // Camera position
             glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);    // Look at the origin
             glm::vec3 upVector = glm::vec3(0.0f, 1.0f, 0.0f);        // Up vector
-            float fov = 45.0f;                           // Field of view
+            float fov = 26.0f;                           // Field of view
             float aspectRatio = 16.0f / 9.0f;            // Aspect ratio
             float nearPlane = 0.1f;                      // Near clipping plane
             float farPlane = 100.0f;
+
+            GLuint debugTexture = 0;
+            GLuint debugFBO = 0;
         };
-        OpenGLDebugDrawer *debugDrawer = nullptr;
+        OpenGLDebugDrawer *debugDrawer = nullptr;        
     };
 
 } // namespace love

@@ -5,6 +5,7 @@ namespace love
 {
 chai_gui::chai_gui()
 {
+    
 }
 
 chai_gui::~chai_gui()
@@ -33,7 +34,7 @@ int chai_gui::addElement(std::string type, std::string image, std::string text, 
     return data->id;
 }
 
-void chai_gui::draw(chai_shader *shader)
+void chai_gui::draw(chai_shader *shader, std::vector<chaiscript::Boxed_Value> viewMatrix1)
 {
     glDisable(GL_DEPTH_TEST);
     auto cg = ChaiLove::getInstance()->chai_gfx;
@@ -122,7 +123,42 @@ void chai_gui::draw(chai_shader *shader)
                 element->texture->replacePixels(copyOfPixelData, dataSize*4, 0, 0, rect, false);
             }
         }
+    } 
+    
+
+    // auto buffer = ChaiLove::getInstance()->chai_collisions.processDebug(1.0f/60.0f, viewMatrix1);
+    
+    if (overlayTexture == nullptr)
+    {
+        gfx::Texture::Settings settings;
+        settings.width = 1920;
+        settings.height = 1080;
+        settings.format = PIXELFORMAT_RGBA8_UNORM;
+        auto slices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
+        overlayTexture = cg.instance->newTexture(settings, &slices);
     }
+    Rect rect = Rect();
+    rect.w = 1920;
+    rect.h = 1080;
+    overlayTexture->replacePixels(ChaiLove::getInstance()->chai_collisions.buffer, 1920*1080*4, 0, 0, rect, false);
+    Matrix4 m = Matrix4(new float[16]{
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
+    });
+    cg.instance->draw(overlayTexture, m);
+
+    initConsole();
+    shader->send("scale", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(2.0f) }));
+    ChaiLove::getInstance()->printNew(console->text, 
+        stoi(console->options[0]), 
+        stoi(console->options[1]),
+        stoi(console->options[2]), 
+        stoi(console->options[3]), 
+        stoi(console->options[4]),
+        stoi(console->options[5]));
+
     glEnable(GL_DEPTH_TEST);
     cg.instance->setShader();
 }
@@ -143,4 +179,37 @@ void chai_gui::setElementText(int id, const std::string &text)
     }
     guiElements[id]->text = text;
 }
+
+void chai_gui::writeConsole(std::string s)
+{
+    initConsole();
+    console->text += s;
+}
+
+void chai_gui::executeConsole()
+{
+    initConsole();
+    printf("executeConsole");
+    console->text = "";
+}
+
+void chai_gui::initConsole()
+{
+    if (!console) {
+        console = new chai_guiData();
+        console->id = 0;
+        console->type = "text";
+        console->image = "";
+        console->text = "";
+        std::vector<std::string> options;
+        options.push_back("50");
+        options.push_back("480");
+        options.push_back("255");
+        options.push_back("255");
+        options.push_back("255");
+        options.push_back("255");
+        console->options = options;
+    }
+}
+
 } // namespace love
