@@ -22,7 +22,7 @@ chai_collisions::chai_collisions()
 chai_collisions::~chai_collisions()
 {
 }
-std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef, bool makeConvex) 
+std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef, bool makeConvex, bool ragdoll) 
 {
     auto cl = ChaiLove::getInstance();
     auto f = cl->getFSModule();
@@ -92,21 +92,24 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
     // Set OpenGL to wireframe mode
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     
+    // Create a ragdoll mesh
+    btCompoundShape *ragdollShape = new btCompoundShape();
+
     for (size_t i = 0; i < model.meshes.size(); i++) {
         // Retrieve the transformation matrix for the model
         glm::mat4 modelMatrix = glm::mat4(1.0f);
         for (auto node : model.nodes) {
             if (node.mesh == i) {
                 if (!node.matrix.empty()) {
-                    modelMatrix = glm::make_mat4(node.matrix.data());
+                    // modelMatrix = glm::make_mat4(node.matrix.data());
                 } else {
-                    if (!node.translation.empty()) {
-                        modelMatrix = glm::translate(modelMatrix, glm::vec3(node.translation[0], node.translation[1], node.translation[2]));
-                    }
-                    if (!node.rotation.empty()) {
-                        glm::quat rotation = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
-                        modelMatrix *= glm::mat4_cast(rotation);
-                    }
+                    // if (!node.translation.empty()) {
+                    //     modelMatrix = glm::translate(modelMatrix, glm::vec3(node.translation[0], node.translation[1], node.translation[2]));
+                    // }
+                    // if (!node.rotation.empty()) {
+                    //     glm::quat rotation = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
+                    //     modelMatrix *= glm::mat4_cast(rotation);
+                    // }
                     if (!node.scale.empty()) {
                         modelMatrix = glm::scale(modelMatrix, glm::vec3(node.scale[0], node.scale[1], node.scale[2]));
                     }
@@ -162,17 +165,17 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
                 // }
                 if (vertices.size() == 9) {
                     auto m = modelMatrix * glm::vec4(vertices[0], vertices[1], vertices[2], 1.0f);
-                    // vertices[0] = m.x;
-                    // vertices[1] = m.y;
-                    // vertices[2] = m.z;
+                    vertices[0] = m.x;
+                    vertices[1] = m.y;
+                    vertices[2] = m.z;
                     m = modelMatrix * glm::vec4(vertices[3], vertices[4], vertices[5], 1.0f);
-                    // vertices[3] = m.x;
-                    // vertices[4] = m.y;
-                    // vertices[5] = m.z;
+                    vertices[3] = m.x;
+                    vertices[4] = m.y;
+                    vertices[5] = m.z;
                     m = modelMatrix * glm::vec4(vertices[6], vertices[7], vertices[8], 1.0f);
-                    // vertices[6] = m.x;
-                    // vertices[7] = m.y;
-                    // vertices[8] = m.z;
+                    vertices[6] = m.x;
+                    vertices[7] = m.y;
+                    vertices[8] = m.z;
                     if (false) {
                         // Define the vertices of the triangle
                         glBegin(GL_TRIANGLES);
@@ -238,17 +241,17 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
                 // }
                 if (vertices.size() == 9) {
                     auto m = modelMatrix * glm::vec4(vertices[0], vertices[1], vertices[2], 1.0f);
-                    // vertices[0] = m.x;
-                    // vertices[1] = m.y;
-                    // vertices[2] = m.z;
+                    vertices[0] = m.x;
+                    vertices[1] = m.y;
+                    vertices[2] = m.z;
                     m = modelMatrix * glm::vec4(vertices[3], vertices[4], vertices[5], 1.0f);
-                    // vertices[3] = m.x;
-                    // vertices[4] = m.y;
-                    // vertices[5] = m.z;
+                    vertices[3] = m.x;
+                    vertices[4] = m.y;
+                    vertices[5] = m.z;
                     m = modelMatrix * glm::vec4(vertices[6], vertices[7], vertices[8], 1.0f);
-                    // vertices[6] = m.x;
-                    // vertices[7] = m.y;
-                    // vertices[8] = m.z;
+                    vertices[6] = m.x;
+                    vertices[7] = m.y;
+                    vertices[8] = m.z;
                     if (false) {
                         // Define the vertices of the triangle
                         glBegin(GL_TRIANGLES);
@@ -287,17 +290,31 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
         }
 
         if (makeConvex) {
-            btDefaultMotionState *motionState = new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, 0, 0)));
-            btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(0, motionState, convexShape, btVector3(0, 0, 0));    
-            btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
-            rigidBody->setWorldTransform(btTransform(btQuaternion(0, 0, 0, 1), btVector3(modelMatrix[3][0], modelMatrix[3][1], modelMatrix[3][2])));
-            rigidMeshes.emplace_back(new RigidMesh(mesh, rigidBody, meshRef));  
+            if (ragdoll) {                
+                ragdollShape->addChildShape(btTransform::getIdentity(), convexShape);
+                refs = std::vector<int>(); // Clear refs since we're making a ragdoll
+                count = rigidMeshes.size();
+            }
+            if ((i+1 == model.meshes.size() && ragdoll) || !ragdoll) {
+                btDefaultMotionState *motionState = new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, 0, 0)));
+                if (ragdoll) {
+                    btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(0, motionState, ragdollShape, btVector3(0, 0, 0));
+                    btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
+                    rigidBody->setWorldTransform(btTransform(btQuaternion(modelMatrix[0][0], modelMatrix[1][1], modelMatrix[2][2], 1), btVector3(modelMatrix[3][0], modelMatrix[3][1], modelMatrix[3][2])));
+                    rigidMeshes.emplace_back(new RigidMesh(mesh, rigidBody, meshRef));  
+                } else {
+                    btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(0, motionState, convexShape, btVector3(0, 0, 0));
+                    btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
+                    rigidBody->setWorldTransform(btTransform(btQuaternion(modelMatrix[0][0], modelMatrix[1][1], modelMatrix[2][2], 1), btVector3(modelMatrix[3][0], modelMatrix[3][1], modelMatrix[3][2])));
+                    rigidMeshes.emplace_back(new RigidMesh(mesh, rigidBody, meshRef));  
+                }
+            }
         } else {
             btBvhTriangleMeshShape *shape = new btBvhTriangleMeshShape(mesh, true);
             btDefaultMotionState *motionState = new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, 0, 0)));
             btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(0, motionState, shape, btVector3(0, 0, 0));    
             btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
-            rigidBody->setWorldTransform(btTransform(btQuaternion(0, 0, 0, 1), btVector3(modelMatrix[3][0], modelMatrix[3][1], modelMatrix[3][2])));
+            rigidBody->setWorldTransform(btTransform(btQuaternion(modelMatrix[0][0], modelMatrix[1][1], modelMatrix[2][2], 1), btVector3(modelMatrix[3][0], modelMatrix[3][1], modelMatrix[3][2])));
             rigidMeshes.emplace_back(new RigidMesh(mesh, rigidBody, meshRef));   
         }  
         refs.push_back(count);
@@ -326,10 +343,21 @@ void chai_collisions::setRigidMeshPosition(std::vector<int> rigidMeshIndex, floa
             transform = rigidMeshes[i]->rigidBody->getWorldTransform();
         }
         printf("x,y,z: %f,%f,%f\n", transform.getOrigin().getX(), transform.getOrigin().getY(), transform.getOrigin().getZ());
-        rigidMeshes[i]->rigidBody->setWorldTransform(btTransform(btQuaternion(0, 0, 0, 1), (btVector3(x, y, z) + btVector3(transform.getOrigin().getX(), transform.getOrigin().getY(), transform.getOrigin().getZ()))));
+        rigidMeshes[i]->rigidBody->setWorldTransform(btTransform(btQuaternion(transform.getBasis()[0][0], transform.getBasis()[1][1], transform.getBasis()[2][2], 1), (btVector3(x, y, z) + btVector3(transform.getOrigin().getX(), transform.getOrigin().getY(), transform.getOrigin().getZ()))));
         idx++;
     }              
 }
+
+void chai_collisions::teleportRigidMesh(std::vector<int> rigidMeshIndex, float x, float y, float z)
+{
+    for (auto i : rigidMeshIndex) {
+        auto r = rigidMeshes[i]->rigidBody;
+        r->setWorldTransform(btTransform(btQuaternion(0, 0, 0, 1), btVector3(x, y, z)));
+        r->setLinearVelocity(btVector3(0, 0, 0));
+        r->setAngularVelocity(btVector3(0, 0, 0));
+    }
+}
+
 void chai_collisions::togglePhysics(std::vector<int> rigidMeshIndex, bool enable)
 {
     for (auto i : rigidMeshIndex) {
@@ -372,6 +400,7 @@ int chai_collisions::addCharacterController(int index, int meshRef, std::string 
         for (int i = 0; i < characterControllers.size(); i++) {
             if (characterControllers[i]->charId == charId) {
                 characterControllers[i]->addMesh(meshRef);
+                printf("Character controller with charId %s already exists, added meshRef %d\n", charId.c_str(), meshRef);
                 return -1;
             }
         }
@@ -395,6 +424,7 @@ int chai_collisions::addCharacterController(int index, int meshRef, std::string 
     ghostObject->setUserPointer(character); // Set the user pointer to the character controller
 
     ghostObject->setUserIndex(index); // Set the user pointer to the character controller
+    printf("Added character controller with index %d, ref %d and charId %s\n", index, meshRef, charId.c_str());
     characterControllers.emplace_back(new CharacterController(ghostObject, character, meshRef, charId));
     return characterControllers.size() - 1;
 }
@@ -414,6 +444,13 @@ void chai_collisions::setCharacterControllerPosition(int characterIndex, float x
     ghostObject->setCollisionFlags(btCollisionObject::CF_CHARACTER_OBJECT);
     ghostObject->setWorldTransform(btTransform(btQuaternion(0, 0, 0, 1), btVector3(x, y, z)));
 }
+
+void chai_collisions::teleportCharacter(int characterIndex, float x, float y, float z)
+{
+    btPairCachingGhostObject *ghostObject = characterControllers[characterIndex]->ghostObject;
+    ghostObject->setWorldTransform(btTransform(btQuaternion(0, 0, 0, 1), btVector3(x, y, z)));
+}
+
 void chai_collisions::applyForceToCharacter(int characterIndex, float x, float y, float z)
 {
     characterControllers[characterIndex]->character->setWalkDirection(btVector3(x, y, z));
@@ -495,8 +532,12 @@ int chai_collisions::addBox(float x, float y, float z, float width, float height
     // Disable deactivation to keep the object active
     rigidBody->setActivationState(DISABLE_DEACTIVATION);
     rigidBody->setCollisionFlags(btCollisionObject::CF_NO_CONTACT_RESPONSE);
-    cameraBox.emplace_back(rigidBody);
-    rigidMeshes.emplace_back(new RigidMesh(shape, rigidBody));   
+    if (index < 4) {
+        cameraBox.emplace_back(rigidBody);
+    } else {
+        portalBox.emplace_back(rigidBody);
+    }
+    rigidMeshes.emplace_back(new RigidMesh(shape, rigidBody));
     for (auto i : group) {
         if (worlds->worlds.find(i) == worlds->worlds.end()) {
             init(i);
@@ -543,58 +584,73 @@ std::vector<std::pair<glm::vec3, glm::vec3>> chai_collisions::getBoundingBox(int
 std::vector<Matrix4> chai_collisions::getPhysicsObjects(int mesh)
 {
     std::vector<Matrix4> objects;
-    int idx = 0;
     for (auto &m : rigidMeshes) {
         if (m->meshRef == mesh) {
-            btTransform transform = m->rigidBody->getWorldTransform();
-            glm::mat4 modelMat(
-                (float)transform.getBasis()[0][0], (float)transform.getBasis()[0][1], (float)transform.getBasis()[0][2], 0.0f,
-                (float)transform.getBasis()[1][0], (float)transform.getBasis()[1][1], (float)transform.getBasis()[1][2], 0.0f,
-                (float)transform.getBasis()[2][0], (float)transform.getBasis()[2][1], (float)transform.getBasis()[2][2], 0.0f,
-                (float)transform.getOrigin().getX(), (float)transform.getOrigin().getY(), (float)transform.getOrigin().getZ(), 1.0f
-            );
+            // Check if the rigid body is a compound shape (ragdoll)
+            // If it is, we need to get the transform of each child shape
+            btCollisionShape* shape = m->rigidBody->getCollisionShape();
+            btCompoundShape* compoundShape = static_cast<btCompoundShape*>(shape);
+            if (compoundShape->getNumChildShapes() > 0) {                
+                for (int i = 0; i < compoundShape->getNumChildShapes(); i++) {
+                    btTransform childTransform = compoundShape->getChildTransform(i);
+                    glm::mat4 modelMat(1.0f);
+                    btTransform transform = m->rigidBody->getWorldTransform() * childTransform;
+                    glm::vec3 translation((float)transform.getOrigin().getX(), (float)transform.getOrigin().getY(), (float)transform.getOrigin().getZ());
+                    btQuaternion btRot = transform.getRotation();
+                    glm::quat rotation(btRot.getW(), btRot.getX(), btRot.getY(), btRot.getZ());
+                    glm::mat4 rotationMatrix = glm::mat4_cast(rotation);
+                    glm::vec3 scale(1.0f, 1.0f, 1.0f); // scale vector
+                    glm::mat4 trs = glm::translate(glm::mat4(1.0f), translation)
+                            * rotationMatrix
+                            * glm::scale(glm::mat4(1.0f), scale);
+                    modelMat = modelMat * trs;
+                    Matrix4 mat = Matrix4(new float[16] {
+                        modelMat[0][0], modelMat[0][1], modelMat[0][2], modelMat[0][3],
+                        modelMat[1][0], modelMat[1][1], modelMat[1][2], modelMat[1][3],
+                        modelMat[2][0], modelMat[2][1], modelMat[2][2], modelMat[2][3],
+                        modelMat[3][0], modelMat[3][1], modelMat[3][2], modelMat[3][3],
+                    });
+                    objects.push_back(mat);
+                }
+            } else {
+                glm::mat4 modelMat(1.0f);
+                btTransform transform = m->rigidBody->getWorldTransform();
+                glm::vec3 translation((float)transform.getOrigin().getX(), (float)transform.getOrigin().getY(), (float)transform.getOrigin().getZ());
+                btQuaternion btRot = transform.getRotation();
+                glm::quat rotation(btRot.getW(), btRot.getX(), btRot.getY(), btRot.getZ());
+                glm::mat4 rotationMatrix = glm::mat4_cast(rotation);
+                glm::vec3 scale(1.0f, 1.0f, 1.0f); // scale vector
+                glm::mat4 trs = glm::translate(glm::mat4(1.0f), translation)
+                        * rotationMatrix
+                        * glm::scale(glm::mat4(1.0f), scale);
 
-            glm::mat4 projection = glm::perspective(
-                glm::radians(26.0f), 
-                debugDrawer->aspectRatio, 
-                debugDrawer->nearPlane, 
-                debugDrawer->farPlane
-            );
-            glm::vec3 vec(1.0f,1.0f,1.0f);
-            glm::vec3 up(0.0f,1.0f,0.0f);
-            glm::mat4 view = glm::lookAt(
-                vec, 
-                vec, 
-                up
-            );
-
-            glm::mat4 reflect = glm::mat4(
-                1,  0,  0, 0,
-                0, 1,  0, 0,
-                0,  0,  1, 0,
-                0,  0,  0, 1
-            );
-
-            // modelMat *= reflect;
-
-            // modelMat = view * modelMat;
-            // modelMat = 20.0f;
-
-            Matrix4 mat = Matrix4(new float[16] {
-                modelMat[0][0], modelMat[0][1], modelMat[0][2], modelMat[0][3],
-                modelMat[1][0], modelMat[1][1], modelMat[1][2], modelMat[1][3],
-                modelMat[2][0], modelMat[2][1], modelMat[2][2], modelMat[2][3],
-                modelMat[3][0], modelMat[3][1], modelMat[3][2], modelMat[3][3],
-            });
-            // printf("Origin: %f, %f, %f\n", 
-                // transform.getOrigin().getX(), 
-                // transform.getOrigin().getY(), 
-                // transform.getOrigin().getZ());
-            objects.push_back(mat);
+                modelMat = modelMat * trs;
+                
+                Matrix4 mat = Matrix4(new float[16] {
+                    modelMat[0][0], modelMat[0][1], modelMat[0][2], modelMat[0][3],
+                    modelMat[1][0], modelMat[1][1], modelMat[1][2], modelMat[1][3],
+                    modelMat[2][0], modelMat[2][1], modelMat[2][2], modelMat[2][3],
+                    modelMat[3][0], modelMat[3][1], modelMat[3][2], modelMat[3][3],
+                });
+                // printf("Origin: %f, %f, %f\n", 
+                    // transform.getOrigin().getX(), 
+                    // transform.getOrigin().getY(), 
+                    // transform.getOrigin().getZ());
+                objects.push_back(mat);
+            }
         }
-        idx++;
     }
     return objects;
+}
+
+int chai_collisions::portalCollide(int index)
+{
+    if (index < 0 || index >= characterControllers.size()) {
+        return -1;
+    }
+    auto portalIndex = characterControllers[index]->ghostObject->getUserIndex3();
+    characterControllers[index]->ghostObject->setUserIndex3(-1);
+    return portalIndex;
 }
 
 void chai_collisions::init(int group = 0)
@@ -643,27 +699,41 @@ void chai_collisions::init(int group = 0)
                 // Optional: Normalize the direction vector
                 collisionDirection.normalize();
 
-                if (body1->getUserIndex() != -1) {
+                if (body1->getUserIndex() != -1 && body1->getUserIndex() < 4) {
                     auto b = self->cameraBox[body1->getUserIndex()];
                     b->setLinearVelocity(btVector3(-collisionDirection.getX() * 6.0f, 0.0f, 0.0f));
                     auto c = self->characterControllers[body1->getUserIndex()]->character;
                     // auto v = c->getLinearVelocity();
                     // c->getGhostObject()->setLinearVelocity(btVector3(v.getX(), v.getY(), 0.0f));
-                    c->getGhostObject()->setUserIndex2(collisionDirection.getZ() > 0 ? 1 : collisionDirection.getZ() < 0 ? -1 : 0);       
-                }         
-            }
+                    c->getGhostObject()->setUserIndex2(collisionDirection.getZ() > 0 ? 1 : collisionDirection.getZ() < 0 ? -1 : 0);
+                }
+            } else if (body1->getUserIndex() >= 4 && body0->getUserIndex() >= 0 && body0->getUserIndex() < 4 && numContacts > 0) {
+                contact[body1->getUserIndex()] = true;
+                auto c = self->characterControllers[body0->getUserIndex()]->character;
+                c->getGhostObject()->setUserIndex3(body1->getUserIndex());
+            } else if (body0->getUserIndex() >= 4 && body1->getUserIndex() >= 0 && body1->getUserIndex() < 4 && numContacts > 0) {
+                contact[body0->getUserIndex()] = true;
+                auto c = self->characterControllers[body1->getUserIndex()]->character;
+                c->getGhostObject()->setUserIndex3(body0->getUserIndex());
+            }      
         }
         for (int i = 0; i < self->cameraBox.size(); ++i) { 
-            self->cameraBox[i]->setGravity(btVector3(0, 0, 0));           
-            if (!contact[i]) {
-                auto b = self->cameraBox[i];                
-                if (b != nullptr) {
-                    auto v = b->getLinearVelocity();
-                    b->setLinearVelocity(btVector3(v.getX()/1.5f, 0, 0));
-                    auto c = self->characterControllers[i]->character->getGhostObject();
-                    c->setUserIndex2(0);
+            self->cameraBox[i]->setGravity(btVector3(0, 0, 0));   
+            if (i < 4) {        
+                if (!contact[i]) {
+                    auto b = self->cameraBox[i];                
+                    if (b != nullptr) {
+                        auto v = b->getLinearVelocity();
+                        b->setLinearVelocity(btVector3(v.getX()/1.5f, 0, 0));
+                        auto c = self->characterControllers[i]->character->getGhostObject();
+                        c->setUserIndex2(0);
+                    }
                 }
             }
+        }
+        for (int i = 0; i < self->portalBox.size(); ++i) { 
+            self->portalBox[i]->setGravity(btVector3(0, 0, 0));
+            self->portalBox[i]->setLinearVelocity(btVector3(0, 0, 0));
         }
     }, this);
 
@@ -752,7 +822,7 @@ uint8_t* chai_collisions::processDebug(float deltaTime, std::vector<chaiscript::
             // printf("ghost pos: %f, %f, %f\n", pos.getX(), pos.getY(), pos.getZ());
         }
         dw.second->dynamicsWorld->stepSimulation(deltaTime, 10);  
-        if (debugDrawer) {
+        if (false && debugDrawer) {
             std::vector<float> prepD;
             for (auto d : viewMatrix) {
                 auto v = chaiscript::boxed_cast<float>(d);

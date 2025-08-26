@@ -24,6 +24,8 @@ public:
     chai_scene *newScene() const;
     bool destroy();
     void addMesh(chai_mesh *mesh);
+    void addChildMesh(chai_mesh *pmesh, chai_mesh *cmesh);
+    void removeChildMesh(chai_mesh *pmesh, chai_mesh *cmesh);
     void addParticleSystem(chai_particles *ps);
     void hideMesh(chai_mesh *mesh);
     void showMesh(chai_mesh *mesh);
@@ -37,6 +39,7 @@ public:
 
 private:
     std::vector<chai_mesh *> meshes;
+    std::map<int, std::vector<chai_mesh *>> meshChildren;
     std::vector<chai_particles *> particleSystems;
     chai_shader *sceneShader = nullptr;
     std::vector<Matrix4> matrices;

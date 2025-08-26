@@ -354,6 +354,8 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_particles::setParticleSystem), "setParticleSystem");
 	chai.add(fun(&chai_particles::updateParticleSystem), "updateParticleSystem");
 	chai.add(fun(&chai_particles::setParameter), "setParameter");
+	chai.add(fun(&chai_particles::setParent), "setParent");
+	chai.add(fun(&chai_particles::setParticleDetails), "setParticleDetails");
 	chai.add(fun(&chai_particles::draw), "draw");
 	chai.add(user_type<chai_mesh>(), "chai_mesh");
 	chai.add(constructor<chai_mesh(const chai_mesh &)>(), "chai_mesh");
@@ -392,6 +394,8 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_scene::destroy), "destroy");
 	chai.add(fun(&chai_scene::prepareScreen), "prepareScreen");
 	chai.add(fun(&chai_scene::update), "update");
+	chai.add(fun(&chai_scene::removeChildMesh), "removeChildMesh");
+	chai.add(fun(&chai_scene::addChildMesh), "addChildMesh");
 	chai.add(user_type<chai_collisions>(), "chai_collisions");
 	chai.add(constructor<chai_collisions(const chai_collisions &)>(), "chai_collisions");
 	chai.add(fun(&chai_collisions::operator=), "=");
@@ -409,6 +413,9 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_collisions::getRigidMesh), "getRigidMesh");
 	chai.add(fun(&chai_collisions::addBox), "addBox");	
 	chai.add(fun(&chai_collisions::togglePhysics), "togglePhysics");
+	chai.add(fun(&chai_collisions::portalCollide), "portalCollide");
+	chai.add(fun(&chai_collisions::teleportCharacter), "teleportCharacter");
+	chai.add(fun(&chai_collisions::teleportRigidMesh), "teleportRigidMesh");
 	chai.add(user_type<chai_gui>(), "chai_gui");
 	chai.add(constructor<chai_gui(const chai_gui &)>(), "chai_gui");
 	chai.add(fun(&chai_gui::operator=), "=");

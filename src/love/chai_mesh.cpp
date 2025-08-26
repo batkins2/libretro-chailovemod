@@ -195,101 +195,102 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
 
         // cm->nodes = model.scenes[0].nodes;
 
-        cm->skins = std::map<
-            int,
-            std::map<
-                int, std::vector<float>
-            >
-        >();
+        // cm->skins = std::map<
+        //     int,
+        //     std::map<
+        //         int, std::vector<float>
+        //     >
+        // >();
 
-        auto skinMaps = std::vector<std::map<int, std::vector<float>>>();
-        int s = 0;
-        // printf("Test point");
-        for (auto skin : model.skins) {
-            auto inverseBindMatricesAccessor = model.accessors[skin.inverseBindMatrices];
-            auto inverseBindMatricesBufferView = model.bufferViews[inverseBindMatricesAccessor.bufferView];
-            auto inverseBindMatricesBuffer = model.buffers[inverseBindMatricesBufferView.buffer];
-            const float* inverseBindMatrices = reinterpret_cast<const float*>(&inverseBindMatricesBuffer.data[inverseBindMatricesAccessor.byteOffset + inverseBindMatricesBufferView.byteOffset]);
+        // auto skinMaps = std::vector<std::map<int, std::vector<float>>>();
+        // int s = 0;
+        // // printf("Test point");
+        // for (auto skin : model.skins) {
+        //     auto inverseBindMatricesAccessor = model.accessors[skin.inverseBindMatrices];
+        //     auto inverseBindMatricesBufferView = model.bufferViews[inverseBindMatricesAccessor.bufferView];
+        //     auto inverseBindMatricesBuffer = model.buffers[inverseBindMatricesBufferView.buffer];
+        //     const float* inverseBindMatrices = reinterpret_cast<const float*>(&inverseBindMatricesBuffer.data[inverseBindMatricesAccessor.byteOffset + inverseBindMatricesBufferView.byteOffset]);
 
-            std::map<int, std::vector<float>> skinMap;
+        //     std::map<int, std::vector<float>> skinMap;
 
-            for (size_t i = 0; i < inverseBindMatricesAccessor.count; ++i) {
-                auto node = skin.joints[i];
-                auto ibMatrix = std::vector<float>();
-                for (size_t j = 0; j < 16; ++j) {
-                    ibMatrix.push_back(inverseBindMatrices[i * 16 + j]);
-                }
-                skinMap[node] = ibMatrix;
-            }
-            skinMaps.push_back(skinMap);
-            cm->jointOrder[s] = skin.joints;
-            s++;
-        }
+        //     for (size_t i = 0; i < inverseBindMatricesAccessor.count; ++i) {
+        //         auto node = skin.joints[i];
+        //         auto ibMatrix = std::vector<float>();
+        //         for (size_t j = 0; j < 16; ++j) {
+        //             ibMatrix.push_back(inverseBindMatrices[i * 16 + j]);
+        //         }
+        //         skinMap[node] = ibMatrix;
+        //     }
+        //     skinMaps.push_back(skinMap);
+        //     cm->jointOrder[s] = skin.joints;
+        //     s++;
+        // }
 
-        int index = 0;
-        for (auto node : model.nodes) {
-            if (node.mesh != -1 && node.skin != -1) {
-                auto skin = skinMaps[node.skin];
-                auto skinMap = std::map<int, std::vector<float>>();
-                for (auto s : skin) {
-                    skinMap[s.first] = s.second;
-                }
-                cm->skins[node.mesh] = skinMap;
-            }
+        // int index = 0;
+        // for (auto node : model.nodes) {
+        //     if (node.mesh != -1 && node.skin != -1) {
+        //         auto skin = skinMaps[node.skin];
+        //         cm->nodeNames[node.name] = index;
+        //         auto skinMap = std::map<int, std::vector<float>>();
+        //         for (auto s : skin) {
+        //             skinMap[s.first] = s.second;
+        //         }
+        //         cm->skins[node.mesh] = skinMap;
+        //     }
             
-            if (node.mesh != -1) {
-                // cm->meshList.push_back(index);
-                cm->meshToNode[node.mesh] = index;
-            }
-            cm->nodeMatrix.push_back(glm::mat4(1.0f));
-            if (node.translation.size() > 0) {
-                cm->nodeMatrix[index] = glm::translate(cm->nodeMatrix[index], glm::vec3(node.translation[0], node.translation[1], node.translation[2]));
-            }
-            if (node.rotation.size() > 0) {
-                glm::quat rotation = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
-                cm->nodeMatrix[index] *= glm::mat4_cast(rotation);
-            }
-            if (node.scale.size() > 0) {
-                cm->nodeMatrix[index] = glm::scale(cm->nodeMatrix[index], glm::vec3(node.scale[0], node.scale[1], node.scale[2]));
-            }
+        //     if (node.mesh != -1) {
+        //         // cm->meshList.push_back(index);
+        //         cm->meshToNode[node.mesh] = index;
+        //     }
+        //     cm->nodeMatrix.push_back(glm::mat4(1.0f));
+        //     if (node.translation.size() > 0) {
+        //         cm->nodeMatrix[index] = glm::translate(cm->nodeMatrix[index], glm::vec3(node.translation[0], node.translation[1], node.translation[2]));
+        //     }
+        //     if (node.rotation.size() > 0) {
+        //         glm::quat rotation = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
+        //         cm->nodeMatrix[index] *= glm::mat4_cast(rotation);
+        //     }
+        //     if (node.scale.size() > 0) {
+        //         cm->nodeMatrix[index] = glm::scale(cm->nodeMatrix[index], glm::vec3(node.scale[0], node.scale[1], node.scale[2]));
+        //     }
 
-            if (node.children.size() > 0) {
-                cm->nodeChildren[index] = node.children;
-                for (auto child : node.children) {
-                    cm->nodeParent.push_back(std::pair<int, int>(child, index));
-                    printf("%s (%d)->%s (%d)\n", model.nodes[child].name.c_str(), child, model.nodes[index].name.c_str(), index);
-                    // glm::mat4 parentMatrix = cm->nodeMatrix[index];
+        //     if (node.children.size() > 0) {
+        //         cm->nodeChildren[index] = node.children;
+        //         for (auto child : node.children) {
+        //             cm->nodeParent.push_back(std::pair<int, int>(child, index));
+        //             printf("%s (%d)->%s (%d)\n", model.nodes[child].name.c_str(), child, model.nodes[index].name.c_str(), index);
+        //             // glm::mat4 parentMatrix = cm->nodeMatrix[index];
 
-                    // if (node.translation.size() > 0) {
-                    //     parentMatrix = glm::translate(parentMatrix, glm::vec3(node.translation[0], node.translation[1], node.translation[2]));
-                    // }
-                    // if (node.rotation.size() > 0) {
-                    //     glm::quat rotation = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
-                    //     parentMatrix *= glm::mat4_cast(rotation);
-                    // }
-                    // if (node.scale.size() > 0) {
-                    //     parentMatrix = glm::scale(parentMatrix, glm::vec3(node.scale[0], node.scale[1], node.scale[2]));
-                    // }
+        //             // if (node.translation.size() > 0) {
+        //             //     parentMatrix = glm::translate(parentMatrix, glm::vec3(node.translation[0], node.translation[1], node.translation[2]));
+        //             // }
+        //             // if (node.rotation.size() > 0) {
+        //             //     glm::quat rotation = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
+        //             //     parentMatrix *= glm::mat4_cast(rotation);
+        //             // }
+        //             // if (node.scale.size() > 0) {
+        //             //     parentMatrix = glm::scale(parentMatrix, glm::vec3(node.scale[0], node.scale[1], node.scale[2]));
+        //             // }
 
-                    // cm->nodeParentMatrix[child] = parentMatrix;
-                }
-            }
-            // if (node.children.size() > 0) {
-            //     auto joints = std::vector<int>();
-            //     auto m = -1;
-            //     for (auto child : node.children) {
-            //         if (model.nodes[child].mesh != -1) {
-            //             m = child;
-            //         } else {
-            //             joints.push_back(child);
-            //         }
-            //     }
-            //     if (m != -1) {
-            //         cm->nodeChildren[m] = joints;
-            //     }
-            // }
-            index++;
-        }
+        //             // cm->nodeParentMatrix[child] = parentMatrix;
+        //         }
+        //     }
+        //     // if (node.children.size() > 0) {
+        //     //     auto joints = std::vector<int>();
+        //     //     auto m = -1;
+        //     //     for (auto child : node.children) {
+        //     //         if (model.nodes[child].mesh != -1) {
+        //     //             m = child;
+        //     //         } else {
+        //     //             joints.push_back(child);
+        //     //         }
+        //     //     }
+        //     //     if (m != -1) {
+        //     //         cm->nodeChildren[m] = joints;
+        //     //     }
+        //     // }
+        //     index++;
+        // }
         // printf("Test point 2");
 
         if (readyData == nullptr && indiceAccessor.componentType != TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
@@ -636,6 +637,112 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
                 cm->specular[i] = true;
             } 
         }
+    }
+    cm->skins = std::map<
+        int,
+        std::map<
+            int, std::vector<float>
+        >
+    >();
+
+    auto skinMaps = std::vector<std::map<int, std::vector<float>>>();
+    int s = 0;
+    // printf("Test point");
+    for (auto skin : model.skins) {
+        auto inverseBindMatricesAccessor = model.accessors[skin.inverseBindMatrices];
+        auto inverseBindMatricesBufferView = model.bufferViews[inverseBindMatricesAccessor.bufferView];
+        auto inverseBindMatricesBuffer = model.buffers[inverseBindMatricesBufferView.buffer];
+        const float* inverseBindMatrices = reinterpret_cast<const float*>(&inverseBindMatricesBuffer.data[inverseBindMatricesAccessor.byteOffset + inverseBindMatricesBufferView.byteOffset]);
+
+        std::map<int, std::vector<float>> skinMap;
+
+        for (size_t i = 0; i < inverseBindMatricesAccessor.count; ++i) {
+            auto node = skin.joints[i];
+            auto ibMatrix = std::vector<float>();
+            for (size_t j = 0; j < 16; ++j) {
+                ibMatrix.push_back(inverseBindMatrices[i * 16 + j]);
+            }
+            skinMap[node] = ibMatrix;
+        }
+        skinMaps.push_back(skinMap);
+        cm->jointOrder[s] = skin.joints;
+        s++;
+    }
+
+    int index = 0;
+    for (auto node : model.nodes) {
+        if (node.mesh != -1 && node.skin != -1) {
+            auto skin = skinMaps[node.skin];
+            cm->nodeNames[node.name] = index;
+            auto skinMap = std::map<int, std::vector<float>>();
+            for (auto s : skin) {
+                skinMap[s.first] = s.second;
+            }
+            cm->skins[node.mesh] = skinMap;
+        }
+
+        if (i == -1) {
+            auto skin = skinMaps[0];
+            cm->nodeNames[node.name] = index;
+            auto skinMap = std::map<int, std::vector<float>>();
+            for (auto s : skin) {
+                skinMap[s.first] = s.second;
+            }
+            cm->skins[0] = skinMap;
+        }
+        
+        if (node.mesh != -1) {
+            // cm->meshList.push_back(index);
+            cm->meshToNode[node.mesh] = index;
+        }
+        cm->nodeMatrix.push_back(glm::mat4(1.0f));
+        if (node.translation.size() > 0) {
+            cm->nodeMatrix[index] = glm::translate(cm->nodeMatrix[index], glm::vec3(node.translation[0], node.translation[1], node.translation[2]));
+        }
+        if (node.rotation.size() > 0) {
+            glm::quat rotation = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
+            cm->nodeMatrix[index] *= glm::mat4_cast(rotation);
+        }
+        if (node.scale.size() > 0) {
+            cm->nodeMatrix[index] = glm::scale(cm->nodeMatrix[index], glm::vec3(node.scale[0], node.scale[1], node.scale[2]));
+        }
+
+        if (node.children.size() > 0) {
+            cm->nodeChildren[index] = node.children;
+            for (auto child : node.children) {
+                cm->nodeParent.push_back(std::pair<int, int>(child, index));
+                printf("%s (%d)->%s (%d)\n", model.nodes[child].name.c_str(), child, model.nodes[index].name.c_str(), index);
+                // glm::mat4 parentMatrix = cm->nodeMatrix[index];
+
+                // if (node.translation.size() > 0) {
+                //     parentMatrix = glm::translate(parentMatrix, glm::vec3(node.translation[0], node.translation[1], node.translation[2]));
+                // }
+                // if (node.rotation.size() > 0) {
+                //     glm::quat rotation = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
+                //     parentMatrix *= glm::mat4_cast(rotation);
+                // }
+                // if (node.scale.size() > 0) {
+                //     parentMatrix = glm::scale(parentMatrix, glm::vec3(node.scale[0], node.scale[1], node.scale[2]));
+                // }
+
+                // cm->nodeParentMatrix[child] = parentMatrix;
+            }
+        }
+        // if (node.children.size() > 0) {
+        //     auto joints = std::vector<int>();
+        //     auto m = -1;
+        //     for (auto child : node.children) {
+        //         if (model.nodes[child].mesh != -1) {
+        //             m = child;
+        //         } else {
+        //             joints.push_back(child);
+        //         }
+        //     }
+        //     if (m != -1) {
+        //         cm->nodeChildren[m] = joints;
+        //     }
+        // }
+        index++;
     }
     // auto imageBufferView = model.bufferViews[image->bufferView];
     // auto imageBuffer = model.buffers[imageBufferView.buffer];
@@ -1274,12 +1381,16 @@ void chai_mesh::update(std::vector<float> position, std::vector<float> rotation,
         debug->pushDebugMessagef("Matrix: %f %f %f %f\n", matrices[i].getColumn(3).x, matrices[i].getColumn(3).y, matrices[i].getColumn(3).z, matrices[i].getColumn(3).w);
 
         // matrices[i] = matrices[i].inverse();
-        glm::mat4 matrix = glm::mat4(
+        glm::mat4 mat = glm::mat4(
             matrices[i].getColumn(0).x, matrices[i].getColumn(0).y, matrices[i].getColumn(0).z, matrices[i].getColumn(0).w,
             matrices[i].getColumn(1).x, matrices[i].getColumn(1).y, matrices[i].getColumn(1).z, matrices[i].getColumn(1).w,
             matrices[i].getColumn(2).x, matrices[i].getColumn(2).y, matrices[i].getColumn(2).z, matrices[i].getColumn(2).w,
             matrices[i].getColumn(3).x, matrices[i].getColumn(3).y, matrices[i].getColumn(3).z, matrices[i].getColumn(3).w
         );
+        glm::vec3 scale;
+        scale.x = glm::length(glm::vec3(mat[0])); // length of first column
+        scale.y = glm::length(glm::vec3(mat[1])); // length of second column
+        scale.z = glm::length(glm::vec3(mat[2]));
         // glm::vec3 rot = glm::vec3(
         //     glm::degrees(atan2(matrix[1][2], matrix[2][2])), // Yaw
         //     glm::degrees(atan2(-matrix[0][2], sqrt(matrix[1][2] * matrix[1][2] + matrix[2][2] * matrix[2][2]))), // Pitch
@@ -1360,9 +1471,7 @@ void chai_mesh::update(std::vector<float> position, std::vector<float> rotation,
         // );
 
         // physMat = glm::scale(physMat, glm::vec3(0.8f, 0.8f, 0.8f)); // Scale the physics matrix to match the original scale
-
         
-
         // Extract physics position
         glm::vec3 physicsPos(
             physicsObjectMatrix.getColumn(3).x,
@@ -1391,7 +1500,7 @@ void chai_mesh::update(std::vector<float> position, std::vector<float> rotation,
             offset.x, offset.y, offset.z, physicsObjectMatrix.getColumn(3).w
         );
 
-        // physMat *= reflectY;
+        physMat = glm::scale(physMat, scale);
 
 
 
@@ -1461,6 +1570,7 @@ void chai_mesh::update(std::vector<float> position, std::vector<float> rotation,
         // physMat = glm::translate(physMat, glm::vec3(0.0f, 1.0f, 0.0f)); // Scale the physics matrix to match the original scale
  
         // matrix = glm::scale(matrix, glm::vec3(0.4f, 0.4f, 0.4f)); // Scale the model matrix to match the original scale
+
         auto diff = physMat;
         offsetMatrices[i] = Matrix4(new float[16] {
             diff[0][0], diff[0][1], diff[0][2], diff[0][3],
@@ -1489,12 +1599,13 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
         
         
         int i = 0;
-        for (int j = 0; j < meshes.size(); j++) {
-            if (subVisible[j] == false) {
-                continue;
-            }
+        for (int j = 0; j < meshes.size(); j++) {                      
             auto msh = meshes[j];
-            
+
+            if (subVisible[j] == false && msh != nullptr) {
+                continue;
+            } 
+
             auto node = meshToNode[i];
             
 
@@ -1519,6 +1630,8 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                         );
                         jointMatrix[i][joint] = glm::mat4(1.0);
                         jointList[i].push_back(joint);
+
+                        nodeActiveMatrix[joint] = glm::inverse(jointIBMatrix[joint]);
                     }
                 }
 
@@ -1717,6 +1830,8 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                                             glm::vec3 v(interpolatedValue);
                                             jointMatrix[i][node] = glm::scale(jointMatrix[i][node], v) * jointMatrix[i][node];
                                         }
+
+                                        nodeActiveMatrix[node] = jointMatrix[i][node] * glm::inverse(jointIBMatrix[node]);
                                     }
                                 }
                             } 
@@ -1757,6 +1872,7 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                 // matrices[i] = offsetMatrices[i];
             }
             
+            activeMatrix = mat;
             // printf("Matrix: %f %f %f %f\n", mat.getColumn(0).x, mat.getColumn(0).y, mat.getColumn(0).z, mat.getColumn(0).w);
             // printf("Matrix: %f %f %f %f\n", mat.getColumn(1).x, mat.getColumn(1).y, mat.getColumn(1).z, mat.getColumn(1).w);
             // printf("Matrix: %f %f %f %f\n", mat.getColumn(2).x, mat.getColumn(2).y, mat.getColumn(2).z, mat.getColumn(2).w);
@@ -1785,8 +1901,24 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
     }
 }
 
-void chai_mesh::loadSpecular() {
-    auto texture = "/cartridges/test/assets/particles/sunrise.jpg";
+Matrix4 chai_mesh::getNodeMatrix(const std::string &node) {
+    auto n = nodeNames[node];
+    glm::mat4 m = nodeActiveMatrix[n];
+    // return activeMatrix;
+    // printf("Node Matrix: %s\n", node.c_str());
+    // printf("Matrix: %f %f %f %f\n", m[3][0], m[3][1], m[3][2], m[3][3]);
+    return matrices[0] * activeMatrix * Matrix4(new float[16] {
+        m[0][0], m[0][1], m[0][2], m[0][3],
+        m[1][0], m[1][1], m[1][2], m[1][3],
+        m[2][0], m[2][1], m[2][2], m[2][3],
+        m[3][0], m[3][1], m[3][2], m[3][3] 
+    });
+}
+
+void chai_mesh::loadSpecular(std::string texture) {
+    if (texture == "") {
+        texture = "/cartridges/test/assets/particles/sunrise.jpg";
+    }
             
     auto cg = ChaiLove::getInstance()->chai_gfx;
     SDL_RWops* rw = ChaiLove::getInstance()->filesystem.openRW(texture);
@@ -1968,6 +2100,7 @@ chai_mesh::chai_mesh(const chai_mesh &c) {
     jointMatrix = c.jointMatrix;
     activeAnimations = c.activeAnimations;
     animations = c.animations;
+    nodeNames = c.nodeNames;
 
     matrices = c.matrices;
     offsetMatrices = c.offsetMatrices;

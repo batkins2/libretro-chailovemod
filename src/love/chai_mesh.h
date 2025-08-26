@@ -100,10 +100,11 @@ class chai_mesh {
     void update(std::vector<float> position, std::vector<float> rotation, std::vector<float> scale, chai_debug *debug);
     std::pair<glm::vec3, glm::vec3> getBoundingBox(const glm::mat4 &viewProjectionMatrix);
     std::vector<float> getMeshBoundingBox();
+    Matrix4 getNodeMatrix(const std::string &node);
     bool isVisible() {
         return visible;
     };
-    void loadSpecular();
+    void loadSpecular(std::string texture);
     love::gfx::Graphics *instance;
     gfx::Mesh *mesh = nullptr;
     std::vector<gfx::Mesh *> meshes;
@@ -136,6 +137,9 @@ class chai_mesh {
     > animations;
     float currentTime = 0.0f;
     std::vector<int> nodes;
+    std::map<std::string, int> nodeNames;
+    std::map<int, glm::mat4> nodeActiveMatrix;
+    Matrix4 activeMatrix;
     // std::vector<int> meshList;
     std::map<int, std::map<int, std::vector<float>>> skins;
     std::map<int, int> meshToNode;

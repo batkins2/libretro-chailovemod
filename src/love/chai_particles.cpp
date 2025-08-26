@@ -128,11 +128,24 @@ void chai_particles::setParameter(const std::string &name, const std::vector<flo
 
 }
 
-void chai_particles::draw(float x, float y, float z, float angle, float scaleX, float scaleY, float scaleZ) {
+void chai_particles::setParent(chai_mesh *parent, const std::string &node) {
+    bindParent = parent;
+    bindNode = node;
+}
+
+void chai_particles::draw() {
     // Draw the particle system at the specified position and angle
     // This is a placeholder implementation
     if (ps) {
-        
+
+        float x = details.values[0];
+        float y = details.values[1];
+        float z = details.values[2];
+        float angle = details.values[3];
+        float scaleX = details.values[4];
+        float scaleY = details.values[5];
+        float scaleZ = details.values[6];
+
         angle = glm::radians(angle);
         auto mat = Matrix4(new float[16]{
             scaleX * cos(angle), -scaleY * sin(angle), 0.0f, 0.0f,
@@ -140,6 +153,15 @@ void chai_particles::draw(float x, float y, float z, float angle, float scaleX, 
             0.0f, 0.0f, scaleZ, 0.0f,
             x, y, z, 1.0f
         });
+        if (bindParent != nullptr) {
+            auto mat2 = bindParent->getNodeMatrix(bindNode);
+            // Set mat x, y, z
+            auto col = mat2.getColumn(3);
+            col.x += x;
+            col.y += y;
+            col.z += z;
+            mat.setColumn(3, col);
+        }
         // auto mat = Matrix4();
         // mat.setIdentity();
         // setParticleSystem(tex, sz);
@@ -150,6 +172,11 @@ void chai_particles::draw(float x, float y, float z, float angle, float scaleX, 
         printf("Particle system not initialized.\n");
     }
 
+}
+
+void chai_particles::setParticleDetails(float x, float y, float z, float angle, float scaleX, float scaleY, float scaleZ) {
+    details.name = "Particle";
+    details.values = {x, y, z, angle, scaleX, scaleY, scaleZ};
 }
 
 }

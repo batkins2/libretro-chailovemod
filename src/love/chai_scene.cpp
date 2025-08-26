@@ -32,6 +32,27 @@ void chai_scene::addMesh(chai_mesh *mesh) {
         0.0f, 0.0f, 0.0f, 1.0f}));   
 }
 
+void chai_scene::addChildMesh(chai_mesh *pmesh, chai_mesh *cmesh) {
+    auto it = std::find(meshes.begin(), meshes.end(), pmesh);
+    if (it != meshes.end()) {
+        int index = it - meshes.begin();
+        meshChildren[index].emplace_back(cmesh);
+    } else {
+        printf("Parent mesh not found in scene.\n");
+    }    
+}
+
+void chai_scene::removeChildMesh(chai_mesh *pmesh, chai_mesh *cmesh) {
+    auto it = std::find(meshes.begin(), meshes.end(), pmesh);
+    if (it != meshes.end()) {
+        int index = it - meshes.begin();
+        auto& children = meshChildren[index];
+        children.erase(std::remove(children.begin(), children.end(), cmesh), children.end());
+    } else {
+        printf("Parent mesh not found in scene.\n");
+    }
+}
+
 void chai_scene::addParticleSystem(chai_particles *ps) {
     particleSystems.push_back(ps);
 }
@@ -149,7 +170,7 @@ void chai_scene::drawMeshes(bool shadows, int view) {
     if (!shadows) {
         auto mesh = meshes[0];
         if (mesh->specData == nullptr) {
-            mesh->loadSpecular();
+            mesh->loadSpecular("");
         }
 
         // tex = cg.instance->newTexture(settings, &slices);
@@ -363,6 +384,22 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         
         auto matrix = matrices[i];
         mesh->draw(cg.instance, matrix, sceneShader, deltaTime);
+        if (meshChildren.find(i) != meshChildren.end()) {
+            for (auto child : meshChildren[i]) {
+                if (child->visible == false) {
+                    continue;
+                }
+                for (int j = 0; j < child->meshes.size(); ++j) {
+                    Matrix4 m = Matrix4(new float[16]{
+                        1.0f, 0.0f, 0.0f, 0.0f,
+                        0.0f, 1.0f, 0.0f, 0.0f,
+                        0.0f, 0.0f, 1.0f, 0.0f,
+                        0.0f, 0.0f, 0.0f, 1.0f
+                    });
+                    child->meshes[j]->draw(cg.instance, m);
+                }
+            }
+        }
         i++;
     }
     if (shadows == false) {
@@ -370,7 +407,7 @@ void chai_scene::drawMeshes(bool shadows, int view) {
             // if (ps->visible == false) {
             //     continue;
             // }
-            ps->draw(0.0f, 5.3f, -2.0f, 0.0f, 2.25f, 2.25f, 2.25f);
+            ps->draw();
         }
     }
 }

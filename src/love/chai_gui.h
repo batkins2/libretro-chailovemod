@@ -31,7 +31,7 @@ public:
     chai_gui *clone() const;
     chai_gui *newGui() const;
     int addElement(std::string type, std::string image, std::string text, const std::vector<std::string> options);
-    void draw(chai_shader *shader, std::vector<chaiscript::Boxed_Value> viewMatrix1);
+    void draw(chai_shader *shader, std::vector<chaiscript::Boxed_Value> viewMatrix1, bool debug);
     void setElementVisible(int id, bool visible);
     void setElementText(int id, const std::string &text);
     void writeConsole(std::string s);

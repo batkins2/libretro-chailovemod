@@ -34,7 +34,7 @@ int chai_gui::addElement(std::string type, std::string image, std::string text, 
     return data->id;
 }
 
-void chai_gui::draw(chai_shader *shader, std::vector<chaiscript::Boxed_Value> viewMatrix1)
+void chai_gui::draw(chai_shader *shader, std::vector<chaiscript::Boxed_Value> viewMatrix1, bool debug)
 {
     glDisable(GL_DEPTH_TEST);
     auto cg = ChaiLove::getInstance()->chai_gfx;
@@ -127,28 +127,28 @@ void chai_gui::draw(chai_shader *shader, std::vector<chaiscript::Boxed_Value> vi
     
 
     // auto buffer = ChaiLove::getInstance()->chai_collisions.processDebug(1.0f/60.0f, viewMatrix1);
-    
-    if (overlayTexture == nullptr)
-    {
-        gfx::Texture::Settings settings;
-        settings.width = 1920;
-        settings.height = 1080;
-        settings.format = PIXELFORMAT_RGBA8_UNORM;
-        auto slices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
-        overlayTexture = cg.instance->newTexture(settings, &slices);
+    if (debug) {
+        if (overlayTexture == nullptr)
+        {
+            gfx::Texture::Settings settings;
+            settings.width = 1920;
+            settings.height = 1080;
+            settings.format = PIXELFORMAT_RGBA8_UNORM;
+            auto slices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
+            overlayTexture = cg.instance->newTexture(settings, &slices);
+        }
+        Rect rect = Rect();
+        rect.w = 1920;
+        rect.h = 1080;
+        overlayTexture->replacePixels(ChaiLove::getInstance()->chai_collisions.buffer, 1920*1080*4, 0, 0, rect, false);
+        Matrix4 m = Matrix4(new float[16]{
+            1.0f, 0.0f, 0.0f, 0.0f,
+            0.0f, 1.0f, 0.0f, 0.0f,
+            0.0f, 0.0f, 1.0f, 0.0f,
+            0.0f, 0.0f, 0.0f, 1.0f
+        });
+        cg.instance->draw(overlayTexture, m);
     }
-    Rect rect = Rect();
-    rect.w = 1920;
-    rect.h = 1080;
-    overlayTexture->replacePixels(ChaiLove::getInstance()->chai_collisions.buffer, 1920*1080*4, 0, 0, rect, false);
-    Matrix4 m = Matrix4(new float[16]{
-        1.0f, 0.0f, 0.0f, 0.0f,
-        0.0f, 1.0f, 0.0f, 0.0f,
-        0.0f, 0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 0.0f, 1.0f
-    });
-    cg.instance->draw(overlayTexture, m);
-
     initConsole();
     shader->send("scale", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(2.0f) }));
     ChaiLove::getInstance()->printNew(console->text, 

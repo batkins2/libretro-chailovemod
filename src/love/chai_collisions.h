@@ -24,7 +24,7 @@ class chai_collisions
     void destroy();
     uint8_t* processDebug(float deltaTime, std::vector<chaiscript::Boxed_Value> viewMatrix);
     void process(float deltaTime);
-    std::vector<int> addRigidMesh(std::string meshPath, int mesh, bool makeConvex);
+    std::vector<int> addRigidMesh(std::string meshPath, int mesh, bool makeConvex, bool ragdoll);
     void setCharacterControllerPosition(int characterIndex, float x, float y, float z, std::vector<int> group);
     void setRigidMeshPosition(std::vector<int> rigidMeshIndex, float x, float y, float z, std::vector<int> group);
     void togglePhysics(std::vector<int> rigidMeshIndex, bool enable);
@@ -36,6 +36,9 @@ class chai_collisions
     int addBox(float x, float y, float z, float width, float height, float depth, std::vector<int> group, int index);
     std::vector<std::pair<glm::vec3, glm::vec3>> getBoundingBox(int mesh);
     std::vector<Matrix4> getPhysicsObjects(int mesh);
+    int portalCollide(int index);
+    void teleportCharacter(int characterIndex, float x, float y, float z);
+    void teleportRigidMesh(std::vector<int> rigidMeshIndex, float x, float y, float z);
 
     void clearWorlds()
     {
@@ -186,6 +189,7 @@ class chai_collisions
     };
     std::vector<RigidMesh *> rigidMeshes;
     std::vector<btRigidBody *> cameraBox;
+    std::vector<btRigidBody *> portalBox;
     std::vector<CharacterController *> characterControllers;    
     WorldMap *worlds = nullptr;    
 
@@ -197,32 +201,32 @@ class chai_collisions
             OpenGLDebugDrawer() : debugMode(DBG_DrawWireframe) {}
 
             void drawLine(const btVector3 &from, const btVector3 &to, const btVector3 &color) override {
-                glColor3f(color.getX(), color.getY(), color.getZ());
-                glBegin(GL_LINES);
-                glVertex3f(from.getX(), from.getY(), from.getZ());
-                glVertex3f(to.getX(), to.getY(), to.getZ());
-                glEnd();
+                // glColor3f(color.getX(), color.getY(), color.getZ());
+                // glBegin(GL_LINES);
+                // glVertex3f(from.getX(), from.getY(), from.getZ());
+                // glVertex3f(to.getX(), to.getY(), to.getZ());
+                // glEnd();
             }
 
             void drawContactPoint(const btVector3 &pointOnB, const btVector3 &normalOnB, btScalar distance, int lifeTime, const btVector3 &color) override {
-                glColor3f(color.getX(), color.getY(), color.getZ());
-                glBegin(GL_POINTS);
-                glVertex3f(pointOnB.getX(), pointOnB.getY(), pointOnB.getZ());
-                glEnd();
+                // glColor3f(color.getX(), color.getY(), color.getZ());
+                // glBegin(GL_POINTS);
+                // glVertex3f(pointOnB.getX(), pointOnB.getY(), pointOnB.getZ());
+                // glEnd();
 
                 btVector3 to = pointOnB + normalOnB * distance;
                 drawLine(pointOnB, to, color);
             }
 
             void drawTriangle(const btVector3 &v0, const btVector3 &v1, const btVector3 &v2, const btVector3 &color, btScalar alpha) override {
-                glColor4f(color.getX(), color.getY(), color.getZ(), alpha);
+                // glColor4f(color.getX(), color.getY(), color.getZ(), alpha);
                 // Set triangle line thickness if needed
-                glLineWidth(8.0f);
-                glBegin(GL_LINE_LOOP);
-                glVertex3f(v0.getX(), v0.getY(), v0.getZ());
-                glVertex3f(v1.getX(), v1.getY(), v1.getZ());
-                glVertex3f(v2.getX(), v2.getY(), v2.getZ());
-                glEnd();
+                glLineWidth(1.0f);
+                // glBegin(GL_LINE_LOOP);
+                // glVertex3f(v0.getX(), v0.getY(), v0.getZ());
+                // glVertex3f(v1.getX(), v1.getY(), v1.getZ());
+                // glVertex3f(v2.getX(), v2.getY(), v2.getZ());
+                // glEnd();
             }
 
             void reportErrorWarning(const char *warningString) override {
