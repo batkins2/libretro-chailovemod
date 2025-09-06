@@ -160,6 +160,8 @@ void chai_particles::draw() {
             col.x += x;
             col.y += y;
             col.z += z;
+            // printf("Binding particle system to parent node: %s\n", bindNode.c_str());
+            // printf("Parent position: %f, %f, %f\n", col.x, col.y, col.z);
             mat.setColumn(3, col);
         }
         // auto mat = Matrix4();

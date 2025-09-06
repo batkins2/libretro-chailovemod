@@ -301,11 +301,13 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
                     btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(0, motionState, ragdollShape, btVector3(0, 0, 0));
                     btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
                     rigidBody->setWorldTransform(btTransform(btQuaternion(modelMatrix[0][0], modelMatrix[1][1], modelMatrix[2][2], 1), btVector3(modelMatrix[3][0], modelMatrix[3][1], modelMatrix[3][2])));
+                    rigidBody->setUserIndex(-1);
                     rigidMeshes.emplace_back(new RigidMesh(mesh, rigidBody, meshRef));  
                 } else {
                     btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(0, motionState, convexShape, btVector3(0, 0, 0));
                     btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
                     rigidBody->setWorldTransform(btTransform(btQuaternion(modelMatrix[0][0], modelMatrix[1][1], modelMatrix[2][2], 1), btVector3(modelMatrix[3][0], modelMatrix[3][1], modelMatrix[3][2])));
+                    rigidBody->setUserIndex(-1);
                     rigidMeshes.emplace_back(new RigidMesh(mesh, rigidBody, meshRef));  
                 }
             }
@@ -315,6 +317,7 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
             btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(0, motionState, shape, btVector3(0, 0, 0));    
             btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
             rigidBody->setWorldTransform(btTransform(btQuaternion(modelMatrix[0][0], modelMatrix[1][1], modelMatrix[2][2], 1), btVector3(modelMatrix[3][0], modelMatrix[3][1], modelMatrix[3][2])));
+            rigidBody->setUserIndex(-1);
             rigidMeshes.emplace_back(new RigidMesh(mesh, rigidBody, meshRef));   
         }  
         refs.push_back(count);
@@ -423,7 +426,11 @@ int chai_collisions::addCharacterController(int index, int meshRef, std::string 
 
     ghostObject->setUserPointer(character); // Set the user pointer to the character controller
 
-    ghostObject->setUserIndex(index); // Set the user pointer to the character controller
+    if (index > 3) {
+        ghostObject->setUserIndex(index * -1); // Set the user pointer to the character controller
+    } else {
+        ghostObject->setUserIndex(index); // Set the user pointer to the character controller
+    }
     printf("Added character controller with index %d, ref %d and charId %s\n", index, meshRef, charId.c_str());
     characterControllers.emplace_back(new CharacterController(ghostObject, character, meshRef, charId));
     return characterControllers.size() - 1;
@@ -437,7 +444,11 @@ void chai_collisions::setCharacterControllerPosition(int characterIndex, float x
             init(i);
         }
         characterControllers[characterIndex]->group.push_back(i);
-        worlds->worlds[i]->dynamicsWorld->addCollisionObject(characterControllers[characterIndex]->ghostObject, btBroadphaseProxy::CharacterFilter, btBroadphaseProxy::StaticFilter | btBroadphaseProxy::DefaultFilter);
+        if (ghostObject->getUserIndex() < 0) {
+            worlds->worlds[i]->dynamicsWorld->addCollisionObject(ghostObject, btBroadphaseProxy::CharacterFilter, btBroadphaseProxy::StaticFilter | btBroadphaseProxy::DefaultFilter | btBroadphaseProxy::CharacterFilter);
+        } else {
+            worlds->worlds[i]->dynamicsWorld->addCollisionObject(ghostObject, btBroadphaseProxy::CharacterFilter, btBroadphaseProxy::StaticFilter | btBroadphaseProxy::DefaultFilter);
+        }
         worlds->worlds[i]->dynamicsWorld->addCharacter(characterControllers[characterIndex]->character);
     }
     
@@ -699,14 +710,14 @@ void chai_collisions::init(int group = 0)
                 // Optional: Normalize the direction vector
                 collisionDirection.normalize();
 
-                if (body1->getUserIndex() != -1 && body1->getUserIndex() < 4) {
+                if (body1->getUserIndex() > -1 && body1->getUserIndex() < 4) {
                     auto b = self->cameraBox[body1->getUserIndex()];
                     b->setLinearVelocity(btVector3(-collisionDirection.getX() * 6.0f, 0.0f, 0.0f));
                     auto c = self->characterControllers[body1->getUserIndex()]->character;
                     // auto v = c->getLinearVelocity();
                     // c->getGhostObject()->setLinearVelocity(btVector3(v.getX(), v.getY(), 0.0f));
                     c->getGhostObject()->setUserIndex2(collisionDirection.getZ() > 0 ? 1 : collisionDirection.getZ() < 0 ? -1 : 0);
-                }
+                }            
             } else if (body1->getUserIndex() >= 4 && body0->getUserIndex() >= 0 && body0->getUserIndex() < 4 && numContacts > 0) {
                 contact[body1->getUserIndex()] = true;
                 auto c = self->characterControllers[body0->getUserIndex()]->character;
@@ -806,10 +817,10 @@ uint8_t* chai_collisions::processDebug(float deltaTime, std::vector<chaiscript::
         for (auto &cc : characterControllers) {
             auto stopZ = cc->ghostObject->getUserIndex2();
             auto v = cc->character->getLinearVelocity();
-            if (stopZ > 0 && v.getZ() < 0) {                
+            if (stopZ > 0 && v.getZ() < 0 && cc->ghostObject->getUserIndex() >= 0) {                
                 cc->character->setWalkDirection(btVector3(v.getX(), v.getY(), 0.0f));
             }
-            if (stopZ < 0 && v.getZ() > 0) {                
+            if (stopZ < 0 && v.getZ() > 0 && cc->ghostObject->getUserIndex() >= 0) {
                 cc->character->setWalkDirection(btVector3(v.getX(), v.getY(), 0.0f));
             }
             cc->character->preStep(dw.second->dynamicsWorld);
@@ -950,10 +961,10 @@ void chai_collisions::process(float deltaTime)
         for (auto &cc : characterControllers) {
             auto stopZ = cc->ghostObject->getUserIndex2();
             auto v = cc->character->getLinearVelocity();
-            if (stopZ > 0 && v.getZ() < 0) {                
+            if (stopZ > 0 && v.getZ() < 0 && cc->ghostObject->getUserIndex() >= 0) {
                 cc->character->setWalkDirection(btVector3(v.getX(), v.getY(), 0.0f));
             }
-            if (stopZ < 0 && v.getZ() > 0) {                
+            if (stopZ < 0 && v.getZ() > 0 && cc->ghostObject->getUserIndex() >= 0) {
                 cc->character->setWalkDirection(btVector3(v.getX(), v.getY(), 0.0f));
             }
             cc->character->preStep(dw.second->dynamicsWorld);

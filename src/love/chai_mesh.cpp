@@ -662,6 +662,7 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
             for (size_t j = 0; j < 16; ++j) {
                 ibMatrix.push_back(inverseBindMatrices[i * 16 + j]);
             }
+            cm->nodeNames[model.nodes[node].name] = node;
             skinMap[node] = ibMatrix;
         }
         skinMaps.push_back(skinMap);
@@ -670,10 +671,9 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
     }
 
     int index = 0;
-    for (auto node : model.nodes) {
+    for (auto node : model.nodes) {       
         if (node.mesh != -1 && node.skin != -1) {
             auto skin = skinMaps[node.skin];
-            cm->nodeNames[node.name] = index;
             auto skinMap = std::map<int, std::vector<float>>();
             for (auto s : skin) {
                 skinMap[s.first] = s.second;
@@ -683,7 +683,6 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
 
         if (i == -1) {
             auto skin = skinMaps[0];
-            cm->nodeNames[node.name] = index;
             auto skinMap = std::map<int, std::vector<float>>();
             for (auto s : skin) {
                 skinMap[s.first] = s.second;
@@ -1903,6 +1902,9 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
 
 Matrix4 chai_mesh::getNodeMatrix(const std::string &node) {
     auto n = nodeNames[node];
+    // for (auto &pair : nodeNames) {
+    //     printf("Node: %s %d %d %d\n", pair.first.c_str(), pair.second, nodeNames.size(), id);
+    // }
     glm::mat4 m = nodeActiveMatrix[n];
     // return activeMatrix;
     // printf("Node Matrix: %s\n", node.c_str());
