@@ -45,6 +45,7 @@ bool chai_gfx::init() {
     instance->hw_render = hw_render;
     instance->FRAMEBUFFER = FRAMEBUFFER;
     instance->COLORATTACH = COLORATTACH;
+    instance->setMeshCullMode(gfx::CULL_BACK);
     // printf("ColorAttach: %d\n", COLORATTACH);
     // instance->setProjection(Matrix4::perspective(120000.0f, 800.0f/600.0f, 0.1f, 100.0f));
     
@@ -82,6 +83,7 @@ bool chai_gfx::init() {
         // shader->shader->updateBuiltinUniforms(instance, width, height);
         // instance->bindVAO();
         win->setGraphics(instance);
+        win->setVSync(0);
         win->setWindow(width, height, winset);
         instance->setActive(true);
         instance->present(nullptr);

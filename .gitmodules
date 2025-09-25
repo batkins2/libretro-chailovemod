@@ -103,3 +103,12 @@
 [submodule "vendor/bullet3"]
 	path = vendor/bullet3
 	url = https://github.com/bulletphysics/bullet3.git
+[submodule "vendor/bullet3cl"]
+	path = vendor/bullet3cl
+	url = https://github.com/erwincoumans/bullet3.git
+[submodule "vendor/tracy"]
+	path = vendor/tracy
+	url = https://github.com/wolfpld/tracy.git
+[submodule "vendor/jolt"]
+	path = vendor/jolt
+	url = https://github.com/jrouwe/JoltPhysics.git

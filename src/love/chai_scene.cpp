@@ -24,6 +24,8 @@ bool chai_scene::destroy() {
 }
 
 void chai_scene::addMesh(chai_mesh *mesh) {
+    mesh->getBoundingBox(glm::mat4(1.0f));
+    printf("Adding mesh to scene %p\n", mesh);
     meshes.push_back(mesh);
     matrices.push_back(Matrix4(new float[16] {
         1.0f, 0.0f, 0.0f, 0.0f,
@@ -33,6 +35,7 @@ void chai_scene::addMesh(chai_mesh *mesh) {
 }
 
 void chai_scene::addChildMesh(chai_mesh *pmesh, chai_mesh *cmesh) {
+    printf("Adding child mesh %p to parent mesh %p\n", cmesh, pmesh);
     auto it = std::find(meshes.begin(), meshes.end(), pmesh);
     if (it != meshes.end()) {
         int index = it - meshes.begin();
@@ -103,30 +106,20 @@ bool isMeshInFrustum(chai_mesh *mesh, const glm::mat4 &viewProjectionMatrix) {
 
     // Extract frustum planes from the view-projection matrix
     glm::vec4 planes[6];
-    planes[0] = glm::vec4(viewProjectionMatrix[0][3] + viewProjectionMatrix[0][0], // Left
-                          viewProjectionMatrix[1][3] + viewProjectionMatrix[1][0],
-                          viewProjectionMatrix[2][3] + viewProjectionMatrix[2][0],
-                          viewProjectionMatrix[3][3] + viewProjectionMatrix[3][0]);
-    planes[1] = glm::vec4(viewProjectionMatrix[0][3] - viewProjectionMatrix[0][0], // Right
-                          viewProjectionMatrix[1][3] - viewProjectionMatrix[1][0],
-                          viewProjectionMatrix[2][3] - viewProjectionMatrix[2][0],
-                          viewProjectionMatrix[3][3] - viewProjectionMatrix[3][0]);
-    planes[2] = glm::vec4(viewProjectionMatrix[0][3] - viewProjectionMatrix[0][1], // Top
-                          viewProjectionMatrix[1][3] - viewProjectionMatrix[1][1],
-                          viewProjectionMatrix[2][3] - viewProjectionMatrix[2][1],
-                          viewProjectionMatrix[3][3] - viewProjectionMatrix[3][1]);
-    planes[3] = glm::vec4(viewProjectionMatrix[0][3] + viewProjectionMatrix[0][1], // Bottom
-                          viewProjectionMatrix[1][3] + viewProjectionMatrix[1][1],
-                          viewProjectionMatrix[2][3] + viewProjectionMatrix[2][1],
-                          viewProjectionMatrix[3][3] + viewProjectionMatrix[3][1]);
-    planes[4] = glm::vec4(viewProjectionMatrix[0][3] + viewProjectionMatrix[0][2], // Near
-                          viewProjectionMatrix[1][3] + viewProjectionMatrix[1][2],
-                          viewProjectionMatrix[2][3] + viewProjectionMatrix[2][2],
-                          viewProjectionMatrix[3][3] + viewProjectionMatrix[3][2]);
-    planes[5] = glm::vec4(viewProjectionMatrix[0][3] - viewProjectionMatrix[0][2], // Far
-                          viewProjectionMatrix[1][3] - viewProjectionMatrix[1][2],
-                          viewProjectionMatrix[2][3] - viewProjectionMatrix[2][2],
-                          viewProjectionMatrix[3][3] - viewProjectionMatrix[3][2]);
+    // Extract frustum planes using the rows of the matrix (glm is column-major)
+    glm::mat4 m = viewProjectionMatrix;
+    planes[0] = glm::vec4(m[0][3] + m[0][0], m[1][3] + m[1][0], m[2][3] + m[2][0], m[3][3] + m[3][0]); // Left
+    // printf("Frustum Plane 0: %f, %f, %f, %f\n", planes[0].x, planes[0].y, planes[0].z, planes[0].w);
+    planes[1] = glm::vec4(m[0][3] - m[0][0], m[1][3] - m[1][0], m[2][3] - m[2][0], m[3][3] - m[3][0]); // Right
+    // printf("Frustum Plane 1: %f, %f, %f, %f\n", planes[1].x, planes[1].y, planes[1].z, planes[1].w);
+    planes[2] = glm::vec4(m[0][3] + m[0][1], m[1][3] + m[1][1], m[2][3] + m[2][1], m[3][3] + m[3][1]); // Bottom
+    // printf("Frustum Plane 2: %f, %f, %f, %f\n", planes[2].x, planes[2].y, planes[2].z, planes[2].w);
+    planes[3] = glm::vec4(m[0][3] - m[0][1], m[1][3] - m[1][1], m[2][3] - m[2][1], m[3][3] - m[3][1]); // Top
+    // printf("Frustum Plane 3: %f, %f, %f, %f\n", planes[3].x, planes[3].y, planes[3].z, planes[3].w);
+    planes[4] = glm::vec4(m[0][3] + m[0][2], m[1][3] + m[1][2], m[2][3] + m[2][2], m[3][3] + m[3][2]); // Near
+    // printf("Frustum Plane 4: %f, %f, %f, %f\n", planes[4].x, planes[4].y, planes[4].z, planes[4].w);
+    planes[5] = glm::vec4(m[0][3] - m[0][2], m[1][3] - m[1][2], m[2][3] - m[2][2], m[3][3] - m[3][2]); // Far
+    // printf("Frustum Plane 5: %f, %f, %f, %f\n", planes[5].x, planes[5].y, planes[5].z, planes[5].w);
 
     // Normalize the planes
     for (int i = 0; i < 6; i++) {
@@ -138,15 +131,17 @@ bool isMeshInFrustum(chai_mesh *mesh, const glm::mat4 &viewProjectionMatrix) {
     for (int i = 0; i < 6; i++) {
         glm::vec3 normal = glm::vec3(planes[i]);
         float distance = planes[i].w;
-
-        // Find the farthest point in the direction of the plane normal
+        // printf("Normalized Frustum Plane %d: %f, %f, %f, %f\n", i, normal.x, normal.y, normal.z, distance);
+        // printf("Mesh Bounds: Min(%f, %f, %f), Max(%f, %f, %f)\n", minBounds.x, minBounds.y, minBounds.z, maxBounds.x, maxBounds.y, maxBounds.z);
         glm::vec3 farPoint = glm::vec3(
             (normal.x > 0) ? maxBounds.x : minBounds.x,
             (normal.y > 0) ? maxBounds.y : minBounds.y,
             (normal.z > 0) ? maxBounds.z : minBounds.z);
-
+        // printf("Far Point for Plane %d: %f, %f, %f\n", i, farPoint.x, farPoint.y, farPoint.z);
+        float farthestPointDistance = glm::dot(normal, farPoint) + distance;
+        // printf("Farthest Point Distance to Plane %d: %f\n", i, farthestPointDistance);
         // If the farthest point is outside the plane, the box is outside the frustum
-        if (glm::dot(normal, farPoint) + distance < 0) {
+        if (farthestPointDistance < 0) {
             return false; // Completely outside
         }
     }
@@ -155,6 +150,11 @@ bool isMeshInFrustum(chai_mesh *mesh, const glm::mat4 &viewProjectionMatrix) {
 }
 
 void chai_scene::drawMeshes(bool shadows, int view) {
+    // if (shadows) {
+    //     printf("Drawing shadows\n");
+    // } else {
+    //     printf("Drawing scene\n");
+    // }
     int i = 0;
     gfx::OptionalColorD clearcolor;
     OptionalInt clearstencil(0);
@@ -279,18 +279,17 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         glEnable(GL_DEPTH_TEST);
     }
 
-    for (auto mesh : meshes) {
-       
-        if (mesh->visible == false) {
-            i++;
-            continue;
-        }
+    glm::mat4 viewProjectionMatrix = t2 * vMatrix;
 
-        if (i == 0) { 
+    for (auto mesh : meshes) {
+        
+        if (i == 0) {
             auto cameraParams = mesh->cameraParams[view];
 
             float fov = cameraParams.at("fov")[0];
+            // printf("FOV: %f\n", fov);
             float aspectRatio = cameraParams.at("aspectRatio")[0];
+            // printf("Aspect Ratio: %f\n", aspectRatio);
             float nearClip = cameraParams.at("near")[0];
             float farClip = cameraParams.at("far")[0];
             t2 = glm::perspective(fov, aspectRatio, nearClip, farClip);
@@ -367,17 +366,44 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                     vm.push_back(chaiscript::Boxed_Value(glm::value_ptr(lightView)[i]));
                 }
                 sceneShader->send("viewMatrix", vm);
+                viewProjectionMatrix = lightSpaceMatrix;
             } else {
                 sceneShader->send("viewMatrix", viewMatrix);
                 viewMatrix.clear();
+                auto mat = sceneShader->shader->getUniformInfo("viewMatrix");
+                auto data = mat->floats;
+                vMatrix = glm::mat4(
+                    data[0], data[1], data[2], data[3],
+                    data[4], data[5], data[6], data[7],
+                    data[8], data[9], data[10], data[11],
+                    data[12], data[13], data[14], data[15]
+                );
+                viewProjectionMatrix = t2 * vMatrix;
             }
+            // printf("viewMatrix: \n");
+            // for (int r = 0; r < 4; ++r) {
+            //     printf("%f, %f, %f, %f\n", vMatrix[r][0], vMatrix[r][1], vMatrix[r][2], vMatrix[r][3]);
+            // }
         }
-                
+
+        if (mesh->visible == false) {
+            // printf("Mesh %d is not visible\n", i);
+            i++;
+            continue;
+        }
+
+        // auto mat = sceneShader->shader->getUniformInfo("viewMatrix");
+        // auto data = mat->floats;
+        // vMatrix = glm::mat4(
+        //     data[0], data[1], data[2], data[3],
+        //     data[4], data[5], data[6], data[7],
+        //     data[8], data[9], data[10], data[11],
+        //     data[12], data[13], data[14], data[15]
+        // );
         // Perform frustum culling
-        glm::mat4 viewProjectionMatrix = t2;
         if (!isMeshInFrustum(mesh, viewProjectionMatrix)) {
             // printf("Mesh %d is outside the frustum\n", i);
-            i++;
+            i++;            
             continue; // Skip meshes outside the frustum
         }
 
@@ -385,7 +411,12 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         auto matrix = matrices[i];
         mesh->draw(cg.instance, matrix, sceneShader, deltaTime);
         if (meshChildren.find(i) != meshChildren.end()) {
+            // if (i == 4) {
+            //     printf("Mesh %p breakpoint\n", mesh);
+            //     isMeshInFrustum(mesh, viewProjectionMatrix);
+            // }
             for (auto child : meshChildren[i]) {
+                // printf("Drawing child mesh %p of parent mesh %p\n", child, mesh);
                 if (child->visible == false) {
                     continue;
                 }
@@ -414,7 +445,7 @@ void chai_scene::drawMeshes(bool shadows, int view) {
 
 void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vector<chaiscript::Boxed_Value> viewMatrix2, std::vector<chaiscript::Boxed_Value> viewMatrix3, std::vector<chaiscript::Boxed_Value> viewMatrix4, int viewCount) {
     auto cg = ChaiLove::getInstance()->chai_gfx;
-    ChaiLove::getInstance()->chai_collisions.processDebug(1.0f / 60.0f, viewMatrix1);
+    // ChaiLove::getInstance()->chai_collisions.processDebug(1.0f / 60.0f, viewMatrix1);
                 
     if (false && cg.reinit) {
         cg.hasReinit();
@@ -444,87 +475,92 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
         if (err != GL_NO_ERROR) {
             printf("ERROR: 1\n");
         }
-
-        if (shadowMapFBO != 0) {
-            glDeleteFramebuffers(1, &shadowMapFBO);
-
-            err = glGetError();
-            if (err != GL_NO_ERROR) {
-                printf("ERROR: 2\n");
-            }
-        }
-
-        // Create depth texture
-        glGenFramebuffers(1, &shadowMapFBO);
-        err = glGetError();
-        if (err != GL_NO_ERROR) {
-            printf("ERROR: 3\n");
-        }
-        if (shadowMap == 0) {
-            glGenTextures(1, &shadowMap); 
-
-            err = glGetError();
-            if (err != GL_NO_ERROR) {
-                printf("ERROR: 4\n");
-            }
-        }    
         
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, shadowMap);
-        GLint shadowMapLoc = glGetUniformLocation(sceneShader->shader->getHandle(), "shadowMap");
-        if (shadowMapLoc >= 0) {
-            glUniform1i(shadowMapLoc, 1); // 1 = GL_TEXTURE1
-        }
-        err = glGetError();
-        if (err != GL_NO_ERROR) {
-            printf("ERROR: 5\n");
-        }
-       
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, cg.width-5, cg.height-5, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-        
-        err = glGetError();
-        if (err != GL_NO_ERROR) {
-            printf("ERROR: 6\n");
-        }
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        err = glGetError();
-        if (err != GL_NO_ERROR) {
-            printf("ERROR: 7\n");
-        }
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        err = glGetError();
-        if (err != GL_NO_ERROR) {
-            printf("ERROR: 8\n");
-        }
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-        err = glGetError();
-        if (err != GL_NO_ERROR) {
-            printf("ERROR: 9\n");
-        }
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-        err = glGetError();
-        if (err != GL_NO_ERROR) {
-            printf("ERROR: 10\n");
-        }
         GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
-        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
-        err = glGetError();
-        if (err != GL_NO_ERROR) {
-            printf("ERROR: 11\n");
+        if (true) {
+            if (shadowMapFBO != 0) {
+                glDeleteFramebuffers(1, &shadowMapFBO);
+
+                err = glGetError();
+                if (err != GL_NO_ERROR) {
+                    printf("ERROR: 2\n");
+                }
+            }
+
+            // Create depth texture
+            glGenFramebuffers(1, &shadowMapFBO);
+            err = glGetError();
+            if (err != GL_NO_ERROR) {
+                printf("ERROR: 3\n");
+            }
+            if (shadowMap == 0) {
+                glGenTextures(1, &shadowMap); 
+
+                err = glGetError();
+                if (err != GL_NO_ERROR) {
+                    printf("ERROR: 4\n");
+                }
+            }    
+            
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, shadowMap);
+            GLint shadowMapLoc = glGetUniformLocation(sceneShader->shader->getHandle(), "shadowMap");
+            if (shadowMapLoc >= 0) {
+                glUniform1i(shadowMapLoc, 1); // 1 = GL_TEXTURE1
+            }
+            err = glGetError();
+            if (err != GL_NO_ERROR) {
+                printf("ERROR: 5\n");
+            }
+        
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, cg.width-5, cg.height-5, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+            
+            err = glGetError();
+            if (err != GL_NO_ERROR) {
+                printf("ERROR: 6\n");
+            }
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            err = glGetError();
+            if (err != GL_NO_ERROR) {
+                printf("ERROR: 7\n");
+            }
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            err = glGetError();
+            if (err != GL_NO_ERROR) {
+                printf("ERROR: 8\n");
+            }
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+            err = glGetError();
+            if (err != GL_NO_ERROR) {
+                printf("ERROR: 9\n");
+            }
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+            err = glGetError();
+            if (err != GL_NO_ERROR) {
+                printf("ERROR: 10\n");
+            }
+            
+            glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+            err = glGetError();
+            if (err != GL_NO_ERROR) {
+                printf("ERROR: 11\n");
+            }
+            
+            // Attach depth texture as FBO's depth buffer
+            glBindFramebuffer(cg.instance->FRAMEBUFFER, shadowMapFBO);
+            err = glGetError();
+            if (err != GL_NO_ERROR) {
+                printf("ERROR: 12\n");
+            }
+            glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
+            err = glGetError();
+            if (err != GL_NO_ERROR) {
+                printf("ERROR: 13\n");
+            }
+            glClear(GL_DEPTH_BUFFER_BIT);
         }
-        // Attach depth texture as FBO's depth buffer
-        glBindFramebuffer(cg.instance->FRAMEBUFFER, shadowMapFBO);
-        err = glGetError();
-        if (err != GL_NO_ERROR) {
-            printf("ERROR: 12\n");
-        }
-        glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
-        err = glGetError();
-        if (err != GL_NO_ERROR) {
-            printf("ERROR: 13\n");
-        }
-        glClear(GL_DEPTH_BUFFER_BIT);
 
         err = glGetError();
         if (err != GL_NO_ERROR) {
@@ -594,6 +630,7 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
                 glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
                 glActiveTexture(GL_TEXTURE0);
                 drawMeshes(false, 1);
+                cg.instance->setShader();
                 // auto fb = cg.instance->hw_render.get_current_framebuffer();
                 // printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
                 
@@ -771,6 +808,7 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
                     glActiveTexture(GL_TEXTURE0);
                     drawMeshes(false, 1);
                 }
+                cg.instance->setShader();
 
                 // auto fb = cg.instance->hw_render.get_current_framebuffer();
                 // glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
@@ -795,24 +833,42 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
                 // glViewport(cg.width*0.5, cg.height*0.5, cg.width*0.5, cg.height*0.5);
                 // sceneShader->send("viewMatrix", viewMatrix4);
                 // drawMeshes(false);
-            } else {
+            } else if (viewCount == 1) {
                 glViewport(0, 0, cg.width, cg.height);
                 sceneShader->send("viewMatrix", viewMatrix1);
+                if (true) {
+                    glActiveTexture(GL_TEXTURE0);
+                    drawMeshes(true, 0);
+                    auto fb = cg.instance->hw_render.get_current_framebuffer();
+                    // printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
+                    glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+                    // gfx::OptionalColorD clearcolor;
+                    // clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
+                    // OptionalInt clearstencil(0);
+                    // OptionalDouble cleardepth(1.0);
+                    // cg.instance->clear(clearcolor, clearstencil, cleardepth);
+
+                    glActiveTexture(GL_TEXTURE0);             
+                    drawMeshes(false, 0);
+                } else {
+                    auto fb = cg.instance->hw_render.get_current_framebuffer();
+                    // printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
+                    glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+                    gfx::OptionalColorD clearcolor;
+                    clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
+                    OptionalInt clearstencil(0);
+                    OptionalDouble cleardepth(1.0);
+                    cg.instance->clear(clearcolor, clearstencil, cleardepth);
+                    glActiveTexture(GL_TEXTURE0);
+                    
+                    drawMeshes(false, 0);
+                }
+                cg.instance->setShader();
+            } else {
                 glActiveTexture(GL_TEXTURE0);
-                drawMeshes(true, 0);
-                auto fb = cg.instance->hw_render.get_current_framebuffer();
-                // printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
-                glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
-                gfx::OptionalColorD clearcolor;
-                clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
-                OptionalInt clearstencil(0);
-                OptionalDouble cleardepth(1.0);
-                cg.instance->clear(clearcolor, clearstencil, cleardepth);
-                
-                glActiveTexture(GL_TEXTURE0);
-                drawMeshes(false, 0);
+                cg.instance->setShader();
             }
-            cg.instance->setShader();
+            // cg.instance->setShader();
         }
     }
 }
@@ -856,6 +912,7 @@ void chai_scene::prepareScreen() {
 void chai_scene::update(float dt) {
     currentTime += dt;
     deltaTime = dt;
+    frameOddEven = !frameOddEven;
 }
 
 chai_scene *chai_scene::clone() const

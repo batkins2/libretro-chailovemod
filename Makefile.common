@@ -359,23 +359,61 @@ FLAGS += -I$(CORE_DIR)/vendor/TinySHA1
 FLAGS += -I$(CORE_DIR)/vendor/cppcodec
 
 # Bullet3
-FLAGS += -I$(CORE_DIR)/vendor/bullet3/src
+# FLAGS += -I$(CORE_DIR)/vendor/bullet3/src
+# SOURCES_CXX += $(wildcard \
+# 	$(CORE_DIR)/vendor/bullet3/src/BulletCollision/*.cpp \
+# 	$(CORE_DIR)/vendor/bullet3/src/BulletCollision/BroadphaseCollision/*.cpp \
+# 	$(CORE_DIR)/vendor/bullet3/src/BulletCollision/CollisionDispatch/*.cpp \
+# 	$(CORE_DIR)/vendor/bullet3/src/BulletCollision/CollisionShapes/*.cpp \
+# 	$(CORE_DIR)/vendor/bullet3/src/BulletCollision/Gimpact/*.cpp \
+# 	$(CORE_DIR)/vendor/bullet3/src/BulletCollision/NarrowPhaseCollision/*.cpp \
+# 	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/*.cpp \
+# 	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/Character/*.cpp \
+# 	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/ConstraintSolver/*.cpp \
+# 	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/Dynamics/*.cpp \
+# 	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/Featherstone/*.cpp \
+# 	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/MLCPSolvers/*.cpp \
+# 	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/Vehicle/*.cpp \
+# 	$(CORE_DIR)/vendor/bullet3/src/LinearMath/*.cpp \
+# 	$(CORE_DIR)/vendor/bullet3/src/LinearMath/TaskScheduler/*.cpp \
+# )
+# FLAGS += -DBT_THREADSAFE=1
+# FLAGS += -DBT_USE_DOUBLE_PRECISION=1
+# FLAGS += -DCMAKE_BUILD_TYPE=Release
+# FLAGS += -DBT_NO_PROFILE=1
+
+# Jolt Physics
+FLAGS += -I$(CORE_DIR)/vendor/jolt
 SOURCES_CXX += $(wildcard \
-	$(CORE_DIR)/vendor/bullet3/src/BulletCollision/*.cpp \
-	$(CORE_DIR)/vendor/bullet3/src/BulletCollision/BroadphaseCollision/*.cpp \
-	$(CORE_DIR)/vendor/bullet3/src/BulletCollision/CollisionDispatch/*.cpp \
-	$(CORE_DIR)/vendor/bullet3/src/BulletCollision/CollisionShapes/*.cpp \
-	$(CORE_DIR)/vendor/bullet3/src/BulletCollision/Gimpact/*.cpp \
-	$(CORE_DIR)/vendor/bullet3/src/BulletCollision/NarrowPhaseCollision/*.cpp \
-	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/*.cpp \
-	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/Character/*.cpp \
-	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/ConstraintSolver/*.cpp \
-	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/Dynamics/*.cpp \
-	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/Featherstone/*.cpp \
-	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/MLCPSolvers/*.cpp \
-	$(CORE_DIR)/vendor/bullet3/src/BulletDynamics/Vehicle/*.cpp \
-	$(CORE_DIR)/vendor/bullet3/src/LinearMath/*.cpp \
+	$(CORE_DIR)/vendor/jolt/Jolt/*.cpp \
+	$(CORE_DIR)/vendor/jolt/Jolt/Skeleton/*.cpp \
+	$(CORE_DIR)/vendor/jolt/Jolt/AABBTree/*.cpp \
+	$(CORE_DIR)/vendor/jolt/Jolt/ObjectStream/*.cpp \
+	$(CORE_DIR)/vendor/jolt/Jolt/TriangleSplitter/*.cpp \
+	$(CORE_DIR)/vendor/jolt/Jolt/Core/*.cpp \
+	$(CORE_DIR)/vendor/jolt/Jolt/Math/*.cpp \
+    $(CORE_DIR)/vendor/jolt/Jolt/Physics/*.cpp \
+	$(CORE_DIR)/vendor/jolt/Jolt/Physics/Ragdoll/*.cpp \
+	$(CORE_DIR)/vendor/jolt/Jolt/Physics/Vehicle/*.cpp \
+    $(CORE_DIR)/vendor/jolt/Jolt/Physics/Collision/*.cpp \
+    $(CORE_DIR)/vendor/jolt/Jolt/Physics/Collision/Broadphase/*.cpp \
+	$(CORE_DIR)/vendor/jolt/Jolt/Physics/Collision/Shape/*.cpp \
+    $(CORE_DIR)/vendor/jolt/Jolt/Physics/Body/*.cpp \
+	$(CORE_DIR)/vendor/jolt/Jolt/Physics/Constraints/*.cpp \
+	$(CORE_DIR)/vendor/jolt/Jolt/Physics/SoftBody/*.cpp \
+    $(CORE_DIR)/vendor/jolt/Jolt/Physics/Character/*.cpp \
+	$(CORE_DIR)/vendor/jolt/Jolt/Geometry/*.cpp \
+	$(CORE_DIR)/vendor/jolt/Jolt/Utilities/*.cpp \
+	$(CORE_DIR)/vendor/jolt/Jolt/Renderer/*.cpp \
 )
+# FLAGS += -DJPH_DEBUG_RENDERER=1
+
+# tracy
+# FLAGS += -I$(CORE_DIR)/vendor/tracy/public
+# SOURCES_CXX += $(wildcard \
+# 	$(CORE_DIR)/vendor/tracy/public/*.cpp \
+# )
+# FLAGS += -DTRACY_ENABLE
 
 # Magnum
 #FLAGS += -I$(CORE_DIR)/vendor/magnum/src/Magnum/Trade

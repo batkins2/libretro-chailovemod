@@ -49,5 +49,6 @@ private:
     GLuint shadowMapFBO = 0;
     GLuint shadowMap = 0;
     love::gfx::Texture *background_tex = nullptr;
+    bool frameOddEven = false;
 };
 } // namespace love
