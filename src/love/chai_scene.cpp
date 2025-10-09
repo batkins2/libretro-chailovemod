@@ -20,18 +20,29 @@ bool chai_scene::destroy() {
     if (shadowMap != 0) {
         glDeleteTextures(1, &shadowMap);
     }
+    // Clean up scene framebuffer
+    if (sceneFramebuffer != 0) {
+        glDeleteFramebuffers(1, &sceneFramebuffer);
+    }
+    if (sceneColorTexture != 0) {
+        glDeleteTextures(1, &sceneColorTexture);
+    }
+    if (sceneDepthTexture != 0) {
+        glDeleteTextures(1, &sceneDepthTexture);
+    }
     return true;
 }
 
 void chai_scene::addMesh(chai_mesh *mesh) {
-    mesh->getBoundingBox(glm::mat4(1.0f));
+    // mesh->getBoundingBox(glm::mat4(1.0f));
     printf("Adding mesh to scene %p\n", mesh);
     meshes.push_back(mesh);
     matrices.push_back(Matrix4(new float[16] {
         1.0f, 0.0f, 0.0f, 0.0f,
         0.0f, 1.0f, 0.0f, 0.0f,
         0.0f, 0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 0.0f, 1.0f}));   
+        0.0f, 0.0f, 0.0f, 1.0f}));
+    meshGroups[mesh->getId()] += 1;
 }
 
 void chai_scene::addChildMesh(chai_mesh *pmesh, chai_mesh *cmesh) {
@@ -40,9 +51,10 @@ void chai_scene::addChildMesh(chai_mesh *pmesh, chai_mesh *cmesh) {
     if (it != meshes.end()) {
         int index = it - meshes.begin();
         meshChildren[index].emplace_back(cmesh);
+        meshGroups[cmesh->getId()] += 1;
     } else {
         printf("Parent mesh not found in scene.\n");
-    }    
+    }
 }
 
 void chai_scene::removeChildMesh(chai_mesh *pmesh, chai_mesh *cmesh) {
@@ -281,6 +293,10 @@ void chai_scene::drawMeshes(bool shadows, int view) {
 
     glm::mat4 viewProjectionMatrix = t2 * vMatrix;
 
+    std::vector<int> deferredChildIndices;
+    std::vector<int> deferredParentIndices;
+    std::vector<int> deferredMeshIndices;
+
     for (auto mesh : meshes) {
         
         if (i == 0) {
@@ -407,6 +423,33 @@ void chai_scene::drawMeshes(bool shadows, int view) {
             continue; // Skip meshes outside the frustum
         }
 
+        bool defer = false;
+
+        if (meshChildren.find(i) != meshChildren.end()) {
+            int j = 0;
+            for (auto child : meshChildren[i]) {
+                if (child->visible == false) {
+                    j++;
+                    continue;
+                }
+                if (meshGroups[child->getId()] > 1) {
+                    deferredChildIndices.push_back(j);
+                    deferredParentIndices.push_back(i);
+                    defer = true;
+                }
+                j++;
+            }
+            if (defer) {
+                i++;
+                continue;
+            }
+        }
+
+        if (meshGroups[mesh->getId()] > 1) {
+            deferredMeshIndices.push_back(i);
+            i++;
+            continue;
+        }
         
         auto matrix = matrices[i];
         mesh->draw(cg.instance, matrix, sceneShader, deltaTime);
@@ -433,6 +476,65 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         }
         i++;
     }
+    // Draw deferred child meshes in order of same index
+    i = 0;
+    std::vector<std::pair<int, int>> drawnPairs;
+    for (auto childIndex : deferredChildIndices) {
+        // printf("Drawing deferred child mesh index %d of parent mesh index %d\n", childIndex, deferredParentIndices[i]);
+        auto vbo = meshChildren[deferredParentIndices[i]][childIndex]->cachedVBOs.begin()->second;
+        // printf("Using VBO %d\n", vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        // printf("Buffer bound\n");
+        for (auto parentId : deferredParentIndices) {
+            int j = 0;
+            for (auto child : meshChildren[parentId]) {
+                if (child->getId() == meshChildren[deferredParentIndices[i]][childIndex]->getId()) {
+                    if (child->visible == false || drawnPairs.end() != std::find(drawnPairs.begin(), drawnPairs.end(), std::make_pair(parentId, j))) {
+                        j++;
+                        continue;
+                    }
+                    auto drawnPair = std::make_pair(parentId, j);
+                    // printf("Drawing child mesh %d of parent mesh %d\n", j, parentId);
+                    drawnPairs.push_back(drawnPair);
+                    // Draw the parent mesh first
+                    meshes[parentId]->draw(cg.instance, matrices[parentId], sceneShader, deltaTime);
+                    Matrix4 m = Matrix4(new float[16]{
+                        1.0f, 0.0f, 0.0f, 0.0f,
+                        0.0f, 1.0f, 0.0f, 0.0f,
+                        0.0f, 0.0f, 1.0f, 0.0f,
+                        0.0f, 0.0f, 0.0f, 1.0f
+                    });
+                    child->meshes[j]->draw(cg.instance, m);
+                }
+                j++;
+            }
+        }
+        i++;
+    }
+
+    // printf("Drawing deferred parent meshes\n");
+
+    for (auto meshIndex : deferredMeshIndices) {
+        auto mesh = meshes[meshIndex];
+        auto matrix = matrices[meshIndex];
+        mesh->draw(cg.instance, matrix, sceneShader, deltaTime);
+        if (meshChildren.find(meshIndex) != meshChildren.end()) {
+            for (auto child : meshChildren[meshIndex]) {
+                if (child->visible == false) {
+                    continue;
+                }
+                for (int j = 0; j < child->meshes.size(); ++j) {
+                    Matrix4 m = Matrix4(new float[16]{
+                        1.0f, 0.0f, 0.0f, 0.0f,
+                        0.0f, 1.0f, 0.0f, 0.0f,
+                        0.0f, 0.0f, 1.0f, 0.0f,
+                        0.0f, 0.0f, 0.0f, 1.0f
+                    });
+                    child->meshes[j]->draw(cg.instance, m);
+                }
+            }
+        }
+    }
     if (shadows == false) {
         for (auto ps : particleSystems) {
             // if (ps->visible == false) {
@@ -446,7 +548,29 @@ void chai_scene::drawMeshes(bool shadows, int view) {
 void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vector<chaiscript::Boxed_Value> viewMatrix2, std::vector<chaiscript::Boxed_Value> viewMatrix3, std::vector<chaiscript::Boxed_Value> viewMatrix4, int viewCount) {
     auto cg = ChaiLove::getInstance()->chai_gfx;
     // ChaiLove::getInstance()->chai_collisions.processDebug(1.0f / 60.0f, viewMatrix1);
-                
+    
+    // Frame skipping logic
+    if (false && skip > 0) {
+        if (skip > 1) skip = -1;
+        // auto fb = cg.instance->hw_render.get_current_framebuffer();
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, sceneFramebuffer);
+        // glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb);
+        // glBlitFramebuffer(0, 0, cg.width, cg.height, 
+        //                  0, 0, cg.width, cg.height, 
+        //                  GL_COLOR_BUFFER_BIT, GL_LINEAR);
+        return;
+    }
+
+    // Initialize framebuffer if needed
+    initFramebuffer();
+    
+    // Bind to our framebuffer for rendering
+    glBindFramebuffer(GL_FRAMEBUFFER, sceneFramebuffer);
+    glViewport(0, 0, cg.width / 4, cg.height / 4);
+
+    // Clear the framebuffer
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
     if (false && cg.reinit) {
         cg.hasReinit();
         printf("Reinit\n");
@@ -909,10 +1033,105 @@ void chai_scene::prepareScreen() {
     
 }
 
+void chai_scene::initFramebuffer() {
+    if (framebufferInitialized) return;
+    
+    auto cg = ChaiLove::getInstance()->chai_gfx;
+    
+    // Generate framebuffer
+    glGenFramebuffers(1, &sceneFramebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, sceneFramebuffer);
+    
+    // Generate color texture
+    glGenTextures(1, &sceneColorTexture);
+    glBindTexture(GL_TEXTURE_2D, sceneColorTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, cg.width, cg.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sceneColorTexture, 0);
+    
+    // Generate depth texture
+    glGenTextures(1, &sceneDepthTexture);
+    glBindTexture(GL_TEXTURE_2D, sceneDepthTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, cg.width, cg.height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, sceneDepthTexture, 0);
+    
+    // Check framebuffer completeness
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        printf("Framebuffer not complete!\n");
+    }
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    framebufferInitialized = true;
+}
+
 void chai_scene::update(float dt) {
     currentTime += dt;
     deltaTime = dt;
     frameOddEven = !frameOddEven;
+    skip += 1;
+
+    // Update framerate calculations
+    m_frameTime = dt;
+    m_frameCount++;
+    m_fpsUpdateTime += dt;
+    
+    // Add current frame time to history
+    m_frameTimes.push_back(dt);
+    if (m_frameTimes.size() > m_maxFrameHistory) {
+        m_frameTimes.erase(m_frameTimes.begin());
+    }
+    
+    // Update FPS every interval (default 1 second)
+    if (m_fpsUpdateTime >= m_fpsUpdateInterval) {
+        m_fps = m_frameCount / m_fpsUpdateTime;
+        
+        // Reset counters
+        m_frameCount = 0;
+        m_fpsUpdateTime = 0.0f;
+        
+        // Optional: Print FPS for debugging
+        // printf("FPS: %.2f (Avg: %.2f, Min: %.2f, Max: %.2f)\n", 
+        //        m_fps, getAverageFramerate(), getMinFramerate(), getMaxFramerate());
+    }
+}
+
+float chai_scene::getFramerate() {
+    return m_fps;
+}
+
+float chai_scene::getAverageFramerate() {
+    if (m_frameTimes.empty()) {
+        return 0.0f;
+    }
+    
+    float sum = 0.0f;
+    for (float frameTime : m_frameTimes) {
+        sum += frameTime;
+    }
+    
+    float avgFrameTime = sum / m_frameTimes.size();
+    return (avgFrameTime > 0.0f) ? (1.0f / avgFrameTime) : 0.0f;
+}
+
+float chai_scene::getMinFramerate() {
+    if (m_frameTimes.empty()) {
+        return 0.0f;
+    }
+    
+    float maxFrameTime = *std::max_element(m_frameTimes.begin(), m_frameTimes.end());
+    return (maxFrameTime > 0.0f) ? (1.0f / maxFrameTime) : 0.0f;
+}
+
+float chai_scene::getMaxFramerate() {
+    if (m_frameTimes.empty()) {
+        return 0.0f;
+    }
+    
+    float minFrameTime = *std::min_element(m_frameTimes.begin(), m_frameTimes.end());
+    return (minFrameTime > 0.0f) ? (1.0f / minFrameTime) : 0.0f;
 }
 
 chai_scene *chai_scene::clone() const

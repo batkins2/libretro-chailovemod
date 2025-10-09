@@ -17,6 +17,7 @@ namespace love
 {
 chai_mesh::chai_mesh(std::vector<chai_meshData*> &data) {
     this->data = data;
+    m_cachedAnimationDurations.clear();
 }
 
 std::vector<gfx::Buffer::DataDeclaration> vertexFormatLoader(const std::vector<chaiscript::Boxed_Value> &vertexFormat) {
@@ -963,6 +964,15 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
         }
 
         cm->animations = anims;
+
+        for (const auto& animation : anims) {
+            const std::string& animName = animation.first;
+            if (cm->m_cachedAnimationDurations.find(animName) == cm->m_cachedAnimationDurations.end()) {
+                float duration = cm->calculateAnimationDuration(animName);
+                cm->m_cachedAnimationDurations[animName] = duration;
+            }
+        }
+
         // Write the animations to json file using rapidjson
         std::ofstream animFile("animations.json");
         rapidjson::Document animDoc;
@@ -1013,12 +1023,38 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
         if (readyData != nullptr) {
             auto m = instance->newMesh(vf, readyData->prepD.data(), readyData->prepD.size() * sizeof(float), gfx::PrimitiveType::PRIMITIVE_TRIANGLES, usage);
             m->setTexture(tex);
+                
+            GLuint vbo;
+            glGenBuffers(1, &vbo);
+            
+            const void* vertexData = m->getVertexData();
+            size_t dataSize = m->getVertexCount() * m->getVertexStride();
+
+            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+            glBufferData(GL_ARRAY_BUFFER, dataSize, vertexData, GL_STATIC_DRAW);
+            
+            cm->cachedVBOs[i] = vbo;
+            cm->vboSizes[i] = dataSize;
+
             std::pair<gfx::Mesh*, chai_meshData*> p = std::pair<gfx::Mesh*, chai_meshData*>(m, readyData);
             return p;
         } else {
             auto m = instance->newMesh(vf, prepD.data(), prepD.size() * sizeof(float), gfx::PrimitiveType::PRIMITIVE_TRIANGLES, usage);
             m->setTexture(tex);
             auto d = new chai_meshData(prepD, cm->animations);
+
+            GLuint vbo;
+            glGenBuffers(1, &vbo);
+            
+            const void* vertexData = m->getVertexData();
+            size_t dataSize = m->getVertexCount() * m->getVertexStride();
+
+            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+            glBufferData(GL_ARRAY_BUFFER, dataSize, vertexData, GL_STATIC_DRAW);
+
+            cm->cachedVBOs[i] = vbo;
+            cm->vboSizes[i] = dataSize;
+
             std::pair<gfx::Mesh*, chai_meshData*> p = std::pair<gfx::Mesh*, chai_meshData*>(m, d);
             return p;
         }
@@ -1339,25 +1375,33 @@ bool chai_mesh::isAnimationPlaying(const std::string &name) {
 
 float chai_mesh::getAnimationPercent(const std::string &name) {
     auto animation = activeAnimations.find(name);
-    if (animation != activeAnimations.end()) {
-        auto totalTime = 0.0f;
-        auto channel = animations[name].find("translation");
-        if (channel == animations[name].end()) {
-            channel = animations[name].find("rotation");
-        }
-        for (auto nodes : channel->second) {
-            auto keyframes = nodes.second;
-            for (auto keyframe : keyframes) {
-                auto time = keyframe.first;
-                if (time > totalTime) {
-                    totalTime = time;
-                }
-            }
-        }
-                
-        return animation->second.first / totalTime;
+    if (animation == activeAnimations.end()) {
+        return 0.0f;
     }
-    return 0.0f;
+    
+    float currentTime = animation->second.first;
+    
+    // Check if we have a cached duration for this animation
+    auto cachedDuration = m_cachedAnimationDurations.find(name);
+    float totalTime = 0.0f;
+    
+    if (cachedDuration != m_cachedAnimationDurations.end()) {
+        // Use cached duration
+        totalTime = cachedDuration->second;
+    } else {
+        // Calculate and cache the duration
+        totalTime = calculateAnimationDuration(name);
+        m_cachedAnimationDurations[name] = totalTime;
+    }
+    
+    // Avoid division by zero
+    if (totalTime <= 0.0f) {
+        return 0.0f;
+    }
+    
+    // Calculate percentage and clamp to [0, 1]
+    float percent = currentTime / totalTime;
+    return std::min(1.0f, std::max(0.0f, percent));
 }
 
 std::vector<int> getChildNodes(std::map<int, std::vector<int>> nodeChildren, int nodeChild, std::vector<int> nodes) {
@@ -1891,7 +1935,12 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                 shader->send("isSpecular", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
             }
            
-            if (msh != nullptr) {
+            auto vboIt = cachedVBOs.find(j);
+            if (vboIt != cachedVBOs.end() && msh != nullptr) {
+                glBindBuffer(GL_ARRAY_BUFFER, vboIt->second);
+                // Use cached VBO for drawing
+                msh->draw(gfx, m);
+            } else if (msh != nullptr) {
                 msh->draw(gfx, m);
             }
             i++;            
@@ -2108,6 +2157,8 @@ chai_mesh::chai_mesh(const chai_mesh &c) {
     animations = c.animations;
     nodeNames = c.nodeNames;
 
+    m_cachedAnimationDurations = c.m_cachedAnimationDurations;
+
     matrices = c.matrices;
     offsetMatrices = c.offsetMatrices;
 
@@ -2137,4 +2188,28 @@ chai_mesh *chai_mesh::clone() const
 {
 	return new chai_mesh(*this);
 }
+
+float chai_mesh::calculateAnimationDuration(const std::string &name) {
+    auto animationIt = animations.find(name);
+    if (animationIt == animations.end()) {
+        return 0.0f;
+    }
+    
+    float maxTime = 0.0f;
+    
+    // Iterate through all channels to find the maximum keyframe time
+    for (const auto& channel : animationIt->second) {
+        for (const auto& node : channel.second) {
+            const auto& keyframes = node.second;
+            if (!keyframes.empty()) {
+                // Get the last keyframe time (keyframes should be sorted by time)
+                float lastKeyframeTime = keyframes.back().first;
+                maxTime = std::max(maxTime, lastKeyframeTime);
+            }
+        }
+    }
+    
+    return maxTime;
+}
+
 }

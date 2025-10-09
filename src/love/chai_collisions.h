@@ -15,6 +15,7 @@
 #include <Jolt/Physics/Body/BodyManager.h>
 #include <Jolt/Physics/Body/BodyActivationListener.h>
 #include <Jolt/Physics/Character/Character.h>
+#include <Jolt/Physics/Character/CharacterVirtual.h>
 #include <Jolt/Physics/Character/CharacterBase.h>
 #include <Jolt/Physics/Collision/Shape/ConvexHullShape.h>
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
@@ -77,8 +78,7 @@ class chai_collisions
 
     void debugDraw();
     uint8_t* buffer = nullptr;
-
-    private:    
+     
     class CharacterController
     {
         public:
@@ -87,10 +87,17 @@ class chai_collisions
         std::vector<int> meshRef;
         std::string charId;
         std::vector<int> group;
-        
-        CharacterController(JPH::BodyID id, int mesh, std::string cId, JPH::Character* c) 
-            : bodyID(id), meshRef({mesh}), charId(cId), character(c) {}
-            
+        int index = 0; // Index to identify the character controller
+        bool collidedX = false;
+        bool collidedZ = false;
+        float velocityX = 0.0f; // Horizontal velocity
+        float velocityZ = 0.0f; // Horizontal velocity
+        float velocityY = 0.0f; // Vertical velocity for jumping and gravity
+        JPH::CharacterVirtual* characterVirtual = nullptr; // Pointer to the CharacterVirtual instance
+
+        CharacterController(JPH::BodyID id, int mesh, std::string cId, JPH::Character* c, int cIndex = 0) 
+            : bodyID(id), meshRef({mesh}), charId(cId), character(c), index(cIndex) {}
+
         ~CharacterController() {
             if (character) {
                 character->RemoveFromPhysicsSystem();
@@ -102,6 +109,7 @@ class chai_collisions
             meshRef.push_back(mesh);
         }
     };
+
     class RigidMesh
     {
         public:
@@ -119,6 +127,10 @@ class chai_collisions
         std::vector<int> group;
         int meshRef;
     };
+
+    class MyContactListener;
+    class CharacterContactListener;
+
     class WorldJolt
     {
         public:
@@ -134,6 +146,8 @@ class chai_collisions
         JPH::ObjectLayerPairFilter* object_vs_object_layer_filter = nullptr;
         JPH::TempAllocatorImpl temp_allocator{ 10 * 1024 * 1024 };
         JPH::JobSystemThreadPool job_system{ JPH::cMaxPhysicsJobs, JPH::cMaxPhysicsBarriers, JPH::thread::hardware_concurrency() - 1 };
+        MyContactListener* contact_listener = nullptr;
+        CharacterContactListener* character_contact_listener = nullptr;
         #ifdef JPH_DEBUG_RENDERER
             JPH::DebugRendererSimple* debug_renderer = nullptr; // Reference to global instance, don't delete in destructor
         #endif
@@ -161,6 +175,18 @@ class chai_collisions
     std::vector<CharacterController *> characterControllers;    
     WorldMap *worlds = nullptr;    
 
+    void setProcessFrequency(float fps) { m_processInterval = 1.0f / fps; }
+    void setDebugFrequency(float fps) { m_debugInterval = 1.0f / fps; }
+    void processDebugRendering(WorldJolt* world);
+    bool calculateWorldBounds(JPH::AABox& worldBounds, WorldJolt* world);    
+    void setupDebugCamera(const JPH::AABox& worldBounds);
+
+    private:
+    float m_lastProcessTime = 0.0f;
+    float m_processInterval = 1.0f / 60.0f; // Process at 60 FPS max
+    float m_lastDebugTime = 0.0f;
+    float m_debugInterval = 1.0f / 30.0f;   // Debug at 30 FPS max
+    bool m_needsUpdate = true;
     // class OpenGLDebugDrawer : public btIDebugDraw {
     //     private:
     //         int debugMode;

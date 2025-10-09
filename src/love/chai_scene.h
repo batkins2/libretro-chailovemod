@@ -36,6 +36,12 @@ public:
     void draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vector<chaiscript::Boxed_Value> viewMatrix2, std::vector<chaiscript::Boxed_Value> viewMatrix3, std::vector<chaiscript::Boxed_Value> viewMatrix4, int viewCount);
     void prepareScreen();
     void update(float dt);
+    void initFramebuffer();
+    float getFramerate();
+    float getAverageFramerate();
+    float getMinFramerate();
+    float getMaxFramerate();
+    void setFPSUpdateInterval(float interval) { m_fpsUpdateInterval = interval; }
 
 private:
     std::vector<chai_mesh *> meshes;
@@ -50,5 +56,19 @@ private:
     GLuint shadowMap = 0;
     love::gfx::Texture *background_tex = nullptr;
     bool frameOddEven = false;
+    int skip = 0;
+    GLuint sceneFramebuffer = 0;
+    GLuint sceneColorTexture = 0;
+    GLuint sceneDepthTexture = 0;
+    bool framebufferInitialized = false;
+    std::map<int, int> meshGroups;
+    // Framerate tracking
+    float m_frameTime = 0.0f;
+    float m_fps = 0.0f;
+    int m_frameCount = 0;
+    float m_fpsUpdateTime = 0.0f;
+    float m_fpsUpdateInterval = 1.0f; // Update FPS every second
+    std::vector<float> m_frameTimes;
+    size_t m_maxFrameHistory = 60; // Keep 60 frames of history
 };
 } // namespace love

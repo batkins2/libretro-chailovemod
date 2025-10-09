@@ -98,6 +98,7 @@ class chai_mesh {
     void setVisible(bool visible);
     void reloadMesh();
     void update(std::vector<float> position, std::vector<float> rotation, std::vector<float> scale, chai_debug *debug);
+    float calculateAnimationDuration(const std::string &name);
     std::pair<glm::vec3, glm::vec3> getBoundingBox(const glm::mat4 &viewProjectionMatrix);
     std::vector<float> getMeshBoundingBox();
     Matrix4 getNodeMatrix(const std::string &node);
@@ -158,6 +159,9 @@ class chai_mesh {
     int specularH = 0;
     uint8_t* specData = nullptr;
     GLuint specularMap = 0;
+    std::map<std::string, float> m_cachedAnimationDurations;
+    std::map<int, GLuint> cachedVBOs;
+    std::map<int, size_t> vboSizes;
     protected:
     int id;
     // float jointMinValue;

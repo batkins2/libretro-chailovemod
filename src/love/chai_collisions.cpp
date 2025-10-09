@@ -18,6 +18,7 @@ namespace love
 {
 chai_collisions::chai_collisions()
 {
+    setProcessFrequency(30); // Default to 30 FPS
 }
 chai_collisions::~chai_collisions()
 {
@@ -31,7 +32,407 @@ namespace Layers
 {
 	static constexpr JPH::ObjectLayer NON_MOVING = 0;
 	static constexpr JPH::ObjectLayer MOVING = 1;
-	static constexpr JPH::ObjectLayer NUM_LAYERS = 2;
+	static constexpr JPH::ObjectLayer AI = 2;
+    static constexpr JPH::ObjectLayer BOUNDARY = 3;
+	static constexpr JPH::ObjectLayer NUM_LAYERS = 4;
+};
+
+class chai_collisions::MyContactListener : public JPH::ContactListener
+{
+private:
+    chai_collisions* mCollisionSystem;
+
+    struct PendingEvent {
+        chai_collisions::CharacterController* characterID;
+        chai_collisions::RigidMesh* otherBodyID;
+        float normalX; // Store the contact normal's X component
+        float normalZ; // Add Z component for front/back collisions
+    };
+    std::vector<PendingEvent> mPendingEvents;
+    struct PendingCharacterEvent {
+        JPH::BodyID character1ID;
+        JPH::BodyID character2ID;
+    };
+    std::vector<PendingCharacterEvent> mPendingCharacterEvents;
+    
+public:
+    MyContactListener(chai_collisions* collisionSystem) : mCollisionSystem(collisionSystem) {}
+    
+    virtual void OnContactAdded(const JPH::Body &inBody1, const JPH::Body &inBody2, const JPH::ContactManifold &inManifold, JPH::ContactSettings &ioSettings) override
+    {
+        if (inBody1.GetObjectLayer() == Layers::NON_MOVING || inBody2.GetObjectLayer() == Layers::NON_MOVING) {
+            // If one of the bodies is a non-moving object, ignore the contact
+            return;
+        }
+        JPH::BodyID body1ID = inBody1.GetID();
+        JPH::BodyID body2ID = inBody2.GetID();
+        // printf("Contact added between bodies %d and %d\n", body1ID, body2ID);
+        // printf("Body 1 Layer: %d, Body 2 Layer: %d\n", inBody1.GetObjectLayer(), inBody2.GetObjectLayer());
+        if (body1ID == body2ID)
+            return;
+
+        if (inBody1.GetObjectLayer() == 2 && inBody2.GetObjectLayer() == 2 &&
+            inBody1.GetUserData() == 1 && inBody2.GetUserData() == 1) {
+            // Ignore collisions between AI characters
+            ioSettings.mIsSensor = true; // Make the contact a sensor to avoid physical response
+            return;
+        }
+
+        // Check if either body is a character controller
+        for (auto &cc : mCollisionSystem->characterControllers) {
+            if (cc->bodyID == body1ID || cc->bodyID == body2ID) {
+                for (auto &r : mCollisionSystem->rigidMeshes) {
+                    auto ref = ("player" + std::to_string(r->meshRef));
+                    // printf("Comparing character %s with ref %s\n", cc->charId.c_str(), ref.c_str());
+                    if (ref == cc->charId && (r->bodyID == body1ID || r->bodyID == body2ID)) {
+                        // Get manifold side contact points (-x or +x)
+                        float normalX = inManifold.mWorldSpaceNormal.GetX();
+                        float normalZ = inManifold.mWorldSpaceNormal.GetZ();
+                        // auto vel = cc->character->GetLinearVelocity();
+                        if (normalZ < 0) {
+                            // printf("Front collision detected for character %s\n", cc->charId.c_str());
+                            // cc->collidedZ = true;
+                        } else {
+                            cc->collidedZ = false;
+                        }
+                        // Queue the event for processing after physics step
+                        mPendingEvents.emplace_back(PendingEvent{cc, r, normalX, normalZ});
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+        
+        // if (inBody1.GetObjectLayer() == 1 && inBody2.GetObjectLayer() == 2) {
+        //     for (auto &cc : mCollisionSystem->characterControllers) {
+        //         if (cc->bodyID == body2ID) {
+        //             cc->collidedX = true;
+        //             cc->collidedZ = true;
+        //             printf("Character %s collided with moving object %d\n", cc->charId.c_str(), body1ID);
+        //             mPendingCharacterEvents.emplace_back(PendingCharacterEvent{body1ID, body2ID});
+        //         }
+        //     }
+        // } else if (inBody1.GetObjectLayer() == 2 && inBody2.GetObjectLayer() == 1) {
+        //     for (auto &cc : mCollisionSystem->characterControllers) {
+        //         if (cc->bodyID == body1ID) {
+        //             cc->collidedX = true;
+        //             cc->collidedZ = true;
+        //             printf("Character %s collided with moving object %d\n", cc->charId.c_str(), body2ID);
+        //             mPendingCharacterEvents.emplace_back(PendingCharacterEvent{body1ID, body2ID});
+                    
+        //         }
+        //     }
+        // if (inBody1.GetObjectLayer() == 2 && inBody2.GetObjectLayer() == 2) {
+        //     printf("Character collision detected between bodies %d and %d\n", body1ID, body2ID);
+        //     int i = 0;
+        //     int char1Index = -1;
+        //     int char2Index = -1;
+        //     for (auto &cc : mCollisionSystem->characterControllers) {
+        //         if (cc->bodyID == body2ID) {
+        //             // cc->collidedX = true;
+        //             // cc->collidedZ = true;
+        //             printf("Character %s collided with character %d\n", cc->charId.c_str(), body1ID);
+                    
+        //             char2Index = i;
+        //         }
+        //         if (cc->bodyID == body1ID) {
+        //             // cc->collidedX = true;
+        //             // cc->collidedZ = true;
+        //             printf("Character %s collided with character %d\n", cc->charId.c_str(), body2ID);
+                    
+        //             char1Index = i;
+        //         }
+        //         i++;
+        //     }
+        //     if (char1Index != -1 && char2Index != -1) {
+        //         mCollisionSystem->characterControllers[char1Index]->collidedX = true;
+        //         mCollisionSystem->characterControllers[char1Index]->collidedZ = true;
+        //         mCollisionSystem->characterControllers[char2Index]->collidedX = true;
+        //         mCollisionSystem->characterControllers[char2Index]->collidedZ = true;
+        //         mPendingCharacterEvents.emplace_back(PendingCharacterEvent{body1ID, body2ID});
+        //     }
+        // }
+        // bool isEdgeContact = (inManifold.mRelativeContactPointsOn1.size() <= 2 && 
+        //                 inManifold.mPenetrationDepth < 0.05f);
+
+        // if (isEdgeContact) {
+        //     // Reduce friction for edge contacts to prevent sticking
+        //     ioSettings.mCombinedFriction *= 0.3f;
+        //     // printf("Edge contact detected\n");
+        // }
+        
+
+        // Check if either body is a boundary
+        // if (inBody1.GetObjectLayer() == 3 || inBody2.GetObjectLayer() == 3) {
+        //     // If one of the bodies is a boundary, ignore the contact
+        //     ioSettings.isSensor = true; // Make the contact a sensor to avoid physical response
+        // }
+        
+        
+    }
+
+    virtual void OnContactPersisted(const JPH::Body &inBody1, const JPH::Body &inBody2, const JPH::ContactManifold &inManifold, JPH::ContactSettings &ioSettings) override
+    {
+        if (inBody1.GetObjectLayer() == Layers::AI && inBody2.GetObjectLayer() == Layers::AI) {
+            JPH::BodyID body1ID = inBody1.GetID();
+            JPH::BodyID body2ID = inBody2.GetID();
+            for (auto &cc : mCollisionSystem->characterControllers) {
+                if (cc->bodyID == body2ID && cc->charId.find("player") == std::string::npos) {
+                    cc->collidedX = true;
+                    cc->collidedZ = true;
+                    // printf("Character %s collided with character %d\n", cc->charId.c_str(), body1ID);
+                    
+                    // char2Index = i;
+                }
+                if (cc->bodyID == body1ID && cc->charId.find("player") == std::string::npos) {
+                    cc->collidedX = true;
+                    cc->collidedZ = true;
+                    // printf("Character %s collided with character %d\n", cc->charId.c_str(), body2ID);
+                    
+                }
+            }
+        }
+
+        JPH::BodyID body1ID = inBody1.GetID();
+        JPH::BodyID body2ID = inBody2.GetID();
+
+        // Check if either body is a character controller
+        for (auto &cc : mCollisionSystem->characterControllers) {
+            if (cc->bodyID == body1ID || cc->bodyID == body2ID) {
+                for (auto &r : mCollisionSystem->rigidMeshes) {
+                    auto ref = ("player" + std::to_string(r->meshRef));
+                    // printf("Comparing character %s with ref %s\n", cc->charId.c_str(), ref.c_str());
+                    if (ref == cc->charId && (r->bodyID == body1ID || r->bodyID == body2ID)) {
+                        // Get manifold side contact points (-x or +x)
+                        float normalX = inManifold.mWorldSpaceNormal.GetX();
+                        float normalZ = inManifold.mWorldSpaceNormal.GetZ();
+                        // auto vel = cc->character->GetLinearVelocity();
+                        if (normalZ < 0) {
+                            printf("Front collision detected for character %s\n", cc->charId.c_str());
+                            cc->collidedZ = true;
+                        } else if (normalZ > 0) {
+                            printf("Back collision detected for character %s\n", cc->charId.c_str());
+                            cc->collidedZ = true;
+                        } else {
+                            cc->collidedZ = false;
+                        }
+                        // Queue the event for processing after physics step
+                        mPendingEvents.emplace_back(PendingEvent{cc, r, normalX, normalZ});
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    virtual void OnContactRemoved(const JPH::SubShapeIDPair &inSubShapePair) override
+    {
+        // Handle contact removal if needed
+    }
+
+    void ProcessPendingEvents(JPH::PhysicsSystem* physicsSystem) {
+        if (mPendingEvents.empty() && mPendingCharacterEvents.empty()) return;
+        
+        JPH::BodyInterface& bodyInterface = physicsSystem->GetBodyInterface();
+        
+        auto pendingEvents = std::vector<PendingEvent>();
+
+        for (const auto& event : mPendingEvents) {
+            // Now it's safe to modify physics bodies
+            auto vel = bodyInterface.GetLinearVelocity(event.characterID->bodyID);
+            if (event.normalZ < 0) {
+                // vel.SetZ(200.0f);
+                // event.characterID->collidedZ = false; // Reset collision flag after processing
+                // bodyInterface.SetLinearVelocity(event.characterID->bodyID, vel);
+            }
+            vel.SetY(0); // Zero out Y component to avoid affecting vertical movement
+            vel.SetZ(0);
+            if (event.normalX < 0 && vel.GetX() < 0) {
+                // Do nothing, allow movement
+                vel.SetX(vel.GetX() * 2.0f);
+            } else if (event.normalX < 0 && vel.GetX() > 0) {
+                // Do nothing, allow movement
+                vel.SetX(vel.GetX() * 2.0f);
+            } else {
+                vel.SetX(0);
+            }
+            bodyInterface.SetLinearVelocity(event.otherBodyID->bodyID, vel);
+            // bodyInterface.SetAngularVelocity(event.otherBodyID, JPH::Vec3::sZero());
+            bodyInterface.ActivateBody(event.otherBodyID->bodyID);
+            pendingEvents.push_back(PendingEvent{event.characterID, event.otherBodyID, 0.0f, 0.0f}); // Clear normalX and normalZ after processing
+        }
+        
+        for (const auto& event : mPendingCharacterEvents) {
+            // Now it's safe to modify physics bodies
+            auto vel1 = bodyInterface.GetLinearVelocity(event.character1ID);
+            auto vel2 = bodyInterface.GetLinearVelocity(event.character2ID);
+            vel1.SetX(0); // Zero out X component to avoid affecting horizontal movement
+            vel2.SetX(0);
+            vel1.SetZ(0);
+            vel2.SetZ(0);
+            printf("Character collision: Setting velocities to zero\n");
+            bodyInterface.SetLinearVelocity(event.character1ID, vel1);
+            bodyInterface.SetLinearVelocity(event.character2ID, vel2);
+        }
+
+        mPendingEvents.clear();
+        mPendingEvents = pendingEvents; // Retain unprocessed events
+        mPendingCharacterEvents.clear();
+    }
+};
+
+// Add this class after MyContactListener in chai_collisions.h:
+class CharacterContactListener : public JPH::CharacterContactListener
+{
+private:
+    chai_collisions* mCollisionSystem;
+    
+public:
+    CharacterContactListener(chai_collisions* collisionSystem) : mCollisionSystem(collisionSystem) {}
+    
+    // Called when character hits something
+    virtual void OnContactAdded(const JPH::CharacterVirtual *inCharacter, const JPH::BodyID &inBodyID2, const JPH::SubShapeID &inSubShapeID2, JPH::RVec3Arg inContactPosition, JPH::Vec3Arg inContactNormal, JPH::CharacterContactSettings &ioSettings) override {
+        // Find which character controller this belongs to by comparing character pointers
+        chai_collisions::CharacterController* characterController = nullptr;
+        for (auto& cc : mCollisionSystem->characterControllers) {
+            // Compare the character pointers directly instead of using GetBodyID()
+            if (cc->character && cc->characterVirtual == inCharacter) {
+                characterController = cc;
+                break;
+            }
+        }
+        
+        if (!characterController) {
+            return;
+        }
+        
+        // Get the physics system
+        auto ps = mCollisionSystem->worlds->worlds[0]->physics_system;
+        JPH::BodyInterface& bodyInterface = ps->GetBodyInterface();
+        
+        // Get what we hit
+        JPH::ObjectLayer hitLayer = bodyInterface.GetObjectLayer(inBodyID2);
+        
+        printf("Character %s contacted layer %d\n", characterController->charId.c_str(), hitLayer);
+        
+        // Handle different collision types
+        switch (hitLayer) {
+            case Layers::AI:
+                // Character hit AI - stop movement
+                characterController->collidedX = true;
+                characterController->collidedZ = true;
+                ioSettings.mCanPushCharacter = false;      // AI can't push this character
+                ioSettings.mCanReceiveImpulses = false;    // Character won't receive impulses from AI
+                printf("Character %s hit AI - blocking movement\n", characterController->charId.c_str());
+                break;
+                
+            case Layers::MOVING:
+                // Character hit moving object - allow some interaction
+                ioSettings.mCanPushCharacter = true;       // Moving objects can push character
+                ioSettings.mCanReceiveImpulses = true;     // Character can receive impulses
+                printf("Character %s hit moving object\n", characterController->charId.c_str());
+                break;
+                
+            case Layers::NON_MOVING:
+                // Character hit static geometry - full stop
+                characterController->collidedX = true;
+                characterController->collidedZ = true;
+                ioSettings.mCanPushCharacter = false;      // Static objects can't be pushed
+                ioSettings.mCanReceiveImpulses = false;    // No impulses from static objects
+                printf("Character %s hit static geometry - full stop\n", characterController->charId.c_str());
+                break;
+                
+            case Layers::BOUNDARY:
+                // Character hit boundary - hard stop
+                characterController->collidedX = true;
+                characterController->collidedZ = true;
+                ioSettings.mCanPushCharacter = false;
+                ioSettings.mCanReceiveImpulses = false;
+                printf("Character %s hit boundary - hard stop\n", characterController->charId.c_str());
+                break;
+        }
+        
+        // Analyze contact for better collision response
+        analyzeCharacterContact(characterController, inContactNormal, ioSettings);
+    }
+
+    virtual void OnContactSolve(const JPH::CharacterVirtual *inCharacter, const JPH::BodyID &inBodyID2, const JPH::SubShapeID &inSubShapeID2, JPH::RVec3Arg inContactPosition, JPH::Vec3Arg inContactNormal, JPH::Vec3Arg inContactVelocity, const JPH::PhysicsMaterial *inContactMaterial, JPH::Vec3Arg inCharacterVelocity, JPH::Vec3 &ioNewCharacterVelocity) override
+    {
+        // Find the character controller by comparing character pointers
+        chai_collisions::CharacterController* characterController = nullptr;
+        for (auto& cc : mCollisionSystem->characterControllers) {
+            if (cc->character && cc->characterVirtual == inCharacter) {
+                characterController = cc;
+                break;
+            }
+        }
+        
+        if (!characterController) {
+            return;
+        }
+        
+        // Get what we hit
+        auto ps = mCollisionSystem->worlds->worlds[0]->physics_system;
+        JPH::BodyInterface& bodyInterface = ps->GetBodyInterface();
+        JPH::ObjectLayer hitLayer = bodyInterface.GetObjectLayer(inBodyID2);
+        
+        // Modify velocity based on what was hit
+        switch (hitLayer) {
+            case Layers::AI:
+                // Stop horizontal movement when hitting AI
+                ioNewCharacterVelocity.SetX(0.0f);
+                ioNewCharacterVelocity.SetZ(0.0f);
+                // Keep Y velocity for gravity/jumping
+                printf("Character %s velocity stopped due to AI collision\n", characterController->charId.c_str());
+                break;
+                
+            case Layers::MOVING:
+                // Reduce velocity when hitting moving objects
+                ioNewCharacterVelocity = ioNewCharacterVelocity * 0.5f;
+                ioNewCharacterVelocity.SetY(inCharacterVelocity.GetY()); // Preserve Y velocity
+                printf("Character %s velocity reduced due to moving object collision\n", characterController->charId.c_str());
+                break;
+                
+            case Layers::NON_MOVING:
+            case Layers::BOUNDARY:
+                // Project velocity along the surface for wall sliding
+                JPH::Vec3 projectedVelocity = inCharacterVelocity - inContactNormal * inCharacterVelocity.Dot(inContactNormal);
+                ioNewCharacterVelocity = projectedVelocity;
+                printf("Character %s sliding along surface\n", characterController->charId.c_str());
+                break;
+        }
+    }
+    
+private:
+    void analyzeCharacterContact(chai_collisions::CharacterController* cc, JPH::Vec3Arg contactNormal, JPH::CharacterContactSettings& ioSettings) {
+        // Determine collision direction for precise movement blocking
+        float normalX = abs(contactNormal.GetX());
+        float normalZ = abs(contactNormal.GetZ());
+        float normalY = abs(contactNormal.GetY());
+        
+        // Block movement in specific directions based on contact normal
+        if (normalX > 0.7f) {
+            cc->collidedX = true;
+            printf("Character %s X movement blocked\n", cc->charId.c_str());
+        }
+        if (normalZ > 0.7f) {
+            cc->collidedZ = true;
+            printf("Character %s Z movement blocked\n", cc->charId.c_str());
+        }
+        
+        // Handle ground contact
+        if (normalY > 0.8f && contactNormal.GetY() > 0) {
+            // Character is on ground - enable full friction
+            ioSettings.mCanPushCharacter = false;
+            printf("Character %s on ground - full friction\n", cc->charId.c_str());
+        } else if (normalY > 0.3f) {
+            // Character on slope - reduced friction
+            ioSettings.mCanPushCharacter = true;
+            printf("Character %s on slope - reduced friction\n", cc->charId.c_str());
+        }
+    }
 };
 
 std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef, bool makeConvex, bool ragdoll) 
@@ -39,7 +440,7 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
     auto cl = ChaiLove::getInstance();
     auto f = cl->getFSModule();
     auto s = f.getSize(meshPath);
-    auto file = f.readBuffer(meshPath, s);    
+    auto file = f.readBuffer(meshPath, s);   
 
     // Allocate a character array and copy the file data into it
     unsigned char* data = new unsigned char[s];
@@ -308,6 +709,7 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
             auto ps = worlds->worlds[0]->physics_system;
             JPH::BodyInterface& bodyInterface = ps->GetBodyInterface();
             JPH::Body *body = bodyInterface.CreateBody(bodySettings);
+            bodyInterface.SetFriction(body->GetID(), 1.0f);
             bodyInterface.AddBody(body->GetID(), JPH::EActivation::DontActivate);
             auto bodyID = body->GetID();
 
@@ -437,31 +839,41 @@ int chai_collisions::addCharacterController(int index, int meshRef, std::string 
     // Create character settings (like in CharacterTest.cpp)
     JPH::Ref<JPH::CharacterSettings> settings = new JPH::CharacterSettings();
     settings->mMaxSlopeAngle = JPH::DegreesToRadians(45.0f);
-    settings->mLayer = Layers::MOVING;
+    settings->mLayer = Layers::AI; // Different layer for each character
     
     // Create capsule shape
-    JPH::CapsuleShapeSettings capsuleSettings(0.5f, 1.0f);
+    JPH::CapsuleShapeSettings capsuleSettings(0.5f, 0.6f);
     auto shapeResult = capsuleSettings.Create();
     if (shapeResult.HasError()) {
         printf("Failed to create capsule shape: %s\n", shapeResult.GetError().c_str());
         return -1;
     }
     settings->mShape = shapeResult.Get();
-    
-    settings->mFriction = 0.5f;
+    settings->mFriction = 1.0f;
+
     settings->mSupportingVolume = JPH::Plane(JPH::Vec3::sAxisY(), -0.5f); // Support plane
     
     // Create character (like in CharacterTest.cpp)
-    JPH::Character* character = new JPH::Character(settings, JPH::RVec3(0, 5.0f, 0), JPH::Quat::sIdentity(), 0, worlds->worlds[0]->physics_system);
+    JPH::Character* character = new JPH::Character(
+        settings, 
+        JPH::RVec3(0, 5.0f, 0), 
+        JPH::Quat::sIdentity(), 
+        0, 
+        worlds->worlds[0]->physics_system);
     
     // Add to physics system (like in CharacterTest.cpp)
     character->AddToPhysicsSystem(JPH::EActivation::Activate);
-
     // Get body ID
     JPH::BodyID bodyID = character->GetBodyID();
+    auto& bodyInterface = worlds->worlds[0]->physics_system->GetBodyInterface();
+    bodyInterface.SetFriction(bodyID, 1.0f);
+
+    if (charId.find("player") != std::string::npos) {
+        bodyInterface.SetUserData(bodyID, 1);
+    }
 
     // Store character reference in your CharacterController
-    characterControllers.emplace_back(new CharacterController(bodyID, meshRef, charId, character));
+    characterControllers.emplace_back(new CharacterController(bodyID, meshRef, charId, character, index));
     
     printf("Created character controller with charId %s at position (0, 5.0f, 0)\n", charId.c_str());
     return characterControllers.size() - 1;
@@ -512,8 +924,18 @@ void chai_collisions::teleportCharacter(int characterIndex, float x, float y, fl
 
 void chai_collisions::applyForceToCharacter(int characterIndex, float x, float y, float z)
 {
+    // if (characterControllers[characterIndex]->collidedX && x != 0) {
+    //     // characterControllers[characterIndex]->collidedX = false;
+    //     x = 0;
+    // }
+    // if (characterControllers[characterIndex]->collidedZ && z != 0) {
+    //     // characterControllers[characterIndex]->collidedZ = false;
+    //     z = 0;
+    // }
     // Apply a walk direction to the character controller
-    characterControllers[characterIndex]->character->SetLinearVelocity(JPH::Vec3(x, y, z));
+    characterControllers[characterIndex]->velocityX = x;
+    characterControllers[characterIndex]->velocityY = y;
+    characterControllers[characterIndex]->velocityZ = z;
     // characterControllers[characterIndex]->character->setWalkDirection(btVector3(x, y, z));
 }
 void chai_collisions::applyForceToRigidMesh(int rigidMeshIndex, float x, float y, float z)
@@ -593,15 +1015,20 @@ int chai_collisions::addBox(float x, float y, float z, float width, float height
         shape, // Shape
         JPH::RVec3(x, y, z), // Position
         JPH::Quat::sIdentity(), // Rotation
-        JPH::EMotionType::Static, // Motion type
-        0               // Layer
+        JPH::EMotionType::Kinematic, // Motion type
+        Layers::BOUNDARY // Collision layer
     );
+    bodySettings.mIsSensor = true; // Make it a sensor
+    // Set gravity to zero
+    bodySettings.mGravityFactor = 0.0f;
+    bodySettings.mFriction = 1.0f;
     // bodySettings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
     // bodySettings.mMassPropertiesOverride.mMass = 1.0f; // Set
     auto ps = worlds->worlds[0]->physics_system;
     JPH::BodyInterface& bodyInterface = ps->GetBodyInterface();
     // Create the body
     JPH::Body *body = bodyInterface.CreateBody(bodySettings);
+    
     bodyInterface.AddBody(body->GetID(), JPH::EActivation::DontActivate);
     auto bodyID = body->GetID();
     auto rm = new RigidMesh(bodyID, index);
@@ -653,7 +1080,7 @@ int chai_collisions::addBox(float x, float y, float z, float width, float height
     // // btScalar mass = 1.0f; // Adjust mass as needed
     // // btVector3 inertia(0, 0, 0);
     // // shape->calculateLocalInertia(mass, inertia);
-    // btDefaultMotionState *motionState = new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(x, y, z)));
+    // btDefaultMotionState *motionState = new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, -1, 0)));
     // btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(1.0f, motionState, shape, btVector3(0, 0, 0));
     // btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
     // rigidBody->setGravity(btVector3(0, 0, 0));
@@ -915,6 +1342,8 @@ public:
     //     return JPH::DebugRenderer::Batch();
     // }
 
+   
+
     // virtual JPH::DebugRenderer::Batch CreateTriangleBatch(const JPH::DebugRenderer::Vertex *inVertices, int inVertexCount, const JPH::uint32 *inIndices, int inIndexCount) override
     // {
     //     // Simple implementation - return empty batch
@@ -989,16 +1418,21 @@ public:
 	virtual bool					ShouldCollide(JPH::ObjectLayer inObject1, JPH::ObjectLayer inObject2) const override
 	{
         switch (inObject1)
-		{
-		case Layers::NON_MOVING:
-			return inObject2 == Layers::MOVING; // Non moving only collides with moving
-		case Layers::MOVING:
-			return true; // Moving collides with everything
-		default:
-			JPH_ASSERT(false);
-			return false;
-		}
-	}
+        {
+        case Layers::NON_MOVING:
+            return inObject2 == Layers::MOVING || inObject2 == Layers::AI; // Non moving only collides with moving
+        case Layers::MOVING:
+            return true; // Moving collides with everything
+        case Layers::AI:
+            return true; // AI only collides with other AI
+        case Layers::BOUNDARY:
+            return inObject2 == Layers::AI; // Boundary collides with AI
+        default:
+            JPH_ASSERT(false);
+            return false;
+        }
+        
+    }
 };
 
 // Each broadphase layer results in a separate bounding volume tree in the broad phase. You at least want to have
@@ -1010,7 +1444,9 @@ namespace BroadPhaseLayers
 {
 	static constexpr JPH::BroadPhaseLayer NON_MOVING(0);
 	static constexpr JPH::BroadPhaseLayer MOVING(1);
-	static constexpr JPH::uint NUM_LAYERS(2);
+	static constexpr JPH::BroadPhaseLayer AI(2);
+    static constexpr JPH::BroadPhaseLayer BOUNDARY(3);
+	static constexpr JPH::uint NUM_LAYERS(4);
 };
 
 // BroadPhaseLayerInterface implementation
@@ -1023,6 +1459,8 @@ public:
         // Create a mapping table from object to broad phase layer
         mObjectToBroadPhase[Layers::NON_MOVING] = BroadPhaseLayers::NON_MOVING;
         mObjectToBroadPhase[Layers::MOVING] = BroadPhaseLayers::MOVING;
+        mObjectToBroadPhase[Layers::AI] = BroadPhaseLayers::AI;
+        mObjectToBroadPhase[Layers::BOUNDARY] = BroadPhaseLayers::BOUNDARY;
     }
 
     virtual JPH::uint GetNumBroadPhaseLayers() const override
@@ -1043,6 +1481,8 @@ public:
         {
         case 0:	return "NON_MOVING";
         case 1:	return "MOVING";
+        case 2:	return "AI";
+        case 3:	return "BOUNDARY";
         default:	JPH_ASSERT(false); return "INVALID";
         }
     }
@@ -1061,42 +1501,17 @@ public:
 		switch (inLayer1)
 		{
 		case Layers::NON_MOVING:
-			return inLayer2 == BroadPhaseLayers::MOVING;
+			return inLayer2 == BroadPhaseLayers::MOVING || inLayer2 == BroadPhaseLayers::AI;
 		case Layers::MOVING:
 			return true;
+		 case Layers::AI:
+            return true; // AI only collides with non-moving and other AI
+        case Layers::BOUNDARY:
+            return inLayer2 == BroadPhaseLayers::AI; // Boundary collides with moving
 		default:
 			JPH_ASSERT(false);
 			return false;
 		}
-	}
-};
-
-// An example contact listener
-class MyContactListener : public JPH::ContactListener
-{
-public:
-	// See: ContactListener
-	virtual JPH::ValidateResult	OnContactValidate(const JPH::Body &inBody1, const JPH::Body &inBody2, JPH::RVec3Arg inBaseOffset, const JPH::CollideShapeResult &inCollisionResult) override
-	{
-		std::cout << "Contact validate callback" << std::endl;
-
-		// Allows you to ignore a contact before it is created (using layers to not make objects collide is cheaper!)
-		return JPH::ValidateResult::AcceptAllContactsForThisBodyPair;
-	}
-
-	virtual void			OnContactAdded(const JPH::Body &inBody1, const JPH::Body &inBody2, const JPH::ContactManifold &inManifold, JPH::ContactSettings &ioSettings) override
-	{
-		std::cout << "A contact was added" << std::endl;
-	}
-
-	virtual void			OnContactPersisted(const JPH::Body &inBody1, const JPH::Body &inBody2, const JPH::ContactManifold &inManifold, JPH::ContactSettings &ioSettings) override
-	{
-		std::cout << "A contact was persisted" << std::endl;
-	}
-
-	virtual void			OnContactRemoved(const JPH::SubShapeIDPair &inSubShapePair) override
-	{
-		std::cout << "A contact was removed" << std::endl;
 	}
 };
 
@@ -1183,11 +1598,16 @@ void chai_collisions::init(int group = 0)
         // Set gravity
         // physics_system->SetGravity(JPH::Vec3(0.0f, -9.81f, 0.0f)); // Gravity pointing down the y-axis
 
+        auto contactListener = new MyContactListener(this);
+        // auto characterContactListener = new CharacterContactListener(this);
+        physics_system->SetContactListener(contactListener);
 
         worldJolt->physics_system = physics_system;
         worldJolt->broad_phase_layer_interface = broad_phase_layer_interface;
         worldJolt->object_vs_broadphase_layer_filter = object_vs_broadphase_layer_filter;
         worldJolt->object_vs_object_layer_filter = object_vs_object_layer_filter;
+        worldJolt->contact_listener = contactListener;
+        // worldJolt->character_contact_listener = characterContactListener;
         
         #ifdef JPH_DEBUG_RENDERER
 
@@ -1535,163 +1955,134 @@ void chai_collisions::debugDraw()
 
 void chai_collisions::process(float deltaTime)
 {  
+    // Accumulate time
+    m_lastProcessTime += deltaTime;
+    
+    // Only process if enough time has passed
+    // if (m_lastProcessTime < m_processInterval && !m_needsUpdate) {
+    //     return;
+    // }
+    
+    float actualDeltaTime = m_lastProcessTime;
+    m_lastProcessTime = 0.0f;
+    m_needsUpdate = false;
+    
+    // Cap delta time to prevent large jumps
+    actualDeltaTime = std::min(actualDeltaTime, 0.033f); // Max 33ms step
+    
     // For each Jolt world/group
     for (auto &dw : worlds->worlds) {
         
-        // Update characters BEFORE physics step (like PrePhysicsUpdate in CharacterTest.cpp)
-        for (auto &cc : characterControllers) {
-            if (cc->character) {
-                // Handle character input/movement here if needed
-                // For now, just let gravity work
-                
-                // Optional: Apply simple movement or let it fall
-                JPH::Vec3 currentVel = cc->character->GetLinearVelocity();
-                // Don't manually add gravity - Character handles this internally
-                
-                // printf("Character Y pos: %.2f, Y vel: %.2f\n", 
-                //        cc->character->GetPosition().GetY(), currentVel.GetY());
-            }
-        }
-
-        // Step the Jolt simulation
-        const float maxSubSteps = 5;
-        dw.second->physics_system->Update(deltaTime, maxSubSteps, &dw.second->temp_allocator, &dw.second->job_system);
-        
-        // Update characters AFTER physics step (like PostPhysicsUpdate in CharacterTest.cpp)
-        const float cCollisionTolerance = 0.05f;
-        for (auto &cc : characterControllers) {
-            if (cc->character) {
-                cc->character->PostSimulation(cCollisionTolerance);
-            }
-        }
-
-        #ifdef JPH_DEBUG_RENDERER
-        if (dw.second->debug_renderer) {
-            // Clear the screen
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-            // Set up OpenGL state for debug rendering
-            glEnable(GL_DEPTH_TEST);
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-            // Calculate world bounds from all physics bodies
-            JPH::AABox worldBounds;
-            bool hasBounds = false;
-            
-            JPH::BodyInterface& bodyInterface = dw.second->physics_system->GetBodyInterface();
-            
-            // Iterate through all bodies to calculate combined bounds
-            for (auto &rm : rigidMeshes) {
-                if (bodyInterface.IsAdded(rm->bodyID)) {
-                    auto bodyTransform = bodyInterface.GetCenterOfMassTransform(rm->bodyID);
-                    JPH::Vec3 inScale(1.0f, 1.0f, 1.0f);
-                    auto shapeBounds = bodyInterface.GetShape(rm->bodyID)->GetWorldSpaceBounds(bodyTransform, inScale);
-                    
-                    if (!hasBounds) {
-                        worldBounds = shapeBounds;
-                        hasBounds = true;
-                    } else {
-                        worldBounds.Encapsulate(shapeBounds);
-                    }
-                }
-            }
-            
-            // Include character controllers in bounds
+        // Update characters BEFORE physics step (reduced frequency)
+        static int characterUpdateCounter = 0;
+        // if (characterUpdateCounter % 2 == 0) { // Update characters every 2nd physics step
             for (auto &cc : characterControllers) {
-                if (bodyInterface.IsAdded(cc->bodyID)) {
-                    auto bodyTransform = bodyInterface.GetCenterOfMassTransform(cc->bodyID);
-                    JPH::Vec3 inScale(1.0f, 1.0f, 1.0f);
-                    auto shapeBounds = bodyInterface.GetShape(cc->bodyID)->GetWorldSpaceBounds(bodyTransform, inScale);
-                    
-                    if (!hasBounds) {
-                        worldBounds = shapeBounds;
-                        hasBounds = true;
-                    } else {
-                        worldBounds.Encapsulate(shapeBounds);
+                if (cc->character) {
+                    const float cCollisionTolerance = 0.05f; 
+           
+                
+                    if (cc->collidedX)
+                    {
+                        cc->velocityX = 0;
                     }
+
+                    if (cc->collidedZ)
+                    {
+                        cc->velocityZ *= -5.0f; // Bounce back with increased force
+                    }
+                    // printf("Applying force to character %d: (%f, %f, %f)\n", cc->index, cc->velocityX, cc->velocityY, cc->velocityZ);
+   
+                    cc->character->SetLinearVelocity(JPH::Vec3(cc->velocityX, cc->velocityY + cc->character->GetLinearVelocity().GetY(), cc->velocityZ));
+                    // cc->character->PostSimulation(cCollisionTolerance);
+                    cc->collidedX = false;
+                    cc->collidedZ = false;
+                
+            
+                    // Handle character input/movement here if needed
+                    JPH::Vec3 currentVel = cc->character->GetLinearVelocity();
+                    
+                    // Only print debug info occasionally
+                    // static int debugCounter = 0;
+                    // if (debugCounter++ % 180 == 0) { // Every 3 seconds at 60fps
+                    //     printf("Character Y pos: %.2f, Y vel: %.2f\n", 
+                    //            cc->character->GetPosition().GetY(), currentVel.GetY());
+                    // }
                 }
             }
-            
-            // Set up orthographic projection based on world bounds
-            if (hasBounds) {
-                JPH::Vec3 boundsMin = worldBounds.mMin;
-                JPH::Vec3 boundsMax = worldBounds.mMax;
-                JPH::Vec3 boundsCenter = (boundsMin + boundsMax) * 0.5f;
-                JPH::Vec3 boundsSize = boundsMax - boundsMin;
-                
-                // Calculate optimal camera position for perspective view
-                float maxDimension = std::max(boundsSize.GetX(), std::max(boundsSize.GetY(), boundsSize.GetZ()));
-                float fov = 45.0f; // Field of view in degrees
-                float aspectRatio = 16.0f / 9.0f; // Aspect ratio
-                
-                // Calculate distance to fit all geometry in view
-                float distance = maxDimension / (2.0f * tan(glm::radians(fov) / 2.0f)) * 1.5f; // 1.5f for padding
-                
-                distance /= 5.0f; // Adjust distance to control zoom level
+        // }
+        characterUpdateCounter++;
 
-                // Position camera to view the scene
-                glm::vec3 cameraPos = glm::vec3(
-                    boundsCenter.GetX() + distance * 0.7f,  // Slightly to the side
-                    boundsCenter.GetY() + distance * 0.5f,  // Above the center
-                    boundsCenter.GetZ() + distance          // Back from the center
-                );
-                
-                glm::vec3 target = glm::vec3(boundsCenter.GetX(), boundsCenter.GetY(), boundsCenter.GetZ());
-                glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-                
-                // Set up perspective projection matrix
-                glMatrixMode(GL_PROJECTION);
-                glLoadIdentity();
-                glm::mat4 projection = glm::perspective(
-                    glm::radians(fov), 
-                    aspectRatio, 
-                    0.1f,                    // Near plane
-                    distance * 3.0f          // Far plane
-                );
-                glLoadMatrixf(glm::value_ptr(projection));
-                
-                // Set up view matrix to look at the center
-                glMatrixMode(GL_MODELVIEW);
-                glLoadIdentity();
-                glm::mat4 view = glm::lookAt(cameraPos, target, up);
-                glLoadMatrixf(glm::value_ptr(view));
-                
-                printf("Perspective view - Camera: (%.2f, %.2f, %.2f), Target: (%.2f, %.2f, %.2f)\n", 
-                       cameraPos.x, cameraPos.y, cameraPos.z,
-                       target.x, target.y, target.z);
-                printf("World bounds: (%.2f, %.2f, %.2f) to (%.2f, %.2f, %.2f)\n", 
-                       boundsMin.GetX(), boundsMin.GetY(), boundsMin.GetZ(),
-                       boundsMax.GetX(), boundsMax.GetY(), boundsMax.GetZ());
-            } else {
-                // Fallback if no bounds found - simple perspective view
-                glMatrixMode(GL_PROJECTION);
-                glLoadIdentity();
-                glm::mat4 projection = glm::perspective(glm::radians(45.0f), 16.0f/9.0f, 0.1f, 100.0f);
-                glLoadMatrixf(glm::value_ptr(projection));
-                
-                glMatrixMode(GL_MODELVIEW);
-                glLoadIdentity();
-                glm::mat4 view = glm::lookAt(
-                    glm::vec3(1.0f, 1.0f, 1.0f), // Camera position
-                    glm::vec3(0.0f, 0.0f, 0.0f),    // Look at origin
-                    glm::vec3(0.0f, 1.0f, 0.0f)     // Up vector
-                );
-                glLoadMatrixf(glm::value_ptr(view));
+        // Step the Jolt simulation with fixed timestep
+        const int maxSubSteps = 10;
+        dw.second->physics_system->Update(deltaTime, maxSubSteps, &dw.second->temp_allocator, &dw.second->job_system);
+
+        // Process contact events less frequently
+        static int contactCounter = 0;
+        // if (contactCounter++ % 3 == 0) { // Every 3rd frame
+            if (dw.second->contact_listener) {
+                dw.second->contact_listener->ProcessPendingEvents(dw.second->physics_system);
             }
+        // }
+
+        // Update characters AFTER physics step (reduced frequency)
+        // if (characterUpdateCounter % 2 == 0) {
             
-            // Draw all physics bodies
-            JPH::BodyManager::DrawSettings settings;
-            settings.mDrawGetSupportFunction = true;
-            settings.mDrawSupportDirection = true;
-            settings.mDrawGetSupportingFace = true;
-            settings.mDrawShape = true;
-            settings.mDrawShapeWireframe = true;
-        
-            dw.second->physics_system->DrawBodies(settings, dw.second->debug_renderer);
-        }
-        #endif // JPH_DEBUG_RENDERER
+        // }
+
+        // Debug rendering at reduced frequency
+        processDebugRendering(dw.second);
     }
+}
+
+void chai_collisions::processDebugRendering(WorldJolt* world)
+{
+    m_lastDebugTime += m_processInterval;
+    
+    // Only render debug info at reduced frequency
+    if (m_lastDebugTime < m_debugInterval) {
+        return;
+    }
+    
+    m_lastDebugTime = 0.0f;
+    
+    #ifdef JPH_DEBUG_RENDERER
+    if (world->debug_renderer) {
+        // Clear the screen
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // Set up OpenGL state for debug rendering
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        // Calculate world bounds only when needed (cache this)
+        static JPH::AABox cachedWorldBounds;
+        static int boundsUpdateCounter = 0;
+        static bool hasCachedBounds = false;
+        
+        // Update bounds every 60 frames (1 second at 60fps)
+        if (boundsUpdateCounter++ % 60 == 0) {
+            hasCachedBounds = calculateWorldBounds(cachedWorldBounds, world);
+        }
+        
+        // Set up camera based on cached bounds
+        if (hasCachedBounds) {
+            setupDebugCamera(cachedWorldBounds);
+        } else {
+            setupFallbackCamera();
+        }
+        
+        // Draw physics bodies at reduced detail
+        JPH::BodyManager::DrawSettings settings;
+        settings.mDrawGetSupportFunction = false;      // Disabled for performance
+        settings.mDrawSupportDirection = false;        // Disabled for performance
+        settings.mDrawGetSupportingFace = false;       // Disabled for performance
+        settings.mDrawShape = true;
+        settings.mDrawShapeWireframe = true;
+    
+        world->physics_system->DrawBodies(settings, world->debug_renderer);
+    }
+    #endif // JPH_DEBUG_RENDERER
 }
 
 void chai_collisions::test() {
@@ -1762,5 +2153,89 @@ void chai_collisions::test() {
     // delete dispatcher;
     // delete broadphase;
     // delete debugDrawer;
+}
+bool chai_collisions::calculateWorldBounds(JPH::AABox& worldBounds, WorldJolt* world)
+{
+    bool hasBounds = false;
+    JPH::BodyInterface& bodyInterface = world->physics_system->GetBodyInterface();
+    
+    // Only process active bodies for bounds calculation
+    int processedBodies = 0;
+    const int maxBodiesToProcess = 50; // Limit processing per frame
+    
+    // Process rigid meshes (with limit)
+    for (int i = 0; i < rigidMeshes.size() && processedBodies < maxBodiesToProcess; i++) {
+        auto& rm = rigidMeshes[i];
+        if (bodyInterface.IsAdded(rm->bodyID) && bodyInterface.IsActive(rm->bodyID)) {
+            auto bodyTransform = bodyInterface.GetCenterOfMassTransform(rm->bodyID);
+            JPH::Vec3 inScale(1.0f, 1.0f, 1.0f);
+            auto shapeBounds = bodyInterface.GetShape(rm->bodyID)->GetWorldSpaceBounds(bodyTransform, inScale);
+            
+            if (!hasBounds) {
+                worldBounds = shapeBounds;
+                hasBounds = true;
+            } else {
+                worldBounds.Encapsulate(shapeBounds);
+            }
+            processedBodies++;
+        }
+    }
+    
+    // Process character controllers (with limit)
+    for (int i = 0; i < characterControllers.size() && processedBodies < maxBodiesToProcess; i++) {
+        auto& cc = characterControllers[i];
+        if (bodyInterface.IsAdded(cc->bodyID) && bodyInterface.IsActive(cc->bodyID)) {
+            auto bodyTransform = bodyInterface.GetCenterOfMassTransform(cc->bodyID);
+            JPH::Vec3 inScale(1.0f, 1.0f, 1.0f);
+            auto shapeBounds = bodyInterface.GetShape(cc->bodyID)->GetWorldSpaceBounds(bodyTransform, inScale);
+            
+            if (!hasBounds) {
+                worldBounds = shapeBounds;
+                hasBounds = true;
+            } else {
+                worldBounds.Encapsulate(shapeBounds);
+            }
+            processedBodies++;
+        }
+    }
+    
+    return hasBounds;
+}
+
+void chai_collisions::setupDebugCamera(const JPH::AABox& worldBounds)
+{
+    static glm::mat4 cachedProjection;
+    static glm::mat4 cachedView;
+    static int cameraUpdateCounter = 0;
+    
+    // Only update camera matrices every 30 frames
+    if (cameraUpdateCounter++ % 30 == 0) {
+        JPH::Vec3 boundsCenter = (worldBounds.mMin + worldBounds.mMax) * 0.5f;
+        JPH::Vec3 boundsSize = worldBounds.mMax - worldBounds.mMin;
+        
+        float maxDimension = std::max(boundsSize.GetX(), std::max(boundsSize.GetY(), boundsSize.GetZ()));
+        float fov = 45.0f;
+        float aspectRatio = 16.0f / 9.0f;
+        float distance = maxDimension / (2.0f * tan(glm::radians(fov) / 2.0f)) * 1.5f / 5.0f;
+
+        glm::vec3 cameraPos = glm::vec3(
+            boundsCenter.GetX() + distance * 0.7f,
+            boundsCenter.GetY() + distance * 0.5f,
+            boundsCenter.GetZ() + distance
+        );
+        
+        glm::vec3 target = glm::vec3(boundsCenter.GetX(), boundsCenter.GetY(), boundsCenter.GetZ());
+        glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+        
+        cachedProjection = glm::perspective(glm::radians(fov), aspectRatio, 0.1f, distance * 3.0f);
+        cachedView = glm::lookAt(cameraPos, target, up);
+    }
+    
+    // Apply cached matrices
+    glMatrixMode(GL_PROJECTION);
+    glLoadMatrixf(glm::value_ptr(cachedProjection));
+    
+    glMatrixMode(GL_MODELVIEW);
+    glLoadMatrixf(glm::value_ptr(cachedView));
 }
 } // namespace love

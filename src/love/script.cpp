@@ -2,6 +2,8 @@
 #include "../ChaiLove.h"
 #include "../LibretroLog.h"
 #include <algorithm>
+#include <ctime>
+#include <chrono>
 
 #ifdef __HAVE_CHAISCRIPT__
 #include "chaiscript/extras/math.hpp"
@@ -173,6 +175,28 @@ script::script(const std::string& file) {
 		love["window"] = var(std::ref(app->window));
 	},
 	"love");
+
+	// app->chai_async.bindToChaiScript(chai);
+
+	// Safe sleep function
+	chai.add(fun([](double milliseconds) {
+		if (milliseconds > 0 && milliseconds < 60000) { // Limit to 60 seconds max
+			std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<long long>(milliseconds)));
+		}
+	}), "sleep");
+
+	// Time functions
+	chai.add(fun([]() -> double {
+		auto now = std::chrono::high_resolution_clock::now();
+		auto duration = now.time_since_epoch();
+		auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+		return static_cast<double>(millis);
+	}), "time");
+
+	// Calculate difference in milliseconds
+	chai.add(fun([](double end, double start) -> double {
+		return end - start; // Already in milliseconds
+	}), "difftime");
 
 	// Quad Object.
 	chai.add(user_type<Quad>(), "Quad");
@@ -396,6 +420,7 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_scene::update), "update");
 	chai.add(fun(&chai_scene::removeChildMesh), "removeChildMesh");
 	chai.add(fun(&chai_scene::addChildMesh), "addChildMesh");
+	chai.add(fun(&chai_scene::getFramerate), "getFramerate");
 	chai.add(user_type<chai_collisions>(), "chai_collisions");
 	chai.add(constructor<chai_collisions(const chai_collisions &)>(), "chai_collisions");
 	chai.add(fun(&chai_collisions::operator=), "=");
