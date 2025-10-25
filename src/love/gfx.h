@@ -890,6 +890,8 @@ public:
 	void flushBatchedDraws();
 	BatchedVertexData requestBatchedDraw(const BatchedDrawCommand &command);
 
+	bool findVertexAttributes(VertexAttributesID id, VertexAttributes &attributes);
+
 	static void flushBatchedDrawsGlobal();
 
 	Texture *getTemporaryTexture(PixelFormat format, int w, int h, int samples);
@@ -1113,6 +1115,8 @@ private:
 	Buffer *defaultStorageBuffer;
 
 	std::vector<uint8> scratchBuffer;
+
+	std::vector<VertexAttributes> vertexAttributesDatabase;
 
 	std::unordered_map<std::string, ShaderStage *> cachedShaderStages[SHADERSTAGE_MAX_ENUM];
 

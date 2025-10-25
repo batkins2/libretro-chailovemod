@@ -22,7 +22,7 @@
 
 #include <random>
 
-#include "opengl/Graphics.h"
+#include "vulkan/Graphics.h"
 namespace love {
 class chai_gfx;
 class chai_mesh {
@@ -158,9 +158,9 @@ class chai_mesh {
     int specularW = 0;
     int specularH = 0;
     uint8_t* specData = nullptr;
-    GLuint specularMap = 0;
+    // GLuint specularMap = 0;
     std::map<std::string, float> m_cachedAnimationDurations;
-    std::map<int, GLuint> cachedVBOs;
+    // std::map<int, GLuint> cachedVBOs;
     std::map<int, size_t> vboSizes;
     protected:
     int id;

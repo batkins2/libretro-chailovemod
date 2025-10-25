@@ -312,6 +312,17 @@ struct VertexBufferLayout
 	uint16 stride;
 };
 
+struct VertexAttributesID
+{
+	int id = 0;
+
+	bool isValid() const { return id > 0; }
+	void invalidate() { id = 0; }
+
+	bool operator == (VertexAttributesID other) const { return other.id == id; }
+	bool operator != (VertexAttributesID other) const { return other.id != id; }
+};
+
 struct VertexAttributes
 {
 	static const uint32 MAX = 32;

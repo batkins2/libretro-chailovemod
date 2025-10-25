@@ -90,10 +90,12 @@ class chai_collisions
         int index = 0; // Index to identify the character controller
         bool collidedX = false;
         bool collidedZ = false;
+        float perimeterPenetration = 0.0f; // Amount of penetration into walls
         float velocityX = 0.0f; // Horizontal velocity
         float velocityZ = 0.0f; // Horizontal velocity
         float velocityY = 0.0f; // Vertical velocity for jumping and gravity
         JPH::CharacterVirtual* characterVirtual = nullptr; // Pointer to the CharacterVirtual instance
+        JPH::Vec3 collisionNormal = JPH::Vec3::sZero(); // Store the collision normal
 
         CharacterController(JPH::BodyID id, int mesh, std::string cId, JPH::Character* c, int cIndex = 0) 
             : bodyID(id), meshRef({mesh}), charId(cId), character(c), index(cIndex) {}

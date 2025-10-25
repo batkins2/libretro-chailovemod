@@ -39,7 +39,7 @@ bool chai_gfx::init() {
     }
     
     if (!init) {
-        instance = new gfx::opengl::Graphics();
+        instance = new gfx::vulkan::Graphics();
     }
         
     instance->hw_render = hw_render;
@@ -60,10 +60,10 @@ bool chai_gfx::init() {
     // width = 1920;
     // height = 1080;
 
-    GLint dims[4];
-    glGetIntegerv(GL_VIEWPORT, dims);
-    width = dims[2];
-    height = dims[3];
+    // GLint dims[4];
+    // glGetIntegerv(GL_VIEWPORT, dims);
+    // width = dims[2];
+    // height = dims[3];
     
     if (!init) {
         win->setWindow(width, height, winset);

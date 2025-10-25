@@ -90,7 +90,7 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
     // }
 
     // Set OpenGL to wireframe mode
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     
     // Create a ragdoll mesh
     btCompoundShape *ragdollShape = new btCompoundShape();
@@ -178,11 +178,11 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
                     vertices[8] = m.z;
                     if (false) {
                         // Define the vertices of the triangle
-                        glBegin(GL_TRIANGLES);
-                        glVertex3f(vertices[0], vertices[1], vertices[2]);
-                        glVertex3f(vertices[3], vertices[4], vertices[5]);
-                        glVertex3f(vertices[6], vertices[7], vertices[8]);
-                        glEnd();    
+                        // glBegin(GL_TRIANGLES);
+                        // glVertex3f(vertices[0], vertices[1], vertices[2]);
+                        // glVertex3f(vertices[3], vertices[4], vertices[5]);
+                        // glVertex3f(vertices[6], vertices[7], vertices[8]);
+                        // glEnd();    
                     }
                     // printf("vertices: %f, %f, %f\n", vertices[0], vertices[1], vertices[2]);
                     // printf("vertices: %f, %f, %f\n", vertices[3], vertices[4], vertices[5]);
@@ -254,11 +254,11 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
                     vertices[8] = m.z;
                     if (false) {
                         // Define the vertices of the triangle
-                        glBegin(GL_TRIANGLES);
-                        glVertex3f(vertices[0], vertices[1], vertices[2]);
-                        glVertex3f(vertices[3], vertices[4], vertices[5]);
-                        glVertex3f(vertices[6], vertices[7], vertices[8]);
-                        glEnd();    
+                        // glBegin(GL_TRIANGLES);
+                        // glVertex3f(vertices[0], vertices[1], vertices[2]);
+                        // glVertex3f(vertices[3], vertices[4], vertices[5]);
+                        // glVertex3f(vertices[6], vertices[7], vertices[8]);
+                        // glEnd();    
                     }                 
                     // printf("vertices: %f, %f, %f\n", vertices[0], vertices[1], vertices[2]);
                     // printf("vertices: %f, %f, %f\n", vertices[3], vertices[4], vertices[5]);
@@ -324,7 +324,7 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
         count++;
     }
     // Reset OpenGL to fill mode (optional)
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    // glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     return refs;
 }
 void chai_collisions::setRigidMeshPosition(std::vector<int> rigidMeshIndex, float x, float y, float z, std::vector<int> group = {0})
@@ -819,173 +819,174 @@ void chai_collisions::destroy()
 
 uint8_t* chai_collisions::processDebug(float deltaTime, std::vector<chaiscript::Boxed_Value> viewMatrix)
 {
-    auto width = 1920; // Set your desired width
-    auto height = 1080; // Set your desired height
-    if (!debugDrawer->debugTexture) {
-        glGenTextures(1, &debugDrawer->debugTexture);
-    }
+    return nullptr;
+    // auto width = 1920; // Set your desired width
+    // auto height = 1080; // Set your desired height
+    // if (!debugDrawer->debugTexture) {
+    //     glGenTextures(1, &debugDrawer->debugTexture);
+    // }
 
-    glBindTexture(GL_TEXTURE_2D, debugDrawer->debugTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // glBindTexture(GL_TEXTURE_2D, debugDrawer->debugTexture);
+    // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    if (!debugDrawer->debugFBO) {
-        glGenFramebuffers(1, &debugDrawer->debugFBO);
-    }
+    // if (!debugDrawer->debugFBO) {
+    //     glGenFramebuffers(1, &debugDrawer->debugFBO);
+    // }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, debugDrawer->debugFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, debugDrawer->debugTexture, 0);
-
-    glViewport(0, 0, width, height);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    
-
-    for (auto &dw : worlds->worlds) {
-        for (auto &cc : characterControllers) {
-            auto stopZ = cc->ghostObject->getUserIndex2();
-            auto v = cc->character->getLinearVelocity();
-            if (stopZ > 0 && v.getZ() < 0 && cc->ghostObject->getUserIndex() >= 0) {                
-                cc->character->setWalkDirection(btVector3(v.getX(), v.getY(), 0.0f));
-            }
-            if (stopZ < 0 && v.getZ() > 0 && cc->ghostObject->getUserIndex() >= 0) {
-                cc->character->setWalkDirection(btVector3(v.getX(), v.getY(), 0.0f));
-            }
-            cc->character->preStep(dw.second->dynamicsWorld);
-            cc->character->playerStep(dw.second->dynamicsWorld, 1);
-            
-            cc->character->setWalkDirection(btVector3(0.0f, 0.0f, 0.0f));
-
-            btVector3 pos = cc->ghostObject->getWorldTransform().getOrigin();
-            
-            // printf("ghost pos: %f, %f, %f\n", pos.getX(), pos.getY(), pos.getZ());
-        }
-        float timeStep = deltaTime;
-        float fixedTimeStep = 1.0f / 60.0f;
-        dw.second->dynamicsWorld->stepSimulation(timeStep, 10, fixedTimeStep);   
-        if (false && debugDrawer) {
-            std::vector<float> prepD;
-            for (auto d : viewMatrix) {
-                auto v = chaiscript::boxed_cast<float>(d);
-                prepD.push_back(v);
-            }
-
-            btVector3 gravity = dw.second->dynamicsWorld->getGravity();
-            // printf("Gravity: %f, %f, %f\n", gravity.getX(), gravity.getY(), gravity.getZ());   
-
-            btVector3 min, max;
-            min.setValue(FLT_MAX, FLT_MAX, FLT_MAX);
-            max.setValue(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-
-            for (int i = 0; i < dw.second->dynamicsWorld->getNumCollisionObjects(); i++) {
-                btCollisionObject *obj = dw.second->dynamicsWorld->getCollisionObjectArray()[i];
-                btVector3 aabbMin, aabbMax;
-                obj->getCollisionShape()->getAabb(obj->getWorldTransform(), aabbMin, aabbMax);
-
-                min.setMin(aabbMin);
-                max.setMax(aabbMax);
-            }
-
-            // Calculate the center and size of the bounding box
-            btVector3 center = (min + max) * 0.5;
-            btVector3 size = max - min;
-
-            // Set the camera target to the center of the geometry
-            debugDrawer->cameraTarget = glm::vec3(-prepD[12], prepD[13]*0.4f, prepD[14]*2.0f);
-
-            // Position the camera far enough to fit the geometry
-            float maxDimension = std::max(size.getX(), std::max(size.getY(), size.getZ()));
-            float horizontalFOV = 2.0f * atan(tan(glm::radians(debugDrawer->fov) / 2.0f) * debugDrawer->aspectRatio);
-            float distance = maxDimension / (2.0f * tan(horizontalFOV / 2.0f)) / 2.0f; // Adjust the divisor to control the distance
-            debugDrawer->cameraPosition = glm::vec3(-prepD[12], -prepD[13]*2.4f, -prepD[14]/0.4f);
-            
-            debugDrawer->fov = 7.0f; // Set the field of view
-
-            // Ensure the up vector is correct
-            debugDrawer->upVector = glm::vec3(0.0f, 1.0f, 0.0f);
-
-            // Adjust the near and far planes
-            debugDrawer->nearPlane = 0.1f;
-            // debugDrawer->farPlane = distance + maxDimension * 2.0f;
-            debugDrawer->farPlane = 100.0f;
-
-            // Set the projection matrix
-            glMatrixMode(GL_PROJECTION);
-            glLoadIdentity();
-            glm::mat4 projection = glm::perspective(glm::radians(debugDrawer->fov), debugDrawer->aspectRatio, debugDrawer->nearPlane, debugDrawer->farPlane);
-            glLoadMatrixf(glm::value_ptr(projection));
-
-            // Set the view matrix
-            glMatrixMode(GL_MODELVIEW);
-            glLoadIdentity();
-            glm::mat4 view = glm::lookAt(debugDrawer->cameraPosition, debugDrawer->cameraTarget, debugDrawer->upVector);
-            glLoadMatrixf(glm::value_ptr(view));
-            
-            // printf("Camera Position: %f, %f, %f\n", debugDrawer->cameraPosition.x, debugDrawer->cameraPosition.y, debugDrawer->cameraPosition.z);
-            // printf("Camera Target: %f, %f, %f\n", debugDrawer->cameraTarget.x, debugDrawer->cameraTarget.y, debugDrawer->cameraTarget.z);
-            // printf("Up Vector: %f, %f, %f\n", debugDrawer->upVector.x, debugDrawer->upVector.y, debugDrawer->upVector.z);
-
-            // printf("Bounding Box Min: %f, %f, %f\n", min.getX(), min.getY(), min.getZ());
-            // printf("Bounding Box Max: %f, %f, %f\n", max.getX(), max.getY(), max.getZ());
-
-            // Perform debug drawing
-            dw.second->dynamicsWorld->debugDrawWorld();
-
-            // test();
-        }
-    }    
-
-    if (buffer == nullptr) {       
-        buffer = new uint8_t[width * height * 4];
-    }
-    // Read the pixels from the framebuffer
     // glBindFramebuffer(GL_FRAMEBUFFER, debugDrawer->debugFBO);
-    // glReadBuffer(ChaiLove::getInstance()->chai_gfx.COLORATTACH);
+    // glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, debugDrawer->debugTexture, 0);
+
+    // glViewport(0, 0, width, height);
+    // glEnable(GL_BLEND);
+    // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    // glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
 
-    // Flip framebuffer vertically
-    for (int y = 0; y < height / 2; ++y) {
-        int oppositeY = height - 1 - y;
-        for (int x = 0; x < width * 4; ++x) {
-            std::swap(buffer[y * width * 4 + x], buffer[oppositeY * width * 4 + x]);
-        }
-    }
-    // glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // for (auto &dw : worlds->worlds) {
+    //     for (auto &cc : characterControllers) {
+    //         auto stopZ = cc->ghostObject->getUserIndex2();
+    //         auto v = cc->character->getLinearVelocity();
+    //         if (stopZ > 0 && v.getZ() < 0 && cc->ghostObject->getUserIndex() >= 0) {                
+    //             cc->character->setWalkDirection(btVector3(v.getX(), v.getY(), 0.0f));
+    //         }
+    //         if (stopZ < 0 && v.getZ() > 0 && cc->ghostObject->getUserIndex() >= 0) {
+    //             cc->character->setWalkDirection(btVector3(v.getX(), v.getY(), 0.0f));
+    //         }
+    //         cc->character->preStep(dw.second->dynamicsWorld);
+    //         cc->character->playerStep(dw.second->dynamicsWorld, 1);
+            
+    //         cc->character->setWalkDirection(btVector3(0.0f, 0.0f, 0.0f));
 
-    return buffer;
+    //         btVector3 pos = cc->ghostObject->getWorldTransform().getOrigin();
+            
+    //         // printf("ghost pos: %f, %f, %f\n", pos.getX(), pos.getY(), pos.getZ());
+    //     }
+    //     float timeStep = deltaTime;
+    //     float fixedTimeStep = 1.0f / 60.0f;
+    //     dw.second->dynamicsWorld->stepSimulation(timeStep, 10, fixedTimeStep);   
+    //     if (false && debugDrawer) {
+    //         std::vector<float> prepD;
+    //         for (auto d : viewMatrix) {
+    //             auto v = chaiscript::boxed_cast<float>(d);
+    //             prepD.push_back(v);
+    //         }
+
+    //         btVector3 gravity = dw.second->dynamicsWorld->getGravity();
+    //         // printf("Gravity: %f, %f, %f\n", gravity.getX(), gravity.getY(), gravity.getZ());   
+
+    //         btVector3 min, max;
+    //         min.setValue(FLT_MAX, FLT_MAX, FLT_MAX);
+    //         max.setValue(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+
+    //         for (int i = 0; i < dw.second->dynamicsWorld->getNumCollisionObjects(); i++) {
+    //             btCollisionObject *obj = dw.second->dynamicsWorld->getCollisionObjectArray()[i];
+    //             btVector3 aabbMin, aabbMax;
+    //             obj->getCollisionShape()->getAabb(obj->getWorldTransform(), aabbMin, aabbMax);
+
+    //             min.setMin(aabbMin);
+    //             max.setMax(aabbMax);
+    //         }
+
+    //         // Calculate the center and size of the bounding box
+    //         btVector3 center = (min + max) * 0.5;
+    //         btVector3 size = max - min;
+
+    //         // Set the camera target to the center of the geometry
+    //         debugDrawer->cameraTarget = glm::vec3(-prepD[12], prepD[13]*0.4f, prepD[14]*2.0f);
+
+    //         // Position the camera far enough to fit the geometry
+    //         float maxDimension = std::max(size.getX(), std::max(size.getY(), size.getZ()));
+    //         float horizontalFOV = 2.0f * atan(tan(glm::radians(debugDrawer->fov) / 2.0f) * debugDrawer->aspectRatio);
+    //         float distance = maxDimension / (2.0f * tan(horizontalFOV / 2.0f)) / 2.0f; // Adjust the divisor to control the distance
+    //         debugDrawer->cameraPosition = glm::vec3(-prepD[12], -prepD[13]*2.4f, -prepD[14]/0.4f);
+            
+    //         debugDrawer->fov = 7.0f; // Set the field of view
+
+    //         // Ensure the up vector is correct
+    //         debugDrawer->upVector = glm::vec3(0.0f, 1.0f, 0.0f);
+
+    //         // Adjust the near and far planes
+    //         debugDrawer->nearPlane = 0.1f;
+    //         // debugDrawer->farPlane = distance + maxDimension * 2.0f;
+    //         debugDrawer->farPlane = 100.0f;
+
+    //         // Set the projection matrix
+    //         glMatrixMode(GL_PROJECTION);
+    //         glLoadIdentity();
+    //         glm::mat4 projection = glm::perspective(glm::radians(debugDrawer->fov), debugDrawer->aspectRatio, debugDrawer->nearPlane, debugDrawer->farPlane);
+    //         glLoadMatrixf(glm::value_ptr(projection));
+
+    //         // Set the view matrix
+    //         glMatrixMode(GL_MODELVIEW);
+    //         glLoadIdentity();
+    //         glm::mat4 view = glm::lookAt(debugDrawer->cameraPosition, debugDrawer->cameraTarget, debugDrawer->upVector);
+    //         glLoadMatrixf(glm::value_ptr(view));
+            
+    //         // printf("Camera Position: %f, %f, %f\n", debugDrawer->cameraPosition.x, debugDrawer->cameraPosition.y, debugDrawer->cameraPosition.z);
+    //         // printf("Camera Target: %f, %f, %f\n", debugDrawer->cameraTarget.x, debugDrawer->cameraTarget.y, debugDrawer->cameraTarget.z);
+    //         // printf("Up Vector: %f, %f, %f\n", debugDrawer->upVector.x, debugDrawer->upVector.y, debugDrawer->upVector.z);
+
+    //         // printf("Bounding Box Min: %f, %f, %f\n", min.getX(), min.getY(), min.getZ());
+    //         // printf("Bounding Box Max: %f, %f, %f\n", max.getX(), max.getY(), max.getZ());
+
+    //         // Perform debug drawing
+    //         dw.second->dynamicsWorld->debugDrawWorld();
+
+    //         // test();
+    //     }
+    // }    
+
+    // if (buffer == nullptr) {       
+    //     buffer = new uint8_t[width * height * 4];
+    // }
+    // // Read the pixels from the framebuffer
+    // // glBindFramebuffer(GL_FRAMEBUFFER, debugDrawer->debugFBO);
+    // // glReadBuffer(ChaiLove::getInstance()->chai_gfx.COLORATTACH);
+    
+    // glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+
+    // // Flip framebuffer vertically
+    // for (int y = 0; y < height / 2; ++y) {
+    //     int oppositeY = height - 1 - y;
+    //     for (int x = 0; x < width * 4; ++x) {
+    //         std::swap(buffer[y * width * 4 + x], buffer[oppositeY * width * 4 + x]);
+    //     }
+    // }
+    // // glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // return buffer;
 }
 
 void chai_collisions::debugDraw()
 {    
-    printf("Debug Draw Texture: %d\n", debugDrawer->debugTexture);
-    // Render texture
-    // auto cg = ChaiLove::getInstance()->chai_gfx;
-    // auto fb = cg.instance->hw_render.get_current_framebuffer();
-    // glBindFramebuffer(GL_FRAMEBUFFER, 0); // Switch to window framebuffer
-    glViewport(0, 0, 1920, 1080);
-    // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // printf("Debug Draw Texture: %d\n", debugDrawer->debugTexture);
+    // // Render texture
+    // // auto cg = ChaiLove::getInstance()->chai_gfx;
+    // // auto fb = cg.instance->hw_render.get_current_framebuffer();
+    // // glBindFramebuffer(GL_FRAMEBUFFER, 0); // Switch to window framebuffer
+    // glViewport(0, 0, 1920, 1080);
+    // // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, debugDrawer->debugTexture);
+    // glEnable(GL_TEXTURE_2D);
+    // glBindTexture(GL_TEXTURE_2D, debugDrawer->debugTexture);
 
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(0, 1920, 0, 1080, -1, 1);
+    // glMatrixMode(GL_PROJECTION);
+    // glLoadIdentity();
+    // glOrtho(0, 1920, 0, 1080, -1, 1);
 
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
+    // glMatrixMode(GL_MODELVIEW);
+    // glLoadIdentity();
 
-    glBegin(GL_QUADS);
-    glTexCoord2f(0.0f, 0.0f); glVertex2f(0.0f, 0.0f);
-    glTexCoord2f(1.0f, 0.0f); glVertex2f(1920.0f, 0.0f);
-    glTexCoord2f(1.0f, 1.0f); glVertex2f(1920.0f, 1080.0f);
-    glTexCoord2f(0.0f, 1.0f); glVertex2f(0.0f, 1080.0f);
-    glEnd();   
-    glDisable(GL_TEXTURE_2D);
+    // glBegin(GL_QUADS);
+    // glTexCoord2f(0.0f, 0.0f); glVertex2f(0.0f, 0.0f);
+    // glTexCoord2f(1.0f, 0.0f); glVertex2f(1920.0f, 0.0f);
+    // glTexCoord2f(1.0f, 1.0f); glVertex2f(1920.0f, 1080.0f);
+    // glTexCoord2f(0.0f, 1.0f); glVertex2f(0.0f, 1080.0f);
+    // glEnd();   
+    // glDisable(GL_TEXTURE_2D);
 }
 
 void chai_collisions::process(float deltaTime)
@@ -1159,72 +1160,72 @@ void chai_collisions::process(float deltaTime)
     // }
 }
 void chai_collisions::test() {
-    btBroadphaseInterface *broadphase = new btDbvtBroadphase();
-    btDefaultCollisionConfiguration *collisionConfiguration = new btDefaultCollisionConfiguration();
-    btCollisionDispatcher *dispatcher = new btCollisionDispatcher(collisionConfiguration);
-    btSequentialImpulseConstraintSolver *solver = new btSequentialImpulseConstraintSolver();
-    btDiscreteDynamicsWorld *dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
-    dynamicsWorld->setGravity(btVector3(0, -10, 0));
-    btCollisionShape *groundShape = new btStaticPlaneShape(btVector3(0, 1, 0), 1);
-    btCollisionShape *fallShape = new btSphereShape(1);
-    btDefaultMotionState *groundMotionState = new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, -1, 0)));
-    btRigidBody::btRigidBodyConstructionInfo groundRigidBodyCI(0, groundMotionState, groundShape, btVector3(0, 0, 0));
-    btRigidBody *groundRigidBody = new btRigidBody(groundRigidBodyCI);
-    dynamicsWorld->addRigidBody(groundRigidBody);
-    btDefaultMotionState *fallMotionState = new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, 50, 0)));
-    btScalar mass = 1;
-    btVector3 fallInertia(0, 0, 0);
-    fallShape->calculateLocalInertia(mass, fallInertia);
-    btRigidBody::btRigidBodyConstructionInfo fallRigidBodyCI(mass, fallMotionState, fallShape, fallInertia);
-    btRigidBody *fallRigidBody = new btRigidBody(fallRigidBodyCI);
-    dynamicsWorld->addRigidBody(fallRigidBody);
-    // Initialize the debug drawer
-    // if (!debugDrawer) {
-    //     debugDrawer = new OpenGLDebugDrawer();
-    //     debugDrawer->setDebugMode(btIDebugDraw::DBG_DrawWireframe | btIDebugDraw::DBG_DrawAabb);
+    // btBroadphaseInterface *broadphase = new btDbvtBroadphase();
+    // btDefaultCollisionConfiguration *collisionConfiguration = new btDefaultCollisionConfiguration();
+    // btCollisionDispatcher *dispatcher = new btCollisionDispatcher(collisionConfiguration);
+    // btSequentialImpulseConstraintSolver *solver = new btSequentialImpulseConstraintSolver();
+    // btDiscreteDynamicsWorld *dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
+    // dynamicsWorld->setGravity(btVector3(0, -10, 0));
+    // btCollisionShape *groundShape = new btStaticPlaneShape(btVector3(0, 1, 0), 1);
+    // btCollisionShape *fallShape = new btSphereShape(1);
+    // btDefaultMotionState *groundMotionState = new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, -1, 0)));
+    // btRigidBody::btRigidBodyConstructionInfo groundRigidBodyCI(0, groundMotionState, groundShape, btVector3(0, 0, 0));
+    // btRigidBody *groundRigidBody = new btRigidBody(groundRigidBodyCI);
+    // dynamicsWorld->addRigidBody(groundRigidBody);
+    // btDefaultMotionState *fallMotionState = new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, 50, 0)));
+    // btScalar mass = 1;
+    // btVector3 fallInertia(0, 0, 0);
+    // fallShape->calculateLocalInertia(mass, fallInertia);
+    // btRigidBody::btRigidBodyConstructionInfo fallRigidBodyCI(mass, fallMotionState, fallShape, fallInertia);
+    // btRigidBody *fallRigidBody = new btRigidBody(fallRigidBodyCI);
+    // dynamicsWorld->addRigidBody(fallRigidBody);
+    // // Initialize the debug drawer
+    // // if (!debugDrawer) {
+    // //     debugDrawer = new OpenGLDebugDrawer();
+    // //     debugDrawer->setDebugMode(btIDebugDraw::DBG_DrawWireframe | btIDebugDraw::DBG_DrawAabb);
+    // // }
+    // dynamicsWorld->setDebugDrawer(debugDrawer);
+    // // Set the projection matrix
+    // glMatrixMode(GL_PROJECTION);
+    // glLoadIdentity();
+    // glm::mat4 projection = glm::perspective(glm::radians(debugDrawer->fov), debugDrawer->aspectRatio, debugDrawer->nearPlane, debugDrawer->farPlane);
+    // glLoadMatrixf(glm::value_ptr(projection));
+
+    // // Set the view matrix
+    // glMatrixMode(GL_MODELVIEW);
+    // glLoadIdentity();
+    // glm::mat4 view = glm::lookAt(debugDrawer->cameraPosition, debugDrawer->cameraTarget, debugDrawer->upVector);
+    // glLoadMatrixf(glm::value_ptr(view));
+    // for (int i = 0; i < 300; i++) {
+    //     dynamicsWorld->stepSimulation(1 / 60.f, 10);
+
+    //     // print positions of all objects
+    //     for (int j = dynamicsWorld->getNumCollisionObjects() - 1; j >= 0; j--) {
+    //         btCollisionObject *obj = dynamicsWorld->getCollisionObjectArray()[j];
+    //         btRigidBody *body = btRigidBody::upcast(obj);
+    //         btTransform trans;
+    //         if (body && body->getMotionState()) {
+    //             body->getMotionState()->getWorldTransform(trans);
+    //         } else {
+    //             trans = obj->getWorldTransform();
+    //         }
+    //         printf("world pos object %d = %f,%f,%f\n", j, float(trans.getOrigin().getX()), float(trans.getOrigin().getY()), float(trans.getOrigin().getZ()));
+    //         // Perform debug drawing
+    //         dynamicsWorld->debugDrawWorld();
+    //     }
+    //     // break;
     // }
-    dynamicsWorld->setDebugDrawer(debugDrawer);
-    // Set the projection matrix
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glm::mat4 projection = glm::perspective(glm::radians(debugDrawer->fov), debugDrawer->aspectRatio, debugDrawer->nearPlane, debugDrawer->farPlane);
-    glLoadMatrixf(glm::value_ptr(projection));
-
-    // Set the view matrix
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    glm::mat4 view = glm::lookAt(debugDrawer->cameraPosition, debugDrawer->cameraTarget, debugDrawer->upVector);
-    glLoadMatrixf(glm::value_ptr(view));
-    for (int i = 0; i < 300; i++) {
-        dynamicsWorld->stepSimulation(1 / 60.f, 10);
-
-        // print positions of all objects
-        for (int j = dynamicsWorld->getNumCollisionObjects() - 1; j >= 0; j--) {
-            btCollisionObject *obj = dynamicsWorld->getCollisionObjectArray()[j];
-            btRigidBody *body = btRigidBody::upcast(obj);
-            btTransform trans;
-            if (body && body->getMotionState()) {
-                body->getMotionState()->getWorldTransform(trans);
-            } else {
-                trans = obj->getWorldTransform();
-            }
-            printf("world pos object %d = %f,%f,%f\n", j, float(trans.getOrigin().getX()), float(trans.getOrigin().getY()), float(trans.getOrigin().getZ()));
-            // Perform debug drawing
-            dynamicsWorld->debugDrawWorld();
-        }
-        // break;
-    }
-    dynamicsWorld->removeRigidBody(fallRigidBody);
-    delete fallRigidBody;
-    dynamicsWorld->removeRigidBody(groundRigidBody);
-    delete groundRigidBody;
-    delete fallShape;
-    delete groundShape;
-    delete dynamicsWorld;
-    delete solver;
-    delete collisionConfiguration;
-    delete dispatcher;
-    delete broadphase;
-    // delete debugDrawer;
+    // dynamicsWorld->removeRigidBody(fallRigidBody);
+    // delete fallRigidBody;
+    // dynamicsWorld->removeRigidBody(groundRigidBody);
+    // delete groundRigidBody;
+    // delete fallShape;
+    // delete groundShape;
+    // delete dynamicsWorld;
+    // delete solver;
+    // delete collisionConfiguration;
+    // delete dispatcher;
+    // delete broadphase;
+    // // delete debugDrawer;
 }
 } // namespace love

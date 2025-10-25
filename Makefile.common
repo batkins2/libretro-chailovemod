@@ -37,9 +37,6 @@ ifneq ($(STATIC_LINKING), 1)
 		$(CORE_DIR)/vendor/libretro-common/streams/file_stream.c \
 		$(CORE_DIR)/vendor/libretro-common/string/stdstring.c \
 		$(CORE_DIR)/vendor/libretro-common/vfs/vfs_implementation.c \
-		$(CORE_DIR)/vendor/libretro-common/glsm/glsm.c \
-		$(CORE_DIR)/vendor/libretro-common/glsym/rglgen.c \
-		$(CORE_DIR)/vendor/libretro-common/glsym/glsym_gl.c \
 	)
     # Ensure the sinc_resampler_neon is available for ARM NEON devices.
 	SOURCES_S += $(CORE_DIR)/vendor/libretro-common/audio/resampler/drivers/sinc_resampler_neon.S
@@ -113,10 +110,7 @@ FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/video/khronos
 FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/video/windows
 FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/test_sdlgfx
 FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/software
-FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengl
-FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengles
-FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengles2
-
+FLAGS += -I$(CORE_DIR)/vendor/sdl2-libretro/src/render/vulkan
 SOURCES_C += $(wildcard \
 	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL2_gfx-1.0.3/*.c \
 	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL2_ttf-2.0.14/*.c \
@@ -126,9 +120,7 @@ SOURCES_C += $(wildcard \
 	$(CORE_DIR)/vendor/sdl2-libretro/libretro-tests/LIBS/SDL_image/external/libpng/arm/*.c \
 	$(CORE_DIR)/vendor/sdl2-libretro/src/render/*.c \
 	$(CORE_DIR)/vendor/sdl2-libretro/src/render/software/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengl/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengles/*.c \
-	$(CORE_DIR)/vendor/sdl2-libretro/src/render/opengles2/*.c \
+	$(CORE_DIR)/vendor/sdl2-libretro/src/render/vulkan/*.c \
 	$(CORE_DIR)/vendor/sdl2-libretro/src/atomic/*.c \
 	$(CORE_DIR)/vendor/physfs/extras/physfsrwops.c \
 	$(CORE_DIR)/src/love/data/libraries/lz4/*.c \
@@ -171,7 +163,7 @@ SOURCES_CXX := $(wildcard \
 	$(CORE_DIR)/src/love/image/*.cpp \
 	$(CORE_DIR)/src/love/image/magpie/*.cpp \
 	$(CORE_DIR)/src/love/math/*.cpp \
-	$(CORE_DIR)/src/love/opengl/*.cpp \
+	$(CORE_DIR)/src/love/vulkan/*.cpp \
 	$(CORE_DIR)/src/love/sound/*.cpp \
 	$(CORE_DIR)/src/love/sound/lullaby/*.cpp \
 	$(CORE_DIR)/src/love/thread/*.cpp \
@@ -187,8 +179,9 @@ SOURCES_CXX := $(wildcard \
 	$(CORE_DIR)/src/love/libraries/glslang/glslang/MachineIndependent/preprocessor/*.cpp \
 	$(CORE_DIR)/src/love/libraries/glslang/glslang/ResourceLimits/*.cpp \
 	$(CORE_DIR)/src/love/libraries/glslang/glslang/GenericCodeGen/*.cpp \
+	$(CORE_DIR)/src/love/libraries/glslang/SPIRV/*.cpp \
 	$(CORE_DIR)/src/love/libraries/lodepng/*.cpp \
-	$(CORE_DIR)/src/love/opengl/libraries/glad/*.cpp \
+	$(CORE_DIR)/src/love/vulkan/spirv_cross/*.cpp \
 )
 SOURCES_C += $(CORE_DIR)/src/physfs_platform_libretro.c
 SOURCES_S =
@@ -199,11 +192,12 @@ FLAGS += -I$(CORE_DIR)/src/love/libraries/tinyexr
 FLAGS += -I$(CORE_DIR)/src/love/libraries/lodepng
 
 # glslang
+
+FLAGS += -I$(CORE_DIR)/src/love/libraries/glslang/SPIRV
 FLAGS += -I$(CORE_DIR)/src/love/libraries/glslang/glslang/Include
 FLAGS += -I$(CORE_DIR)/src/love/libraries/glslang/glslang/Public
 FLAGS += -I$(CORE_DIR)/src/love/libraries/glslang/glslang/MachineIndependent
 
-FLAGS += -I$(CORE_DIR)/src/love/opengl/libraries/glad
 # FLAGS += -I$(CORE_DIR)/src/love/joystick/sdl
 
 # random
@@ -260,8 +254,8 @@ FLAGS += -I$(CORE_DIR)/vendor/physfs/extras
 # 	FLAGS += -D__MACH__ -D__APPLE__ -DPHYSFS_PLATFORM_APPLE
 # endif
 
-FLAGS += -I$(CORE_DIR)/vendor/libretro-common/include/glsm
-FLAGS += -I$(CORE_DIR)/vendor/libretro-common/include/glsym
+# FLAGS += -I$(CORE_DIR)/vendor/libretro-common/include/glsm
+# FLAGS += -I$(CORE_DIR)/vendor/libretro-common/include/glsym
 
 # SDL_tty
 FLAGS += -I$(CORE_DIR)/vendor/SDL2_tty/include/SDL_tty

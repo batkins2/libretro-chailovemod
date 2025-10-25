@@ -9,20 +9,21 @@
 #include "LibretroLog.h"
 #include <retro_dirent.h>
 #include <streams/file_stream.h>
+#include "libretro_vulkan.h"
 
-#if defined(HAVE_PSGL)
-#define RARCH_GL_FRAMEBUFFER GL_FRAMEBUFFER_OES
-#define RARCH_GL_FRAMEBUFFER_COMPLETE GL_FRAMEBUFFER_COMPLETE_OES
-#define RARCH_GL_COLOR_ATTACHMENT0 GL_COLOR_ATTACHMENT0_EXT
-#elif defined(OSX_PPC)
-#define RARCH_GL_FRAMEBUFFER GL_FRAMEBUFFER_EXT
-#define RARCH_GL_FRAMEBUFFER_COMPLETE GL_FRAMEBUFFER_COMPLETE_EXT
-#define RARCH_GL_COLOR_ATTACHMENT0 GL_COLOR_ATTACHMENT0_EXT
-#else
-#define RARCH_GL_FRAMEBUFFER GL_FRAMEBUFFER
-#define RARCH_GL_FRAMEBUFFER_COMPLETE GL_FRAMEBUFFER_COMPLETE
-#define RARCH_GL_COLOR_ATTACHMENT0 GL_COLOR_ATTACHMENT0
-#endif
+// #if defined(HAVE_PSGL)
+// #define RARCH_GL_FRAMEBUFFER GL_FRAMEBUFFER_OES
+// #define RARCH_GL_FRAMEBUFFER_COMPLETE GL_FRAMEBUFFER_COMPLETE_OES
+// #define RARCH_GL_COLOR_ATTACHMENT0 GL_COLOR_ATTACHMENT0_EXT
+// #elif defined(OSX_PPC)
+// #define RARCH_GL_FRAMEBUFFER GL_FRAMEBUFFER_EXT
+// #define RARCH_GL_FRAMEBUFFER_COMPLETE GL_FRAMEBUFFER_COMPLETE_EXT
+// #define RARCH_GL_COLOR_ATTACHMENT0 GL_COLOR_ATTACHMENT0_EXT
+// #else
+// #define RARCH_GL_FRAMEBUFFER GL_FRAMEBUFFER
+// #define RARCH_GL_FRAMEBUFFER_COMPLETE GL_FRAMEBUFFER_COMPLETE
+// #define RARCH_GL_COLOR_ATTACHMENT0 GL_COLOR_ATTACHMENT0
+// #endif
 
 
 static void fallback_log(enum retro_log_level level,
@@ -30,7 +31,14 @@ static void fallback_log(enum retro_log_level level,
 
 static retro_video_refresh_t video_cb;
 static struct retro_hw_render_callback hw_render;
+static const struct retro_hw_render_interface_vulkan *vulkan;
 retro_log_printf_t log_cb = fallback_log;
+
+static struct {
+    uint32_t index;
+    VkImage images[8];  // Adjust size as needed
+    VkCommandBuffer cmd[8];
+} vk;
 
 // This is needed to allow SDL-libretro to compile.
 // @see SDL_LIBRETROaudio.c:37
@@ -460,9 +468,16 @@ size_t retro_get_memory_size(unsigned id) {
 static void context_reset(void)
 {
 
+	if (!ChaiLove::environ_cb(RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE, (void**)&vulkan) || !vulkan)
+	{
+		fprintf(stderr, "Failed to get HW rendering interface!\n");
+		return;
+	}
+
 	ChaiLove::getInstance()->chai_gfx.hw_render = hw_render;
-	ChaiLove::getInstance()->chai_gfx.FRAMEBUFFER = RARCH_GL_FRAMEBUFFER;
-	ChaiLove::getInstance()->chai_gfx.COLORATTACH = RARCH_GL_COLOR_ATTACHMENT0;
+	ChaiLove::getInstance()->chai_gfx.setVulkanInterface(reinterpret_cast<const love::retro_hw_render_interface_vulkan*>(vulkan));
+	// ChaiLove::getInstance()->chai_gfx.FRAMEBUFFER = RARCH_GL_FRAMEBUFFER;
+	// ChaiLove::getInstance()->chai_gfx.COLORATTACH = RARCH_GL_COLOR_ATTACHMENT0;
 	// printf("context_reset\n");
 	// printf("FRAMEBUFFER: %d\n", RARCH_GL_FRAMEBUFFER);
 	// printf("hw_render: %d\n", hw_render.get_current_framebuffer());
@@ -479,7 +494,7 @@ static void context_destroy(void)
 
 static bool retro_init_hw_context(void)
 {
-   hw_render.context_type = RETRO_HW_CONTEXT_OPENGL_CORE;
+   hw_render.context_type = RETRO_HW_CONTEXT_VULKAN;
    hw_render.version_major = 3;
    hw_render.version_minor = 1;
 
@@ -592,10 +607,10 @@ void retro_run(void) {
 	app->update();
 
 	// Clear the color and depth buffers
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Set the clear color (optional, if you want to change the background color)
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    // glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
 	// Render the game.
 	app->draw();
@@ -603,14 +618,20 @@ void retro_run(void) {
 	// Copy the video buffer to the screen.
 	// video_cb(app->videoBuffer, app->config.window.width, app->config.window.height, app->config.window.width << 2);
 	if (!app->event.m_pauserendering) {
-		glUseProgram(0);
-		// glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, hw_render.get_current_framebuffer());
-		glBlitFramebuffer(0, 0, app->chai_gfx.width, app->chai_gfx.height,
-				0, 0, app->chai_gfx.width, app->chai_gfx.height,
-				GL_COLOR_BUFFER_BIT, GL_NEAREST);
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+				
+		vulkan->wait_sync_index(vulkan->handle);
+
+		vk.index = vulkan->get_sync_index(vulkan->handle);
+		
+		auto vulkanGfx = reinterpret_cast<love::gfx::vulkan::Graphics*>(&app->chai_gfx);
+		retro_vulkan_image image;
+		vulkanGfx->present(nullptr);
+		image.image_view = vulkanGfx->getCurrentSwapchainImageView();
+		image.image_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		image.create_info = vulkanGfx->getCurrentSwapchainImageViewCreateInfo();
+
+		vulkan->set_image(vulkan->handle, &image, 0, NULL, VK_QUEUE_FAMILY_IGNORED);
+   		vulkan->set_command_buffers(vulkan->handle, 1, &vk.cmd[vk.index]);
 		video_cb(RETRO_HW_FRAME_BUFFER_VALID, app->chai_gfx.width, app->chai_gfx.height, 0);
 	}
 

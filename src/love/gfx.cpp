@@ -105,25 +105,25 @@ bool isDebugEnabled()
 
 love::Type Graphics::type("graphics", &Module::type);
 
-namespace opengl { extern love::gfx::Graphics *createInstance(); }
+// namespace opengl { extern love::gfx::Graphics *createInstance(); }
 // #ifdef LOVE_GRAPHICS_METAL
 // namespace metal { extern love::gfx::Graphics *createInstance(); }
 // #endif
 // #ifdef LOVE_GRAPHICS_VULKAN
-// namespace vulkan { extern love::gfx::Graphics* createInstance(); }
+namespace vulkan { extern love::gfx::Graphics* createInstance(); }
 // #endif
 
 static const Renderer rendererOrder[] = {
 	// RENDERER_METAL,
-	RENDERER_OPENGL,
-	// RENDERER_VULKAN,
+	// RENDERER_OPENGL,
+	RENDERER_VULKAN,
 };
 
 static std::vector<Renderer> defaultRenderers =
 {
 	// RENDERER_METAL,
-	RENDERER_OPENGL,
-	// RENDERER_VULKAN,
+	// RENDERER_OPENGL,
+	RENDERER_VULKAN,
 };
 
 static std::vector<Renderer> _renderers = defaultRenderers;
@@ -158,11 +158,11 @@ Graphics *Graphics::createInstance()
 				continue;
 
 // #ifdef LOVE_GRAPHICS_VULKAN
-// 			if (r == RENDERER_VULKAN)
-// 				instance = vulkan::createInstance();
+			if (r == RENDERER_VULKAN)
+				instance = vulkan::createInstance();
 // #endif
-			if (r == RENDERER_OPENGL)
-				instance = opengl::createInstance();
+			// if (r == RENDERER_OPENGL)
+			// 	instance = opengl::createInstance();
 // #ifdef LOVE_GRAPHICS_METAL
 // 			if (r == RENDERER_METAL)
 // 				instance = metal::createInstance();
@@ -257,6 +257,17 @@ Graphics::~Graphics()
 	clearTemporaryResources();
 
 	Shader::deinitialize();
+}
+
+bool Graphics::findVertexAttributes(VertexAttributesID id, VertexAttributes &attributes)
+{
+	int index = id.id - 1;
+
+	if (index < 0 || index >= (int)vertexAttributesDatabase.size())
+		return false;
+
+	attributes = vertexAttributesDatabase[index];
+	return true;
 }
 
 void Graphics::createQuadIndexBuffer()
@@ -2054,7 +2065,7 @@ void Graphics::flushBatchedDraws()
 	{
 		usedsizes[2] = sizeof(uint16) * sbstate.indexCount;
 
-		DrawIndexedCommand cmd(&attributes, &buffers, sbstate.indexBuffer);
+		DrawIndexedCommand cmd(&attributes, &buffers, static_cast<Resource *>(sbstate.indexBuffer));
 		cmd.primitiveType = sbstate.primitiveMode;
 		cmd.indexCount = sbstate.indexCount;
 		cmd.indexType = INDEX_UINT16;

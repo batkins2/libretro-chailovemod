@@ -37,6 +37,16 @@ namespace Layers
 	static constexpr JPH::ObjectLayer NUM_LAYERS = 4;
 };
 
+namespace Groups
+{
+    // Different collision groups for characters
+    static constexpr uint32_t CHARACTER_0 = 1; // 0001
+    static constexpr uint32_t CHARACTER_1 = 2; // 0010
+    static constexpr uint32_t CHARACTER_2 = 4; // 0100
+    static constexpr uint32_t CHARACTER_3 = 8; // 1000
+    static constexpr uint32_t ALL_CHARACTERS = CHARACTER_0 | CHARACTER_1 | CHARACTER_2 | CHARACTER_3; // 1111
+};
+
 class chai_collisions::MyContactListener : public JPH::ContactListener
 {
 private:
@@ -57,7 +67,7 @@ private:
     
 public:
     MyContactListener(chai_collisions* collisionSystem) : mCollisionSystem(collisionSystem) {}
-    
+
     virtual void OnContactAdded(const JPH::Body &inBody1, const JPH::Body &inBody2, const JPH::ContactManifold &inManifold, JPH::ContactSettings &ioSettings) override
     {
         if (inBody1.GetObjectLayer() == Layers::NON_MOVING || inBody2.GetObjectLayer() == Layers::NON_MOVING) {
@@ -88,12 +98,21 @@ public:
                         // Get manifold side contact points (-x or +x)
                         float normalX = inManifold.mWorldSpaceNormal.GetX();
                         float normalZ = inManifold.mWorldSpaceNormal.GetZ();
+                        // Get penetration depth
+                        float penetrationDepth = inManifold.mPenetrationDepth;
+                        printf("Contact normal for character %s: (%.2f, %.2f, %.2f)\n", cc->charId.c_str(), inManifold.mWorldSpaceNormal.GetX(), inManifold.mWorldSpaceNormal.GetY(), inManifold.mWorldSpaceNormal.GetZ());
                         // auto vel = cc->character->GetLinearVelocity();
                         if (normalZ < 0) {
-                            // printf("Front collision detected for character %s\n", cc->charId.c_str());
+                            printf("Front collision detected for character %s\n", cc->charId.c_str());
                             // cc->collidedZ = true;
+                            cc->perimeterPenetration = penetrationDepth;
+                        } else if (normalZ > 0) {
+                            printf("Back collision detected for character %s\n", cc->charId.c_str());
+                            // cc->collidedX = true;
+                            cc->perimeterPenetration = penetrationDepth;
                         } else {
                             cc->collidedZ = false;
+                            // cc->perimeterPenetration = 0.0f;
                         }
                         // Queue the event for processing after physics step
                         mPendingEvents.emplace_back(PendingEvent{cc, r, normalX, normalZ});
@@ -179,15 +198,15 @@ public:
             JPH::BodyID body2ID = inBody2.GetID();
             for (auto &cc : mCollisionSystem->characterControllers) {
                 if (cc->bodyID == body2ID && cc->charId.find("player") == std::string::npos) {
-                    cc->collidedX = true;
-                    cc->collidedZ = true;
+                    // cc->collidedX = true;
+                    // cc->collidedZ = true;
                     // printf("Character %s collided with character %d\n", cc->charId.c_str(), body1ID);
                     
                     // char2Index = i;
                 }
                 if (cc->bodyID == body1ID && cc->charId.find("player") == std::string::npos) {
-                    cc->collidedX = true;
-                    cc->collidedZ = true;
+                    // cc->collidedX = true;
+                    // cc->collidedZ = true;
                     // printf("Character %s collided with character %d\n", cc->charId.c_str(), body2ID);
                     
                 }
@@ -207,13 +226,18 @@ public:
                         // Get manifold side contact points (-x or +x)
                         float normalX = inManifold.mWorldSpaceNormal.GetX();
                         float normalZ = inManifold.mWorldSpaceNormal.GetZ();
+                        cc->collisionNormal = inManifold.mWorldSpaceNormal;
+                        float penetrationDepth = inManifold.mPenetrationDepth;
                         // auto vel = cc->character->GetLinearVelocity();
                         if (normalZ < 0) {
                             printf("Front collision detected for character %s\n", cc->charId.c_str());
-                            cc->collidedZ = true;
+                            // cc->collidedZ = true;
+                            cc->perimeterPenetration = penetrationDepth;
+
                         } else if (normalZ > 0) {
                             printf("Back collision detected for character %s\n", cc->charId.c_str());
-                            cc->collidedZ = true;
+                            // cc->collidedZ = true;
+                            cc->perimeterPenetration = penetrationDepth;
                         } else {
                             cc->collidedZ = false;
                         }
@@ -242,17 +266,19 @@ public:
         for (const auto& event : mPendingEvents) {
             // Now it's safe to modify physics bodies
             auto vel = bodyInterface.GetLinearVelocity(event.characterID->bodyID);
-            if (event.normalZ < 0) {
-                // vel.SetZ(200.0f);
-                // event.characterID->collidedZ = false; // Reset collision flag after processing
-                // bodyInterface.SetLinearVelocity(event.characterID->bodyID, vel);
-            }
-            vel.SetY(0); // Zero out Y component to avoid affecting vertical movement
+            
+            // if (event.normalZ != 0) {
+            //     vel.SetZ(event.normalZ);
+            //    // event.characterID->collidedZ = false; // Reset collision flag after processing
+            //     bodyInterface.SetLinearVelocity(event.characterID->bodyID, vel);
+            // }
             vel.SetZ(0);
+            vel.SetY(0); // Zero out Y component to avoid affecting vertical movement
+            
             if (event.normalX < 0 && vel.GetX() < 0) {
                 // Do nothing, allow movement
                 vel.SetX(vel.GetX() * 2.0f);
-            } else if (event.normalX < 0 && vel.GetX() > 0) {
+            } else if (event.normalX > 0 && vel.GetX() > 0) {
                 // Do nothing, allow movement
                 vel.SetX(vel.GetX() * 2.0f);
             } else {
@@ -273,8 +299,8 @@ public:
             vel1.SetZ(0);
             vel2.SetZ(0);
             printf("Character collision: Setting velocities to zero\n");
-            bodyInterface.SetLinearVelocity(event.character1ID, vel1);
-            bodyInterface.SetLinearVelocity(event.character2ID, vel2);
+            // bodyInterface.SetLinearVelocity(event.character1ID, vel1);
+            // bodyInterface.SetLinearVelocity(event.character2ID, vel2);
         }
 
         mPendingEvents.clear();
@@ -572,11 +598,11 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
                     vertices[7] = m.y;
                     vertices[8] = m.z;
                     if (false) {
-                        glBegin(GL_TRIANGLES);
-                        glVertex3f(vertices[0], vertices[1], vertices[2]);
-                        glVertex3f(vertices[3], vertices[4], vertices[5]);
-                        glVertex3f(vertices[6], vertices[7], vertices[8]);
-                        glEnd();    
+                        // glBegin(GL_TRIANGLES);
+                        // glVertex3f(vertices[0], vertices[1], vertices[2]);
+                        // glVertex3f(vertices[3], vertices[4], vertices[5]);
+                        // glVertex3f(vertices[6], vertices[7], vertices[8]);
+                        // glEnd();    
                     }
                     if (makeConvex) {
                         if (!isfinite(vertices[0]) || !isfinite(vertices[1]) || !isfinite(vertices[2]) ||
@@ -617,11 +643,11 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
                     vertices[7] = m.y;
                     vertices[8] = m.z;
                     if (false) {
-                        glBegin(GL_TRIANGLES);
-                        glVertex3f(vertices[0], vertices[1], vertices[2]);
-                        glVertex3f(vertices[3], vertices[4], vertices[5]);
-                        glVertex3f(vertices[6], vertices[7], vertices[8]);
-                        glEnd();    
+                        // glBegin(GL_TRIANGLES);
+                        // glVertex3f(vertices[0], vertices[1], vertices[2]);
+                        // glVertex3f(vertices[3], vertices[4], vertices[5]);
+                        // glVertex3f(vertices[6], vertices[7], vertices[8]);
+                        // glEnd();    
                     }                 
                     if (makeConvex) {
                         if (!isfinite(vertices[0]) || !isfinite(vertices[1]) || !isfinite(vertices[2]) ||
@@ -850,7 +876,7 @@ int chai_collisions::addCharacterController(int index, int meshRef, std::string 
     }
     settings->mShape = shapeResult.Get();
     settings->mFriction = 1.0f;
-
+    
     settings->mSupportingVolume = JPH::Plane(JPH::Vec3::sAxisY(), -0.5f); // Support plane
     
     // Create character (like in CharacterTest.cpp)
@@ -870,6 +896,12 @@ int chai_collisions::addCharacterController(int index, int meshRef, std::string 
 
     if (charId.find("player") != std::string::npos) {
         bodyInterface.SetUserData(bodyID, 1);
+        // JPH::CollisionGroup group;
+        // if (charId == "player0") group.SetGroupID(Groups::CHARACTER_0);
+        // if (charId == "player1") group.SetGroupID(Groups::CHARACTER_1);
+        // if (charId == "player2") group.SetGroupID(Groups::CHARACTER_2);
+        // if (charId == "player3") group.SetGroupID(Groups::CHARACTER_3);
+        // bodyInterface.SetCollisionGroup(bodyID, group);
     }
 
     // Store character reference in your CharacterController
@@ -986,19 +1018,50 @@ int chai_collisions::addBox(float x, float y, float z, float width, float height
     // Create a triangle mesh to represent the box in jolt physics
     JPH::TriangleList mesh;
 
-    // Create a triangle mesh to represent the box
-    mesh.push_back(JPH::Triangle(JPH::Vec3(-width / 2, -height / 2, -depth / 2), JPH::Vec3(width / 2, -height / 2, -depth / 2), JPH::Vec3(width / 2, height / 2, -depth / 2)));
-    mesh.push_back(JPH::Triangle(JPH::Vec3(-width / 2, -height / 2, -depth / 2), JPH::Vec3(width / 2, height / 2, -depth / 2), JPH::Vec3(-width / 2, height / 2, -depth / 2)));
-    mesh.push_back(JPH::Triangle(JPH::Vec3(-width / 2, -height / 2, depth / 2), JPH::Vec3(width / 2, -height / 2, depth / 2), JPH::Vec3(width / 2, height / 2, depth / 2)));
-    mesh.push_back(JPH::Triangle(JPH::Vec3(-width / 2, -height / 2, depth / 2), JPH::Vec3(width / 2, height / 2, depth / 2), JPH::Vec3(-width / 2, height / 2, depth / 2)));
-    mesh.push_back(JPH::Triangle(JPH::Vec3(-width / 2, -height / 2, -depth / 2), JPH::Vec3(width / 2, -height / 2, -depth / 2), JPH::Vec3(width / 2, -height / 2, depth / 2)));
-    mesh.push_back(JPH::Triangle(JPH::Vec3(-width / 2, -height / 2, -depth / 2), JPH::Vec3(width / 2, -height / 2, depth / 2), JPH::Vec3(-width / 2, -height / 2, depth / 2)));
-    mesh.push_back(JPH::Triangle(JPH::Vec3(-width / 2, height / 2, -depth / 2), JPH::Vec3(width / 2, height / 2, -depth / 2), JPH::Vec3(width / 2, height / 2, depth / 2)));
-    mesh.push_back(JPH::Triangle(JPH::Vec3(-width / 2, height / 2, -depth / 2), JPH::Vec3(width / 2, height / 2, depth / 2), JPH::Vec3(-width / 2, height / 2, depth / 2)));
-    mesh.push_back(JPH::Triangle(JPH::Vec3(-width / 2, -height / 2, -depth / 2), JPH::Vec3(-width / 2, height / 2, -depth / 2), JPH::Vec3(-width / 2, height / 2, depth / 2)));
-    mesh.push_back(JPH::Triangle(JPH::Vec3(-width / 2, -height / 2, -depth / 2), JPH::Vec3(-width / 2, height / 2, depth / 2), JPH::Vec3(-width / 2, -height / 2, depth / 2)));
-    mesh.push_back(JPH::Triangle(JPH::Vec3(width / 2, -height / 2, -depth / 2), JPH::Vec3(width / 2, height / 2, -depth / 2), JPH::Vec3(width / 2, height / 2, depth / 2)));
-    mesh.push_back(JPH::Triangle(JPH::Vec3(width / 2, -height / 2, -depth / 2), JPH::Vec3(width / 2, height / 2, depth / 2), JPH::Vec3(width / 2, -height / 2, depth / 2)));
+    // Box vertices in local space
+    JPH::Vec3 vertices[8] = {
+        JPH::Vec3(-width/2, -height/2, -depth/2), // 0
+        JPH::Vec3( width/2, -height/2, -depth/2), // 1
+        JPH::Vec3( width/2, -height/2,  depth/2), // 2
+        JPH::Vec3(-width/2, -height/2,  depth/2), // 3
+        JPH::Vec3(-width/2,  height/2, -depth/2), // 4
+        JPH::Vec3( width/2,  height/2, -depth/2), // 5
+        JPH::Vec3( width/2,  height/2,  depth/2), // 6
+        JPH::Vec3(-width/2,  height/2,  depth/2)  // 7
+    };
+
+    // Face definitions: each quad becomes 2 triangles
+    struct Face {
+        int indices[4]; // 4 vertices of the quad (counter-clockwise)
+    };
+    
+    Face faces[6] = {
+        {{0, 3, 2, 1}}, // Bottom: indices for quad vertices (CCW from bottom)
+        {{4, 5, 6, 7}}, // Top: indices for quad vertices (CCW from top)
+        {{0, 1, 5, 4}}, // Back: Z = -depth/2
+        {{2, 3, 7, 6}}, // Front: Z = +depth/2
+        {{0, 4, 7, 3}}, // Left: X = -width/2
+        {{1, 2, 6, 5}}  // Right: X = +width/2
+    };
+
+    // Generate triangles for each face
+    for (int f = 0; f < 6; f++) {
+        Face& face = faces[f];
+        
+        // First triangle: v0, v1, v2
+        mesh.push_back(JPH::Triangle(
+            vertices[face.indices[0]], 
+            vertices[face.indices[1]], 
+            vertices[face.indices[2]]
+        ));
+        
+        // Second triangle: v0, v2, v3
+        mesh.push_back(JPH::Triangle(
+            vertices[face.indices[0]], 
+            vertices[face.indices[2]], 
+            vertices[face.indices[3]]
+        ));
+    }
 
     // Create the mesh shape from settings
     JPH::MeshShapeSettings meshSettings(mesh, {JPH::PhysicsMaterial::sDefault});
@@ -1021,7 +1084,14 @@ int chai_collisions::addBox(float x, float y, float z, float width, float height
     bodySettings.mIsSensor = true; // Make it a sensor
     // Set gravity to zero
     bodySettings.mGravityFactor = 0.0f;
-    bodySettings.mFriction = 1.0f;
+    // JPH::CollisionGroup groupSettings;
+    // if (index == 0) groupSettings.SetGroupID(Groups::CHARACTER_0);
+    // if (index == 1) groupSettings.SetGroupID(Groups::CHARACTER_1);
+    // if (index == 2) groupSettings.SetGroupID(Groups::CHARACTER_2);
+    // if (index == 3) groupSettings.SetGroupID(Groups::CHARACTER_3);
+    // bodySettings.mCollisionGroup = groupSettings;
+
+    // bodySettings.mFriction = 1.0f;
     // bodySettings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
     // bodySettings.mMassPropertiesOverride.mMass = 1.0f; // Set
     auto ps = worlds->worlds[0]->physics_system;
@@ -1307,33 +1377,33 @@ public:
     
     virtual void DrawLine(JPH::RVec3Arg inFrom, JPH::RVec3Arg inTo, JPH::ColorArg inColor) override
     {
-        glBegin(GL_LINES);
-        glColor3f(inColor.r, inColor.g, inColor.b);
-        glVertex3f((float)inFrom.GetX(), (float)inFrom.GetY(), (float)inFrom.GetZ());
-        glVertex3f((float)inTo.GetX(), (float)inTo.GetY(), (float)inTo.GetZ());
-        glEnd();
+        // glBegin(GL_LINES);
+        // glColor3f(inColor.r, inColor.g, inColor.b);
+        // glVertex3f((float)inFrom.GetX(), (float)inFrom.GetY(), (float)inFrom.GetZ());
+        // glVertex3f((float)inTo.GetX(), (float)inTo.GetY(), (float)inTo.GetZ());
+        // glEnd();
     }
 
     virtual void DrawTriangle(JPH::RVec3Arg inV1, JPH::RVec3Arg inV2, JPH::RVec3Arg inV3, JPH::ColorArg inColor, ECastShadow inCastShadow) override
     {
-        glBegin(GL_TRIANGLES);
-        glColor3f(inColor.r, inColor.g, inColor.b);
-        glVertex3f((float)inV1.GetX(), (float)inV1.GetY(), (float)inV1.GetZ());
-        glVertex3f((float)inV2.GetX(), (float)inV2.GetY(), (float)inV2.GetZ());
-        glVertex3f((float)inV3.GetX(), (float)inV3.GetY(), (float)inV3.GetZ());
-        glEnd();
+        // glBegin(GL_TRIANGLES);
+        // glColor3f(inColor.r, inColor.g, inColor.b);
+        // glVertex3f((float)inV1.GetX(), (float)inV1.GetY(), (float)inV1.GetZ());
+        // glVertex3f((float)inV2.GetX(), (float)inV2.GetY(), (float)inV2.GetZ());
+        // glVertex3f((float)inV3.GetX(), (float)inV3.GetY(), (float)inV3.GetZ());
+        // glEnd();
     }
 
     // Add missing pure virtual functions
     virtual void DrawText3D(JPH::RVec3Arg inPosition, const std::string_view& inString, JPH::ColorArg inColor, float inHeight = 0.5f) override
     {
         // Simple implementation - draw a point instead of text
-        glPointSize(5.0f);
-        glBegin(GL_POINTS);
-        glColor3f(inColor.r, inColor.g, inColor.b);
-        glVertex3f((float)inPosition.GetX(), (float)inPosition.GetY(), (float)inPosition.GetZ());
-        glEnd();
-        glPointSize(1.0f);
+        // glPointSize(5.0f);
+        // glBegin(GL_POINTS);
+        // glColor3f(inColor.r, inColor.g, inColor.b);
+        // glVertex3f((float)inPosition.GetX(), (float)inPosition.GetY(), (float)inPosition.GetZ());
+        // glEnd();
+        // glPointSize(1.0f);
     }
 
     // virtual JPH::DebugRenderer::Batch CreateTriangleBatch(const JPH::DebugRenderer::Triangle *inTriangles, int inTriangleCount) override
@@ -1986,10 +2056,29 @@ void chai_collisions::process(float deltaTime)
                         cc->velocityX = 0;
                     }
 
-                    if (cc->collidedZ)
+                    if (cc->perimeterPenetration > 0.01f || cc->perimeterPenetration < -0.01f)
                     {
-                        cc->velocityZ *= -5.0f; // Bounce back with increased force
+                        // Push character out of penetration
+                        JPH::Vec3 correctionVector = cc->collisionNormal * cc->perimeterPenetration * -1.1f;
+                        JPH::Vec3 newPosition = cc->character->GetPosition() + correctionVector;
+
+                        cc->character->SetPosition(newPosition, JPH::EActivation::Activate);
+                        printf("Character %s: Corrected penetration by %.3f units\n",
+                            cc->charId.c_str(), cc->perimeterPenetration);
                     }
+
+                    if (abs(cc->collisionNormal.GetZ()) > 0.3f) {
+                        // Z-axis collision (front/back walls)
+                        if ((cc->collisionNormal.GetZ() < 0 && cc->velocityZ < 0) || (cc->collisionNormal.GetZ() > 0 && cc->velocityZ > 0)) {
+                            cc->velocityZ = 0.0f;
+                            cc->velocityY += 0.1f; // Small upward nudge to prevent sticking
+                            printf("Character %s: Z movement blocked (normal: %.2f, vel: %.2f)\n",
+                                cc->charId.c_str(), cc->collisionNormal.GetZ(), cc->velocityZ);
+                        }
+                    }
+
+                    cc->perimeterPenetration = 0.0f;
+                    cc->collisionNormal = JPH::Vec3::sZero();
                     // printf("Applying force to character %d: (%f, %f, %f)\n", cc->index, cc->velocityX, cc->velocityY, cc->velocityZ);
    
                     cc->character->SetLinearVelocity(JPH::Vec3(cc->velocityX, cc->velocityY + cc->character->GetLinearVelocity().GetY(), cc->velocityZ));
@@ -1999,7 +2088,7 @@ void chai_collisions::process(float deltaTime)
                 
             
                     // Handle character input/movement here if needed
-                    JPH::Vec3 currentVel = cc->character->GetLinearVelocity();
+                    // JPH::Vec3 currentVel = cc->character->GetLinearVelocity();
                     
                     // Only print debug info occasionally
                     // static int debugCounter = 0;
@@ -2013,7 +2102,7 @@ void chai_collisions::process(float deltaTime)
         characterUpdateCounter++;
 
         // Step the Jolt simulation with fixed timestep
-        const int maxSubSteps = 10;
+        const int maxSubSteps = 20;
         dw.second->physics_system->Update(deltaTime, maxSubSteps, &dw.second->temp_allocator, &dw.second->job_system);
 
         // Process contact events less frequently
@@ -2026,7 +2115,12 @@ void chai_collisions::process(float deltaTime)
 
         // Update characters AFTER physics step (reduced frequency)
         // if (characterUpdateCounter % 2 == 0) {
-            
+            // for (auto &cc : characterControllers) {
+            //     if (cc->character) {
+            //         const float cCollisionTolerance = 0.05f; 
+            //         cc->character->PostSimulation(cCollisionTolerance);
+            //     }
+            // }
         // }
 
         // Debug rendering at reduced frequency
@@ -2204,38 +2298,38 @@ bool chai_collisions::calculateWorldBounds(JPH::AABox& worldBounds, WorldJolt* w
 
 void chai_collisions::setupDebugCamera(const JPH::AABox& worldBounds)
 {
-    static glm::mat4 cachedProjection;
-    static glm::mat4 cachedView;
-    static int cameraUpdateCounter = 0;
+    // static glm::mat4 cachedProjection;
+    // static glm::mat4 cachedView;
+    // static int cameraUpdateCounter = 0;
     
-    // Only update camera matrices every 30 frames
-    if (cameraUpdateCounter++ % 30 == 0) {
-        JPH::Vec3 boundsCenter = (worldBounds.mMin + worldBounds.mMax) * 0.5f;
-        JPH::Vec3 boundsSize = worldBounds.mMax - worldBounds.mMin;
+    // // Only update camera matrices every 30 frames
+    // if (cameraUpdateCounter++ % 30 == 0) {
+    //     JPH::Vec3 boundsCenter = (worldBounds.mMin + worldBounds.mMax) * 0.5f;
+    //     JPH::Vec3 boundsSize = worldBounds.mMax - worldBounds.mMin;
         
-        float maxDimension = std::max(boundsSize.GetX(), std::max(boundsSize.GetY(), boundsSize.GetZ()));
-        float fov = 45.0f;
-        float aspectRatio = 16.0f / 9.0f;
-        float distance = maxDimension / (2.0f * tan(glm::radians(fov) / 2.0f)) * 1.5f / 5.0f;
+    //     float maxDimension = std::max(boundsSize.GetX(), std::max(boundsSize.GetY(), boundsSize.GetZ()));
+    //     float fov = 45.0f;
+    //     float aspectRatio = 16.0f / 9.0f;
+    //     float distance = maxDimension / (2.0f * tan(glm::radians(fov) / 2.0f)) * 1.5f / 5.0f;
 
-        glm::vec3 cameraPos = glm::vec3(
-            boundsCenter.GetX() + distance * 0.7f,
-            boundsCenter.GetY() + distance * 0.5f,
-            boundsCenter.GetZ() + distance
-        );
+    //     glm::vec3 cameraPos = glm::vec3(
+    //         boundsCenter.GetX() + distance * 0.7f,
+    //         boundsCenter.GetY() + distance * 0.5f,
+    //         boundsCenter.GetZ() + distance
+    //     );
         
-        glm::vec3 target = glm::vec3(boundsCenter.GetX(), boundsCenter.GetY(), boundsCenter.GetZ());
-        glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+    //     glm::vec3 target = glm::vec3(boundsCenter.GetX(), boundsCenter.GetY(), boundsCenter.GetZ());
+    //     glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
         
-        cachedProjection = glm::perspective(glm::radians(fov), aspectRatio, 0.1f, distance * 3.0f);
-        cachedView = glm::lookAt(cameraPos, target, up);
-    }
+    //     cachedProjection = glm::perspective(glm::radians(fov), aspectRatio, 0.1f, distance * 3.0f);
+    //     cachedView = glm::lookAt(cameraPos, target, up);
+    // }
     
-    // Apply cached matrices
-    glMatrixMode(GL_PROJECTION);
-    glLoadMatrixf(glm::value_ptr(cachedProjection));
+    // // Apply cached matrices
+    // glMatrixMode(GL_PROJECTION);
+    // glLoadMatrixf(glm::value_ptr(cachedProjection));
     
-    glMatrixMode(GL_MODELVIEW);
-    glLoadMatrixf(glm::value_ptr(cachedView));
+    // glMatrixMode(GL_MODELVIEW);
+    // glLoadMatrixf(glm::value_ptr(cachedView));
 }
 } // namespace love

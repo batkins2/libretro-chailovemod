@@ -8,7 +8,7 @@
 #ifndef __HAVE_CHAI_PARTICLES__
 #include "chai_particles.h"
 #endif
-#include "opengl/Graphics.h"
+#include "vulkan/Graphics.h"
 // #include "gfx.h" // Assuming you have a Graphics class for rendering
 
 namespace love 
@@ -52,14 +52,14 @@ private:
     float currentTime = 0.01f;
     float deltaTime = 0.01f;
     std::vector<chaiscript::Boxed_Value> viewMatrix;
-    GLuint shadowMapFBO = 0;
-    GLuint shadowMap = 0;
+    // GLuint shadowMapFBO = 0;
+    // GLuint shadowMap = 0;
     love::gfx::Texture *background_tex = nullptr;
     bool frameOddEven = false;
     int skip = 0;
-    GLuint sceneFramebuffer = 0;
-    GLuint sceneColorTexture = 0;
-    GLuint sceneDepthTexture = 0;
+    // GLuint sceneFramebuffer = 0;
+    // GLuint sceneColorTexture = 0;
+    // GLuint sceneDepthTexture = 0;
     bool framebufferInitialized = false;
     std::map<int, int> meshGroups;
     // Framerate tracking

@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-#include "opengl/Graphics.h"
+#include "vulkan/Graphics.h"
 #include "gfx.h"
 
 #ifndef __HAVE_CHAI_SHADER__
@@ -51,6 +51,10 @@ class chai_gfx {
     love::windowmod::Window *win;
     love::gfx::Texture *canvas;
     inline static struct retro_hw_render_callback hw_render;
+    inline static const struct retro_hw_render_interface_vulkan *vulkan;
+    void setVulkanInterface(const struct retro_hw_render_interface_vulkan *vulkanInterface) {
+        vulkan = vulkanInterface;
+    }
     unsigned int FRAMEBUFFER;
     unsigned int COLORATTACH;
     chai_shader *shader = nullptr;
@@ -58,8 +62,8 @@ class chai_gfx {
     int width = 1440;
     int height = 1080;
     void *scene = nullptr;
-    GLuint shadowMapFBO = 0;
-    GLuint shadowMap = 0;
+    // GLuint shadowMapFBO = 0;
+    // GLuint shadowMap = 0;
     bool reinit = false;
 };
 }

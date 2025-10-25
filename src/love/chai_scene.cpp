@@ -14,22 +14,22 @@ bool chai_scene::destroy() {
     sceneShader = nullptr;
     printf("Destroying scene\n");
     meshes = std::vector<chai_mesh *>();
-    if (shadowMapFBO != 0) {
-        glDeleteFramebuffers(1, &shadowMapFBO);
-    }
-    if (shadowMap != 0) {
-        glDeleteTextures(1, &shadowMap);
-    }
-    // Clean up scene framebuffer
-    if (sceneFramebuffer != 0) {
-        glDeleteFramebuffers(1, &sceneFramebuffer);
-    }
-    if (sceneColorTexture != 0) {
-        glDeleteTextures(1, &sceneColorTexture);
-    }
-    if (sceneDepthTexture != 0) {
-        glDeleteTextures(1, &sceneDepthTexture);
-    }
+    // if (shadowMapFBO != 0) {
+    //     glDeleteFramebuffers(1, &shadowMapFBO);
+    // }
+    // if (shadowMap != 0) {
+    //     glDeleteTextures(1, &shadowMap);
+    // }
+    // // Clean up scene framebuffer
+    // if (sceneFramebuffer != 0) {
+    //     glDeleteFramebuffers(1, &sceneFramebuffer);
+    // }
+    // if (sceneColorTexture != 0) {
+    //     glDeleteTextures(1, &sceneColorTexture);
+    // }
+    // if (sceneDepthTexture != 0) {
+    //     glDeleteTextures(1, &sceneDepthTexture);
+    // }
     return true;
 }
 
@@ -176,8 +176,8 @@ void chai_scene::drawMeshes(bool shadows, int view) {
     glm::mat4 vMatrix = glm::mat4(1.0f);
     glm::mat4 t2 = glm::mat4(1.0f);
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    // glEnable(GL_BLEND);
+    // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
     if (!shadows) {
         auto mesh = meshes[0];
@@ -188,15 +188,15 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         // tex = cg.instance->newTexture(settings, &slices);
         // tex->replacePixels(copyOfPixelData, dataSize*4, 0, 0, rect, false);
         
-        if (mesh->specularMap == 0) {
+        // if (mesh->specularMap == 0) {
         
-            // Create sampler2d specularMap
-            glGenTextures(1, &mesh->specularMap);
-        }
+        //     // Create sampler2d specularMap
+        //     glGenTextures(1, &mesh->specularMap);
+        // }
         
         // Bind the specular map texture
-        glActiveTexture(GL_TEXTURE2); // Use texture unit 2 for specular map                        
-        glBindTexture(GL_TEXTURE_2D, mesh->specularMap);
+        // glActiveTexture(GL_TEXTURE2); // Use texture unit 2 for specular map                        
+        // glBindTexture(GL_TEXTURE_2D, mesh->specularMap);
 
         // Set the sampler uniform in your shader to use texture unit 0
         // GLint specularMapLoc = glGetUniformLocation(sceneShader->shader->getHandle(), "specularMap");
@@ -204,32 +204,32 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         //     glUniform1i(specularMapLoc, 2);
         // }
         // Set texture parameters (adjust as needed)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
         // Load your specular map image data here (replace with your actual loading code)
         
         if (mesh->specData) {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, mesh->specularW, mesh->specularH, 0, GL_RGBA, GL_UNSIGNED_BYTE, mesh->specData);
-            glGenerateMipmap(GL_TEXTURE_2D);
+            // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, mesh->specularW, mesh->specularH, 0, GL_RGBA, GL_UNSIGNED_BYTE, mesh->specData);
+            // glGenerateMipmap(GL_TEXTURE_2D);
             // Free specData if needed
         }
 
         // Set the sampler uniform in your shader to use texture unit 2
-        GLint specularMapLoc = glGetUniformLocation(sceneShader->shader->getHandle(), "specularMap");
-        if (specularMapLoc >= 0) {
-            glUniform1i(specularMapLoc, 2); // 2 = GL_TEXTURE2
-        }
+        // GLint specularMapLoc = glGetUniformLocation(sceneShader->shader->getHandle(), "specularMap");
+        // if (specularMapLoc >= 0) {
+        //     glUniform1i(specularMapLoc, 2); // 2 = GL_TEXTURE2
+        // }
 
         // sceneShader->send("isSpecular", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1) }));
 
         
         // Unbind the texture
         // glBindTexture(GL_TEXTURE_2D, 0);
-        glActiveTexture(GL_TEXTURE0); // Switch back to texture unit 0 for the main texture
-        glDisable(GL_DEPTH_TEST);
+        // glActiveTexture(GL_TEXTURE0); // Switch back to texture unit 0 for the main texture
+        // glDisable(GL_DEPTH_TEST);
         auto mat = Matrix4(new float[16] {
             1.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 1.0f, 0.0f, 0.0f,
@@ -288,7 +288,7 @@ void chai_scene::drawMeshes(bool shadows, int view) {
             background_tex->replacePixels(mesh->specData, mesh->specularW*mesh->specularH*4, 0, 0, rect, false);
         }
         background_tex->draw(gfx, mat);
-        glEnable(GL_DEPTH_TEST);
+        // glEnable(GL_DEPTH_TEST);
     }
 
     glm::mat4 viewProjectionMatrix = t2 * vMatrix;
@@ -481,9 +481,9 @@ void chai_scene::drawMeshes(bool shadows, int view) {
     std::vector<std::pair<int, int>> drawnPairs;
     for (auto childIndex : deferredChildIndices) {
         // printf("Drawing deferred child mesh index %d of parent mesh index %d\n", childIndex, deferredParentIndices[i]);
-        auto vbo = meshChildren[deferredParentIndices[i]][childIndex]->cachedVBOs.begin()->second;
+        // auto vbo = meshChildren[deferredParentIndices[i]][childIndex]->cachedVBOs.begin()->second;
         // printf("Using VBO %d\n", vbo);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        // glBindBuffer(GL_ARRAY_BUFFER, vbo);
         // printf("Buffer bound\n");
         for (auto parentId : deferredParentIndices) {
             int j = 0;
@@ -553,7 +553,7 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
     if (false && skip > 0) {
         if (skip > 1) skip = -1;
         // auto fb = cg.instance->hw_render.get_current_framebuffer();
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, sceneFramebuffer);
+        // glBindFramebuffer(GL_DRAW_FRAMEBUFFER, sceneFramebuffer);
         // glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb);
         // glBlitFramebuffer(0, 0, cg.width, cg.height, 
         //                  0, 0, cg.width, cg.height, 
@@ -565,11 +565,11 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
     initFramebuffer();
     
     // Bind to our framebuffer for rendering
-    glBindFramebuffer(GL_FRAMEBUFFER, sceneFramebuffer);
-    glViewport(0, 0, cg.width / 4, cg.height / 4);
+    // glBindFramebuffer(GL_FRAMEBUFFER, sceneFramebuffer);
+    // glViewport(0, 0, cg.width / 4, cg.height / 4);
 
     // Clear the framebuffer
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     if (false && cg.reinit) {
         cg.hasReinit();
@@ -577,423 +577,423 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
     } else {
         // cg.instance->setActive(true);
         // cg.instance->setShader();
-        cg.instance->setShader(sceneShader->shader);
-        GLuint err = glGetError();
-        if (err != GL_NO_ERROR) {
-            GLint maxLength = 0;
-            glGetShaderiv(sceneShader->shader->getHandle(), GL_INFO_LOG_LENGTH, &maxLength);
-            std::vector<GLchar> infoLog(maxLength);
-            glGetShaderInfoLog(sceneShader->shader->getHandle(), maxLength, &maxLength, &infoLog[0]);
-            printf("ERROR::SHADER::COMPILATION_FAILED\n%s\n", infoLog);
-            printf("ERROR: %d\n", err);            
-            printf("sceneShader: %d\n", sceneShader->shader);
-        } else {            
-            // printf("sceneShader: %d\n", sceneShader->shader);
-        }
-        // glBindFramebuffer(cg.instance->FRAMEBUFFER, cg.instance->hw_render.get_current_framebuffer());
-        cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);  
+        // cg.instance->setShader(sceneShader->shader);
+        // GLuint err = glGetError();
+        // if (err != GL_NO_ERROR) {
+        //     GLint maxLength = 0;
+        //     glGetShaderiv(sceneShader->shader->getHandle(), GL_INFO_LOG_LENGTH, &maxLength);
+        //     std::vector<GLchar> infoLog(maxLength);
+        //     glGetShaderInfoLog(sceneShader->shader->getHandle(), maxLength, &maxLength, &infoLog[0]);
+        //     printf("ERROR::SHADER::COMPILATION_FAILED\n%s\n", infoLog);
+        //     printf("ERROR: %d\n", err);            
+        //     printf("sceneShader: %d\n", sceneShader->shader);
+        // } else {            
+        //     // printf("sceneShader: %d\n", sceneShader->shader);
+        // }
+        // // glBindFramebuffer(cg.instance->FRAMEBUFFER, cg.instance->hw_render.get_current_framebuffer());
+        // cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);  
 
-        glEnable(GL_DEPTH_TEST);
+        // glEnable(GL_DEPTH_TEST);
 
-        err = glGetError();
-        if (err != GL_NO_ERROR) {
-            printf("ERROR: 1\n");
-        }
+        // err = glGetError();
+        // if (err != GL_NO_ERROR) {
+        //     printf("ERROR: 1\n");
+        // }
         
-        GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+        // GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
 
-        if (true) {
-            if (shadowMapFBO != 0) {
-                glDeleteFramebuffers(1, &shadowMapFBO);
+        // if (true) {
+        //     if (shadowMapFBO != 0) {
+        //         glDeleteFramebuffers(1, &shadowMapFBO);
 
-                err = glGetError();
-                if (err != GL_NO_ERROR) {
-                    printf("ERROR: 2\n");
-                }
-            }
+        //         err = glGetError();
+        //         if (err != GL_NO_ERROR) {
+        //             printf("ERROR: 2\n");
+        //         }
+        //     }
 
-            // Create depth texture
-            glGenFramebuffers(1, &shadowMapFBO);
-            err = glGetError();
-            if (err != GL_NO_ERROR) {
-                printf("ERROR: 3\n");
-            }
-            if (shadowMap == 0) {
-                glGenTextures(1, &shadowMap); 
+        //     // Create depth texture
+        //     glGenFramebuffers(1, &shadowMapFBO);
+        //     err = glGetError();
+        //     if (err != GL_NO_ERROR) {
+        //         printf("ERROR: 3\n");
+        //     }
+        //     if (shadowMap == 0) {
+        //         glGenTextures(1, &shadowMap); 
 
-                err = glGetError();
-                if (err != GL_NO_ERROR) {
-                    printf("ERROR: 4\n");
-                }
-            }    
+        //         err = glGetError();
+        //         if (err != GL_NO_ERROR) {
+        //             printf("ERROR: 4\n");
+        //         }
+        //     }    
             
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, shadowMap);
-            GLint shadowMapLoc = glGetUniformLocation(sceneShader->shader->getHandle(), "shadowMap");
-            if (shadowMapLoc >= 0) {
-                glUniform1i(shadowMapLoc, 1); // 1 = GL_TEXTURE1
-            }
-            err = glGetError();
-            if (err != GL_NO_ERROR) {
-                printf("ERROR: 5\n");
-            }
+        //     glActiveTexture(GL_TEXTURE1);
+        //     glBindTexture(GL_TEXTURE_2D, shadowMap);
+        //     GLint shadowMapLoc = glGetUniformLocation(sceneShader->shader->getHandle(), "shadowMap");
+        //     if (shadowMapLoc >= 0) {
+        //         glUniform1i(shadowMapLoc, 1); // 1 = GL_TEXTURE1
+        //     }
+        //     err = glGetError();
+        //     if (err != GL_NO_ERROR) {
+        //         printf("ERROR: 5\n");
+        //     }
         
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, cg.width-5, cg.height-5, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+        //     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, cg.width-5, cg.height-5, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
             
-            err = glGetError();
-            if (err != GL_NO_ERROR) {
-                printf("ERROR: 6\n");
-            }
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            err = glGetError();
-            if (err != GL_NO_ERROR) {
-                printf("ERROR: 7\n");
-            }
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            err = glGetError();
-            if (err != GL_NO_ERROR) {
-                printf("ERROR: 8\n");
-            }
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-            err = glGetError();
-            if (err != GL_NO_ERROR) {
-                printf("ERROR: 9\n");
-            }
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-            err = glGetError();
-            if (err != GL_NO_ERROR) {
-                printf("ERROR: 10\n");
-            }
+        //     err = glGetError();
+        //     if (err != GL_NO_ERROR) {
+        //         printf("ERROR: 6\n");
+        //     }
+        //     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        //     err = glGetError();
+        //     if (err != GL_NO_ERROR) {
+        //         printf("ERROR: 7\n");
+        //     }
+        //     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        //     err = glGetError();
+        //     if (err != GL_NO_ERROR) {
+        //         printf("ERROR: 8\n");
+        //     }
+        //     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        //     err = glGetError();
+        //     if (err != GL_NO_ERROR) {
+        //         printf("ERROR: 9\n");
+        //     }
+        //     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        //     err = glGetError();
+        //     if (err != GL_NO_ERROR) {
+        //         printf("ERROR: 10\n");
+        //     }
             
-            glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+        //     glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
-            err = glGetError();
-            if (err != GL_NO_ERROR) {
-                printf("ERROR: 11\n");
-            }
+        //     err = glGetError();
+        //     if (err != GL_NO_ERROR) {
+        //         printf("ERROR: 11\n");
+        //     }
             
-            // Attach depth texture as FBO's depth buffer
-            glBindFramebuffer(cg.instance->FRAMEBUFFER, shadowMapFBO);
-            err = glGetError();
-            if (err != GL_NO_ERROR) {
-                printf("ERROR: 12\n");
-            }
-            glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
-            err = glGetError();
-            if (err != GL_NO_ERROR) {
-                printf("ERROR: 13\n");
-            }
-            glClear(GL_DEPTH_BUFFER_BIT);
-        }
+        //     // Attach depth texture as FBO's depth buffer
+        //     glBindFramebuffer(cg.instance->FRAMEBUFFER, shadowMapFBO);
+        //     err = glGetError();
+        //     if (err != GL_NO_ERROR) {
+        //         printf("ERROR: 12\n");
+        //     }
+        //     glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
+        //     err = glGetError();
+        //     if (err != GL_NO_ERROR) {
+        //         printf("ERROR: 13\n");
+        //     }
+        //     glClear(GL_DEPTH_BUFFER_BIT);
+        // }
 
-        err = glGetError();
-        if (err != GL_NO_ERROR) {
-            printf("ERROR: %d\n", err);
-            printf("shadowMapFBO: %d\n", shadowMapFBO);
-            printf("shadowMap: %d\n", shadowMap);
-            printf("cg.width: %d\n", cg.width);
-            printf("cg.height: %d\n", cg.height);
-            printf("sceneShader: %d\n", sceneShader->shader);
-            printf("cg.instance->FRAMEBUFFER: %d\n", cg.instance->FRAMEBUFFER);
-        } else {
+        // err = glGetError();
+        // if (err != GL_NO_ERROR) {
+        //     printf("ERROR: %d\n", err);
+        //     printf("shadowMapFBO: %d\n", shadowMapFBO);
+        //     printf("shadowMap: %d\n", shadowMap);
+        //     printf("cg.width: %d\n", cg.width);
+        //     printf("cg.height: %d\n", cg.height);
+        //     printf("sceneShader: %d\n", sceneShader->shader);
+        //     printf("cg.instance->FRAMEBUFFER: %d\n", cg.instance->FRAMEBUFFER);
+        // } else {
             
-            // currentTime += 500.0f;
+        //     // currentTime += 500.0f;
             
-            if (viewCount == 2) {
-                glViewport(0, 0, cg.width, cg.height);
-                sceneShader->send("viewMatrix", viewMatrix1); 
-                glActiveTexture(GL_TEXTURE0);               
-                drawMeshes(true, 0);
-                glViewport(0, cg.height*0.5, cg.width, cg.height*0.5);
-                auto fb = cg.instance->hw_render.get_current_framebuffer();
-                glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
-                glActiveTexture(GL_TEXTURE0);
-                drawMeshes(false, 0);
-                cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+        //     if (viewCount == 2) {
+        //         glViewport(0, 0, cg.width, cg.height);
+        //         sceneShader->send("viewMatrix", viewMatrix1); 
+        //         glActiveTexture(GL_TEXTURE0);               
+        //         drawMeshes(true, 0);
+        //         glViewport(0, cg.height*0.5, cg.width, cg.height*0.5);
+        //         auto fb = cg.instance->hw_render.get_current_framebuffer();
+        //         glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+        //         glActiveTexture(GL_TEXTURE0);
+        //         drawMeshes(false, 0);
+        //         cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
 
 
-                if (shadowMapFBO != 0) {
-                    glDeleteFramebuffers(1, &shadowMapFBO);
-                }
+        //         if (shadowMapFBO != 0) {
+        //             glDeleteFramebuffers(1, &shadowMapFBO);
+        //         }
 
-                // Create depth texture
-                glGenFramebuffers(1, &shadowMapFBO);
+        //         // Create depth texture
+        //         glGenFramebuffers(1, &shadowMapFBO);
                 
-                if (shadowMap == 0) {
-                    glGenTextures(1, &shadowMap); 
+        //         if (shadowMap == 0) {
+        //             glGenTextures(1, &shadowMap); 
 
-                }    
+        //         }    
                 
-                glBindTexture(GL_TEXTURE_2D, shadowMap);
+        //         glBindTexture(GL_TEXTURE_2D, shadowMap);
                 
             
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, cg.width-5, cg.height-5, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+        //         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, cg.width-5, cg.height-5, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
                 
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        //         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
                 
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        //         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
                 
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        //         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
                 
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        //         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
             
-                // GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
-                glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+        //         // GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+        //         glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
-                // Attach depth texture as FBO's depth buffer
-                glBindFramebuffer(cg.instance->FRAMEBUFFER, shadowMapFBO);
+        //         // Attach depth texture as FBO's depth buffer
+        //         glBindFramebuffer(cg.instance->FRAMEBUFFER, shadowMapFBO);
                 
-                glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
-                glClear(GL_DEPTH_BUFFER_BIT);
-                glViewport(0, 0, cg.width, cg.height);
-                sceneShader->send("viewMatrix", viewMatrix2);
-                glActiveTexture(GL_TEXTURE0);
-                drawMeshes(true, 1);
-                glViewport(0, 0, cg.width, cg.height*0.5);
-                fb = cg.instance->hw_render.get_current_framebuffer();
-                glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
-                glActiveTexture(GL_TEXTURE0);
-                drawMeshes(false, 1);
-                cg.instance->setShader();
-                // auto fb = cg.instance->hw_render.get_current_framebuffer();
-                // printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
+        //         glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
+        //         glClear(GL_DEPTH_BUFFER_BIT);
+        //         glViewport(0, 0, cg.width, cg.height);
+        //         sceneShader->send("viewMatrix", viewMatrix2);
+        //         glActiveTexture(GL_TEXTURE0);
+        //         drawMeshes(true, 1);
+        //         glViewport(0, 0, cg.width, cg.height*0.5);
+        //         fb = cg.instance->hw_render.get_current_framebuffer();
+        //         glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+        //         glActiveTexture(GL_TEXTURE0);
+        //         drawMeshes(false, 1);
+        //         cg.instance->setShader();
+        //         // auto fb = cg.instance->hw_render.get_current_framebuffer();
+        //         // printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
                 
-                // glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
-                // gfx::OptionalColorD clearcolor;
-                // clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
-                // OptionalInt clearstencil(0);
-                // OptionalDouble cleardepth(1.0);
-                // cg.instance->clear(clearcolor, clearstencil, cleardepth);
-                // sceneShader->send("viewMatrix", viewMatrix1);  
+        //         // glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+        //         // gfx::OptionalColorD clearcolor;
+        //         // clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
+        //         // OptionalInt clearstencil(0);
+        //         // OptionalDouble cleardepth(1.0);
+        //         // cg.instance->clear(clearcolor, clearstencil, cleardepth);
+        //         // sceneShader->send("viewMatrix", viewMatrix1);  
                
                 
-                // fb = cg.instance->hw_render.get_current_framebuffer();
+        //         // fb = cg.instance->hw_render.get_current_framebuffer();
                 
-                // printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
-                // glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
-                // gfx::OptionalColorD clearcolor;
-                // clearcolor = ColorD(0.0, 0.0, 0.0, 0.0); // Set the clear color to black with full opacity
-                // OptionalInt clearstencil(0);
-                // OptionalDouble cleardepth(1.0);
-                // cg.instance->clear(clearcolor, clearstencil, cleardepth);
-                // sceneShader->send("viewMatrix", viewMatrix2);  
+        //         // printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
+        //         // glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+        //         // gfx::OptionalColorD clearcolor;
+        //         // clearcolor = ColorD(0.0, 0.0, 0.0, 0.0); // Set the clear color to black with full opacity
+        //         // OptionalInt clearstencil(0);
+        //         // OptionalDouble cleardepth(1.0);
+        //         // cg.instance->clear(clearcolor, clearstencil, cleardepth);
+        //         // sceneShader->send("viewMatrix", viewMatrix2);  
                
-            } else if (viewCount > 2) {
-                glViewport(0, 0, cg.width, cg.height);
+        //     } else if (viewCount > 2) {
+        //         glViewport(0, 0, cg.width, cg.height);
                 
-                sceneShader->send("viewMatrix", viewCount > 3 ? viewMatrix3 : viewMatrix2);  
-                glActiveTexture(GL_TEXTURE0);
-                drawMeshes(true, viewCount > 3 ? 2 : 1);
-                glViewport(0, 0, cg.width*0.5, cg.height*0.5); 
-                auto fb = cg.instance->hw_render.get_current_framebuffer();
-                glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
-                glActiveTexture(GL_TEXTURE0);
-                drawMeshes(false, viewCount > 3 ? 2 : 1);
+        //         sceneShader->send("viewMatrix", viewCount > 3 ? viewMatrix3 : viewMatrix2);  
+        //         glActiveTexture(GL_TEXTURE0);
+        //         drawMeshes(true, viewCount > 3 ? 2 : 1);
+        //         glViewport(0, 0, cg.width*0.5, cg.height*0.5); 
+        //         auto fb = cg.instance->hw_render.get_current_framebuffer();
+        //         glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+        //         glActiveTexture(GL_TEXTURE0);
+        //         drawMeshes(false, viewCount > 3 ? 2 : 1);
                 
         
-                cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+        //         cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
 
 
-                if (shadowMapFBO != 0) {
-                    glDeleteFramebuffers(1, &shadowMapFBO);
-                }
+        //         if (shadowMapFBO != 0) {
+        //             glDeleteFramebuffers(1, &shadowMapFBO);
+        //         }
 
-                // Create depth texture
-                glGenFramebuffers(1, &shadowMapFBO);
+        //         // Create depth texture
+        //         glGenFramebuffers(1, &shadowMapFBO);
                 
-                if (shadowMap == 0) {
-                    glGenTextures(1, &shadowMap); 
+        //         if (shadowMap == 0) {
+        //             glGenTextures(1, &shadowMap); 
 
-                }    
+        //         }    
                 
-                glBindTexture(GL_TEXTURE_2D, shadowMap);
+        //         glBindTexture(GL_TEXTURE_2D, shadowMap);
                 
             
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, cg.width-5, cg.height-5, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+        //         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, cg.width-5, cg.height-5, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
                 
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        //         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
                 
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        //         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
                 
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        //         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
                 
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        //         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
             
-                // GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
-                glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+        //         // GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+        //         glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
-                // Attach depth texture as FBO's depth buffer
-                glBindFramebuffer(cg.instance->FRAMEBUFFER, shadowMapFBO);
+        //         // Attach depth texture as FBO's depth buffer
+        //         glBindFramebuffer(cg.instance->FRAMEBUFFER, shadowMapFBO);
                 
-                glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
-                glClear(GL_DEPTH_BUFFER_BIT);                
-                glViewport(0, 0, cg.width, cg.height);
-                sceneShader->send("viewMatrix", viewCount > 3 ? viewMatrix4 : viewMatrix3);
-                glActiveTexture(GL_TEXTURE0);
-                drawMeshes(true, viewCount > 3 ? 3 : 2);
-                glViewport(cg.width*0.5, 0, cg.width*0.5, cg.height*0.5);
-                fb = cg.instance->hw_render.get_current_framebuffer();
-                glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
-                glActiveTexture(GL_TEXTURE0);
-                drawMeshes(false, viewCount > 3 ? 3 : 2);
-                cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
-
-
-                if (shadowMapFBO != 0) {
-                    glDeleteFramebuffers(1, &shadowMapFBO);
-                }
-
-                // Create depth texture
-                glGenFramebuffers(1, &shadowMapFBO);
-                
-                if (shadowMap == 0) {
-                    glGenTextures(1, &shadowMap); 
-
-                }    
-                
-                glBindTexture(GL_TEXTURE_2D, shadowMap);
-                
-            
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, cg.width-5, cg.height-5, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-                
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-                
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-                
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-            
-                // GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
-                glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-
-                // Attach depth texture as FBO's depth buffer
-                glBindFramebuffer(cg.instance->FRAMEBUFFER, shadowMapFBO);
-                
-                glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
-                glClear(GL_DEPTH_BUFFER_BIT);
-                glViewport(0, 0, cg.width, cg.height);
-                sceneShader->send("viewMatrix", viewMatrix1);
-                glActiveTexture(GL_TEXTURE0);
-                drawMeshes(true, 0);
-                if (viewCount > 3) {                    
-                    glViewport(0, cg.height*0.5, cg.width*0.5, cg.height*0.5);
-                } else {
-                    glViewport(0, cg.height*0.5, cg.width, cg.height*0.5);
-                }
-                fb = cg.instance->hw_render.get_current_framebuffer();
-                glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
-                glActiveTexture(GL_TEXTURE0);
-                drawMeshes(false, 0);
-                cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+        //         glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
+        //         glClear(GL_DEPTH_BUFFER_BIT);                
+        //         glViewport(0, 0, cg.width, cg.height);
+        //         sceneShader->send("viewMatrix", viewCount > 3 ? viewMatrix4 : viewMatrix3);
+        //         glActiveTexture(GL_TEXTURE0);
+        //         drawMeshes(true, viewCount > 3 ? 3 : 2);
+        //         glViewport(cg.width*0.5, 0, cg.width*0.5, cg.height*0.5);
+        //         fb = cg.instance->hw_render.get_current_framebuffer();
+        //         glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+        //         glActiveTexture(GL_TEXTURE0);
+        //         drawMeshes(false, viewCount > 3 ? 3 : 2);
+        //         cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
 
 
-                if (shadowMapFBO != 0) {
-                    glDeleteFramebuffers(1, &shadowMapFBO);
-                }
+        //         if (shadowMapFBO != 0) {
+        //             glDeleteFramebuffers(1, &shadowMapFBO);
+        //         }
 
-                // Create depth texture
-                glGenFramebuffers(1, &shadowMapFBO);
+        //         // Create depth texture
+        //         glGenFramebuffers(1, &shadowMapFBO);
                 
-                if (shadowMap == 0) {
-                    glGenTextures(1, &shadowMap); 
+        //         if (shadowMap == 0) {
+        //             glGenTextures(1, &shadowMap); 
 
-                }    
+        //         }    
                 
-                glBindTexture(GL_TEXTURE_2D, shadowMap);
+        //         glBindTexture(GL_TEXTURE_2D, shadowMap);
                 
             
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, cg.width-5, cg.height-5, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+        //         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, cg.width-5, cg.height-5, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
                 
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        //         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
                 
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        //         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
                 
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        //         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
                 
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        //         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
             
-                // GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
-                glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+        //         // GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+        //         glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
-                // Attach depth texture as FBO's depth buffer
-                glBindFramebuffer(cg.instance->FRAMEBUFFER, shadowMapFBO);
+        //         // Attach depth texture as FBO's depth buffer
+        //         glBindFramebuffer(cg.instance->FRAMEBUFFER, shadowMapFBO);
                 
-                glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
-                glClear(GL_DEPTH_BUFFER_BIT);
-                if (viewCount > 3) {                        
-                    glViewport(0, 0, cg.width, cg.height);
-                    sceneShader->send("viewMatrix", viewMatrix2);
-                    glActiveTexture(GL_TEXTURE0);
-                    drawMeshes(true, 1);
-                    glViewport(cg.width*0.5, cg.height*0.5, cg.width*0.5, cg.height*0.5);
-                    fb = cg.instance->hw_render.get_current_framebuffer();
-                    glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
-                    glActiveTexture(GL_TEXTURE0);
-                    drawMeshes(false, 1);
-                }
-                cg.instance->setShader();
+        //         glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
+        //         glClear(GL_DEPTH_BUFFER_BIT);
+        //         glViewport(0, 0, cg.width, cg.height);
+        //         sceneShader->send("viewMatrix", viewMatrix1);
+        //         glActiveTexture(GL_TEXTURE0);
+        //         drawMeshes(true, 0);
+        //         if (viewCount > 3) {                    
+        //             glViewport(0, cg.height*0.5, cg.width*0.5, cg.height*0.5);
+        //         } else {
+        //             glViewport(0, cg.height*0.5, cg.width, cg.height*0.5);
+        //         }
+        //         fb = cg.instance->hw_render.get_current_framebuffer();
+        //         glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+        //         glActiveTexture(GL_TEXTURE0);
+        //         drawMeshes(false, 0);
+        //         cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
 
-                // auto fb = cg.instance->hw_render.get_current_framebuffer();
-                // glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
-                // gfx::OptionalColorD clearcolor;
-                // clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
-                // OptionalInt clearstencil(0);
-                // OptionalDouble cleardepth(1.0);
-                // cg.instance->clear(clearcolor, clearstencil, cleardepth);
+
+        //         if (shadowMapFBO != 0) {
+        //             glDeleteFramebuffers(1, &shadowMapFBO);
+        //         }
+
+        //         // Create depth texture
+        //         glGenFramebuffers(1, &shadowMapFBO);
                 
-                // glViewport(0, 0, cg.width*0.5, cg.height*0.5);                
-                // sceneShader->send("viewMatrix", viewMatrix1);  
-                // drawMeshes(false);
+        //         if (shadowMap == 0) {
+        //             glGenTextures(1, &shadowMap); 
+
+        //         }    
                 
-                // glViewport(cg.width*0.5, 0, cg.width*0.5, cg.height*0.5);
-                // sceneShader->send("viewMatrix", viewMatrix2);  
-                // drawMeshes(false);
+        //         glBindTexture(GL_TEXTURE_2D, shadowMap);
+                
+            
+        //         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, cg.width-5, cg.height-5, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+                
+        //         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                
+        //         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                
+        //         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+                
+        //         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+            
+        //         // GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+        //         glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
-                // glViewport(0, cg.height*0.5, cg.width*0.5, cg.height*0.5);
-                // sceneShader->send("viewMatrix", viewMatrix3);
-                // drawMeshes(false);
+        //         // Attach depth texture as FBO's depth buffer
+        //         glBindFramebuffer(cg.instance->FRAMEBUFFER, shadowMapFBO);
+                
+        //         glFramebufferTexture2D(cg.instance->FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowMap, 0);
+        //         glClear(GL_DEPTH_BUFFER_BIT);
+        //         if (viewCount > 3) {                        
+        //             glViewport(0, 0, cg.width, cg.height);
+        //             sceneShader->send("viewMatrix", viewMatrix2);
+        //             glActiveTexture(GL_TEXTURE0);
+        //             drawMeshes(true, 1);
+        //             glViewport(cg.width*0.5, cg.height*0.5, cg.width*0.5, cg.height*0.5);
+        //             fb = cg.instance->hw_render.get_current_framebuffer();
+        //             glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+        //             glActiveTexture(GL_TEXTURE0);
+        //             drawMeshes(false, 1);
+        //         }
+        //         cg.instance->setShader();
 
-                // glViewport(cg.width*0.5, cg.height*0.5, cg.width*0.5, cg.height*0.5);
-                // sceneShader->send("viewMatrix", viewMatrix4);
-                // drawMeshes(false);
-            } else if (viewCount == 1) {
-                glViewport(0, 0, cg.width, cg.height);
-                sceneShader->send("viewMatrix", viewMatrix1);
-                if (true) {
-                    glActiveTexture(GL_TEXTURE0);
-                    drawMeshes(true, 0);
-                    auto fb = cg.instance->hw_render.get_current_framebuffer();
-                    // printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
-                    glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
-                    // gfx::OptionalColorD clearcolor;
-                    // clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
-                    // OptionalInt clearstencil(0);
-                    // OptionalDouble cleardepth(1.0);
-                    // cg.instance->clear(clearcolor, clearstencil, cleardepth);
+        //         // auto fb = cg.instance->hw_render.get_current_framebuffer();
+        //         // glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+        //         // gfx::OptionalColorD clearcolor;
+        //         // clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
+        //         // OptionalInt clearstencil(0);
+        //         // OptionalDouble cleardepth(1.0);
+        //         // cg.instance->clear(clearcolor, clearstencil, cleardepth);
+                
+        //         // glViewport(0, 0, cg.width*0.5, cg.height*0.5);                
+        //         // sceneShader->send("viewMatrix", viewMatrix1);  
+        //         // drawMeshes(false);
+                
+        //         // glViewport(cg.width*0.5, 0, cg.width*0.5, cg.height*0.5);
+        //         // sceneShader->send("viewMatrix", viewMatrix2);  
+        //         // drawMeshes(false);
 
-                    glActiveTexture(GL_TEXTURE0);             
-                    drawMeshes(false, 0);
-                } else {
-                    auto fb = cg.instance->hw_render.get_current_framebuffer();
-                    // printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
-                    glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
-                    gfx::OptionalColorD clearcolor;
-                    clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
-                    OptionalInt clearstencil(0);
-                    OptionalDouble cleardepth(1.0);
-                    cg.instance->clear(clearcolor, clearstencil, cleardepth);
-                    glActiveTexture(GL_TEXTURE0);
+        //         // glViewport(0, cg.height*0.5, cg.width*0.5, cg.height*0.5);
+        //         // sceneShader->send("viewMatrix", viewMatrix3);
+        //         // drawMeshes(false);
+
+        //         // glViewport(cg.width*0.5, cg.height*0.5, cg.width*0.5, cg.height*0.5);
+        //         // sceneShader->send("viewMatrix", viewMatrix4);
+        //         // drawMeshes(false);
+        //     } else if (viewCount == 1) {
+        //         glViewport(0, 0, cg.width, cg.height);
+        //         sceneShader->send("viewMatrix", viewMatrix1);
+        //         if (true) {
+        //             glActiveTexture(GL_TEXTURE0);
+        //             drawMeshes(true, 0);
+        //             auto fb = cg.instance->hw_render.get_current_framebuffer();
+        //             // printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
+        //             glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+        //             // gfx::OptionalColorD clearcolor;
+        //             // clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
+        //             // OptionalInt clearstencil(0);
+        //             // OptionalDouble cleardepth(1.0);
+        //             // cg.instance->clear(clearcolor, clearstencil, cleardepth);
+
+        //             glActiveTexture(GL_TEXTURE0);             
+        //             drawMeshes(false, 0);
+        //         } else {
+        //             auto fb = cg.instance->hw_render.get_current_framebuffer();
+        //             // printf("fb: %d %d\n", fb, cg.instance->FRAMEBUFFER);
+        //             glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+        //             gfx::OptionalColorD clearcolor;
+        //             clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
+        //             OptionalInt clearstencil(0);
+        //             OptionalDouble cleardepth(1.0);
+        //             cg.instance->clear(clearcolor, clearstencil, cleardepth);
+        //             glActiveTexture(GL_TEXTURE0);
                     
-                    drawMeshes(false, 0);
-                }
-                cg.instance->setShader();
-            } else {
-                glActiveTexture(GL_TEXTURE0);
-                cg.instance->setShader();
-            }
-            // cg.instance->setShader();
-        }
+        //             drawMeshes(false, 0);
+        //         }
+        //         cg.instance->setShader();
+        //     } else {
+        //         glActiveTexture(GL_TEXTURE0);
+        //         cg.instance->setShader();
+        //     }
+        //     // cg.instance->setShader();
+        // }
     }
 }
 
@@ -1005,12 +1005,12 @@ void chai_scene::prepareScreen() {
 
     // Create a framebuffer for the loading screen
     auto fb = cg.instance->hw_render.get_current_framebuffer();
-    glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
+    // glBindFramebuffer(cg.instance->FRAMEBUFFER, fb);
     
-    glViewport(0, 0, cg.width, cg.height);
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    // glViewport(0, 0, cg.width, cg.height);
+    // glDisable(GL_DEPTH_TEST);
+    // glEnable(GL_BLEND);
+    // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     
 
@@ -1039,31 +1039,31 @@ void chai_scene::initFramebuffer() {
     auto cg = ChaiLove::getInstance()->chai_gfx;
     
     // Generate framebuffer
-    glGenFramebuffers(1, &sceneFramebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, sceneFramebuffer);
+    // glGenFramebuffers(1, &sceneFramebuffer);
+    // glBindFramebuffer(GL_FRAMEBUFFER, sceneFramebuffer);
     
-    // Generate color texture
-    glGenTextures(1, &sceneColorTexture);
-    glBindTexture(GL_TEXTURE_2D, sceneColorTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, cg.width, cg.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sceneColorTexture, 0);
+    // // Generate color texture
+    // glGenTextures(1, &sceneColorTexture);
+    // glBindTexture(GL_TEXTURE_2D, sceneColorTexture);
+    // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, cg.width, cg.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sceneColorTexture, 0);
     
-    // Generate depth texture
-    glGenTextures(1, &sceneDepthTexture);
-    glBindTexture(GL_TEXTURE_2D, sceneDepthTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, cg.width, cg.height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, sceneDepthTexture, 0);
+    // // Generate depth texture
+    // glGenTextures(1, &sceneDepthTexture);
+    // glBindTexture(GL_TEXTURE_2D, sceneDepthTexture);
+    // glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, cg.width, cg.height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, sceneDepthTexture, 0);
     
-    // Check framebuffer completeness
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        printf("Framebuffer not complete!\n");
-    }
+    // // Check framebuffer completeness
+    // if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    //     printf("Framebuffer not complete!\n");
+    // }
     
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // glBindFramebuffer(GL_FRAMEBUFFER, 0);
     framebufferInitialized = true;
 }
 

@@ -1024,17 +1024,17 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
             auto m = instance->newMesh(vf, readyData->prepD.data(), readyData->prepD.size() * sizeof(float), gfx::PrimitiveType::PRIMITIVE_TRIANGLES, usage);
             m->setTexture(tex);
                 
-            GLuint vbo;
-            glGenBuffers(1, &vbo);
+            // GLuint vbo;
+            // glGenBuffers(1, &vbo);
             
-            const void* vertexData = m->getVertexData();
-            size_t dataSize = m->getVertexCount() * m->getVertexStride();
+            // const void* vertexData = m->getVertexData();
+            // size_t dataSize = m->getVertexCount() * m->getVertexStride();
 
-            glBindBuffer(GL_ARRAY_BUFFER, vbo);
-            glBufferData(GL_ARRAY_BUFFER, dataSize, vertexData, GL_STATIC_DRAW);
+            // glBindBuffer(GL_ARRAY_BUFFER, vbo);
+            // glBufferData(GL_ARRAY_BUFFER, dataSize, vertexData, GL_STATIC_DRAW);
             
-            cm->cachedVBOs[i] = vbo;
-            cm->vboSizes[i] = dataSize;
+            // cm->cachedVBOs[i] = vbo;
+            // cm->vboSizes[i] = dataSize;
 
             std::pair<gfx::Mesh*, chai_meshData*> p = std::pair<gfx::Mesh*, chai_meshData*>(m, readyData);
             return p;
@@ -1043,17 +1043,17 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
             m->setTexture(tex);
             auto d = new chai_meshData(prepD, cm->animations);
 
-            GLuint vbo;
-            glGenBuffers(1, &vbo);
+            // GLuint vbo;
+            // glGenBuffers(1, &vbo);
             
-            const void* vertexData = m->getVertexData();
-            size_t dataSize = m->getVertexCount() * m->getVertexStride();
+            // const void* vertexData = m->getVertexData();
+            // size_t dataSize = m->getVertexCount() * m->getVertexStride();
 
-            glBindBuffer(GL_ARRAY_BUFFER, vbo);
-            glBufferData(GL_ARRAY_BUFFER, dataSize, vertexData, GL_STATIC_DRAW);
+            // glBindBuffer(GL_ARRAY_BUFFER, vbo);
+            // glBufferData(GL_ARRAY_BUFFER, dataSize, vertexData, GL_STATIC_DRAW);
 
-            cm->cachedVBOs[i] = vbo;
-            cm->vboSizes[i] = dataSize;
+            // cm->cachedVBOs[i] = vbo;
+            // cm->vboSizes[i] = dataSize;
 
             std::pair<gfx::Mesh*, chai_meshData*> p = std::pair<gfx::Mesh*, chai_meshData*>(m, d);
             return p;
@@ -1935,14 +1935,14 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                 shader->send("isSpecular", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
             }
            
-            auto vboIt = cachedVBOs.find(j);
-            if (vboIt != cachedVBOs.end() && msh != nullptr) {
-                glBindBuffer(GL_ARRAY_BUFFER, vboIt->second);
-                // Use cached VBO for drawing
+            // auto vboIt = cachedVBOs.find(j);
+            // if (vboIt != cachedVBOs.end() && msh != nullptr) {
+            //     glBindBuffer(GL_ARRAY_BUFFER, vboIt->second);
+            //     // Use cached VBO for drawing
+            //     msh->draw(gfx, m);
+            // } else if (msh != nullptr) {
                 msh->draw(gfx, m);
-            } else if (msh != nullptr) {
-                msh->draw(gfx, m);
-            }
+            // }
             i++;            
         }
         currentTime = dt;
