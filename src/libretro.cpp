@@ -2,7 +2,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <sstream>
-#include "libretro.h"
+// #include "libretro.h"
 #include "libretro_core_options.h"
 #define __STDC_FORMAT_MACROS
 #include "ChaiLove.h"
@@ -475,7 +475,8 @@ static void context_reset(void)
 	}
 
 	ChaiLove::getInstance()->chai_gfx.hw_render = hw_render;
-	ChaiLove::getInstance()->chai_gfx.setVulkanInterface(reinterpret_cast<const love::retro_hw_render_interface_vulkan*>(vulkan));
+	// ChaiLove::getInstance()->chai_gfx.setVulkanInterface(reinterpret_cast<const love::retro_hw_render_interface_vulkan*>(vulkan));
+	ChaiLove::getInstance()->chai_gfx.setVulkanInterface(vulkan);
 	// ChaiLove::getInstance()->chai_gfx.FRAMEBUFFER = RARCH_GL_FRAMEBUFFER;
 	// ChaiLove::getInstance()->chai_gfx.COLORATTACH = RARCH_GL_COLOR_ATTACHMENT0;
 	// printf("context_reset\n");
@@ -492,20 +493,40 @@ static void context_destroy(void)
 	ChaiLove::getInstance()->chai_collisions.destroy();
 }
 
+static const VkApplicationInfo *get_application_info(void)
+{
+   static const VkApplicationInfo info = {
+      VK_STRUCTURE_TYPE_APPLICATION_INFO,
+      NULL,
+      "libretro-test-vulkan",
+      0,
+      "libretro-test-vulkan",
+      0,
+      VK_MAKE_VERSION(1, 0, 18),
+   };
+   return &info;
+}
+
 static bool retro_init_hw_context(void)
 {
-   hw_render.context_type = RETRO_HW_CONTEXT_VULKAN;
-   hw_render.version_major = 3;
-   hw_render.version_minor = 1;
+    hw_render.context_type = RETRO_HW_CONTEXT_VULKAN;
+	hw_render.version_major = VK_MAKE_VERSION(1, 0, 18);
+	hw_render.version_minor = 0;
+	hw_render.context_reset = context_reset;
+	hw_render.context_destroy = context_destroy;
+	hw_render.cache_context = true;
+	if (!ChaiLove::environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &hw_render))
+		return false;
 
-   hw_render.context_reset = context_reset;
-   hw_render.context_destroy = context_destroy;
-   hw_render.depth = true;
-   hw_render.stencil = true;
-   hw_render.bottom_left_origin = true;
+	static const struct retro_hw_render_context_negotiation_interface_vulkan iface = {
+		RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN,
+		RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN_VERSION,
 
-   if (!ChaiLove::environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER, &hw_render))
-      return false;
+		get_application_info,
+		NULL,
+	};
+
+	ChaiLove::environ_cb(RETRO_ENVIRONMENT_SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE, (void*)&iface);
 
    return true;
 }
@@ -623,15 +644,15 @@ void retro_run(void) {
 
 		vk.index = vulkan->get_sync_index(vulkan->handle);
 		
-		auto vulkanGfx = reinterpret_cast<love::gfx::vulkan::Graphics*>(&app->chai_gfx);
+		auto cg = ChaiLove::getInstance()->chai_gfx;
 		retro_vulkan_image image;
-		vulkanGfx->present(nullptr);
-		image.image_view = vulkanGfx->getCurrentSwapchainImageView();
-		image.image_layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-		image.create_info = vulkanGfx->getCurrentSwapchainImageViewCreateInfo();
-
+		// cg.instance->present(nullptr);
+		image.image_view = cg.instance->getCurrentSwapchainImageView();
+		image.image_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		image.create_info = cg.instance->getCurrentSwapchainImageViewCreateInfo();
+		VkCommandBuffer cmd[] = { cg.instance->getCommandBufferForDataTransfer() };
 		vulkan->set_image(vulkan->handle, &image, 0, NULL, VK_QUEUE_FAMILY_IGNORED);
-   		vulkan->set_command_buffers(vulkan->handle, 1, &vk.cmd[vk.index]);
+   		vulkan->set_command_buffers(vulkan->handle, 1, cmd);
 		video_cb(RETRO_HW_FRAME_BUFFER_VALID, app->chai_gfx.width, app->chai_gfx.height, 0);
 	}
 

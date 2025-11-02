@@ -29,7 +29,6 @@
 #include "Texture.h"
 
 // libraries
-#include "VulkanWrapper.h"
 #include "../libraries/xxHash/xxhash.h"
 
 // c++
@@ -38,6 +37,9 @@
 #include <functional>
 #include <set>
 #include <tuple>
+
+// Add this constant near the top of the file, after the includes
+static constexpr uint32_t GRAPHICS_MAGIC = 0x47524658; // 'GRFX'
 
 namespace love
 {
@@ -289,8 +291,12 @@ public:
 
 	uint32 getDeviceApiVersion() const { return deviceApiVersion; }
 
-	VkImageView getCurrentSwapchainImageView() const;
-	VkImageViewCreateInfo getCurrentSwapchainImageViewCreateInfo() const;
+	VkImageView getCurrentSwapchainImageView() override;
+	VkImageViewCreateInfo getCurrentSwapchainImageViewCreateInfo() override;
+
+	bool setLibretroVulkanContext(VkInstance instance, VkDevice device, VkPhysicalDevice physicalDevice, 
+                                  VkQueue queue, VkCommandPool commandPool);
+	VkCommandPool getCommandPool() { return commandPool; }
 
 protected:
 	gfx::ShaderStage *newShaderStageInternal(ShaderStageType stage, const std::string &cachekey, const std::string &source, bool gles) override;
@@ -354,7 +360,7 @@ private:
 	void applyScissor();
 	VkSampler createSampler(const SamplerState &sampler);
 	void requestSwapchainRecreation();
-
+	
 	VkInstance instance = VK_NULL_HANDLE;
 	VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 	uint32_t deviceApiVersion = VK_API_VERSION_1_0;
@@ -408,6 +414,19 @@ private:
 	std::vector<std::vector<std::function<void()>>> readbackCallbacks;
 	std::set<StrongRef<Shader>> usedShadersInFrame;
 	RenderpassState renderPassState;
+
+	bool libretroMode = false;
+	bool commandBufferRecording = false;  // Track if command buffer is in recording state
+	// Add this member variable in the private section around line 415, after commandBufferRecording
+uint32_t magicNumber = GRAPHICS_MAGIC;  // Magic number for corruption detection
+    VkInstance externalInstance = VK_NULL_HANDLE;
+    VkDevice externalDevice = VK_NULL_HANDLE;
+    VkPhysicalDevice externalPhysicalDevice = VK_NULL_HANDLE;
+    VkQueue externalQueue = VK_NULL_HANDLE;
+    VkCommandPool externalCommandPool = VK_NULL_HANDLE;
+	bool ownsCommandPool = false;  // Track if we created the command pool ourselves
+
+	VmaVulkanFunctions vmaVulkanFunctions = {};
 };
 
 } // vulkan

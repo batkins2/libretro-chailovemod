@@ -36,6 +36,7 @@ class chai_gfx {
     bool init();
     bool destroy();
     bool hasReinit();
+    bool isGraphicsAvailable() const;
     chai_shader *wrap_newShader(const std::string *FileName, const std::string *PixFileName, chai_shader *cshader);
     void wrap_setShader(chai_shader *s);
     chai_mesh *wrap_newMesh(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::vector<chaiscript::Boxed_Value> &data, const std::string &type);
@@ -54,6 +55,14 @@ class chai_gfx {
     inline static const struct retro_hw_render_interface_vulkan *vulkan;
     void setVulkanInterface(const struct retro_hw_render_interface_vulkan *vulkanInterface) {
         vulkan = vulkanInterface;
+    }
+    const struct retro_hw_render_interface_vulkan* getVulkanInterface() const {
+        return vulkan;
+    }
+    
+    // Add method to check if we're in libretro mode
+    bool isLibretroMode() const {
+        return vulkan != nullptr;
     }
     unsigned int FRAMEBUFFER;
     unsigned int COLORATTACH;

@@ -18,6 +18,9 @@
  * 3. This notice may not be removed or altered from any source distribution.
  **/
 
+#define VOLK_IMPLEMENTATION
+#define VMA_IMPLEMENTATION
+
 #include "../common/Exception.h"
 #include "../common/pixelformat.h"
 #include "../common/version.h"
@@ -38,11 +41,10 @@
 #include <sstream>
 #include <array>
 
-#define VOLK_IMPLEMENTATION
-#include "volk/volk.h"
+#include "../../ChaiLove.h"
 
-#define VMA_IMPLEMENTATION
-#include "vma/vk_mem_alloc.h"
+
+// #include "vma/vk_mem_alloc.h"
 
 namespace love
 {
@@ -72,16 +74,21 @@ VmaAllocator Graphics::getVmaAllocator() const
 	return vmaAllocator;
 }
 
-VkImageView Graphics::getCurrentSwapchainImageView() const
+VkImageView Graphics::getCurrentSwapchainImageView()
 {
+	if (imageIndex >= swapChainImageViews.size())
+		return VK_NULL_HANDLE;
 	return swapChainImageViews[imageIndex];
 }
 
-VkImageViewCreateInfo Graphics::getCurrentSwapchainImageViewCreateInfo() const
+VkImageViewCreateInfo Graphics::getCurrentSwapchainImageViewCreateInfo()
 {
 	VkImageViewCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	createInfo.image = swapChainImages[imageIndex];
+	if (swapChainImageViews.empty() || imageIndex >= swapChainImageViews.size())
+		createInfo.image = VK_NULL_HANDLE;
+	else
+		createInfo.image = swapChainImages[imageIndex];
 	createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 	createInfo.format = swapChainImageFormat;
 	createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -111,79 +118,104 @@ static void checkOptionalInstanceExtensions(OptionalInstanceExtensions& ext)
 	{
 		if (strcmp(extension.extensionName, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME) == 0)
 			ext.physicalDeviceProperties2 = true;
-		if (strcmp(extension.extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0)
+		if (strcmp(extension.extensionName, VK_EXT_DEBUG_MARKER_EXTENSION_NAME) == 0)
 			ext.debugInfo = true;
 	}
 }
 
 Graphics::Graphics()
-	: love::gfx::Graphics("love.graphics.vulkan")
+    : love::gfx::Graphics("love.graphics.vulkan")
 {
-	if (SDL_Vulkan_LoadLibrary(nullptr) < 0)
-		throw love::Exception("could not find vulkan");
+    std::printf("[CHAILOVE DEBUG] Graphics::Graphics() constructor called\n");
+    
+	// Initialize magic number first for corruption detection
+    magicNumber = GRAPHICS_MAGIC;
 
-	volkInitializeCustom((PFN_vkGetInstanceProcAddr)SDL_Vulkan_GetVkGetInstanceProcAddr());
+	commandBufferRecording = false;  // Initialize command buffer recording flag
 
-	if (isDebugEnabled() && !checkValidationSupport())
-		throw love::Exception("validation layers requested, but not available");
+    if (SDL_Vulkan_LoadLibrary(nullptr) < 0)
+        throw love::Exception("Could not load Vulkan library.");
 
-	VkApplicationInfo appInfo{};
-	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	appInfo.pApplicationName = "LOVE";
-	appInfo.applicationVersion = VK_MAKE_API_VERSION(0, 1, 0, 0);	// get this version from somewhere else?
-	appInfo.pEngineName = "LOVE Game Framework";
-	appInfo.engineVersion = VK_MAKE_API_VERSION(0, VERSION_MAJOR, VERSION_MINOR, VERSION_REV);
-	appInfo.apiVersion = VK_API_VERSION_1_3;
+    volkInitializeCustom((PFN_vkGetInstanceProcAddr)SDL_Vulkan_GetVkGetInstanceProcAddr());
 
-	VkInstanceCreateInfo createInfo{};
-	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-	createInfo.pApplicationInfo = &appInfo;
-	createInfo.pNext = nullptr;
+    if (isDebugEnabled() && !checkValidationSupport())
+        throw love::Exception("Validation layers requested, but not available!");
 
-	// GetInstanceExtensions works with a null window parameter as long as
-	// SDL_Vulkan_LoadLibrary has been called (which we do earlier).
-	unsigned int count = 0;
-	if (!SDL_Vulkan_GetInstanceExtensions(nullptr, &count, nullptr)) {
-		throw love::Exception("couldn't retrieve required extension count from SDL");
-	}
+    VkApplicationInfo appInfo{};
+    appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    appInfo.pApplicationName = "LOVE";
+    appInfo.applicationVersion = VK_MAKE_VERSION(0, 1, 0);	// get this version from somewhere else?
+    appInfo.pEngineName = "LOVE Game Framework";
+    appInfo.engineVersion = VK_MAKE_VERSION(0, VERSION_MAJOR, VERSION_MINOR);
+    appInfo.apiVersion = VK_API_VERSION_1_0;
 
-	std::vector<const char*> extensions(count);
-	if (!SDL_Vulkan_GetInstanceExtensions(nullptr, &count, extensions.data())) {
-		throw love::Exception("couldn't retrieve sdl vulkan extensions");
-	}
+    VkInstanceCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    createInfo.pApplicationInfo = &appInfo;
+    createInfo.pNext = nullptr;
 
-	checkOptionalInstanceExtensions(optionalInstanceExtensions);
+    // GetInstanceExtensions works with a null window parameter as long as
+    // SDL_Vulkan_LoadLibrary has been called (which we do earlier).
+    unsigned int count = 0;
+    if (!SDL_Vulkan_GetInstanceExtensions(nullptr, &count, nullptr)) {
+        throw love::Exception("Failed to get SDL Vulkan instance extensions count.");
+    }
 
-	if (optionalInstanceExtensions.physicalDeviceProperties2)
-		extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-	if (optionalInstanceExtensions.debugInfo)
-		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    std::vector<const char*> extensions(count);
+    if (!SDL_Vulkan_GetInstanceExtensions(nullptr, &count, extensions.data())) {
+        throw love::Exception("Failed to get SDL Vulkan instance extensions.");
+    }
 
-	createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
-	createInfo.ppEnabledExtensionNames = extensions.data();
+    checkOptionalInstanceExtensions(optionalInstanceExtensions);
 
-	if (isDebugEnabled())
-	{
-		createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-		createInfo.ppEnabledLayerNames = validationLayers.data();
-	}
+    if (optionalInstanceExtensions.physicalDeviceProperties2)
+        extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    if (optionalInstanceExtensions.debugInfo)
+        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
-	if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS)
-		throw love::Exception("couldn't create vulkan instance");
+    createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+    createInfo.ppEnabledExtensionNames = extensions.data();
 
-	volkLoadInstance(instance);
+    if (isDebugEnabled())
+    {
+        createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+        createInfo.ppEnabledLayerNames = validationLayers.data();
+    }
+
+    if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS)
+        throw love::Exception("Failed to create Vulkan instance.");
+
+    volkLoadInstance(instance);
+    
+    std::printf("[CHAILOVE DEBUG] Graphics::Graphics() constructor completed\n");
 }
 
 Graphics::~Graphics()
 {
-	defaultVertexBuffer.set(nullptr);
-	localUniformBuffer.set(nullptr);
+	// Immediately mark magic number as destroyed to detect use-after-free
+    magicNumber = 0xDEADBEEF;
 
-	Volatile::unloadAll();
-	cleanup();
-	vkDestroyInstance(instance, nullptr);
+    // Immediately mark as destroyed to prevent further access
+    created = false;
+    if (magicNumber == GRAPHICS_MAGIC) {  // Only clear if it was valid
+        magicNumber = 0xDEADBEEF;
+    }
+    
+    defaultVertexBuffer.set(nullptr);
+    localUniformBuffer.set(nullptr);
 
-	SDL_Vulkan_UnloadLibrary();
+    Volatile::unloadAll();
+    cleanup();
+    
+    // Clean up command pool if we created it
+    if (ownsCommandPool && commandPool != VK_NULL_HANDLE) {
+        vkDestroyCommandPool(device, commandPool, nullptr);
+        commandPool = VK_NULL_HANDLE;
+    }
+    
+    vkDestroyInstance(instance, nullptr);
+
+    SDL_Vulkan_UnloadLibrary();
 }
 
 bool Graphics::bindVAO()
@@ -360,6 +392,20 @@ void Graphics::discard(const std::vector<bool> &colorbuffers, bool depthstencil)
 
 void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallbackData)
 {
+	if (libretroMode) {
+        // Just end the command buffer recording, RetroArch will submit it
+        endRecordingGraphicsCommands();
+        return;
+    }
+
+	if (graphicsQueue == VK_NULL_HANDLE) {
+        throw love::Exception("Graphics queue is null!");
+    }
+    
+    if (device == VK_NULL_HANDLE) {
+        throw love::Exception("Device is null!");
+    }
+
 	flushBatchedDraws();
 
 	if (renderPassState.active)
@@ -442,51 +488,39 @@ void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallback
 
 	endRecordingGraphicsCommands();
 
-	if (!imagesInFlight.empty())
-	{
-		if (imagesInFlight[imageIndex] != VK_NULL_HANDLE)
-			vkWaitForFences(device, 1, &imagesInFlight.at(imageIndex), VK_TRUE, UINT64_MAX);
-		imagesInFlight[imageIndex] = inFlightFences[currentFrame];
+	return;
+
+	// Instead of managing our own semaphores, work with RetroArch's system
+    std::array<VkCommandBuffer, 1> submitCommandbuffers = { commandBuffers.at(currentFrame) };
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.pNext = nullptr;
+    
+    // Let RetroArch handle the semaphores - don't use our own
+    submitInfo.waitSemaphoreCount = 0;
+    submitInfo.pWaitSemaphores = nullptr;
+    submitInfo.pWaitDstStageMask = nullptr;
+
+    submitInfo.commandBufferCount = static_cast<uint32_t>(submitCommandbuffers.size());
+    submitInfo.pCommandBuffers = submitCommandbuffers.data();
+
+    // Don't signal our own semaphores - RetroArch will handle this
+    submitInfo.signalSemaphoreCount = 0;
+    submitInfo.pSignalSemaphores = nullptr;
+
+	auto vulkan = ChaiLove::getInstance()->chai_gfx.vulkan;
+	if (vulkan->lock_queue) {
+		vulkan->lock_queue(vulkan->handle);
 	}
 
-	std::array<VkCommandBuffer, 1> submitCommandbuffers = { commandBuffers.at(currentFrame) };
-
-	VkSubmitInfo submitInfo{};
-	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-	VkSemaphore waitSemaphores[] = { imageAvailableSemaphores.at(currentFrame) };
-	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT };
-
-	if (imageRequested)
-	{
-		submitInfo.waitSemaphoreCount = 1;
-		submitInfo.pWaitSemaphores = waitSemaphores;
-		submitInfo.pWaitDstStageMask = waitStages;
-		imageRequested = false;
-	}
-
-	submitInfo.commandBufferCount = static_cast<uint32_t>(submitCommandbuffers.size());
-	submitInfo.pCommandBuffers = submitCommandbuffers.data();
-
-	VkSemaphore signalSemaphores[] = { renderFinishedSemaphores.at(currentFrame) };
-
-	VkFence fence = VK_NULL_HANDLE;
-
-	if (submitMode == SUBMIT_PRESENT)
-	{
-		if (!swapChainImages.empty())
-		{
-			submitInfo.signalSemaphoreCount = 1;
-			submitInfo.pSignalSemaphores = signalSemaphores;
-		}
-
-		vkResetFences(device, 1, &inFlightFences[currentFrame]);
-		fence = inFlightFences[currentFrame];
-	}
-
-	if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, fence) != VK_SUCCESS)
+	if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
 		throw love::Exception("failed to submit draw command buffer");
-	
+
+	if (vulkan->unlock_queue) {
+		vulkan->unlock_queue(vulkan->handle);
+	}
+
 	if (submitMode == SUBMIT_NOPRESENT || submitMode == SUBMIT_RESTART || screenshotBuffer != VK_NULL_HANDLE)
 	{
 		vkQueueWaitIdle(graphicsQueue);
@@ -563,68 +597,71 @@ void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallback
 
 void Graphics::present(void *screenshotCallbackdata)
 {
-	if (!isActive())
-		return;
+    if (!isActive())
+        return;
 
-	if (isRenderTargetActive())
-		throw love::Exception("present cannot be called while a render target is active.");
+    if (isRenderTargetActive())
+        throw love::Exception("present cannot be called while a render target is active.");
 
-	if (!renderPassState.active && renderPassState.windowClearRequested)
-		startRenderPass();
+    if (!renderPassState.active && renderPassState.windowClearRequested)
+        startRenderPass();
 
-	deprecations.draw(this);
+    deprecations.draw(this);
 
-	submitGpuCommands(SUBMIT_PRESENT, screenshotCallbackdata);
+    submitGpuCommands(SUBMIT_PRESENT, screenshotCallbackdata);
 
-	VkResult result = VK_SUCCESS;
+    VkResult result = VK_SUCCESS;
 
-	if (!swapChainImages.empty())
-	{
-		VkPresentInfoKHR presentInfo{};
-		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		presentInfo.waitSemaphoreCount = 1;
-		presentInfo.pWaitSemaphores = &renderFinishedSemaphores.at(currentFrame);
-		presentInfo.swapchainCount = 1;
-		presentInfo.pSwapchains = &swapChain;
-		presentInfo.pImageIndices = &imageIndex;
+    // In libretro mode, skip all swapchain/surface operations
+    if (!libretroMode) {
+        if (!swapChainImages.empty())
+        {
+            VkPresentInfoKHR presentInfo{};
+            presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+            presentInfo.waitSemaphoreCount = 1;
+            presentInfo.pWaitSemaphores = &renderFinishedSemaphores.at(currentFrame);
+            presentInfo.swapchainCount = 1;
+            presentInfo.pSwapchains = &swapChain;
+            presentInfo.pImageIndices = &imageIndex;
 
-		result = vkQueuePresentKHR(presentQueue, &presentInfo);
-	}
-	else
-	{
-		// Presenting without a real swap chain can happen if the window is minimized.
-		// Check every frame to see if a proper one can be created, in this situation.
-		VkSurfaceCapabilitiesKHR capabilities = {};
-		if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &capabilities) == VK_SUCCESS)
-		{
-			VkExtent2D extent = chooseSwapExtent(capabilities);
-			if (extent.width > 0 && extent.height > 0)
-				swapChainRecreationRequested = true;
-		}
-	}
+            result = vkQueuePresentKHR(presentQueue, &presentInfo);
+        }
+        else
+        {
+            // Presenting without a real swap chain can happen if the window is minimized.
+            // Check every frame to see if a proper one can be created, in this situation.
+            VkSurfaceCapabilitiesKHR capabilities = {};
+            if (surface != VK_NULL_HANDLE && vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &capabilities) == VK_SUCCESS)
+            {
+                VkExtent2D extent = chooseSwapExtent(capabilities);
+                if (extent.width > 0 && extent.height > 0)
+                    swapChainRecreationRequested = true;
+            }
+        }
 
-	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || swapChainRecreationRequested)
-	{
-		swapChainRecreationRequested = false;
-		recreateSwapChain();
-	}
-	else if (result != VK_SUCCESS)
-		throw love::Exception("failed to present swap chain image");
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || swapChainRecreationRequested)
+        {
+            swapChainRecreationRequested = false;
+            recreateSwapChain();
+        }
+        else if (result != VK_SUCCESS)
+            throw love::Exception("failed to present swap chain image");
+    }
 
-	for (love::gfx::StreamBuffer *buffer : batchedDrawState.vb)
-		buffer->nextFrame();
-	batchedDrawState.indexBuffer->nextFrame();
+    for (love::gfx::StreamBuffer *buffer : batchedDrawState.vb)
+        buffer->nextFrame();
+    batchedDrawState.indexBuffer->nextFrame();
 
-	drawCalls = 0;
-	renderTargetSwitchCount = 0;
-	drawCallsBatched = 0;
+    drawCalls = 0;
+    renderTargetSwitchCount = 0;
+    drawCallsBatched = 0;
 
-	updatePendingReadbacks();
-	updateTemporaryResources();
+    updatePendingReadbacks();
+    updateTemporaryResources();
 
-	currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 
-	beginFrame();
+    beginFrame();
 }
 
 void Graphics::backbufferChanged(int width, int height, int pixelwidth, int pixelheight, bool backbufferstencil, bool backbufferdepth, int msaa)
@@ -651,155 +688,499 @@ void Graphics::backbufferChanged(int width, int height, int pixelwidth, int pixe
 
 bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int pixelheight, bool backbufferstencil, bool backbufferdepth, int msaa)
 {
-	// Must be called before the swapchain is created.
-	backbufferChanged(width, height, pixelwidth, pixelheight, backbufferstencil, backbufferdepth, msaa);
+    std::printf("[CHAILOVE DEBUG] setMode called, libretroMode = %s, externalInstance = %p\n", 
+           libretroMode ? "true" : "false", externalInstance);
+           
+    if (libretroMode && externalInstance != VK_NULL_HANDLE) {
+        std::printf("[CHAILOVE DEBUG] Entering libretro initialization path\n");
+        
+        // Use RetroArch's Vulkan context instead of creating our own
+        instance = externalInstance;
+        device = externalDevice;
+        physicalDevice = externalPhysicalDevice;
+        graphicsQueue = externalQueue;
+		
+        // Only set command pool if we don't already have one
+        if (commandPool == VK_NULL_HANDLE) {
+            commandPool = externalCommandPool;
+        }
+        
+        if (vmaAllocator == VK_NULL_HANDLE) {
+            VmaAllocatorCreateInfo allocatorCreateInfo = {};
+            allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_0;
+            allocatorCreateInfo.physicalDevice = physicalDevice;
+            allocatorCreateInfo.device = device;
+            allocatorCreateInfo.instance = instance;
+            
+            vmaVulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
+            vmaVulkanFunctions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
+            vmaVulkanFunctions.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
+            vmaVulkanFunctions.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
+            vmaVulkanFunctions.vkAllocateMemory = vkAllocateMemory;
+            vmaVulkanFunctions.vkFreeMemory = vkFreeMemory;
+            vmaVulkanFunctions.vkMapMemory = vkMapMemory;
+            vmaVulkanFunctions.vkUnmapMemory = vkUnmapMemory;
+            vmaVulkanFunctions.vkFlushMappedMemoryRanges = vkFlushMappedMemoryRanges;
+            vmaVulkanFunctions.vkInvalidateMappedMemoryRanges = vkInvalidateMappedMemoryRanges;
+            vmaVulkanFunctions.vkBindBufferMemory = vkBindBufferMemory;
+            vmaVulkanFunctions.vkBindImageMemory = vkBindImageMemory;
+            vmaVulkanFunctions.vkGetBufferMemoryRequirements = vkGetBufferMemoryRequirements;
+            vmaVulkanFunctions.vkGetImageMemoryRequirements = vkGetImageMemoryRequirements;
+            vmaVulkanFunctions.vkCreateBuffer = vkCreateBuffer;
+            vmaVulkanFunctions.vkCreateImage = vkCreateImage;
+            vmaVulkanFunctions.vkDestroyBuffer = vkDestroyBuffer;
+            vmaVulkanFunctions.vkDestroyImage = vkDestroyImage;
+            vmaVulkanFunctions.vkCmdCopyBuffer = vkCmdCopyBuffer;
 
-	cleanUpFunctions.clear();
-	cleanUpFunctions.resize(MAX_FRAMES_IN_FLIGHT);
+            vmaVulkanFunctions.vkGetBufferMemoryRequirements2KHR = vkGetBufferMemoryRequirements2KHR;
+            vmaVulkanFunctions.vkGetImageMemoryRequirements2KHR = vkGetImageMemoryRequirements2KHR;
+            vmaVulkanFunctions.vkBindBufferMemory2KHR = vkBindBufferMemory2KHR;
+            vmaVulkanFunctions.vkBindImageMemory2KHR = vkBindImageMemory2KHR;
+            vmaVulkanFunctions.vkGetPhysicalDeviceMemoryProperties2KHR = vkGetPhysicalDeviceMemoryProperties2KHR;
+            vmaVulkanFunctions.vkGetDeviceBufferMemoryRequirements = vkGetDeviceBufferMemoryRequirements;
+            vmaVulkanFunctions.vkGetDeviceImageMemoryRequirements = vkGetDeviceImageMemoryRequirements;
 
-	readbackCallbacks.clear();
-	readbackCallbacks.resize(MAX_FRAMES_IN_FLIGHT);
+            allocatorCreateInfo.pVulkanFunctions = &vmaVulkanFunctions;
+            allocatorCreateInfo.flags |= VMA_ALLOCATOR_CREATE_EXTERNALLY_SYNCHRONIZED_BIT;
 
-	bool createBaseObjects = physicalDevice == VK_NULL_HANDLE;
+            if (vmaCreateAllocator(&allocatorCreateInfo, &vmaAllocator) != VK_SUCCESS)
+                throw love::Exception("Failed to create VMA allocator in libretro mode");
+        }
+        
+        // Set up the rest of the graphics state for libretro
+        backbufferChanged(width, height, pixelwidth, pixelheight, backbufferstencil, backbufferdepth, msaa);
 
-	createSurface();
+        std::printf("[CHAILOVE DEBUG] About to call initCapabilities() in libretro mode\n");
+        // Initialize capabilities with the external device - MUST BE DONE EARLY
+        initCapabilities();
+        std::printf("[CHAILOVE DEBUG] initCapabilities() completed in libretro mode\n");
 
-	if (createBaseObjects)
-	{
-		pickPhysicalDevice();
-		createLogicalDevice();
-		createPipelineCache();
-		initVMA();
-		initCapabilities();
-	}
+        // Initialize cleanup and callback vectors
+        cleanUpFunctions.clear();
+        cleanUpFunctions.resize(MAX_FRAMES_IN_FLIGHT);
+        readbackCallbacks.clear();
+        readbackCallbacks.resize(MAX_FRAMES_IN_FLIGHT);
+        
+        // Create command buffers from RetroArch's command pool
+        commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.commandPool = commandPool;  // Use RetroArch's command pool
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandBufferCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
-	msaaSamples = getMsaaCount(requestedMsaa);
+        if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS)
+            throw love::Exception("Failed to allocate command buffers in libretro mode");
+        
+        // Create our internal resources that don't conflict with RetroArch
+        if (localUniformBuffer == nullptr)
+            localUniformBuffer.set(new StreamBuffer(this, BUFFERUSAGE_UNIFORM, 1024 * 512 * 1), Acquire::NORETAIN);
+            
+        // Create defaultVertexBuffer
+        if (defaultVertexBuffer == nullptr) {
+            std::vector<Buffer::DataDeclaration> defaultVertexFormat = {
+                {"DefaultFloat", DATAFORMAT_FLOAT_VEC4},
+                {"DefaultInt", DATAFORMAT_INT32_VEC4},
+                {"DefaultColor", DATAFORMAT_FLOAT_VEC4},
+            };
+            
+            Buffer::Settings settings(BUFFERUSAGEFLAG_VERTEX, BUFFERDATAUSAGE_STATIC);
+            
+            defaultVertexBuffer.set(new Buffer(this, settings, defaultVertexFormat, nullptr, sizeof(float) * 8 * 4, 4), Acquire::NORETAIN);
+        }
 
-	createSwapChain();
-	createImageViews();
-	createColorResources();
-	createDepthResources();
-	transitionColorDepthLayouts = true;
+        // Set MSAA
+        msaaSamples = getMsaaCount(requestedMsaa);
+        
+        // Create color resources (for MSAA if needed)
+        createColorResources();
+        
+        // Create depth resources if needed
+        if (backbufferstencil || backbufferdepth) {
+            createDepthResources();
+        }
+        
+        transitionColorDepthLayouts = true;
 
-	if (createBaseObjects)
-	{
-		createCommandPool();
-		createCommandBuffers();
-		createSyncObjects();
-	}
+        // Create our render target texture for libretro
+        auto settings = love::gfx::Texture::Settings{
+                    width, height, 1,
+                    love::gfx::TEXTURE_2D,
+                    love::gfx::Texture::MipmapsMode::MIPMAPS_NONE,
+                    0,
+                    love::PixelFormat::PIXELFORMAT_RGBA8_UNORM,
+                    false,
+                    1.0f,
+                    1,
+                    true  // isRenderTarget = true
+                };
+        fakeBackbuffer.set(new Texture(this, settings, nullptr), Acquire::NORETAIN);
 
-	if (localUniformBuffer == nullptr)
-		localUniformBuffer.set(new StreamBuffer(this, BUFFERUSAGE_UNIFORM, 1024 * 512 * 1), Acquire::NORETAIN);
+        // Create default shaders
+        createDefaultShaders();
 
-	beginFrame();
+        // Create quad index buffer (needed for drawQuads function)
+        if (quadIndexBuffer == nullptr) {
+            std::vector<uint16> quadIndices;
+            quadIndices.reserve(LOVE_UINT16_MAX);
 
-	if (createBaseObjects)
-	{
-		if (batchedDrawState.vb[0] == nullptr)
-		{
-			// Initial sizes that should be good enough for most cases. It will
-			// resize to fit if needed, later.
-			batchedDrawState.vb[0] = new StreamBuffer(this, BUFFERUSAGE_VERTEX, 1024 * 1024 * 1);
-			batchedDrawState.vb[1] = new StreamBuffer(this, BUFFERUSAGE_VERTEX, 256 * 1024 * 1);
-			batchedDrawState.indexBuffer = new StreamBuffer(this, BUFFERUSAGE_INDEX, sizeof(uint16) * LOVE_UINT16_MAX);
-		}
+            for (uint16 i = 0; i < LOVE_UINT16_MAX - 3; i += 4)
+            {
+                quadIndices.push_back(i + 0);
+                quadIndices.push_back(i + 1);
+                quadIndices.push_back(i + 2);
 
-		if (defaultVertexBuffer == nullptr)
-		{
-			struct DefaultData
-			{
-				float floats[4];
-				int ints[4];
-				float color[4];
-			} data;
+                quadIndices.push_back(i + 0);
+                quadIndices.push_back(i + 2);
+                quadIndices.push_back(i + 3);
+            }
 
-			data.floats[0] = 0.0f;
-			data.floats[1] = 0.0f;
-			data.floats[2] = 0.0f;
-			data.floats[3] = 1.0f;
+            size_t quadIndexDataSize = quadIndices.size() * sizeof(uint16);
 
-			data.ints[0] = 0;
-			data.ints[1] = 0;
-			data.ints[2] = 0;
-			data.ints[3] = 1;
+            Buffer::Settings quadIndexBufferSettings(BUFFERUSAGEFLAG_INDEX, BUFFERDATAUSAGE_STATIC);
 
-			data.color[0] = 1.0f;
-			data.color[1] = 1.0f;
-			data.color[2] = 1.0f;
-			data.color[3] = 1.0f;
+            std::vector<Buffer::DataDeclaration> quadIndexFormat = {
+                {"index", DATAFORMAT_UINT16},
+            };
 
-			std::vector<Buffer::DataDeclaration> format = {
-				Buffer::DataDeclaration("Floats", DATAFORMAT_FLOAT_VEC4),
-				Buffer::DataDeclaration("Ints", DATAFORMAT_INT32_VEC4),
-				Buffer::DataDeclaration("Color", DATAFORMAT_FLOAT_VEC4)
-			};
+            quadIndexBuffer = new Buffer(this, quadIndexBufferSettings, quadIndexFormat, quadIndices.data(), quadIndexDataSize, quadIndices.size());
+        }
 
-			Buffer::Settings settings(BUFFERUSAGEFLAG_VERTEX, BUFFERDATAUSAGE_STATIC);
-			defaultVertexBuffer.set(newBuffer(settings, format, &data, sizeof(DefaultData), 1), Acquire::NORETAIN);
+        // Begin frame to initialize command buffer state
+        beginFrame();
 
-			VkBuffer buffer = (VkBuffer)defaultVertexBuffer->getHandle();
-			VkDeviceSize offset = 0;
-			vkCmdBindVertexBuffers(commandBuffers.at(currentFrame), DEFAULT_VERTEX_BUFFER_BINDING, 1, &buffer, &offset);
-		}
+        // Final setup
+        restoreState(states.back());
+        Vulkan::resetShaderSwitches();
+        created = true;
+        drawCalls = 0;
+        drawCallsBatched = 0;
 
-		createDefaultShaders();
-		Shader::current = Shader::standardShaders[Shader::StandardShader::STANDARD_DEFAULT];
-		createQuadIndexBuffer();
-		createFanIndexBuffer();
+        std::printf("[CHAILOVE DEBUG] Libretro initialization completed successfully\n");
+        // RETURN EARLY - don't continue with normal initialization
+        return true;
+    }
 
-		currentFrame = 0;
-	}
+    std::printf("[CHAILOVE DEBUG] Taking normal (non-libretro) initialization path\n");
+    // Normal (non-libretro) initialization path starts here...
+    // Must be called before the swapchain is created.
+    backbufferChanged(width, height, pixelwidth, pixelheight, backbufferstencil, backbufferdepth, msaa);
 
-	restoreState(states.back());
+    cleanUpFunctions.clear();
+    cleanUpFunctions.resize(MAX_FRAMES_IN_FLIGHT);
 
-	Vulkan::resetShaderSwitches();
+    readbackCallbacks.clear();
+    readbackCallbacks.resize(MAX_FRAMES_IN_FLIGHT);
 
-	created = true;
-	drawCalls = 0;
-	drawCallsBatched = 0;
+    bool createBaseObjects = physicalDevice == VK_NULL_HANDLE;
 
-	return true;
+    createSurface();
+
+    if (createBaseObjects)
+    {
+        pickPhysicalDevice();
+        createLogicalDevice();
+        createPipelineCache();
+        initVMA();
+        initCapabilities();
+    }
+
+    msaaSamples = getMsaaCount(requestedMsaa);
+
+    // For libretro mode, skip swapchain creation but create our own render targets
+    // createSwapChain();  // Skip this for libretro
+    // createImageViews();
+    createColorResources();
+    
+    // Only create depth resources if we actually need them
+    if (backbufferstencil || backbufferdepth) {
+        createDepthResources();
+    }
+    
+    transitionColorDepthLayouts = true;
+
+    if (createBaseObjects)
+    {
+        createCommandPool();
+        createCommandBuffers();
+        createSyncObjects();
+    }
+
+    if (localUniformBuffer == nullptr)
+        localUniformBuffer.set(new StreamBuffer(this, BUFFERUSAGE_UNIFORM, 1024 * 512 * 1), Acquire::NORETAIN);
+
+    // Create our render target texture for libretro
+    auto settings = love::gfx::Texture::Settings{
+                width, height, 1,
+                love::gfx::TEXTURE_2D,
+                love::gfx::Texture::MipmapsMode::MIPMAPS_NONE,
+                0,
+                love::PixelFormat::PIXELFORMAT_RGBA8_UNORM,
+                false,
+                1.0f,
+                1,
+                true  // isRenderTarget = true
+            };
+    fakeBackbuffer.set(new Texture(this, settings, nullptr), Acquire::NORETAIN);
+
+    if (createBaseObjects)
+    {
+        // Create default shaders
+        createDefaultShaders();
+
+        // Create quad index buffer (needed for drawQuads function)
+        if (quadIndexBuffer == nullptr) {
+            std::vector<uint16> quadIndices;
+            quadIndices.reserve(LOVE_UINT16_MAX);
+
+            for (uint16 i = 0; i < LOVE_UINT16_MAX - 3; i += 4)
+            {
+                quadIndices.push_back(i + 0);
+                quadIndices.push_back(i + 1);
+                quadIndices.push_back(i + 2);
+
+                quadIndices.push_back(i + 0);
+                quadIndices.push_back(i + 2);
+                quadIndices.push_back(i + 3);
+            }
+
+            size_t quadIndexDataSize = quadIndices.size() * sizeof(uint16);
+
+            Buffer::Settings quadIndexBufferSettings(BUFFERUSAGEFLAG_INDEX, BUFFERDATAUSAGE_STATIC);
+
+            std::vector<Buffer::DataDeclaration> quadIndexFormat = {
+                {"index", DATAFORMAT_UINT16},
+            };
+
+            quadIndexBuffer = new Buffer(this, quadIndexBufferSettings, quadIndexFormat, quadIndices.data(), quadIndexDataSize, quadIndices.size());
+        }
+    }
+
+    // Begin frame to initialize command buffer state
+    beginFrame();
+
+    restoreState(states.back());
+
+    Vulkan::resetShaderSwitches();
+
+    created = true;
+    drawCalls = 0;
+    drawCallsBatched = 0;
+
+    return true;
+}
+
+bool Graphics::setLibretroVulkanContext(VkInstance instance, VkDevice device, VkPhysicalDevice physicalDevice, 
+                                        VkQueue queue, VkCommandPool commandPool)
+{
+    std::printf("[CHAILOVE DEBUG] setLibretroVulkanContext called\n");
+    std::printf("[CHAILOVE DEBUG] - instance: %p\n", instance);
+    std::printf("[CHAILOVE DEBUG] - device: %p\n", device);
+    std::printf("[CHAILOVE DEBUG] - physicalDevice: %p\n", physicalDevice);
+    std::printf("[CHAILOVE DEBUG] - queue: %p\n", queue);
+    std::printf("[CHAILOVE DEBUG] - commandPool: %p\n", commandPool);
+    
+    libretroMode = true;
+	commandBufferRecording = false;  // Initialize command buffer recording flag
+    externalInstance = instance;
+    externalDevice = device;
+    externalPhysicalDevice = physicalDevice;
+    externalQueue = queue;
+    externalCommandPool = commandPool;
+    
+    // Set up the Vulkan objects so initCapabilities() can use them
+    this->instance = externalInstance;
+    this->device = externalDevice;
+    this->physicalDevice = externalPhysicalDevice;
+    this->graphicsQueue = externalQueue;
+    
+    // Create our own command pool if RetroArch doesn't provide one
+    if (commandPool == VK_NULL_HANDLE) {
+        std::printf("[CHAILOVE DEBUG] Creating our own command pool\n");
+        // Find queue family for graphics queue
+        uint32_t queueFamilyCount = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
+        
+        std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
+        
+        uint32_t graphicsFamily = 0;
+        for (uint32_t i = 0; i < queueFamilyCount; i++) {
+            if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+                graphicsFamily = i;
+                break;
+            }
+        }
+        
+        VkCommandPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        poolInfo.queueFamilyIndex = graphicsFamily;
+        
+        if (vkCreateCommandPool(device, &poolInfo, nullptr, &this->commandPool) != VK_SUCCESS) {
+            throw love::Exception("Failed to create command pool in libretro mode");
+        }
+        
+        ownsCommandPool = true;  // We created it, so we own it
+        std::printf("[CHAILOVE DEBUG] Created command pool: %p\n", this->commandPool);
+    } else {
+        this->commandPool = externalCommandPool;
+        ownsCommandPool = false;  // RetroArch provided it
+    }
+    
+    // Initialize VMA allocator if not already created
+    if (vmaAllocator == VK_NULL_HANDLE) {
+        std::printf("[CHAILOVE DEBUG] Initializing VMA allocator\n");
+        VmaAllocatorCreateInfo allocatorCreateInfo = {};
+        allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_0;
+        allocatorCreateInfo.physicalDevice = physicalDevice;
+        allocatorCreateInfo.device = device;
+        allocatorCreateInfo.instance = instance;
+        
+        vmaVulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
+        vmaVulkanFunctions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
+        vmaVulkanFunctions.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
+        vmaVulkanFunctions.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
+        vmaVulkanFunctions.vkAllocateMemory = vkAllocateMemory;
+        vmaVulkanFunctions.vkFreeMemory = vkFreeMemory;
+        vmaVulkanFunctions.vkMapMemory = vkMapMemory;
+        vmaVulkanFunctions.vkUnmapMemory = vkUnmapMemory;
+        vmaVulkanFunctions.vkFlushMappedMemoryRanges = vkFlushMappedMemoryRanges;
+        vmaVulkanFunctions.vkInvalidateMappedMemoryRanges = vkInvalidateMappedMemoryRanges;
+        vmaVulkanFunctions.vkBindBufferMemory = vkBindBufferMemory;
+        vmaVulkanFunctions.vkBindImageMemory = vkBindImageMemory;
+        vmaVulkanFunctions.vkGetBufferMemoryRequirements = vkGetBufferMemoryRequirements;
+        vmaVulkanFunctions.vkGetImageMemoryRequirements = vkGetImageMemoryRequirements;
+        vmaVulkanFunctions.vkCreateBuffer = vkCreateBuffer;
+        vmaVulkanFunctions.vkCreateImage = vkCreateImage;
+        vmaVulkanFunctions.vkDestroyBuffer = vkDestroyBuffer;
+        vmaVulkanFunctions.vkDestroyImage = vkDestroyImage;
+        vmaVulkanFunctions.vkCmdCopyBuffer = vkCmdCopyBuffer;
+
+        vmaVulkanFunctions.vkGetBufferMemoryRequirements2KHR = vkGetBufferMemoryRequirements2KHR;
+        vmaVulkanFunctions.vkGetImageMemoryRequirements2KHR = vkGetImageMemoryRequirements2KHR;
+        vmaVulkanFunctions.vkBindBufferMemory2KHR = vkBindBufferMemory2KHR;
+        vmaVulkanFunctions.vkBindImageMemory2KHR = vkBindImageMemory2KHR;
+        vmaVulkanFunctions.vkGetPhysicalDeviceMemoryProperties2KHR = vkGetPhysicalDeviceMemoryProperties2KHR;
+        vmaVulkanFunctions.vkGetDeviceBufferMemoryRequirements = vkGetDeviceBufferMemoryRequirements;
+        vmaVulkanFunctions.vkGetDeviceImageMemoryRequirements = vkGetDeviceImageMemoryRequirements;
+
+        allocatorCreateInfo.pVulkanFunctions = &vmaVulkanFunctions;
+        allocatorCreateInfo.flags |= VMA_ALLOCATOR_CREATE_EXTERNALLY_SYNCHRONIZED_BIT;
+
+        if (vmaCreateAllocator(&allocatorCreateInfo, &vmaAllocator) != VK_SUCCESS)
+            throw love::Exception("Failed to create VMA allocator in libretro mode");
+        
+        std::printf("[CHAILOVE DEBUG] VMA allocator created successfully: %p\n", vmaAllocator);
+    }
+    
+    // Initialize command buffers if not already done
+    if (commandBuffers.empty()) {
+        std::printf("[CHAILOVE DEBUG] Initializing command buffers with pool: %p\n", this->commandPool);
+        // Initialize cleanup and callback vectors
+        cleanUpFunctions.clear();
+        cleanUpFunctions.resize(MAX_FRAMES_IN_FLIGHT);
+        readbackCallbacks.clear();
+        readbackCallbacks.resize(MAX_FRAMES_IN_FLIGHT);
+        
+        // Create command buffers from our command pool
+        commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.commandPool = this->commandPool;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandBufferCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+        if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS)
+            throw love::Exception("Failed to allocate command buffers in libretro mode");
+        
+        std::printf("[CHAILOVE DEBUG] Command buffers allocated successfully, size: %zu\n", commandBuffers.size());
+    }
+    
+    // Initialize capabilities now that we have a valid physicalDevice
+    initCapabilities();
+    
+    std::printf("[CHAILOVE DEBUG] libretroMode set to: %s\n", libretroMode ? "true" : "false");
+    return true;
 }
 
 void Graphics::initCapabilities()
 {
-	capabilities.features[FEATURE_MULTI_RENDER_TARGET_FORMATS] = true;
-	capabilities.features[FEATURE_CLAMP_ZERO] = true;
-	capabilities.features[FEATURE_CLAMP_ONE] = true;
-	capabilities.features[FEATURE_LIGHTEN] = true;
-	capabilities.features[FEATURE_FULL_NPOT] = true;
-	capabilities.features[FEATURE_PIXEL_SHADER_HIGHP] = true;
-	capabilities.features[FEATURE_SHADER_DERIVATIVES] = true;
-	capabilities.features[FEATURE_GLSL3] = true;
-	capabilities.features[FEATURE_GLSL4] = true;
-	capabilities.features[FEATURE_INSTANCING] = true;
-	capabilities.features[FEATURE_TEXEL_BUFFER] = true;
-	capabilities.features[FEATURE_COPY_TEXTURE_TO_BUFFER] = true;
-	capabilities.features[FEATURE_INDIRECT_DRAW] = true;
-	static_assert(FEATURE_MAX_ENUM == 13, "Graphics::initCapabilities must be updated when adding a new graphics feature!");
+    std::printf("[CHAILOVE DEBUG] initCapabilities() called, libretroMode = %s\n", 
+           libretroMode ? "true" : "false");
+           
+    // Always set basic capabilities first
+    capabilities.features[FEATURE_MULTI_RENDER_TARGET_FORMATS] = true;
+    capabilities.features[FEATURE_CLAMP_ZERO] = true;
+    capabilities.features[FEATURE_CLAMP_ONE] = true;
+    capabilities.features[FEATURE_LIGHTEN] = true;
+    capabilities.features[FEATURE_FULL_NPOT] = true;
+    capabilities.features[FEATURE_PIXEL_SHADER_HIGHP] = true;
+    capabilities.features[FEATURE_SHADER_DERIVATIVES] = true;
+    capabilities.features[FEATURE_GLSL3] = true;
+    capabilities.features[FEATURE_GLSL4] = true;
+    capabilities.features[FEATURE_INSTANCING] = true;
+    capabilities.features[FEATURE_TEXEL_BUFFER] = true;
+    capabilities.features[FEATURE_COPY_TEXTURE_TO_BUFFER] = true;
+    capabilities.features[FEATURE_INDIRECT_DRAW] = true;
+    static_assert(FEATURE_MAX_ENUM == 13, "Graphics::initCapabilities must be updated when adding a new graphics feature!");
 
-	VkPhysicalDeviceProperties properties;
-	vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+    // Always set texture types first to prevent "textures not supported" errors
+    capabilities.textureTypes[TEXTURE_2D] = true;
+    capabilities.textureTypes[TEXTURE_2D_ARRAY] = true;
+    capabilities.textureTypes[TEXTURE_VOLUME] = true;
+    capabilities.textureTypes[TEXTURE_CUBE] = true;
 
-	capabilities.limits[LIMIT_POINT_SIZE] = properties.limits.pointSizeRange[1];
-	capabilities.limits[LIMIT_TEXTURE_SIZE] = properties.limits.maxImageDimension2D;
-	capabilities.limits[LIMIT_TEXTURE_LAYERS] = properties.limits.maxImageArrayLayers;
-	capabilities.limits[LIMIT_VOLUME_TEXTURE_SIZE] = properties.limits.maxImageDimension3D;
-	capabilities.limits[LIMIT_CUBE_TEXTURE_SIZE] = properties.limits.maxImageDimensionCube;
-	capabilities.limits[LIMIT_TEXEL_BUFFER_SIZE] = properties.limits.maxTexelBufferElements;
-	capabilities.limits[LIMIT_SHADER_STORAGE_BUFFER_SIZE] = properties.limits.maxStorageBufferRange;
-	capabilities.limits[LIMIT_THREADGROUPS_X] = properties.limits.maxComputeWorkGroupCount[0];
-	capabilities.limits[LIMIT_THREADGROUPS_Y] = properties.limits.maxComputeWorkGroupCount[1];
-	capabilities.limits[LIMIT_THREADGROUPS_Z] = properties.limits.maxComputeWorkGroupCount[2];
-	capabilities.limits[LIMIT_RENDER_TARGETS] = properties.limits.maxColorAttachments;
-	capabilities.limits[LIMIT_TEXTURE_MSAA] = static_cast<double>(getMsaaCount(64));
-	capabilities.limits[LIMIT_ANISOTROPY] = properties.limits.maxSamplerAnisotropy;
-	static_assert(LIMIT_MAX_ENUM == 13, "Graphics::initCapabilities must be updated when adding a new system limit!");
+    std::printf("[CHAILOVE DEBUG] Set TEXTURE_2D = %d to true, current value = %s\n", 
+           TEXTURE_2D, capabilities.textureTypes[TEXTURE_2D] ? "true" : "false");
 
-	capabilities.textureTypes[TEXTURE_2D] = true;
-	capabilities.textureTypes[TEXTURE_2D_ARRAY] = true;
-	capabilities.textureTypes[TEXTURE_VOLUME] = true;
-	capabilities.textureTypes[TEXTURE_CUBE] = true;
+    // Safety check for physicalDevice
+    if (physicalDevice == VK_NULL_HANDLE)
+    {
+        if (libretroMode) {
+            // In libretro mode, set reasonable defaults if physicalDevice is not available
+            capabilities.limits[LIMIT_POINT_SIZE] = 64.0;
+            capabilities.limits[LIMIT_TEXTURE_SIZE] = 16384.0;
+            capabilities.limits[LIMIT_TEXTURE_LAYERS] = 2048.0;
+            capabilities.limits[LIMIT_VOLUME_TEXTURE_SIZE] = 2048.0;
+            capabilities.limits[LIMIT_CUBE_TEXTURE_SIZE] = 16384.0;
+            capabilities.limits[LIMIT_TEXEL_BUFFER_SIZE] = 65536.0;
+            capabilities.limits[LIMIT_SHADER_STORAGE_BUFFER_SIZE] = 134217728.0;
+            capabilities.limits[LIMIT_THREADGROUPS_X] = 65535.0;
+            capabilities.limits[LIMIT_THREADGROUPS_Y] = 65535.0;
+            capabilities.limits[LIMIT_THREADGROUPS_Z] = 65535.0;
+            capabilities.limits[LIMIT_RENDER_TARGETS] = 8.0;
+            capabilities.limits[LIMIT_TEXTURE_MSAA] = 4.0;
+            capabilities.limits[LIMIT_ANISOTROPY] = 16.0;
+            std::printf("[CHAILOVE DEBUG] Using libretro defaults for capabilities limits\n");
+            return;
+        }
+        else {
+            std::printf("[CHAILOVE DEBUG] physicalDevice is NULL in non-libretro mode!\n");
+            return;
+        }
+    }
+
+    VkPhysicalDeviceProperties properties;
+    vkGetPhysicalDeviceProperties(physicalDevice, &properties);
+
+    capabilities.limits[LIMIT_POINT_SIZE] = properties.limits.pointSizeRange[1];
+    capabilities.limits[LIMIT_TEXTURE_SIZE] = properties.limits.maxImageDimension2D;
+    capabilities.limits[LIMIT_TEXTURE_LAYERS] = properties.limits.maxImageArrayLayers;
+    capabilities.limits[LIMIT_VOLUME_TEXTURE_SIZE] = properties.limits.maxImageDimension3D;
+    capabilities.limits[LIMIT_CUBE_TEXTURE_SIZE] = properties.limits.maxImageDimensionCube;
+    capabilities.limits[LIMIT_TEXEL_BUFFER_SIZE] = properties.limits.maxTexelBufferElements;
+    capabilities.limits[LIMIT_SHADER_STORAGE_BUFFER_SIZE] = properties.limits.maxStorageBufferRange;
+    capabilities.limits[LIMIT_THREADGROUPS_X] = properties.limits.maxComputeWorkGroupCount[0];
+    capabilities.limits[LIMIT_THREADGROUPS_Y] = properties.limits.maxComputeWorkGroupCount[1];
+    capabilities.limits[LIMIT_THREADGROUPS_Z] = properties.limits.maxComputeWorkGroupCount[2];
+    capabilities.limits[LIMIT_RENDER_TARGETS] = properties.limits.maxColorAttachments;
+    capabilities.limits[LIMIT_TEXTURE_MSAA] = static_cast<double>(getMsaaCount(64));
+    capabilities.limits[LIMIT_ANISOTROPY] = properties.limits.maxSamplerAnisotropy;
+    static_assert(LIMIT_MAX_ENUM == 13, "Graphics::initCapabilities must be updated when adding a new system limit!");
+    
+    std::printf("[CHAILOVE DEBUG] initCapabilities completed, final TEXTURE_2D support = %s\n",
+           capabilities.textureTypes[TEXTURE_2D] ? "true" : "false");
 }
 
 void Graphics::getAPIStats(int &shaderswitches) const
@@ -1107,33 +1488,56 @@ void Graphics::setWireframe(bool enable)
 
 bool Graphics::isPixelFormatSupported(PixelFormat format, uint32 usage)
 {
-	format = getSizedFormat(format);
+    // Safety check for libretro mode - physicalDevice must be valid
+    if (physicalDevice == VK_NULL_HANDLE)
+    {
+        // If we're in libretro mode and haven't been properly initialized yet, 
+        // assume basic formats are supported to prevent crashes
+        if (libretroMode)
+        {
+            switch (getSizedFormat(format))
+            {
+                case PIXELFORMAT_RGBA8_UNORM:
+                case PIXELFORMAT_RGBA8_sRGB:
+                case PIXELFORMAT_BGRA8_UNORM:
+                case PIXELFORMAT_BGRA8_sRGB:
+                case PIXELFORMAT_DEPTH24_UNORM_STENCIL8:
+                case PIXELFORMAT_DEPTH32_FLOAT_STENCIL8:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+        throw love::Exception("Cannot check pixel format support: physicalDevice is VK_NULL_HANDLE");
+    }
 
-	switch (format)
-	{
-	case PIXELFORMAT_PVR1_RGB2_UNORM:
-	case PIXELFORMAT_PVR1_RGB2_sRGB:
-	case PIXELFORMAT_PVR1_RGB4_UNORM:
-	case PIXELFORMAT_PVR1_RGB4_sRGB:
-	case PIXELFORMAT_PVR1_RGBA2_UNORM:
-	case PIXELFORMAT_PVR1_RGBA2_sRGB:
-	case PIXELFORMAT_PVR1_RGBA4_UNORM:
-	case PIXELFORMAT_PVR1_RGBA4_sRGB:
-		// Lets not support these in Vulkan - they're deprecated.
-		return false;
-	default:
-		break;
-	}
+    format = getSizedFormat(format);
 
-	auto vulkanFormat = Vulkan::getTextureFormat(format);
+    switch (format)
+    {
+    case PIXELFORMAT_PVR1_RGB2_UNORM:
+    case PIXELFORMAT_PVR1_RGB2_sRGB:
+    case PIXELFORMAT_PVR1_RGB4_UNORM:
+    case PIXELFORMAT_PVR1_RGB4_sRGB:
+    case PIXELFORMAT_PVR1_RGBA2_UNORM:
+    case PIXELFORMAT_PVR1_RGBA2_sRGB:
+    case PIXELFORMAT_PVR1_RGBA4_UNORM:
+    case PIXELFORMAT_PVR1_RGBA4_sRGB:
+        // Lets not support these in Vulkan - they're deprecated.
+        return false;
+    default:
+        break;
+    }
 
-	VkFormatProperties formatProperties;
-	vkGetPhysicalDeviceFormatProperties(physicalDevice, vulkanFormat.internalFormat, &formatProperties);
+    auto vulkanFormat = Vulkan::getTextureFormat(format);
 
-	VkFormatFeatureFlags featureFlags = formatProperties.optimalTilingFeatures;
-	VkImageUsageFlags usageFlags = 0;
+    VkFormatProperties formatProperties;
+    vkGetPhysicalDeviceFormatProperties(physicalDevice, vulkanFormat.internalFormat, &formatProperties);
 
-	if (!featureFlags)
+    VkFormatFeatureFlags featureFlags = formatProperties.optimalTilingFeatures;
+    VkImageUsageFlags usageFlags = 0;
+
+    if (!featureFlags)
 		return false;
 
 	if (usage & PIXELFORMATUSAGEFLAGS_SAMPLE)
@@ -1355,7 +1759,7 @@ void Graphics::initDynamicState()
 
 void Graphics::beginFrame()
 {
-	vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+	// vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
 	if (swapChain != VK_NULL_HANDLE)
 	{
@@ -1432,7 +1836,13 @@ void Graphics::beginFrame()
 
 void Graphics::startRecordingGraphicsCommands()
 {
-	VkCommandBufferBeginInfo beginInfo{};
+    // Safety check for command buffers
+    if (commandBuffers.empty() || currentFrame >= commandBuffers.size()) {
+        throw love::Exception("Command buffers not properly initialized - size: %zu, currentFrame: %zu", 
+                             commandBuffers.size(), currentFrame);
+    }
+    
+    VkCommandBufferBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 	beginInfo.pInheritanceInfo = nullptr;
@@ -1440,30 +1850,37 @@ void Graphics::startRecordingGraphicsCommands()
 	if (vkBeginCommandBuffer(commandBuffers.at(currentFrame), &beginInfo) != VK_SUCCESS)
 		throw love::Exception("failed to begin recording command buffer");
 
+	commandBufferRecording = true;
+
 	initDynamicState();
 
-	// This must be done after vkBeginCommandBuffer (since newTexture needs an
-	// active command buffer for layout transitions), and before setDefaultRenderPass
-	// (since that tries to use fakeBackbuffer).
-	if (swapChainImages.empty() && fakeBackbuffer == nullptr)
-	{
-		Texture::Settings settings;
-		settings.format = swapChainPixelFormat;
-		settings.width = swapChainExtent.width;
-		settings.height = swapChainExtent.height;
-		settings.renderTarget = true;
-		settings.readable.set(false);
-		fakeBackbuffer.set((Texture*)newTexture(settings, nullptr), Acquire::NORETAIN);
-	}
+    // This must be done after vkBeginCommandBuffer (since newTexture needs an
+    // active command buffer for layout transitions), and before setDefaultRenderPass
+    // (since that tries to use fakeBackbuffer).
+    if (swapChainImages.empty() && fakeBackbuffer == nullptr)
+    {
+        auto settings = love::gfx::Texture::Settings{
+            width, height, 1,
+            love::gfx::TEXTURE_2D,
+            love::gfx::Texture::MipmapsMode::MIPMAPS_NONE,
+            0,
+            love::PixelFormat::PIXELFORMAT_RGBA8_UNORM,
+            false,
+            1.0f,
+            1,
+            true // isRenderTarget = true
+        };
+        fakeBackbuffer.set(new Texture(this, settings, nullptr), Acquire::NORETAIN);
+    }
 
-	setDefaultRenderPass();
+    setDefaultRenderPass();
 
-	if (defaultVertexBuffer)
-	{
-		VkBuffer buffer = (VkBuffer)defaultVertexBuffer->getHandle();
-		VkDeviceSize offset = 0;
-		vkCmdBindVertexBuffers(commandBuffers.at(currentFrame), DEFAULT_VERTEX_BUFFER_BINDING, 1, &buffer, &offset);
-	}
+    if (defaultVertexBuffer)
+    {
+        VkBuffer buffer = (VkBuffer)defaultVertexBuffer->getHandle();
+        VkDeviceSize offset = 0;
+        vkCmdBindVertexBuffers(commandBuffers.at(currentFrame), DEFAULT_VERTEX_BUFFER_BINDING, 1, &buffer, &offset);
+    }
 }
 
 void Graphics::endRecordingGraphicsCommands()
@@ -1473,12 +1890,27 @@ void Graphics::endRecordingGraphicsCommands()
 
 	if (vkEndCommandBuffer(commandBuffers.at(currentFrame)) != VK_SUCCESS)
 		throw love::Exception("failed to record command buffer");
+	
+	commandBufferRecording = false;
 }
 
 VkCommandBuffer Graphics::getCommandBufferForDataTransfer()
 {
 	if (renderPassState.active)
 		endRenderPass();
+
+	if (!commandBufferRecording) {
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        beginInfo.pInheritanceInfo = nullptr;
+
+        if (vkBeginCommandBuffer(commandBuffers.at(currentFrame), &beginInfo) != VK_SUCCESS)
+            throw love::Exception("failed to begin recording command buffer for data transfer");
+        
+        commandBufferRecording = true;
+        initDynamicState();  // Initialize dynamic state when starting recording
+    }
 
 	return commandBuffers.at(currentFrame);
 }
@@ -1830,6 +2262,10 @@ void Graphics::createPipelineCache()
 
 void Graphics::initVMA()
 {
+	if (libretroMode) {
+        return;
+    }
+
 	VmaAllocatorCreateInfo allocatorCreateInfo = {};
 	allocatorCreateInfo.vulkanApiVersion = deviceApiVersion;
 	allocatorCreateInfo.physicalDevice = physicalDevice;
@@ -1872,16 +2308,10 @@ void Graphics::initVMA()
 
 	allocatorCreateInfo.pVulkanFunctions = &vulkanFunctions;
 
-	allocatorCreateInfo.flags |= VMA_ALLOCATOR_CREATE_EXTERNALLY_SYNCHRONIZED_BIT;
-	if (optionalDeviceExtensions.dedicatedAllocation)
-		allocatorCreateInfo.flags |= VMA_ALLOCATOR_CREATE_KHR_DEDICATED_ALLOCATION_BIT;
-	if (optionalDeviceExtensions.memoryBudget)
-		allocatorCreateInfo.flags |= VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
-
 	if (vmaCreateAllocator(&allocatorCreateInfo, &vmaAllocator) != VK_SUCCESS)
-		throw love::Exception("failed to create vma allocator");
+		throw love::Exception("failed to create VMA allocator");
 }
-
+ 
 void Graphics::createSurface()
 {
 	auto window = Module::getInstance<love::windowmod::Window>(M_WINDOW);
@@ -2498,14 +2928,41 @@ void Graphics::createVulkanVertexFormat(
 
 void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &buffers, gfx::Texture *texture, PrimitiveType primitiveType, CullMode cullmode)
 {
-	if (!renderPassState.active)
-		startRenderPass();
+    // Add safety check for corrupted Graphics object
+    if (this == nullptr) {
+        std::printf("[CHAILOVE DEBUG] prepareDraw called with null Graphics object\n");
+        return;
+    }
+    
+    // Check if Graphics object is in a valid state
+    try {
+		// Try to access the magic number - this will fail if memory is corrupted
+        volatile uint32_t testMagic = magicNumber;
+        
+        if (testMagic != GRAPHICS_MAGIC) {
+            std::printf("[CHAILOVE DEBUG] prepareDraw: Corrupted Graphics object detected - magic: 0x%X (expected: 0x%X)\n", 
+                testMagic, GRAPHICS_MAGIC);
+            return;
+        }
 
-	auto s = dynamic_cast<Shader*>(Shader::current);
+        // Try to access a member variable safely
+        volatile bool testActive = renderPassState.active;
+        
+        if (!testActive)
+            startRenderPass();
+    } catch (const std::exception& e) {
+        std::printf("[CHAILOVE DEBUG] Exception in prepareDraw accessing renderPassState: %s\n", e.what());
+        return;
+    } catch (...) {
+        std::printf("[CHAILOVE DEBUG] Unknown exception in prepareDraw - Graphics object corrupted\n");
+        return;
+    }
 
-	usedShadersInFrame.insert(s);
+    auto s = dynamic_cast<Shader*>(Shader::current);
 
-	GraphicsPipelineConfigurationFull configuration{};
+    usedShadersInFrame.insert(s);
+
+    GraphicsPipelineConfigurationFull configuration{};
 
 	configuration.core.renderPass = renderPassState.beginInfo.renderPass;
 	configuration.core.attributes = attributes;
@@ -2573,84 +3030,155 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
 
 void Graphics::setDefaultRenderPass()
 {
-	uint32_t numClearValues = 2;
-	renderPassState.clearColors.resize(numClearValues);
+    uint32_t numClearValues = 2;
+    renderPassState.clearColors.resize(numClearValues);
 
-	renderPassState.beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	renderPassState.beginInfo.renderPass = VK_NULL_HANDLE;
-	renderPassState.beginInfo.framebuffer = VK_NULL_HANDLE;
-	renderPassState.beginInfo.renderArea.offset = { 0, 0 };
-	renderPassState.beginInfo.renderArea.extent = swapChainExtent;
-	renderPassState.beginInfo.clearValueCount = numClearValues;
-	renderPassState.beginInfo.pClearValues = renderPassState.clearColors.data();
+    renderPassState.beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassState.beginInfo.renderPass = VK_NULL_HANDLE;
+    renderPassState.beginInfo.framebuffer = VK_NULL_HANDLE;
+    renderPassState.beginInfo.renderArea.offset = { 0, 0 };
+    
+    // For libretro mode, use fakeBackbuffer dimensions instead of swapchain
+    uint32_t renderWidth = 0, renderHeight = 0;
+    
+    if (!swapChainImages.empty()) {
+        renderWidth = swapChainExtent.width;
+        renderHeight = swapChainExtent.height;
+        std::printf("[CHAILOVE DEBUG] Using swapchain dimensions: %ux%u\n", renderWidth, renderHeight);
+    } else if (fakeBackbuffer) {
+        renderWidth = fakeBackbuffer->getWidth();
+        renderHeight = fakeBackbuffer->getHeight();
+        std::printf("[CHAILOVE DEBUG] Using fakeBackbuffer dimensions: %ux%u\n", renderWidth, renderHeight);
+    } else {
+        // Fallback to window size - ensure they're not zero
+        renderWidth = std::max(1, width);
+        renderHeight = std::max(1, height);
+        std::printf("[CHAILOVE DEBUG] Using fallback window dimensions: %ux%u (from %dx%d)\n", 
+               renderWidth, renderHeight, width, height);
+    }
+    
+    // Critical: Ensure dimensions are never zero
+    if (renderWidth == 0 || renderHeight == 0) {
+        std::printf("[CHAILOVE ERROR] Calculated render dimensions are zero! Setting to 1x1 fallback\n");
+        renderWidth = 1;
+        renderHeight = 1;
+    }
+    
+    renderPassState.beginInfo.renderArea.extent.width = renderWidth;
+    renderPassState.beginInfo.renderArea.extent.height = renderHeight;
+    renderPassState.width = static_cast<float>(renderWidth);
+    renderPassState.height = static_cast<float>(renderHeight);
+    
+    std::printf("[CHAILOVE DEBUG] Final render area extent: %ux%u\n", renderWidth, renderHeight);
+    
+    renderPassState.beginInfo.clearValueCount = numClearValues;
+    renderPassState.beginInfo.pClearValues = renderPassState.clearColors.data();
 
-	renderPassState.isWindow = true;
-	renderPassState.pipeline = VK_NULL_HANDLE;
-	renderPassState.width = static_cast<float>(swapChainExtent.width);
-	renderPassState.height = static_cast<float>(swapChainExtent.height);
-	renderPassState.msaa = msaaSamples;
-	renderPassState.numColorAttachments = 1;
-	renderPassState.packedColorAttachmentFormats = (uint8)swapChainPixelFormat;
+    renderPassState.isWindow = true;
+    renderPassState.pipeline = VK_NULL_HANDLE;
+    renderPassState.msaa = msaaSamples;
+    renderPassState.numColorAttachments = 1;
+    
+    // Use fakeBackbuffer format in libretro mode
+    VkFormat colorFormat;
+    if (!swapChainImages.empty()) {
+        colorFormat = swapChainImageFormat;
+        renderPassState.packedColorAttachmentFormats = (uint8)swapChainPixelFormat;
+    } else if (fakeBackbuffer) {
+        colorFormat = Vulkan::getTextureFormat(fakeBackbuffer->getPixelFormat()).internalFormat;
+        renderPassState.packedColorAttachmentFormats = (uint8)fakeBackbuffer->getPixelFormat();
+    } else {
+        // Fallback format
+        colorFormat = VK_FORMAT_R8G8B8A8_UNORM;
+        renderPassState.packedColorAttachmentFormats = (uint8)PIXELFORMAT_RGBA8_UNORM;
+    }
 
-	RenderPassConfiguration renderPassConfiguration{};
+    // Rest of the function remains the same...
+    RenderPassConfiguration renderPassConfiguration{};
 
-	VkFormat dsformat = backbufferHasDepth || backbufferHasStencil ? depthStencilFormat : VK_FORMAT_UNDEFINED;
-	renderPassConfiguration.staticData.depthStencilAttachment = { dsformat, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_LOAD_OP_LOAD, msaaSamples };
-	if (msaaSamples & VK_SAMPLE_COUNT_1_BIT)
-		renderPassConfiguration.staticData.resolve = false;
-	else
-		renderPassConfiguration.staticData.resolve = true;
+    VkFormat dsformat = (backbufferHasDepth || backbufferHasStencil) ? depthStencilFormat : VK_FORMAT_UNDEFINED;
+    renderPassConfiguration.staticData.depthStencilAttachment = { 
+        dsformat, 
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 
+        VK_ATTACHMENT_LOAD_OP_LOAD, 
+        VK_ATTACHMENT_LOAD_OP_LOAD, 
+        msaaSamples 
+    };
+    
+    if (msaaSamples & VK_SAMPLE_COUNT_1_BIT)
+        renderPassConfiguration.staticData.resolve = false;
+    else
+        renderPassConfiguration.staticData.resolve = true;
 
-	FramebufferConfiguration framebufferConfiguration{};
-	framebufferConfiguration.staticData.depthView = depthImageView;
-	framebufferConfiguration.staticData.width = swapChainExtent.width;
-	framebufferConfiguration.staticData.height = swapChainExtent.height;
+    FramebufferConfiguration framebufferConfiguration{};
+    
+    // Only set depth view if we have depth/stencil
+    if (dsformat != VK_FORMAT_UNDEFINED && depthImageView != VK_NULL_HANDLE) {
+        framebufferConfiguration.staticData.depthView = depthImageView;
+    }
+    
+    framebufferConfiguration.staticData.width = renderWidth;
+    framebufferConfiguration.staticData.height = renderHeight;
 
-	if (msaaSamples & VK_SAMPLE_COUNT_1_BIT)
-	{
-		renderPassConfiguration.colorAttachments.push_back({ swapChainImageFormat, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_UNDEFINED, VK_ATTACHMENT_LOAD_OP_LOAD, msaaSamples });
+    if (msaaSamples & VK_SAMPLE_COUNT_1_BIT)
+    {
+        renderPassConfiguration.colorAttachments.push_back({ 
+            colorFormat, 
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
+            VK_IMAGE_LAYOUT_UNDEFINED, 
+            VK_ATTACHMENT_LOAD_OP_LOAD, 
+            msaaSamples 
+        });
 
-		if (!swapChainImageViews.empty())
-			framebufferConfiguration.colorViews.push_back(swapChainImageViews.at(imageIndex));
-		else
-			framebufferConfiguration.colorViews.push_back(fakeBackbuffer->getRenderTargetView(0, 0));
-	}
-	else
-	{
-		renderPassConfiguration.colorAttachments.push_back({ swapChainImageFormat, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ATTACHMENT_LOAD_OP_LOAD, msaaSamples });
+        if (!swapChainImageViews.empty())
+            framebufferConfiguration.colorViews.push_back(swapChainImageViews.at(imageIndex));
+        else if (fakeBackbuffer)
+            framebufferConfiguration.colorViews.push_back(fakeBackbuffer->getRenderTargetView(0, 0));
+    }
+    else
+    {
+        renderPassConfiguration.colorAttachments.push_back({ 
+            colorFormat, 
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
+            VK_ATTACHMENT_LOAD_OP_LOAD, 
+            msaaSamples 
+        });
 
-		framebufferConfiguration.colorViews.push_back(colorImageView);
-		if (!swapChainImageViews.empty())
-			framebufferConfiguration.colorResolveViews.push_back(swapChainImageViews.at(imageIndex));
-		else
-			framebufferConfiguration.colorResolveViews.push_back(fakeBackbuffer->getRenderTargetView(0, 0));
-	}
+        if (colorImageView != VK_NULL_HANDLE)
+            framebufferConfiguration.colorViews.push_back(colorImageView);
+        
+        if (!swapChainImageViews.empty())
+            framebufferConfiguration.colorResolveViews.push_back(swapChainImageViews.at(imageIndex));
+        else if (fakeBackbuffer)
+            framebufferConfiguration.colorResolveViews.push_back(fakeBackbuffer->getRenderTargetView(0, 0));
+    }
 
-	renderPassState.renderPassConfiguration = std::move(renderPassConfiguration);
-	renderPassState.framebufferConfiguration = std::move(framebufferConfiguration);
+    renderPassState.renderPassConfiguration = std::move(renderPassConfiguration);
+    renderPassState.framebufferConfiguration = std::move(framebufferConfiguration);
 
-	// Can't call clear() here because it depends on current RT state, which might not be
-	// set yet when this is called from within setRenderTargetsInternal.
-	if (renderPassState.windowClearRequested)
-	{
-		if (renderPassState.mainWindowClearColorValue.hasValue)
-		{
-			renderPassState.renderPassConfiguration.colorAttachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			renderPassState.clearColors[0].color = Texture::getClearColor(nullptr, renderPassState.mainWindowClearColorValue.value);
-		}
+    // Can't call clear() here because it depends on current RT state, which might not be
+    // set yet when this is called from within setRenderTargetsInternal.
+    if (renderPassState.windowClearRequested)
+    {
+        if (renderPassState.mainWindowClearColorValue.hasValue)
+        {
+            renderPassState.renderPassConfiguration.colorAttachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            renderPassState.clearColors[0].color = Texture::getClearColor(nullptr, renderPassState.mainWindowClearColorValue.value);
+        }
 
-		if (renderPassState.mainWindowClearDepthValue.hasValue && backbufferHasDepth)
-		{
-			renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.depthLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			renderPassState.clearColors[1].depthStencil.depth = static_cast<float>(renderPassState.mainWindowClearDepthValue.value);
-		}
+        if (renderPassState.mainWindowClearDepthValue.hasValue && backbufferHasDepth)
+        {
+            renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.depthLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            renderPassState.clearColors[1].depthStencil.depth = static_cast<float>(renderPassState.mainWindowClearDepthValue.value);
+        }
 
-		if (renderPassState.mainWindowClearStencilValue.hasValue && backbufferHasStencil)
-		{
-			renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			renderPassState.clearColors[1].depthStencil.stencil = static_cast<uint32_t>(renderPassState.mainWindowClearStencilValue.value);
-		}
-	}
+        if (renderPassState.mainWindowClearStencilValue.hasValue && backbufferHasStencil)
+        {
+            renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            renderPassState.clearColors[1].depthStencil.stencil = static_cast<uint32_t>(renderPassState.mainWindowClearStencilValue.value);
+        }
+    }
 }
 
 void Graphics::setRenderPass(const RenderTargets &rts, int pixelw, int pixelh)
@@ -3163,8 +3691,17 @@ void Graphics::createDepthResources()
 	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 	imageInfo.imageType = VK_IMAGE_TYPE_2D;
 	imageInfo.format = depthStencilFormat;
-	imageInfo.extent.width = swapChainExtent.width;
-	imageInfo.extent.height = swapChainExtent.height;
+
+	// In libretro mode, use window dimensions instead of swapchain extent
+    if (!swapChainImages.empty()) {
+        imageInfo.extent.width = swapChainExtent.width;
+        imageInfo.extent.height = swapChainExtent.height;
+    } else {
+        // Use window dimensions for libretro mode
+        imageInfo.extent.width = static_cast<uint32_t>(pixelWidth);
+        imageInfo.extent.height = static_cast<uint32_t>(pixelHeight);
+    }
+
 	imageInfo.extent.depth = 1;
 	imageInfo.mipLevels = 1;
 	imageInfo.arrayLayers = 1;
@@ -3218,16 +3755,20 @@ void Graphics::createCommandPool()
 
 void Graphics::createCommandBuffers()
 {
-	commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+    if (libretroMode && commandPool == VK_NULL_HANDLE) {
+        throw love::Exception("Command pool is null in libretro mode - cannot create command buffers");
+    }
+    
+    commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 
-	VkCommandBufferAllocateInfo allocInfo{};
-	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocInfo.commandPool = commandPool;
-	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandBufferCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = commandPool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 
-	if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS)
-		throw love::Exception("failed to allocate command buffers");
+    if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS)
+        throw love::Exception("failed to allocate command buffers");
 }
 
 void Graphics::createSyncObjects()

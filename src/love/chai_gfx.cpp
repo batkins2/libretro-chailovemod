@@ -41,6 +41,16 @@ bool chai_gfx::init() {
     if (!init) {
         instance = new gfx::vulkan::Graphics();
     }
+    if (vulkan != nullptr) {
+        auto vkGfx = dynamic_cast<gfx::vulkan::Graphics*>(instance);
+        if (vkGfx) {
+            // Set up the external Vulkan context from RetroArch
+            // retro_hw_render_interface_vulkan does not provide a command_pool; pass VK_NULL_HANDLE instead
+            vkGfx->setLibretroVulkanContext(vulkan->instance, vulkan->device, vulkan->gpu, 
+                                           vulkan->queue, VK_NULL_HANDLE);
+        }
+    }
+    
         
     instance->hw_render = hw_render;
     instance->FRAMEBUFFER = FRAMEBUFFER;
@@ -66,10 +76,10 @@ bool chai_gfx::init() {
     // height = dims[3];
     
     if (!init) {
-        win->setWindow(width, height, winset);
+        // win->setWindow(width, height, winset);
     }
     
-    if (init) {
+    if (!init) {
         
         // shader->shader->~Shader();
         // instance->setShader();
@@ -78,16 +88,17 @@ bool chai_gfx::init() {
 
         
         
-        instance->setMode(nullptr, width, height, width, height, true, 16, 0);
         
         // shader->shader->updateBuiltinUniforms(instance, width, height);
         // instance->bindVAO();
         win->setGraphics(instance);
         win->setVSync(0);
         win->setWindow(width, height, winset);
+        instance->setMode(nullptr, width, height, width, height, true, 16, 0);
+        
         instance->setActive(true);
         instance->present(nullptr);
-        auto gfx = Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS);
+        // auto gfx = Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS);
         
         // auto slices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
     
@@ -112,8 +123,9 @@ bool chai_gfx::init() {
         // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
         // glFramebufferTexture2D(FRAMEBUFFER, COLORATTACH, GL_TEXTURE_2D, texture, 0);
 
-    } else {    
+    } else {       
         win->setGraphics(instance);
+        // instance->present(nullptr);
     }
 
     // instance->setMode(nullptr, 1920, 1080, 1920, 1080, true, 16, 0);
@@ -172,6 +184,24 @@ bool chai_gfx::hasReinit() {
     return reinit;
 }
 
+// Add this helper function at the top of the class or as a private method
+bool chai_gfx::isGraphicsAvailable() const {
+    if (instance == nullptr) {
+        std::printf("[CHAILOVE DEBUG] Graphics instance is null\n");
+        return false;
+    }
+    
+    try {
+        return instance->isCreated();
+    } catch (const std::exception& e) {
+        std::printf("[CHAILOVE DEBUG] Exception checking graphics availability: %s\n", e.what());
+        return false;
+    } catch (...) {
+        std::printf("[CHAILOVE DEBUG] Unknown exception checking graphics availability\n");
+        return false;
+    }
+}
+
 chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, const std::string *PixFileName, chai_shader *cshader) {
     // delete win;
     // delete instance;
@@ -179,7 +209,7 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, const std::st
 
    
 
-    if (instance->isCreated()) {
+    if (isGraphicsAvailable()) {
         
         // instance->bindVAO();
         auto file = new filesystem();

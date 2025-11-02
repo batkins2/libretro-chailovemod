@@ -528,9 +528,9 @@ std::string Vulkan::getVulkanApiVersion(uint32_t version)
 {
 	std::stringstream ss;
 
-	ss << VK_API_VERSION_MAJOR(version) 
-		<< "." << VK_API_VERSION_MINOR(version) 
-		<< "." << VK_API_VERSION_PATCH(version);
+	ss << VK_VERSION_MAJOR(version) 
+		<< "." << VK_VERSION_MINOR(version) 
+		<< "." << VK_VERSION_PATCH(version);
 
 	return ss.str();
 }

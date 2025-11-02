@@ -22,7 +22,6 @@
 
 #include "../Texture.h"
 #include "../Volatile.h"
-
 #include "VulkanWrapper.h"
 
 

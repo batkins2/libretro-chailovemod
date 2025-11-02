@@ -21,6 +21,8 @@
 #ifndef LOVE_GFX_H
 #define LOVE_GFX_H
 
+#include "vulkan/VulkanWrapper.h"
+
 // LOVE
 #include "common/config.h"
 #include "common/Module.h"
@@ -48,6 +50,7 @@
 #include "data/HashFunction.h"
 
 #include <libretro.h>
+#include <libretro_vulkan.h>
 
 // C++
 #include <string>
@@ -514,6 +517,10 @@ public:
 	virtual bool setMode(void *context, int width, int height, int pixelwidth, int pixelheight, bool backbufferstencil, bool backbufferdepth, int msaa) = 0;
 
 	virtual bool bindVAO() = 0;
+
+	virtual VkImageView getCurrentSwapchainImageView() = 0;
+	virtual VkImageViewCreateInfo getCurrentSwapchainImageViewCreateInfo() = 0;
+	virtual VkCommandBuffer getCommandBufferForDataTransfer() = 0;
 
 	/**
 	 * Un-sets the current graphics display mode (uninitializing objects if
@@ -1067,6 +1074,9 @@ protected:
 	bool backbufferHasStencil;
 	bool backbufferHasDepth;
 
+	static constexpr uint32_t GRAPHICS_MAGIC = 0x47524658; // 'GRFX'
+    uint32_t magicNumber = GRAPHICS_MAGIC;  // Add this to detect corruption
+	
 	bool created;
 	bool active;
 

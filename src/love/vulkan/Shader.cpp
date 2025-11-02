@@ -727,12 +727,12 @@ void Shader::compileShaders()
 		{
 			auto device = vgfx->getDevice();
 
-			VkDebugUtilsObjectNameInfoEXT nameInfo{};
-			nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-			nameInfo.objectType = VK_OBJECT_TYPE_SHADER_MODULE;
-			nameInfo.objectHandle = (uint64_t)shaderModule;
+			VkDebugMarkerObjectNameInfoEXT nameInfo{};
+			nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT;
+			nameInfo.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT;
+			nameInfo.object = (uint64_t)shaderModule;
 			nameInfo.pObjectName = debugname.c_str();
-			vkSetDebugUtilsObjectNameEXT(device, &nameInfo);
+			vkDebugMarkerSetObjectNameEXT(device, &nameInfo);
 		}
 
 		shaderModules.push_back(shaderModule);
@@ -1127,7 +1127,7 @@ VkDescriptorSet Shader::allocateDescriptorSet()
 		{
 		case VK_SUCCESS:
 			return descriptorSet;
-		case VK_ERROR_OUT_OF_POOL_MEMORY:
+		case VK_ERROR_OUT_OF_POOL_MEMORY_KHR:
 			currentDescriptorPool++;
 			if (descriptorPools[currentFrame].size() <= currentDescriptorPool)
 				createDescriptorPool();

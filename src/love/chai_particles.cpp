@@ -15,7 +15,7 @@ void chai_particles::setParticleSystem(const std::string &texture, int size) {
     printf("Setting up particle system with texture: %s and size: %d\n", texture.c_str(), size);
     texName = texture;
     sz = size;
-    auto cg = ChaiLove::getInstance()->chai_gfx;
+    auto& cg = ChaiLove::getInstance()->chai_gfx;
     SDL_RWops* rw = ChaiLove::getInstance()->filesystem.openRW(texture);
     auto img = new Image(rw);
 

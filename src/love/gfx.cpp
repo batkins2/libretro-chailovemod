@@ -182,6 +182,7 @@ Graphics::DisplayState::DisplayState()
 
 Graphics::Graphics(const char *name)
 	: Module(M_GRAPHICS, name)
+	, magicNumber(GRAPHICS_MAGIC)  // Initialize magic number
 	, width(0)
 	, height(0)
 	, pixelWidth(0)
@@ -218,12 +219,16 @@ Graphics::Graphics(const char *name)
 
 Graphics::~Graphics()
 {
-	if (quadIndexBuffer != nullptr)
-		quadIndexBuffer->release();
-	if (fanIndexBuffer != nullptr)
-		fanIndexBuffer->release();
+    // Clear magic number to detect use-after-free
+    magicNumber = 0xDEADBEEF;
+    created = false;  // Immediately mark as not created
+    
+    if (quadIndexBuffer != nullptr)
+        quadIndexBuffer->release();
+    if (fanIndexBuffer != nullptr)
+        fanIndexBuffer->release();
 
-	releaseDefaultResources();
+    releaseDefaultResources();
 
 	// Clean up standard shaders before the active shader. If we do it after,
 	// the active shader may try to activate a standard shader when deactivating
@@ -784,7 +789,32 @@ double Graphics::getScreenDPIScale() const
 
 bool Graphics::isCreated() const
 {
-	return created;
+    // Simple null check
+    if (this == nullptr) {
+        return false;
+    }
+    
+    // Check for common bad pointer patterns (works on both 32-bit and 64-bit)
+    uintptr_t ptr = (uintptr_t)this;
+    if (ptr < 0x1000) {  // Low memory addresses are usually invalid
+        return false;
+    }
+    
+    // Common debug heap patterns
+    if ((ptr & 0xFFFFFFFF) == 0xCCCCCCCC || 
+        (ptr & 0xFFFFFFFF) == 0xDDDDDDDD || 
+        (ptr & 0xFFFFFFFF) == 0xFEEEFEEE || 
+        (ptr & 0xFFFFFFFF) == 0xDEADBEEF ||
+		(ptr & 0xFFFFFFFF) == 0xBAADF00D) {
+        return false;
+    }
+    
+    // Simple try-catch for any remaining issues
+    try {
+        return created;
+    } catch (...) {
+        return false;
+    }
 }
 
 bool Graphics::isActive() const
@@ -1923,33 +1953,47 @@ Graphics::BatchedVertexData Graphics::requestBatchedDraw(const BatchedDrawComman
 			continue;
 
 		size_t stride = getFormatStride(cmd.formats[i]);
-		size_t datasize = stride * totalvertices;
+        size_t datasize = stride * totalvertices;
 
-		if (state.vbMap[i].data != nullptr && datasize > state.vbMap[i].size)
-			shouldflush = true;
+        if (state.vbMap[i].data != nullptr && datasize > state.vbMap[i].size)
+            shouldflush = true;
 
-		if (datasize > state.vb[i]->getUsableSize())
-		{
-			buffersizes[i] = std::max(datasize, state.vb[i]->getSize() * 2);
-			shouldresize = true;
-		}
+        // Add null check for vertex buffer before accessing it
+        if (state.vb[i] != nullptr && datasize > state.vb[i]->getUsableSize())
+        {
+            buffersizes[i] = std::max(datasize, state.vb[i]->getSize() * 2);
+            shouldresize = true;
+        }
+        else if (state.vb[i] == nullptr)
+        {
+            // Vertex buffer doesn't exist, need to create it
+            buffersizes[i] = datasize;
+            shouldresize = true;
+        }
 
-		newdatasizes[i] = stride * cmd.vertexCount;
+        newdatasizes[i] = stride * cmd.vertexCount;
 	}
 
-	if (cmd.indexMode != TRIANGLEINDEX_NONE)
-	{
-		size_t datasize = (state.indexCount + reqIndexCount) * sizeof(uint16);
+		if (cmd.indexMode != TRIANGLEINDEX_NONE)
+    {
+        size_t datasize = (state.indexCount + reqIndexCount) * sizeof(uint16);
 
-		if (state.indexBufferMap.data != nullptr && datasize > state.indexBufferMap.size)
-			shouldflush = true;
+        if (state.indexBufferMap.data != nullptr && datasize > state.indexBufferMap.size)
+            shouldflush = true;
 
-		if (datasize > state.indexBuffer->getUsableSize())
-		{
-			buffersizes[2] = std::max(datasize, state.indexBuffer->getSize() * 2);
-			shouldresize = true;
-		}
-	}
+        // Add null check for index buffer before accessing it
+        if (state.indexBuffer != nullptr && datasize > state.indexBuffer->getUsableSize())
+        {
+            buffersizes[2] = std::max(datasize, state.indexBuffer->getSize() * 2);
+            shouldresize = true;
+        }
+        else if (state.indexBuffer == nullptr)
+        {
+            // Index buffer doesn't exist, need to create it
+            buffersizes[2] = datasize;
+            shouldresize = true;
+        }
+    }
 
 	if (shouldflush || shouldresize)
 	{
@@ -1971,23 +2015,48 @@ Graphics::BatchedVertexData Graphics::requestBatchedDraw(const BatchedDrawComman
 			Shader::current->validateDrawState(cmd.primitiveMode, cmd.texture);
 	}
 
-	if (shouldresize)
-	{
-		for (int i = 0; i < 2; i++)
-		{
-			if (state.vb[i]->getSize() < buffersizes[i])
-			{
-				state.vb[i]->release();
-				state.vb[i] = newStreamBuffer(BUFFERUSAGE_VERTEX, buffersizes[i]);
-			}
-		}
+		if (shouldresize)
+    {
+        for (int i = 0; i < 2; i++)
+        {
+            if (buffersizes[i] > 0) // Only process if we actually need this buffer
+            {
+                if (state.vb[i] != nullptr)
+                {
+                    // Buffer exists, check if we need to resize it
+                    if (state.vb[i]->getSize() < buffersizes[i])
+                    {
+                        state.vb[i]->release();
+                        state.vb[i] = newStreamBuffer(BUFFERUSAGE_VERTEX, buffersizes[i]);
+                    }
+                }
+                else
+                {
+                    // Buffer doesn't exist, create it
+                    state.vb[i] = newStreamBuffer(BUFFERUSAGE_VERTEX, buffersizes[i]);
+                }
+            }
+        }
 
-		if (state.indexBuffer->getSize() < buffersizes[2])
-		{
-			state.indexBuffer->release();
-			state.indexBuffer = newStreamBuffer(BUFFERUSAGE_INDEX, buffersizes[2]);
-		}
-	}
+        // Handle index buffer resize
+        if (buffersizes[2] > 0) // Only process if we actually need index buffer
+        {
+            if (state.indexBuffer != nullptr)
+            {
+                // Buffer exists, check if we need to resize it
+                if (state.indexBuffer->getSize() < buffersizes[2])
+                {
+                    state.indexBuffer->release();
+                    state.indexBuffer = newStreamBuffer(BUFFERUSAGE_INDEX, buffersizes[2]);
+                }
+            }
+            else
+            {
+                // Buffer doesn't exist, create it
+                state.indexBuffer = newStreamBuffer(BUFFERUSAGE_INDEX, buffersizes[2]);
+            }
+        }
+    }
 
 	if (cmd.indexMode != TRIANGLEINDEX_NONE)
 	{
@@ -2648,9 +2717,17 @@ void Graphics::polygon(DrawMode mode, const Vector2 *coords, size_t count, bool 
 	}
 }
 
+// filepath: c:\Users\Brian\libretro-chailovemod\src\love\gfx.cpp
 const Graphics::Capabilities &Graphics::getCapabilities() const
 {
-	return capabilities;
+    // DEBUG: Check capabilities when accessed
+    static bool debug_logged = false;
+    if (!debug_logged) {
+        std::printf("[CHAILOVE DEBUG] getCapabilities() called, TEXTURE_2D support = %s\n", 
+               capabilities.textureTypes[TEXTURE_2D] ? "true" : "false");
+        debug_logged = true;
+    }
+    return capabilities;
 }
 
 PixelFormat Graphics::getSizedFormat(PixelFormat format) const
