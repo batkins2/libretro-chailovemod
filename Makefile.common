@@ -257,6 +257,9 @@ FLAGS += -I$(CORE_DIR)/vendor/physfs/extras
 # FLAGS += -I$(CORE_DIR)/vendor/libretro-common/include/glsm
 # FLAGS += -I$(CORE_DIR)/vendor/libretro-common/include/glsym
 
+FLAGS += -I$(CORE_DIR)/vendor/libretro-common/include/vulkan
+FLAGS += -I$(CORE_DIR)/src/love/vulkan/vulkanheaders
+
 # SDL_tty
 FLAGS += -I$(CORE_DIR)/vendor/SDL2_tty/include/SDL_tty
 SOURCES_C += $(wildcard \
@@ -351,6 +354,8 @@ FLAGS += -I$(CORE_DIR)/vendor/TinySHA1
 
 # cppcodec
 FLAGS += -I$(CORE_DIR)/vendor/cppcodec
+
+# FLAGS += -DVK_NO_PROTOTYPES
 
 # Bullet3
 # FLAGS += -I$(CORE_DIR)/vendor/bullet3/src
