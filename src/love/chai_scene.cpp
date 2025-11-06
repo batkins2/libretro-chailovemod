@@ -168,11 +168,12 @@ void chai_scene::drawMeshes(bool shadows, int view) {
     //     printf("Drawing scene\n");
     // }
     int i = 0;
-    gfx::OptionalColorD clearcolor;
-    OptionalInt clearstencil(0);
-    OptionalDouble cleardepth(1.0);
-    auto cg = ChaiLove::getInstance()->chai_gfx;
-    cg.instance->clear(clearcolor, clearstencil, cleardepth);
+    // gfx::OptionalColorD clearcolor;
+    // clearcolor = ColorD(0.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
+    // OptionalInt clearstencil(0);
+    // OptionalDouble cleardepth(1.0);
+    auto& cg = ChaiLove::getInstance()->chai_gfx;
+    // cg.instance->clear(clearcolor, clearstencil, cleardepth);
     glm::mat4 vMatrix = glm::mat4(1.0f);
     glm::mat4 t2 = glm::mat4(1.0f);
 
@@ -575,7 +576,14 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
         cg.hasReinit();
         printf("Reinit\n");
     } else {
+        cg.instance->setShader(sceneShader->shader);
+        gfx::OptionalColorD clearcolor;
+        clearcolor = ColorD(1.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
+        OptionalInt clearstencil(0);
+        OptionalDouble cleardepth(1.0);
+        cg.instance->clear(clearcolor, clearstencil, cleardepth);
         drawMeshes(false, 0);
+        cg.instance->setShader();
         // cg.instance->setActive(true);
         // cg.instance->setShader();
         // cg.instance->setShader(sceneShader->shader);

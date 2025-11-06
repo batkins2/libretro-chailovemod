@@ -97,7 +97,7 @@ bool chai_gfx::init() {
         instance->setMode(nullptr, width, height, width, height, true, 16, 0);
         
         instance->setActive(true);
-        instance->present(nullptr);
+        // instance->present(nullptr);
         // auto gfx = Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS);
         
         // auto slices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);

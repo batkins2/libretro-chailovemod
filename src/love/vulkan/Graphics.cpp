@@ -76,32 +76,45 @@ VmaAllocator Graphics::getVmaAllocator() const
 
 VkImageView Graphics::getCurrentSwapchainImageView()
 {
-	if (imageIndex >= swapChainImageViews.size())
-		return VK_NULL_HANDLE;
-	return swapChainImageViews[imageIndex];
+    // In libretro mode, use fakeBackbuffer instead of swapchain
+    if (libretroMode && fakeBackbuffer != nullptr) {
+        return fakeBackbuffer->getRenderTargetView(0, 0);
+    }
+    
+    if (imageIndex >= swapChainImageViews.size())
+        return VK_NULL_HANDLE;
+    return swapChainImageViews[imageIndex];
 }
 
 VkImageViewCreateInfo Graphics::getCurrentSwapchainImageViewCreateInfo()
 {
-	VkImageViewCreateInfo createInfo{};
-	createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	if (swapChainImageViews.empty() || imageIndex >= swapChainImageViews.size())
-		createInfo.image = VK_NULL_HANDLE;
-	else
-		createInfo.image = swapChainImages[imageIndex];
-	createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	createInfo.format = swapChainImageFormat;
-	createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-	createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-	createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-	createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-	createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	createInfo.subresourceRange.baseMipLevel = 0;
-	createInfo.subresourceRange.levelCount = 1;
-	createInfo.subresourceRange.baseArrayLayer = 0;
-	createInfo.subresourceRange.layerCount = 1;
+    VkImageViewCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    
+    // In libretro mode, use fakeBackbuffer instead of swapchain
+    if (libretroMode && fakeBackbuffer != nullptr) {
+        createInfo.image = (VkImage)fakeBackbuffer->getRenderTargetHandle();
+        createInfo.format = Vulkan::getTextureFormat(fakeBackbuffer->getPixelFormat()).internalFormat;
+    } else if (swapChainImageViews.empty() || imageIndex >= swapChainImageViews.size()) {
+        createInfo.image = VK_NULL_HANDLE;
+        createInfo.format = swapChainImageFormat;
+    } else {
+        createInfo.image = swapChainImages[imageIndex];
+        createInfo.format = swapChainImageFormat;
+    }
+    
+    createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+    createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    createInfo.subresourceRange.baseMipLevel = 0;
+    createInfo.subresourceRange.levelCount = 1;
+    createInfo.subresourceRange.baseArrayLayer = 0;
+    createInfo.subresourceRange.layerCount = 1;
 
-	return createInfo;
+    return createInfo;
 }
 
 static void checkOptionalInstanceExtensions(OptionalInstanceExtensions& ext)
@@ -126,7 +139,7 @@ static void checkOptionalInstanceExtensions(OptionalInstanceExtensions& ext)
 Graphics::Graphics()
     : love::gfx::Graphics("love.graphics.vulkan")
 {
-    std::printf("[CHAILOVE DEBUG] Graphics::Graphics() constructor called\n");
+    // std::printf("[CHAILOVE DEBUG] Graphics::Graphics() constructor called\n");
     
 	// Initialize magic number first for corruption detection
     magicNumber = GRAPHICS_MAGIC;
@@ -187,7 +200,7 @@ Graphics::Graphics()
 
     volkLoadInstance(instance);
     
-    std::printf("[CHAILOVE DEBUG] Graphics::Graphics() constructor completed\n");
+    // std::printf("[CHAILOVE DEBUG] Graphics::Graphics() constructor completed\n");
 }
 
 Graphics::~Graphics()
@@ -392,105 +405,97 @@ void Graphics::discard(const std::vector<bool> &colorbuffers, bool depthstencil)
 
 void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallbackData)
 {
-	if (libretroMode) {
-        // Just end the command buffer recording, RetroArch will submit it
-        endRecordingGraphicsCommands();
+    // std::printf("[CHAILOVE DEBUG] submitGpuCommands called:\n");
+    // std::printf("[CHAILOVE DEBUG] - libretroMode: %s\n", libretroMode ? "true" : "false");
+    // std::printf("[CHAILOVE DEBUG] - submitMode: %d (SUBMIT_NOPRESENT=%d, SUBMIT_PRESENT=%d)\n", 
+        //    submitMode, SUBMIT_NOPRESENT, SUBMIT_PRESENT);
+    // std::printf("[CHAILOVE DEBUG] - renderPassState.active: %s\n", renderPassState.active ? "true" : "false");
+    
+    if (graphicsQueue == VK_NULL_HANDLE) {
+        // std::printf("[CHAILOVE DEBUG] Graphics queue is null, cannot submit\n");
         return;
-    }
-
-	if (graphicsQueue == VK_NULL_HANDLE) {
-        throw love::Exception("Graphics queue is null!");
     }
     
     if (device == VK_NULL_HANDLE) {
-        throw love::Exception("Device is null!");
+        // std::printf("[CHAILOVE DEBUG] Device is null, cannot submit\n");
+        return;
     }
 
-	flushBatchedDraws();
+    // LIBRETRO FIX: Force startRenderPass() in libretro mode when submitting with SUBMIT_NOPRESENT
+    if (libretroMode && submitMode == SUBMIT_NOPRESENT && !renderPassState.active) {
+        // std::printf("[CHAILOVE DEBUG] LIBRETRO MODE: Forcing startRenderPass() before submitGpuCommands(SUBMIT_NOPRESENT)\n");
+        
+        // Force windowClearRequested if not already set
+        if (!renderPassState.windowClearRequested) {
+            // std::printf("[CHAILOVE DEBUG] Setting windowClearRequested = true for libretro\n");
+            renderPassState.windowClearRequested = true;
+            
+            // Set a default clear color if none is set - use BRIGHT GREEN to be sure
+            renderPassState.mainWindowClearColorValue.hasValue = true;
+            renderPassState.mainWindowClearColorValue.value = ColorD(0.0, 1.0, 0.0, 1.0); // Bright green 
+            // std::printf("[CHAILOVE DEBUG] Set default clear color to bright GREEN\n");
+        }
+        
+        startRenderPass();
+        // std::printf("[CHAILOVE DEBUG] startRenderPass() called successfully before submit\n");
+    } else {
+        // std::printf("[CHAILOVE DEBUG] NOT triggering libretro fix because:\n");
+        // std::printf("[CHAILOVE DEBUG] - libretroMode: %s\n", libretroMode ? "true" : "false");
+        // std::printf("[CHAILOVE DEBUG] - submitMode == SUBMIT_NOPRESENT: %s\n", (submitMode == SUBMIT_NOPRESENT) ? "true" : "false");
+        // std::printf("[CHAILOVE DEBUG] - !renderPassState.active: %s\n", !renderPassState.active ? "true" : "false");
+    }
 
-	if (renderPassState.active)
-		endRenderPass();
+    flushBatchedDraws();
+    
+    // ...rest of function...
 
-	VkBuffer screenshotBuffer = VK_NULL_HANDLE;
-	VmaAllocation screenshotAllocation = VK_NULL_HANDLE;
-	VmaAllocationInfo screenshotAllocationInfo = {};
+    if (renderPassState.active)
+        endRenderPass();
 
-	if (submitMode == SUBMIT_PRESENT)
-	{
-		VkImage backbufferImage = fakeBackbuffer != nullptr ? (VkImage)fakeBackbuffer->getRenderTargetHandle() : swapChainImages.at(imageIndex);
+    VkBuffer screenshotBuffer = VK_NULL_HANDLE;
+    VmaAllocation screenshotAllocation = VK_NULL_HANDLE;
+    VmaAllocationInfo screenshotAllocationInfo = {};
 
-		if (pendingScreenshotCallbacks.empty())
-		{
-			if (fakeBackbuffer == nullptr)
-			{
-				Vulkan::cmdTransitionImageLayout(
-					commandBuffers.at(currentFrame),
-					backbufferImage,
-					swapChainPixelFormat, true,
-					VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-					VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-			}
-		}
-		else
-		{
-			VkBufferCreateInfo bufferInfo{};
-			bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-			bufferInfo.size = 4ll * swapChainExtent.width * swapChainExtent.height;
-			bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    endRecordingGraphicsCommands();
 
-			VmaAllocationCreateInfo allocCreateInfo{};
-			allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
-			allocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    // In libretro mode, we still need to submit the commands
+    if (libretroMode) {
+        // std::printf("[CHAILOVE DEBUG] Libretro mode: submitting commands directly\n");
+        
+        // Get the current Vulkan interface
+        auto vulkan = ChaiLove::getInstance()->chai_gfx.vulkan;
+        if (!vulkan) {
+            throw love::Exception("Vulkan interface not available in libretro mode");
+        }
+        
+        // Wait for the current index to be available
+        vulkan->wait_sync_index(vulkan->handle);
+        
+        // Get the sync index
+        uint32_t sync_index = vulkan->get_sync_index(vulkan->handle);
+        // std::printf("[CHAILOVE DEBUG] Got sync index: %u\n", sync_index);
+        
+        // Create array of command buffers for this frame
+        std::array<VkCommandBuffer, 1> libretroCommandBuffers = { commandBuffers.at(currentFrame) };
+        
+        // Set the command buffers for RetroArch
+        vulkan->set_command_buffers(vulkan->handle, static_cast<unsigned>(libretroCommandBuffers.size()), libretroCommandBuffers.data());
+        
+        // std::printf("[CHAILOVE DEBUG] Set command buffers for RetroArch\n");
+        
+        // Note: We don't submit here - RetroArch will handle the submission
+        // This is different from the normal present() flow
+        
+        if (submitMode == SUBMIT_NOPRESENT || submitMode == SUBMIT_RESTART || screenshotBuffer != VK_NULL_HANDLE)
+        {
+            // Handle screenshot readback if needed
+        }
+        
+        // std::printf("[CHAILOVE DEBUG] Libretro command submission completed\n");
+        return;
+    }
 
-			auto result = vmaCreateBuffer(
-				vmaAllocator,
-				&bufferInfo,
-				&allocCreateInfo,
-				&screenshotBuffer,
-				&screenshotAllocation,
-				&screenshotAllocationInfo);
-
-			if (result != VK_SUCCESS)
-				throw love::Exception("failed to create screenshot readback buffer");
-
-			Vulkan::cmdTransitionImageLayout(
-				commandBuffers.at(currentFrame),
-				backbufferImage,
-				swapChainPixelFormat, true,
-				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-
-			VkBufferImageCopy region{};
-			region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			region.imageSubresource.layerCount = 1;
-			region.imageExtent = {
-				swapChainExtent.width,
-				swapChainExtent.height,
-				1
-			};
-
-			vkCmdCopyImageToBuffer(
-				commandBuffers.at(currentFrame),
-				backbufferImage,
-				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				screenshotBuffer,
-				1, &region);
-
-			Vulkan::cmdTransitionImageLayout(
-				commandBuffers.at(currentFrame),
-				backbufferImage,
-				swapChainPixelFormat, true,
-				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-				fakeBackbuffer == nullptr ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-		}
-	}
-
-	endRecordingGraphicsCommands();
-
-	return;
-
-	// Instead of managing our own semaphores, work with RetroArch's system
+    // Instead of managing our own semaphores, work with RetroArch's system
     std::array<VkCommandBuffer, 1> submitCommandbuffers = { commandBuffers.at(currentFrame) };
 
     VkSubmitInfo submitInfo{};
@@ -509,102 +514,81 @@ void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallback
     submitInfo.signalSemaphoreCount = 0;
     submitInfo.pSignalSemaphores = nullptr;
 
-	auto vulkan = ChaiLove::getInstance()->chai_gfx.vulkan;
-	if (vulkan->lock_queue) {
-		vulkan->lock_queue(vulkan->handle);
-	}
+    auto vulkan = ChaiLove::getInstance()->chai_gfx.vulkan;
+    if (vulkan->lock_queue) {
+        vulkan->lock_queue(vulkan->handle);
+    }
 
-	if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
-		throw love::Exception("failed to submit draw command buffer");
+    if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
+        throw love::Exception("failed to submit draw command buffer!");
 
-	if (vulkan->unlock_queue) {
-		vulkan->unlock_queue(vulkan->handle);
-	}
+    if (vulkan->unlock_queue) {
+        vulkan->unlock_queue(vulkan->handle);
+    }
 
-	if (submitMode == SUBMIT_NOPRESENT || submitMode == SUBMIT_RESTART || screenshotBuffer != VK_NULL_HANDLE)
-	{
-		vkQueueWaitIdle(graphicsQueue);
+    if (submitMode == SUBMIT_NOPRESENT || submitMode == SUBMIT_RESTART || screenshotBuffer != VK_NULL_HANDLE)
+    {
+        // if (screenshotBuffer != VK_NULL_HANDLE)
+        // {
+        //     auto readbackMemory = vmaAllocator.mapMemory(screenshotAllocation);
 
-		for (auto &callbacks : readbackCallbacks)
-		{
-			for (const auto &callback : callbacks)
-				callback();
-			callbacks.clear();
-		}
+        //     readbackCallbacks.at(currentFrame).push_back([this, readbackMemory, screenshotAllocationInfo, screenshotCallbackData, screenshotBuffer, screenshotAllocation]()
+        //     {
+        //         if (screenshotCallbackData != nullptr)
+        //         {
+        //             void(*callback)(void *data, size_t size, void *userdata) = (void(*)(void*, size_t, void*)) screenshotCallbackData;
+        //             callback(readbackMemory, screenshotAllocationInfo.size, nullptr);
+        //         }
 
-		if (screenshotBuffer != VK_NULL_HANDLE)
-		{
-			auto imageModule = Module::getInstance<love::imagemod::Image>(M_IMAGE);
+        //         vmaUnmapMemory(vmaAllocator, screenshotAllocation);
+        //         vmaDestroyBuffer(vmaAllocator, screenshotBuffer, screenshotAllocation);
+        //     });
+        // }
 
-			for (int i = 0; i < (int)pendingScreenshotCallbacks.size(); i++)
-			{
-				const auto &info = pendingScreenshotCallbacks[i];
-				imagemod::ImageData *img = nullptr;
+        if (submitMode != SUBMIT_RESTART)
+        {
+            // vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+            // vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
-				try
-				{
-					img = imageModule->newImageData(
-						swapChainExtent.width,
-						swapChainExtent.height,
-						PIXELFORMAT_RGBA8_UNORM,
-						screenshotAllocationInfo.pMappedData);
-				}
-				catch (love::Exception &)
-				{
-					info.callback(&info, nullptr, nullptr);
-					for (int j = i + 1; j < (int)pendingScreenshotCallbacks.size(); j++)
-					{
-						const auto& ninfo = pendingScreenshotCallbacks[j];
-						ninfo.callback(&ninfo, nullptr, nullptr);
-					}
-					vmaDestroyBuffer(vmaAllocator, screenshotBuffer, screenshotAllocation);
-					pendingScreenshotCallbacks.clear();
-					throw;
-				}
+            updatePendingReadbacks();
+            updateTemporaryResources();
 
-				uint8 *screenshot = (uint8*)img->getData();
+            currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 
-				if (swapChainImageFormat == VK_FORMAT_B8G8R8A8_UNORM || swapChainImageFormat == VK_FORMAT_B8G8R8A8_SRGB)
-				{
-					// Convert from BGRA to RGBA and replace alpha with full opacity.
-					for (size_t i = 0; i < img->getSize(); i += 4)
-					{
-						uint8 r = screenshot[i + 2];
-						screenshot[i + 2] = screenshot[i + 0];
-						screenshot[i + 0] = r;
-						screenshot[i + 3] = 255;
-					}
-				}
-				else
-				{
-					// Replace alpha with full opacity.
-					for (size_t i = 0; i < img->getSize(); i += 4)
-						screenshot[i + 3] = 255;
-				}
-
-				info.callback(&info, img, screenshotCallbackData);
-				img->release();
-			}
-
-			vmaDestroyBuffer(vmaAllocator, screenshotBuffer, screenshotAllocation);
-			pendingScreenshotCallbacks.clear();
-		}
-
-		if (submitMode == SUBMIT_RESTART)
-			startRecordingGraphicsCommands();
-	}
+            beginFrame();
+        }
+    }
 }
 
 void Graphics::present(void *screenshotCallbackdata)
 {
     if (!isActive())
-        return;
+        throw love::Exception("present can only be called while the graphics module is active.");
 
     if (isRenderTargetActive())
         throw love::Exception("present cannot be called while a render target is active.");
 
-    if (!renderPassState.active && renderPassState.windowClearRequested)
+    // LIBRETRO FIX: Force startRenderPass() in libretro mode to trigger clearing
+    if (libretroMode && !renderPassState.active) {
+        // std::printf("[CHAILOVE DEBUG] LIBRETRO MODE: Forcing startRenderPass() to trigger clearing\n");
+        
+        // Force windowClearRequested if not already set
+        if (!renderPassState.windowClearRequested) {
+            // std::printf("[CHAILOVE DEBUG] Setting windowClearRequested = true for libretro\n");
+            renderPassState.windowClearRequested = true;
+            
+            // Set a default clear color if none is set
+            renderPassState.mainWindowClearColorValue.hasValue = true;
+            renderPassState.mainWindowClearColorValue.value = ColorD(1.0, 0.0, 1.0, 1.0); // Bright magenta for visibility
+            // std::printf("[CHAILOVE DEBUG] Set default clear color to bright magenta\n");
+        }
+        
         startRenderPass();
+        // std::printf("[CHAILOVE DEBUG] startRenderPass() called successfully\n");
+    } else if (!renderPassState.active && renderPassState.windowClearRequested) {
+        // Original logic for non-libretro mode
+        startRenderPass();
+    }
 
     deprecations.draw(this);
 
@@ -612,45 +596,39 @@ void Graphics::present(void *screenshotCallbackdata)
 
     VkResult result = VK_SUCCESS;
 
-    // In libretro mode, skip all swapchain/surface operations
+        // In libretro mode, skip all swapchain/surface operations
     if (!libretroMode) {
-        if (!swapChainImages.empty())
-        {
-            VkPresentInfoKHR presentInfo{};
-            presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-            presentInfo.waitSemaphoreCount = 1;
-            presentInfo.pWaitSemaphores = &renderFinishedSemaphores.at(currentFrame);
-            presentInfo.swapchainCount = 1;
-            presentInfo.pSwapchains = &swapChain;
-            presentInfo.pImageIndices = &imageIndex;
-
-            result = vkQueuePresentKHR(presentQueue, &presentInfo);
-        }
-        else
-        {
-            // Presenting without a real swap chain can happen if the window is minimized.
-            // Check every frame to see if a proper one can be created, in this situation.
-            VkSurfaceCapabilitiesKHR capabilities = {};
-            if (surface != VK_NULL_HANDLE && vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &capabilities) == VK_SUCCESS)
-            {
-                VkExtent2D extent = chooseSwapExtent(capabilities);
-                if (extent.width > 0 && extent.height > 0)
-                    swapChainRecreationRequested = true;
-            }
-        }
-
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || swapChainRecreationRequested)
         {
             swapChainRecreationRequested = false;
             recreateSwapChain();
         }
         else if (result != VK_SUCCESS)
-            throw love::Exception("failed to present swap chain image");
+            throw love::Exception("failed to present swap chain image!");
     }
 
-    for (love::gfx::StreamBuffer *buffer : batchedDrawState.vb)
-        buffer->nextFrame();
-    batchedDrawState.indexBuffer->nextFrame();
+    // Process the 2 vertex buffers in batchedDrawState
+    // std::printf("[CHAILOVE DEBUG] Processing batchedDrawState buffers\n");
+    
+    for (int i = 0; i < 2; i++) {
+        if (batchedDrawState.vb[i] != nullptr) {
+            // std::printf("[CHAILOVE DEBUG] - vb[%d]: %p\n", i, batchedDrawState.vb[i]);
+            if (batchedDrawState.vb[i]->getSize() > 0) {
+                // std::printf("[CHAILOVE DEBUG]   Size: %zu bytes\n", batchedDrawState.vb[i]->getSize());
+            }
+        } else {
+            // std::printf("[CHAILOVE DEBUG] - vb[%d]: nullptr\n", i);
+        }
+    }
+    
+    if (batchedDrawState.indexBuffer != nullptr) {
+        // std::printf("[CHAILOVE DEBUG] - indexBuffer: %p\n", batchedDrawState.indexBuffer);
+        if (batchedDrawState.indexBuffer->getSize() > 0) {
+            // std::printf("[CHAILOVE DEBUG]   Size: %zu bytes\n", batchedDrawState.indexBuffer->getSize());
+        }
+    } else {
+        // std::printf("[CHAILOVE DEBUG] - indexBuffer: nullptr\n");
+    }
 
     drawCalls = 0;
     renderTargetSwitchCount = 0;
@@ -688,11 +666,11 @@ void Graphics::backbufferChanged(int width, int height, int pixelwidth, int pixe
 
 bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int pixelheight, bool backbufferstencil, bool backbufferdepth, int msaa)
 {
-    std::printf("[CHAILOVE DEBUG] setMode called, libretroMode = %s, externalInstance = %p\n", 
-           libretroMode ? "true" : "false", externalInstance);
+    // std::printf("[CHAILOVE DEBUG] setMode called, libretroMode = %s, externalInstance = %p\n", 
+        //    libretroMode ? "true" : "false", externalInstance);
            
     if (libretroMode && externalInstance != VK_NULL_HANDLE) {
-        std::printf("[CHAILOVE DEBUG] Entering libretro initialization path\n");
+        // std::printf("[CHAILOVE DEBUG] Entering libretro initialization path\n");
         
         // Use RetroArch's Vulkan context instead of creating our own
         instance = externalInstance;
@@ -750,10 +728,10 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
         // Set up the rest of the graphics state for libretro
         backbufferChanged(width, height, pixelwidth, pixelheight, backbufferstencil, backbufferdepth, msaa);
 
-        std::printf("[CHAILOVE DEBUG] About to call initCapabilities() in libretro mode\n");
+        // std::printf("[CHAILOVE DEBUG] About to call initCapabilities() in libretro mode\n");
         // Initialize capabilities with the external device - MUST BE DONE EARLY
         initCapabilities();
-        std::printf("[CHAILOVE DEBUG] initCapabilities() completed in libretro mode\n");
+        // std::printf("[CHAILOVE DEBUG] initCapabilities() completed in libretro mode\n");
 
         // Initialize cleanup and callback vectors
         cleanUpFunctions.clear();
@@ -796,8 +774,38 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
         createColorResources();
         
         // Create depth resources if needed
+        // If we have a physical device but depthStencilFormat is undefined, reinitialize it
         if (backbufferstencil || backbufferdepth) {
-            createDepthResources();
+            // If we have a physical device but depthStencilFormat is undefined, initialize it
+            if (depthStencilFormat == VK_FORMAT_UNDEFINED) {
+                if (physicalDevice != VK_NULL_HANDLE) {
+                    // Reinitialize depth format - this can happen during reinitialization
+                    // std::printf("[CHAILOVE DEBUG] Reinitializing depthStencilFormat during setMode\n");
+                    depthStencilFormat = findDepthFormat();
+                    switch (depthStencilFormat)
+                    {
+                    case VK_FORMAT_D32_SFLOAT_S8_UINT:
+                        depthStencilPixelFormat = PIXELFORMAT_DEPTH32_FLOAT_STENCIL8;
+                        break;
+                    case VK_FORMAT_D24_UNORM_S8_UINT:
+                        depthStencilPixelFormat = PIXELFORMAT_DEPTH24_UNORM_STENCIL8;
+                        break;
+                    default:
+                        throw love::Exception("Failed to convert vulkan depth/stencil swapchain pixel format %d to love PixelFormat.", depthStencilFormat);
+                        break;
+                    }
+                } else {
+                    // std::printf("[CHAILOVE DEBUG] Skipping depth resource creation - no physical device\n");
+                }
+            }
+            
+            // Only create depth resources if we have a valid format
+            if (depthStencilFormat != VK_FORMAT_UNDEFINED) {
+                // std::printf("[CHAILOVE DEBUG] Creating depth resources with format %d\n", depthStencilFormat);
+                createDepthResources();
+            } else {
+                // std::printf("[CHAILOVE DEBUG] Skipping depth resource creation - undefined format\n");
+            }
         }
         
         transitionColorDepthLayouts = true;
@@ -808,7 +816,7 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
                     love::gfx::TEXTURE_2D,
                     love::gfx::Texture::MipmapsMode::MIPMAPS_NONE,
                     0,
-                    love::PixelFormat::PIXELFORMAT_RGBA8_UNORM,
+                    love::PixelFormat::PIXELFORMAT_NORMAL,
                     false,
                     1.0f,
                     1,
@@ -856,12 +864,12 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
         drawCalls = 0;
         drawCallsBatched = 0;
 
-        std::printf("[CHAILOVE DEBUG] Libretro initialization completed successfully\n");
+        // std::printf("[CHAILOVE DEBUG] Libretro initialization completed successfully\n");
         // RETURN EARLY - don't continue with normal initialization
         return true;
     }
 
-    std::printf("[CHAILOVE DEBUG] Taking normal (non-libretro) initialization path\n");
+    // std::printf("[CHAILOVE DEBUG] Taking normal (non-libretro) initialization path\n");
     // Normal (non-libretro) initialization path starts here...
     // Must be called before the swapchain is created.
     backbufferChanged(width, height, pixelwidth, pixelheight, backbufferstencil, backbufferdepth, msaa);
@@ -892,8 +900,9 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
     // createImageViews();
     createColorResources();
     
-    // Only create depth resources if we actually need them
-    if (backbufferstencil || backbufferdepth) {
+    // Only create depth resources if we actually need them AND they haven't been created yet
+    if ((backbufferstencil || backbufferdepth) && depthImageView == VK_NULL_HANDLE) {
+        // std::printf("[CHAILOVE DEBUG] Creating depth resources in second initialization path\n");
         createDepthResources();
     }
     
@@ -915,7 +924,7 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
                 love::gfx::TEXTURE_2D,
                 love::gfx::Texture::MipmapsMode::MIPMAPS_NONE,
                 0,
-                love::PixelFormat::PIXELFORMAT_RGBA8_UNORM,
+                love::PixelFormat::PIXELFORMAT_NORMAL,
                 false,
                 1.0f,
                 1,
@@ -963,6 +972,14 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
 
     Vulkan::resetShaderSwitches();
 
+    // Initialize BatchedDrawState buffers (similar to OpenGL implementation)
+    if (batchedDrawState.vb[0] == nullptr) {
+        // std::printf("[CHAILOVE DEBUG] Initializing BatchedDrawState buffers\n");
+        batchedDrawState.vb[0] = newStreamBuffer(BUFFERUSAGE_VERTEX, 1024 * 1024 * 1);
+        batchedDrawState.vb[1] = newStreamBuffer(BUFFERUSAGE_VERTEX, 256 * 1024 * 1);
+        batchedDrawState.indexBuffer = newStreamBuffer(BUFFERUSAGE_INDEX, sizeof(uint16) * LOVE_UINT16_MAX);
+    }
+
     created = true;
     drawCalls = 0;
     drawCallsBatched = 0;
@@ -973,12 +990,12 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
 bool Graphics::setLibretroVulkanContext(VkInstance instance, VkDevice device, VkPhysicalDevice physicalDevice, 
                                         VkQueue queue, VkCommandPool commandPool)
 {
-    std::printf("[CHAILOVE DEBUG] setLibretroVulkanContext called\n");
-    std::printf("[CHAILOVE DEBUG] - instance: %p\n", instance);
-    std::printf("[CHAILOVE DEBUG] - device: %p\n", device);
-    std::printf("[CHAILOVE DEBUG] - physicalDevice: %p\n", physicalDevice);
-    std::printf("[CHAILOVE DEBUG] - queue: %p\n", queue);
-    std::printf("[CHAILOVE DEBUG] - commandPool: %p\n", commandPool);
+    // std::printf("[CHAILOVE DEBUG] setLibretroVulkanContext called\n");
+    // std::printf("[CHAILOVE DEBUG] - instance: %p\n", instance);
+    // std::printf("[CHAILOVE DEBUG] - device: %p\n", device);
+    // std::printf("[CHAILOVE DEBUG] - physicalDevice: %p\n", physicalDevice);
+    // std::printf("[CHAILOVE DEBUG] - queue: %p\n", queue);
+    // std::printf("[CHAILOVE DEBUG] - commandPool: %p\n", commandPool);
     
     libretroMode = true;
 	commandBufferRecording = false;  // Initialize command buffer recording flag
@@ -996,7 +1013,7 @@ bool Graphics::setLibretroVulkanContext(VkInstance instance, VkDevice device, Vk
     
     // Create our own command pool if RetroArch doesn't provide one
     if (commandPool == VK_NULL_HANDLE) {
-        std::printf("[CHAILOVE DEBUG] Creating our own command pool\n");
+        // std::printf("[CHAILOVE DEBUG] Creating our own command pool\n");
         // Find queue family for graphics queue
         uint32_t queueFamilyCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
@@ -1022,7 +1039,7 @@ bool Graphics::setLibretroVulkanContext(VkInstance instance, VkDevice device, Vk
         }
         
         ownsCommandPool = true;  // We created it, so we own it
-        std::printf("[CHAILOVE DEBUG] Created command pool: %p\n", this->commandPool);
+        // std::printf("[CHAILOVE DEBUG] Created command pool: %p\n", this->commandPool);
     } else {
         this->commandPool = externalCommandPool;
         ownsCommandPool = false;  // RetroArch provided it
@@ -1030,7 +1047,7 @@ bool Graphics::setLibretroVulkanContext(VkInstance instance, VkDevice device, Vk
     
     // Initialize VMA allocator if not already created
     if (vmaAllocator == VK_NULL_HANDLE) {
-        std::printf("[CHAILOVE DEBUG] Initializing VMA allocator\n");
+        // std::printf("[CHAILOVE DEBUG] Initializing VMA allocator\n");
         VmaAllocatorCreateInfo allocatorCreateInfo = {};
         allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_0;
         allocatorCreateInfo.physicalDevice = physicalDevice;
@@ -1071,12 +1088,12 @@ bool Graphics::setLibretroVulkanContext(VkInstance instance, VkDevice device, Vk
         if (vmaCreateAllocator(&allocatorCreateInfo, &vmaAllocator) != VK_SUCCESS)
             throw love::Exception("Failed to create VMA allocator in libretro mode");
         
-        std::printf("[CHAILOVE DEBUG] VMA allocator created successfully: %p\n", vmaAllocator);
+        // std::printf("[CHAILOVE DEBUG] VMA allocator created successfully: %p\n", vmaAllocator);
     }
     
     // Initialize command buffers if not already done
     if (commandBuffers.empty()) {
-        std::printf("[CHAILOVE DEBUG] Initializing command buffers with pool: %p\n", this->commandPool);
+        // std::printf("[CHAILOVE DEBUG] Initializing command buffers with pool: %p\n", this->commandPool);
         // Initialize cleanup and callback vectors
         cleanUpFunctions.clear();
         cleanUpFunctions.resize(MAX_FRAMES_IN_FLIGHT);
@@ -1094,20 +1111,20 @@ bool Graphics::setLibretroVulkanContext(VkInstance instance, VkDevice device, Vk
         if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS)
             throw love::Exception("Failed to allocate command buffers in libretro mode");
         
-        std::printf("[CHAILOVE DEBUG] Command buffers allocated successfully, size: %zu\n", commandBuffers.size());
+        // std::printf("[CHAILOVE DEBUG] Command buffers allocated successfully, size: %zu\n", commandBuffers.size());
     }
     
     // Initialize capabilities now that we have a valid physicalDevice
     initCapabilities();
     
-    std::printf("[CHAILOVE DEBUG] libretroMode set to: %s\n", libretroMode ? "true" : "false");
+    // std::printf("[CHAILOVE DEBUG] libretroMode set to: %s\n", libretroMode ? "true" : "false");
     return true;
 }
 
 void Graphics::initCapabilities()
 {
-    std::printf("[CHAILOVE DEBUG] initCapabilities() called, libretroMode = %s\n", 
-           libretroMode ? "true" : "false");
+    // std::printf("[CHAILOVE DEBUG] initCapabilities() called, libretroMode = %s\n", 
+        //    libretroMode ? "true" : "false");
            
     // Always set basic capabilities first
     capabilities.features[FEATURE_MULTI_RENDER_TARGET_FORMATS] = true;
@@ -1131,8 +1148,8 @@ void Graphics::initCapabilities()
     capabilities.textureTypes[TEXTURE_VOLUME] = true;
     capabilities.textureTypes[TEXTURE_CUBE] = true;
 
-    std::printf("[CHAILOVE DEBUG] Set TEXTURE_2D = %d to true, current value = %s\n", 
-           TEXTURE_2D, capabilities.textureTypes[TEXTURE_2D] ? "true" : "false");
+    // std::printf("[CHAILOVE DEBUG] Set TEXTURE_2D = %d to true, current value = %s\n", 
+        //    TEXTURE_2D, capabilities.textureTypes[TEXTURE_2D] ? "true" : "false");
 
     // Safety check for physicalDevice
     if (physicalDevice == VK_NULL_HANDLE)
@@ -1152,11 +1169,11 @@ void Graphics::initCapabilities()
             capabilities.limits[LIMIT_RENDER_TARGETS] = 8.0;
             capabilities.limits[LIMIT_TEXTURE_MSAA] = 4.0;
             capabilities.limits[LIMIT_ANISOTROPY] = 16.0;
-            std::printf("[CHAILOVE DEBUG] Using libretro defaults for capabilities limits\n");
+            // std::printf("[CHAILOVE DEBUG] Using libretro defaults for capabilities limits\n");
             return;
         }
         else {
-            std::printf("[CHAILOVE DEBUG] physicalDevice is NULL in non-libretro mode!\n");
+            // std::printf("[CHAILOVE DEBUG] physicalDevice is NULL in non-libretro mode!\n");
             return;
         }
     }
@@ -1179,8 +1196,8 @@ void Graphics::initCapabilities()
     capabilities.limits[LIMIT_ANISOTROPY] = properties.limits.maxSamplerAnisotropy;
     static_assert(LIMIT_MAX_ENUM == 13, "Graphics::initCapabilities must be updated when adding a new system limit!");
     
-    std::printf("[CHAILOVE DEBUG] initCapabilities completed, final TEXTURE_2D support = %s\n",
-           capabilities.textureTypes[TEXTURE_2D] ? "true" : "false");
+    // std::printf("[CHAILOVE DEBUG] initCapabilities completed, final TEXTURE_2D support = %s\n",
+        //    capabilities.textureTypes[TEXTURE_2D] ? "true" : "false");
 }
 
 void Graphics::getAPIStats(int &shaderswitches) const
@@ -1279,23 +1296,17 @@ void Graphics::draw(const DrawCommand &cmd)
 	prepareDraw(*cmd.attributes, *cmd.buffers, cmd.texture, cmd.primitiveType, cmd.cullMode);
 
 	if (cmd.indirectBuffer != nullptr)
-	{
-		vkCmdDrawIndirect(
-			commandBuffers.at(currentFrame),
-			(VkBuffer) cmd.indirectBuffer->getHandle(),
-			cmd.indirectBufferOffset,
-			1,
-			0);
-	}
-	else
-	{
-		vkCmdDraw(
-			commandBuffers.at(currentFrame),
-			(uint32) cmd.vertexCount,
-			(uint32) cmd.instanceCount,
-			(uint32) cmd.vertexStart,
-			0);
-	}
+    {
+        // Debug output for indirect draws
+        std::printf("[CHAILOVE DEBUG] Issuing vkCmdDrawIndirect - this should render geometry\n");
+        vkCmdDrawIndirect(commandBuffers.at(currentFrame), (VkBuffer) cmd.indirectBuffer->getHandle(), cmd.indirectBufferOffset, 1, 0);
+    }
+    else
+    {
+        // Debug output for direct draws  
+        std::printf("[CHAILOVE DEBUG] Issuing vkCmdDraw: vertexCount=%d, instanceCount=%d\n", cmd.vertexCount, cmd.instanceCount);
+        vkCmdDraw(commandBuffers.at(currentFrame), cmd.vertexCount, cmd.instanceCount, cmd.vertexStart, 0);
+    }
 
 	drawCalls++;
 }
@@ -1303,6 +1314,13 @@ void Graphics::draw(const DrawCommand &cmd)
 void Graphics::draw(const DrawIndexedCommand &cmd)
 {
 	prepareDraw(*cmd.attributes, *cmd.buffers, cmd.texture, cmd.primitiveType, cmd.cullMode);
+
+	// CRITICAL SAFETY CHECK: Vulkan requires active render pass for draw commands
+    if (!renderPassState.active) {
+        std::printf("[CHAILOVE ERROR] Cannot issue draw commands - no active render pass!\n");
+        std::printf("[CHAILOVE ERROR] This will cause RenderDoc crashes and validation errors\n");
+        return;
+    }
 
 	vkCmdBindIndexBuffer(
 		commandBuffers.at(currentFrame),
@@ -1312,6 +1330,7 @@ void Graphics::draw(const DrawIndexedCommand &cmd)
 
 	if (cmd.indirectBuffer != nullptr)
 	{
+		std::printf("[CHAILOVE DEBUG] Issuing vkCmdDrawIndexedIndirect\n");
 		vkCmdDrawIndexedIndirect(
 			commandBuffers.at(currentFrame),
 			(VkBuffer) cmd.indirectBuffer->getHandle(),
@@ -1321,6 +1340,7 @@ void Graphics::draw(const DrawIndexedCommand &cmd)
 	}
 	else
 	{
+		std::printf("[CHAILOVE DEBUG] Issuing vkCmdDrawIndexed: indexCount=%d, instanceCount=%d\n", cmd.indexCount, cmd.instanceCount);
 		vkCmdDrawIndexed(
 			commandBuffers.at(currentFrame),
 			(uint32) cmd.indexCount,
@@ -1842,44 +1862,107 @@ void Graphics::startRecordingGraphicsCommands()
                              commandBuffers.size(), currentFrame);
     }
     
+    // Add debug information about the command buffer state
+    VkCommandBuffer currentCommandBuffer = commandBuffers.at(currentFrame);
+    // std::printf("[CHAILOVE DEBUG] startRecordingGraphicsCommands:\n");
+    // std::printf("[CHAILOVE DEBUG] - currentFrame: %zu\n", currentFrame);
+    // std::printf("[CHAILOVE DEBUG] - commandBuffers.size(): %zu\n", commandBuffers.size());
+    // std::printf("[CHAILOVE DEBUG] - currentCommandBuffer: %p\n", currentCommandBuffer);
+    // std::printf("[CHAILOVE DEBUG] - commandPool: %p\n", commandPool);
+    // std::printf("[CHAILOVE DEBUG] - device: %p\n", device);
+    // std::printf("[CHAILOVE DEBUG] - commandBufferRecording: %s\n", commandBufferRecording ? "true" : "false");
+    
+    // Check if command buffer is valid
+    if (currentCommandBuffer == VK_NULL_HANDLE) {
+        throw love::Exception("Command buffer at frame %zu is VK_NULL_HANDLE", currentFrame);
+    }
+    
+    // IMPORTANT FIX: Reset the command buffer if it's already recording
+    if (commandBufferRecording) {
+        // std::printf("[CHAILOVE DEBUG] Command buffer already recording, resetting it first\n");
+        
+        // End the current recording if it's active
+        VkResult endResult = vkEndCommandBuffer(currentCommandBuffer);
+        if (endResult != VK_SUCCESS) {
+            // std::printf("[CHAILOVE DEBUG] Warning: vkEndCommandBuffer failed with result: %d\n", endResult);
+        }
+        
+        // Reset the command buffer to initial state
+        VkResult resetResult = vkResetCommandBuffer(currentCommandBuffer, 0);
+        if (resetResult != VK_SUCCESS) {
+            // std::printf("[CHAILOVE DEBUG] vkResetCommandBuffer failed with result: %d\n", resetResult);
+            throw love::Exception("Failed to reset command buffer (VkResult: %d)", resetResult);
+        }
+        
+        commandBufferRecording = false;
+        // std::printf("[CHAILOVE DEBUG] Command buffer reset successfully\n");
+    }
+    
     VkCommandBufferBeginInfo beginInfo{};
-	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-	beginInfo.pInheritanceInfo = nullptr;
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    beginInfo.pInheritanceInfo = nullptr;
+    beginInfo.pNext = nullptr;  // Explicitly set to nullptr for clarity
 
-	if (vkBeginCommandBuffer(commandBuffers.at(currentFrame), &beginInfo) != VK_SUCCESS)
-		throw love::Exception("failed to begin recording command buffer");
+    // std::printf("[CHAILOVE DEBUG] About to call vkBeginCommandBuffer\n");
+    // std::printf("[CHAILOVE DEBUG] - beginInfo.sType: %u\n", beginInfo.sType);
+    // std::printf("[CHAILOVE DEBUG] - beginInfo.flags: %u\n", beginInfo.flags);
+    // std::printf("[CHAILOVE DEBUG] - beginInfo.pNext: %p\n", beginInfo.pNext);
+    // std::printf("[CHAILOVE DEBUG] - beginInfo.pInheritanceInfo: %p\n", beginInfo.pInheritanceInfo);
 
-	commandBufferRecording = true;
+    VkResult result = vkBeginCommandBuffer(currentCommandBuffer, &beginInfo);
+    if (result != VK_SUCCESS) {
+        // std::printf("[CHAILOVE DEBUG] vkBeginCommandBuffer failed with result: %d\n", result);
+        throw love::Exception("failed to begin recording command buffer (VkResult: %d)", result);
+    }
 
-	initDynamicState();
+    // std::printf("[CHAILOVE DEBUG] vkBeginCommandBuffer succeeded\n");
+    commandBufferRecording = true;
+
+    initDynamicState();
 
     // This must be done after vkBeginCommandBuffer (since newTexture needs an
     // active command buffer for layout transitions), and before setDefaultRenderPass
     // (since that tries to use fakeBackbuffer).
     if (swapChainImages.empty() && fakeBackbuffer == nullptr)
     {
+        // Create our render target texture for libretro
         auto settings = love::gfx::Texture::Settings{
-            width, height, 1,
-            love::gfx::TEXTURE_2D,
-            love::gfx::Texture::MipmapsMode::MIPMAPS_NONE,
-            0,
-            love::PixelFormat::PIXELFORMAT_RGBA8_UNORM,
-            false,
-            1.0f,
-            1,
-            true // isRenderTarget = true
-        };
+                    width, height, 1,
+                    love::gfx::TEXTURE_2D,
+                    love::gfx::Texture::MipmapsMode::MIPMAPS_NONE,
+                    0,
+                    love::PixelFormat::PIXELFORMAT_NORMAL,
+                    false,
+                    1.0f,
+                    1,
+                    true  // renderTarget
+                };
         fakeBackbuffer.set(new Texture(this, settings, nullptr), Acquire::NORETAIN);
     }
 
     setDefaultRenderPass();
 
+    // For libretro mode, automatically request a clear with background color
+    if (libretroMode && !renderPassState.windowClearRequested) {
+        renderPassState.windowClearRequested = true;
+        // Use the current background color - convert from Colorf to ColorT<double>
+        renderPassState.mainWindowClearColorValue.hasValue = true;
+        auto bgColor = getBackgroundColor();
+        renderPassState.mainWindowClearColorValue.value = ColorD(bgColor.r, bgColor.g, bgColor.b, bgColor.a);
+        renderPassState.mainWindowClearDepthValue.hasValue = true;
+        renderPassState.mainWindowClearDepthValue.value = 1.0;
+        renderPassState.mainWindowClearStencilValue.hasValue = true;
+        renderPassState.mainWindowClearStencilValue.value = 0;
+        
+        // std::printf("[CHAILOVE DEBUG] Auto-requesting clear for libretro mode with background color\n");
+    }
+
     if (defaultVertexBuffer)
     {
-        VkBuffer buffer = (VkBuffer)defaultVertexBuffer->getHandle();
+        VkBuffer vkBuffer = (VkBuffer) defaultVertexBuffer->getHandle();
         VkDeviceSize offset = 0;
-        vkCmdBindVertexBuffers(commandBuffers.at(currentFrame), DEFAULT_VERTEX_BUFFER_BINDING, 1, &buffer, &offset);
+        vkCmdBindVertexBuffers(commandBuffers.at(currentFrame), DEFAULT_VERTEX_BUFFER_BINDING, 1, &vkBuffer, &offset);
     }
 }
 
@@ -2930,108 +3013,220 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
 {
     // Add safety check for corrupted Graphics object
     if (this == nullptr) {
-        std::printf("[CHAILOVE DEBUG] prepareDraw called with null Graphics object\n");
+        std::printf("[CHAILOVE ERROR] prepareDraw: Graphics object is null\n");
         return;
     }
     
     // Check if Graphics object is in a valid state
     try {
-		// Try to access the magic number - this will fail if memory is corrupted
-        volatile uint32_t testMagic = magicNumber;
-        
-        if (testMagic != GRAPHICS_MAGIC) {
-            std::printf("[CHAILOVE DEBUG] prepareDraw: Corrupted Graphics object detected - magic: 0x%X (expected: 0x%X)\n", 
-                testMagic, GRAPHICS_MAGIC);
+        if (magicNumber != GRAPHICS_MAGIC) {
+            std::printf("[CHAILOVE ERROR] prepareDraw: Graphics object corrupted (magic: 0x%08X, expected: 0x%08X)\n", 
+                       magicNumber, GRAPHICS_MAGIC);
             return;
         }
-
-        // Try to access a member variable safely
-        volatile bool testActive = renderPassState.active;
         
-        if (!testActive)
-            startRenderPass();
+        if (!created) {
+            std::printf("[CHAILOVE ERROR] prepareDraw: Graphics object not created\n");
+            return;
+        }
     } catch (const std::exception& e) {
-        std::printf("[CHAILOVE DEBUG] Exception in prepareDraw accessing renderPassState: %s\n", e.what());
+        std::printf("[CHAILOVE ERROR] prepareDraw: Exception during validation: %s\n", e.what());
         return;
     } catch (...) {
-        std::printf("[CHAILOVE DEBUG] Unknown exception in prepareDraw - Graphics object corrupted\n");
+        std::printf("[CHAILOVE ERROR] prepareDraw: Unknown exception during validation\n");
         return;
     }
 
+    // ADD VALIDATION CHECKS FOR VULKAN STATE
+    std::printf("[CHAILOVE DEBUG] prepareDraw validation:\n");
+    std::printf("[CHAILOVE DEBUG] - commandBufferRecording: %s\n", commandBufferRecording ? "true" : "false");
+    std::printf("[CHAILOVE DEBUG] - renderPassState.active: %s\n", renderPassState.active ? "true" : "false");
+    
+    // CRITICAL FIX: Start render pass automatically if none is active
+	if (!renderPassState.active) {
+		if (!commandBufferRecording) {
+			std::printf("[CHAILOVE DEBUG] prepareDraw: Starting command buffer recording\n");
+			startRecordingGraphicsCommands();
+		}else {
+			// Command buffer is already recording, but we still need to set up render pass configuration
+			std::printf("[CHAILOVE DEBUG] prepareDraw: Command buffer already recording, setting up render pass configuration\n");
+			setDefaultRenderPass();
+		}
+
+		std::printf("[CHAILOVE DEBUG] prepareDraw: No active render pass, starting one automatically\n");
+		startRenderPass();
+		
+		// Verify that render pass was successfully started
+		if (!renderPassState.active) {
+			std::printf("[CHAILOVE ERROR] prepareDraw: Failed to start render pass!\n");
+			return;
+		}
+		std::printf("[CHAILOVE DEBUG] prepareDraw: Render pass started successfully\n");
+	}
+    
+    // Validate command buffer
+    VkCommandBuffer currentCommandBuffer = commandBuffers.at(currentFrame);
+    if (currentCommandBuffer == VK_NULL_HANDLE) {
+        std::printf("[CHAILOVE ERROR] prepareDraw: Invalid command buffer!\n");
+        return;
+    }
+    
+    // ADD SHADER DEBUG OUTPUT
+    std::printf("[CHAILOVE DEBUG] prepareDraw shader status:\n");
+    std::printf("[CHAILOVE DEBUG] - Shader::current: %p\n", Shader::current);
+    
     auto s = dynamic_cast<Shader*>(Shader::current);
+    if (!s) {
+        std::printf("[CHAILOVE ERROR] prepareDraw: No valid shader is currently bound (current=%p)\n", Shader::current);
+        
+        // Try to use default shader
+        if (Shader::standardShaders[Shader::STANDARD_DEFAULT]) {
+            std::printf("[CHAILOVE DEBUG] prepareDraw: Attempting to use default shader\n");
+            s = dynamic_cast<Shader*>(Shader::standardShaders[Shader::STANDARD_DEFAULT]);
+            if (s) {
+                s->attach();
+                std::printf("[CHAILOVE DEBUG] prepareDraw: Default shader attached successfully\n");
+            } else {
+                std::printf("[CHAILOVE ERROR] prepareDraw: Default shader cast failed\n");
+                return;
+            }
+        } else {
+            std::printf("[CHAILOVE ERROR] prepareDraw: No default shader available\n");
+            return;
+        }
+    } else {
+        std::printf("[CHAILOVE DEBUG] prepareDraw: Using shader %p\n", s);
+    }
 
     usedShadersInFrame.insert(s);
 
+    // LIBRETRO FIX: Handle pipeline creation when render pass is null
     GraphicsPipelineConfigurationFull configuration{};
+    
+    // If we don't have a render pass (direct rendering mode), we need to create one for pipeline compatibility
+    VkRenderPass pipelineRenderPass = renderPassState.beginInfo.renderPass;
+    
+    if (pipelineRenderPass == VK_NULL_HANDLE) {
+        std::printf("[CHAILOVE ERROR] prepareDraw: No render pass available for pipeline creation!\n");
+        
+        // Try to start render pass
+        if (!renderPassState.active) {
+            std::printf("[CHAILOVE DEBUG] prepareDraw: Attempting to start render pass\n");
+            try {
+                startRenderPass();
+                pipelineRenderPass = renderPassState.beginInfo.renderPass;
+                std::printf("[CHAILOVE DEBUG] prepareDraw: Render pass started, new renderPass: %p\n", (void*)pipelineRenderPass);
+            } catch (const std::exception& e) {
+                std::printf("[CHAILOVE ERROR] prepareDraw: Failed to start render pass: %s\n", e.what());
+                return;
+            }
+        }
+        
+        if (pipelineRenderPass == VK_NULL_HANDLE) {
+            std::printf("[CHAILOVE ERROR] prepareDraw: Still no render pass after startRenderPass()\n");
+            return;
+        }
+    }
 
-	configuration.core.renderPass = renderPassState.beginInfo.renderPass;
-	configuration.core.attributes = attributes;
-	configuration.core.wireFrame = states.back().wireframe;
-	configuration.core.blendStateKey = states.back().blend.toKey();
-	configuration.core.colorChannelMask = states.back().colorMask;
-	configuration.core.msaaSamples = renderPassState.msaa;
-	configuration.core.numColorAttachments = renderPassState.numColorAttachments;
-	configuration.core.packedColorAttachmentFormats = renderPassState.packedColorAttachmentFormats;
-	configuration.core.primitiveType = primitiveType;
+    // VALIDATE RENDER PASS AND PIPELINE COMPATIBILITY
+    std::printf("[CHAILOVE DEBUG] Pipeline validation:\n");
+    std::printf("[CHAILOVE DEBUG] - pipelineRenderPass: %p\n", (void*)pipelineRenderPass);
+    std::printf("[CHAILOVE DEBUG] - renderPassState.numColorAttachments: %d\n", renderPassState.numColorAttachments);
+    std::printf("[CHAILOVE DEBUG] - renderPassState.msaa: %d\n", (int)renderPassState.msaa);
+    
+    configuration.core.renderPass = pipelineRenderPass;
+    configuration.core.attributes = attributes;
+    configuration.core.wireFrame = states.back().wireframe;
+    configuration.core.blendStateKey = states.back().blend.toKey();
+    configuration.core.colorChannelMask = states.back().colorMask;
+    configuration.core.msaaSamples = renderPassState.msaa;
+    configuration.core.numColorAttachments = renderPassState.numColorAttachments;
+    configuration.core.packedColorAttachmentFormats = renderPassState.packedColorAttachmentFormats;
+    configuration.core.primitiveType = primitiveType;
 
-	VkPipeline pipeline = VK_NULL_HANDLE;
+    VkPipeline pipeline = VK_NULL_HANDLE;
 
-	if (optionalDeviceExtensions.extendedDynamicState)
-	{
-		vkCmdSetCullModeEXT(commandBuffers.at(currentFrame), Vulkan::getCullMode(cullmode));
-		pipeline = s->getCachedGraphicsPipeline(this, configuration.core);
-	}
-	else
-	{
-		configuration.noDynamicState.winding = states.back().winding;
-		configuration.noDynamicState.depthState.compare = states.back().depthTest;
-		configuration.noDynamicState.depthState.write = states.back().depthWrite;
-		configuration.noDynamicState.stencilAction = states.back().stencil.action;
-		configuration.noDynamicState.stencilCompare = states.back().stencil.compare;
-		configuration.noDynamicState.cullmode = cullmode;
+    try {
+        pipeline = s->getCachedGraphicsPipeline(this, configuration);
+        std::printf("[CHAILOVE DEBUG] Pipeline retrieved successfully: %p\n", (void*)pipeline);
+    } catch (const std::exception& e) {
+        std::printf("[CHAILOVE ERROR] Failed to get graphics pipeline: %s\n", e.what());
+        return;
+    }
 
-		pipeline = s->getCachedGraphicsPipeline(this, configuration);
-	}
+    if (pipeline == VK_NULL_HANDLE) {
+        std::printf("[CHAILOVE ERROR] prepareDraw: Failed to create/get graphics pipeline\n");
+        return;
+    }
 
-	if (pipeline != renderPassState.pipeline)
-	{
-		vkCmdBindPipeline(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-		renderPassState.pipeline = pipeline;
-	}
+    if (pipeline != renderPassState.pipeline) {
+        std::printf("[CHAILOVE DEBUG] Binding new pipeline: %p (was %p)\n", (void*)pipeline, (void*)renderPassState.pipeline);
+        vkCmdBindPipeline(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+        renderPassState.pipeline = pipeline;
+    }
 
-	s->setMainTex(texture);
-	s->cmdPushDescriptorSets(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS);
+    // VALIDATE DESCRIPTOR SETS BEFORE BINDING
+    std::printf("[CHAILOVE DEBUG] Setting up descriptor sets\n");
+    try {
+        s->setMainTex(texture);
+        s->cmdPushDescriptorSets(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS);
+        std::printf("[CHAILOVE DEBUG] Descriptor sets bound successfully\n");
+    } catch (const std::exception& e) {
+        std::printf("[CHAILOVE ERROR] Failed to bind descriptor sets: %s\n", e.what());
+        return;
+    }
 
-	VkBuffer vkbuffers[BufferBindings::MAX];
-	VkDeviceSize vkoffsets[BufferBindings::MAX];
-	uint32 buffercount = 0;
+    VkBuffer vkbuffers[BufferBindings::MAX];
+    VkDeviceSize vkoffsets[BufferBindings::MAX];
+    uint32 buffercount = 0;
 
-	uint32 allbits = buffers.useBits;
-	uint32 i = 0;
-	while (allbits)
-	{
-		uint32 bit = 1u << i;
+    uint32 allbits = buffers.useBits;
+    uint32 i = 0;
+    while (allbits) {
+        if (allbits & 1) {
+            if (buffers.info[i].buffer != nullptr) {
+                vkbuffers[buffercount] = (VkBuffer)buffers.info[i].buffer->getHandle();
+                vkoffsets[buffercount] = (VkDeviceSize)buffers.info[i].offset;
+                buffercount++;
+            }
+        }
+        allbits >>= 1;
+        i++;
+    }
 
-		// TODO: handle split ranges.
-		if (buffers.useBits & bit)
-		{
-			vkbuffers[buffercount] = (VkBuffer)buffers.info[i].buffer->getHandle();
-			vkoffsets[buffercount] = (VkDeviceSize)buffers.info[i].offset;
-			buffercount++;
-		}
-
-		i++;
-		allbits >>= 1;
-	}
-
-	if (buffercount > 0)
-		vkCmdBindVertexBuffers(commandBuffers.at(currentFrame), VERTEX_BUFFER_BINDING_START, buffercount, vkbuffers, vkoffsets);
+    if (buffercount > 0) {
+        std::printf("[CHAILOVE DEBUG] Binding %u vertex buffers\n", buffercount);
+        vkCmdBindVertexBuffers(commandBuffers.at(currentFrame), VERTEX_BUFFER_BINDING_START, buffercount, vkbuffers, vkoffsets);
+    }
+    
+    std::printf("[CHAILOVE DEBUG] prepareDraw completed successfully\n");
 }
 
 void Graphics::setDefaultRenderPass()
 {
-    uint32_t numClearValues = 2;
-    renderPassState.clearColors.resize(numClearValues);
+    // Add extensive pixel format debugging right at the beginning
+    // std::printf("[CHAILOVE DEBUG] ========== PIXEL FORMAT DEBUG ==========\n");
+    // std::printf("[CHAILOVE DEBUG] Checking supported pixel formats:\n");
+    
+    // Test key pixel formats
+    std::vector<love::PixelFormat> testFormats = {
+        love::PixelFormat::PIXELFORMAT_RGBA8_UNORM,
+        love::PixelFormat::PIXELFORMAT_BGRA8_UNORM
+    };
+    
+    for (auto format : testFormats) {
+        bool supported = isPixelFormatSupported(format, PIXELFORMATUSAGEFLAGS_RENDERTARGET);
+        // std::printf("[CHAILOVE DEBUG] Format %d supported: %s\n", (int)format, supported ? "YES" : "NO");
+    }
+    
+    // Check fakeBackbuffer
+    if (fakeBackbuffer) {
+        // std::printf("[CHAILOVE DEBUG] fakeBackbuffer exists: %p\n", fakeBackbuffer.get());
+        // Try to get format info from fakeBackbuffer if possible
+    } else {
+        // std::printf("[CHAILOVE DEBUG] fakeBackbuffer is null!\n");
+    }
+    // std::printf("[CHAILOVE DEBUG] ========================================\n");
 
     renderPassState.beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassState.beginInfo.renderPass = VK_NULL_HANDLE;
@@ -3044,24 +3239,23 @@ void Graphics::setDefaultRenderPass()
     if (!swapChainImages.empty()) {
         renderWidth = swapChainExtent.width;
         renderHeight = swapChainExtent.height;
-        std::printf("[CHAILOVE DEBUG] Using swapchain dimensions: %ux%u\n", renderWidth, renderHeight);
+        // std::printf("[CHAILOVE DEBUG] Using swapchain dimensions: %ux%u\n", renderWidth, renderHeight);
     } else if (fakeBackbuffer) {
-        renderWidth = fakeBackbuffer->getWidth();
-        renderHeight = fakeBackbuffer->getHeight();
-        std::printf("[CHAILOVE DEBUG] Using fakeBackbuffer dimensions: %ux%u\n", renderWidth, renderHeight);
+        renderWidth = static_cast<uint32_t>(width);
+        renderHeight = static_cast<uint32_t>(height);
+        // std::printf("[CHAILOVE DEBUG] Using fakeBackbuffer dimensions: %ux%u (from width=%d, height=%d)\n", 
+                //    renderWidth, renderHeight, width, height);
     } else {
-        // Fallback to window size - ensure they're not zero
-        renderWidth = std::max(1, width);
-        renderHeight = std::max(1, height);
-        std::printf("[CHAILOVE DEBUG] Using fallback window dimensions: %ux%u (from %dx%d)\n", 
-               renderWidth, renderHeight, width, height);
+        renderWidth = 800;  // Fallback
+        renderHeight = 600;
+        // std::printf("[CHAILOVE DEBUG] Using fallback dimensions: %ux%u\n", renderWidth, renderHeight);
     }
     
     // Critical: Ensure dimensions are never zero
     if (renderWidth == 0 || renderHeight == 0) {
-        std::printf("[CHAILOVE ERROR] Calculated render dimensions are zero! Setting to 1x1 fallback\n");
-        renderWidth = 1;
-        renderHeight = 1;
+        renderWidth = 800;
+        renderHeight = 600;
+        // std::printf("[CHAILOVE DEBUG] Corrected zero dimensions to: %ux%u\n", renderWidth, renderHeight);
     }
     
     renderPassState.beginInfo.renderArea.extent.width = renderWidth;
@@ -3069,42 +3263,132 @@ void Graphics::setDefaultRenderPass()
     renderPassState.width = static_cast<float>(renderWidth);
     renderPassState.height = static_cast<float>(renderHeight);
     
-    std::printf("[CHAILOVE DEBUG] Final render area extent: %ux%u\n", renderWidth, renderHeight);
-    
-    renderPassState.beginInfo.clearValueCount = numClearValues;
-    renderPassState.beginInfo.pClearValues = renderPassState.clearColors.data();
+    // std::printf("[CHAILOVE DEBUG] Final render area extent: %ux%u\n", renderWidth, renderHeight);
 
     renderPassState.isWindow = true;
     renderPassState.pipeline = VK_NULL_HANDLE;
     renderPassState.msaa = msaaSamples;
     renderPassState.numColorAttachments = 1;
     
-    // Use fakeBackbuffer format in libretro mode
-    VkFormat colorFormat;
+    // CRITICAL FIX: Try multiple pixel formats until we find a supported one
+    VkFormat colorFormat = VK_FORMAT_UNDEFINED;
+    
     if (!swapChainImages.empty()) {
         colorFormat = swapChainImageFormat;
-        renderPassState.packedColorAttachmentFormats = (uint8)swapChainPixelFormat;
-    } else if (fakeBackbuffer) {
-        colorFormat = Vulkan::getTextureFormat(fakeBackbuffer->getPixelFormat()).internalFormat;
-        renderPassState.packedColorAttachmentFormats = (uint8)fakeBackbuffer->getPixelFormat();
+        // std::printf("[CHAILOVE DEBUG] Using swapchain color format: %d\n", colorFormat);
     } else {
-        // Fallback format
-        colorFormat = VK_FORMAT_R8G8B8A8_UNORM;
-        renderPassState.packedColorAttachmentFormats = (uint8)PIXELFORMAT_RGBA8_UNORM;
+        // Try different formats in order of preference
+        std::vector<VkFormat> candidateFormats = {
+            VK_FORMAT_R8G8B8A8_UNORM,  // Most common
+            VK_FORMAT_B8G8R8A8_UNORM,  // Alternative
+            VK_FORMAT_R8G8B8A8_SRGB,   // sRGB variant
+            VK_FORMAT_B8G8R8A8_SRGB    // sRGB alternative
+        };
+        
+        for (auto format : candidateFormats) {
+            // Test if this Vulkan format works
+            VkFormatProperties props;
+            vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &props);
+            
+            if (props.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT) {
+                colorFormat = format;
+                // std::printf("[CHAILOVE DEBUG] Selected working color format: %d\n", colorFormat);
+                break;
+            } else {
+                // std::printf("[CHAILOVE DEBUG] Format %d not supported for color attachment\n", format);
+            }
+        }
+        
+        if (colorFormat == VK_FORMAT_UNDEFINED) {
+            std::printf("[CHAILOVE ERROR] No supported color format found! Using fallback.\n");
+            colorFormat = VK_FORMAT_R8G8B8A8_UNORM; // Force fallback
+        }
     }
 
-    // Rest of the function remains the same...
+    // Create render pass configuration
     RenderPassConfiguration renderPassConfiguration{};
 
+    // CRITICAL FIX: Determine if we need depth/stencil and set appropriate load operations
     VkFormat dsformat = (backbufferHasDepth || backbufferHasStencil) ? depthStencilFormat : VK_FORMAT_UNDEFINED;
+    
+    // For the window render pass, we typically want to clear the color attachment
+    // and load the depth/stencil if it exists (since it may contain useful data from previous frames)
+    VkAttachmentLoadOp colorLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;  // Clear color each frame
+    VkAttachmentLoadOp depthLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;   // Clear depth each frame  
+    VkAttachmentLoadOp stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Clear stencil each frame
+    
+    ColorAttachment colorAttachment;
+    colorAttachment.format = colorFormat;
+    colorAttachment.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachment.msaaLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachment.loadOp = colorLoadOp;
+    colorAttachment.msaaSamples = msaaSamples;
+
+    // Set up color attachment  
+    renderPassConfiguration.colorAttachments.push_back(colorAttachment);
+
+	renderPassState.packedColorAttachmentFormats = static_cast<uint64_t>(love::PixelFormat::PIXELFORMAT_NORMAL);
+
+    // Rest of the function continues...
+    // std::printf("[CHAILOVE DEBUG] ColorAttachment setup complete with format: %d\n", colorFormat);
+
+    // Set up depth/stencil attachment if needed
     renderPassConfiguration.staticData.depthStencilAttachment = { 
         dsformat, 
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 
-        VK_ATTACHMENT_LOAD_OP_LOAD, 
-        VK_ATTACHMENT_LOAD_OP_LOAD, 
+        depthLoadOp,
+        stencilLoadOp, 
         msaaSamples 
     };
     
+    // CRITICAL FIX: Calculate clear value count based on which attachments actually need clearing
+    uint32_t numClearValues = 0;
+    
+    // Count color attachments that need clearing
+    for (const auto& colorAtt : renderPassConfiguration.colorAttachments) {
+        if (colorAtt.loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR) {
+            numClearValues++;
+        }
+    }
+    
+    // Count depth/stencil attachment if it needs clearing
+    if (dsformat != VK_FORMAT_UNDEFINED && 
+        (depthLoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR || stencilLoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR)) {
+        numClearValues++;
+    }
+    
+    // std::printf("[CHAILOVE DEBUG] Calculated numClearValues: %u (color attachments: %zu, depth format: %d)\n", 
+            //    numClearValues, renderPassConfiguration.colorAttachments.size(), dsformat);
+    
+    // Set up clear values array with the correct size
+    renderPassState.clearColors.resize(numClearValues);
+    
+    uint32_t clearIndex = 0;
+    
+    // Initialize color clear values
+    for (size_t i = 0; i < renderPassConfiguration.colorAttachments.size(); i++) {
+        if (renderPassConfiguration.colorAttachments[i].loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR) {
+            renderPassState.clearColors[clearIndex].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+            // std::printf("[CHAILOVE DEBUG] Set clear value [%u] for color attachment %zu\n", clearIndex, i);
+            clearIndex++;
+        }
+    }
+    
+    // Initialize depth/stencil clear value if needed
+    if (dsformat != VK_FORMAT_UNDEFINED && 
+        (depthLoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR || stencilLoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR)) {
+        renderPassState.clearColors[clearIndex].depthStencil = {1.0f, 0};
+        // std::printf("[CHAILOVE DEBUG] Set clear value [%u] for depth/stencil attachment\n", clearIndex);
+        clearIndex++;
+    }
+    
+    // Set up the beginInfo with correct clear value count
+    renderPassState.beginInfo.clearValueCount = numClearValues;
+    renderPassState.beginInfo.pClearValues = numClearValues > 0 ? renderPassState.clearColors.data() : nullptr;
+    
+    // std::printf("[CHAILOVE DEBUG] Final clear setup: count=%u, pClearValues=%p\n", 
+            //    renderPassState.beginInfo.clearValueCount, renderPassState.beginInfo.pClearValues);
+
     if (msaaSamples & VK_SAMPLE_COUNT_1_BIT)
         renderPassConfiguration.staticData.resolve = false;
     else
@@ -3120,39 +3404,62 @@ void Graphics::setDefaultRenderPass()
     framebufferConfiguration.staticData.width = renderWidth;
     framebufferConfiguration.staticData.height = renderHeight;
 
-    if (msaaSamples & VK_SAMPLE_COUNT_1_BIT)
+	if (msaaSamples & VK_SAMPLE_COUNT_1_BIT)
     {
-        renderPassConfiguration.colorAttachments.push_back({ 
-            colorFormat, 
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
-            VK_IMAGE_LAYOUT_UNDEFINED, 
-            VK_ATTACHMENT_LOAD_OP_LOAD, 
-            msaaSamples 
-        });
-
-        if (!swapChainImageViews.empty())
-            framebufferConfiguration.colorViews.push_back(swapChainImageViews.at(imageIndex));
-        else if (fakeBackbuffer)
-            framebufferConfiguration.colorViews.push_back(fakeBackbuffer->getRenderTargetView(0, 0));
+        // No MSAA - use fakeBackbuffer directly
+        if (!swapChainImages.empty()) {
+            framebufferConfiguration.colorViews.push_back(swapChainImageViews[0]);
+            std::printf("[CHAILOVE DEBUG] Added swapchain color view: %p\n", swapChainImageViews[0]);
+        } else if (fakeBackbuffer) {
+            // Use fakeBackbuffer image view
+            auto texture = dynamic_cast<Texture*>(fakeBackbuffer.get());
+            if (texture) {
+                VkImageView colorView = texture->getRenderTargetView(0, 0);
+                std::printf("[CHAILOVE DEBUG] fakeBackbuffer render target view: %p\n", colorView);
+                
+                if (colorView != VK_NULL_HANDLE) {
+                    framebufferConfiguration.colorViews.push_back(colorView);
+                    std::printf("[CHAILOVE DEBUG] Successfully added fakeBackbuffer color view\n");
+                } else {
+                    std::printf("[CHAILOVE ERROR] fakeBackbuffer render target view is VK_NULL_HANDLE!\n");
+                    throw love::Exception("fakeBackbuffer render target view is invalid");
+                }
+            } else {
+                std::printf("[CHAILOVE ERROR] fakeBackbuffer is not a valid Texture!\n");
+                throw love::Exception("Invalid fakeBackbuffer texture");
+            }
+        } else {
+            std::printf("[CHAILOVE ERROR] No color attachment available - no swapchain and no fakeBackbuffer!\n");
+        }
     }
     else
     {
-        renderPassConfiguration.colorAttachments.push_back({ 
-            colorFormat, 
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
-            VK_ATTACHMENT_LOAD_OP_LOAD, 
-            msaaSamples 
-        });
-
-        if (colorImageView != VK_NULL_HANDLE)
-            framebufferConfiguration.colorViews.push_back(colorImageView);
+        // MSAA enabled - use color image as resolve target
+        framebufferConfiguration.colorViews.push_back(colorImageView);
+        std::printf("[CHAILOVE DEBUG] Added MSAA color view: %p\n", colorImageView);
         
-        if (!swapChainImageViews.empty())
-            framebufferConfiguration.colorResolveViews.push_back(swapChainImageViews.at(imageIndex));
-        else if (fakeBackbuffer)
-            framebufferConfiguration.colorResolveViews.push_back(fakeBackbuffer->getRenderTargetView(0, 0));
+        if (!swapChainImages.empty()) {
+            framebufferConfiguration.colorResolveViews.push_back(swapChainImageViews[0]);
+        } else if (fakeBackbuffer) {
+            auto texture = dynamic_cast<Texture*>(fakeBackbuffer.get());
+            if (texture) {
+                // Use the render-target view for resolve target (mipmap 0, slice 0)
+                framebufferConfiguration.colorResolveViews.push_back(texture->getRenderTargetView(0, 0));
+            }
+        }
     }
+    
+    // CRITICAL DEBUG: Verify framebuffer configuration before using it
+    std::printf("[CHAILOVE DEBUG] Final framebuffer configuration:\n");
+    std::printf("[CHAILOVE DEBUG] - colorViews.size(): %zu\n", framebufferConfiguration.colorViews.size());
+    std::printf("[CHAILOVE DEBUG] - colorResolveViews.size(): %zu\n", framebufferConfiguration.colorResolveViews.size());
+    std::printf("[CHAILOVE DEBUG] - depthView: %p\n", framebufferConfiguration.staticData.depthView);
+    
+    if (framebufferConfiguration.colorViews.empty()) {
+        std::printf("[CHAILOVE ERROR] NO COLOR VIEWS IN FRAMEBUFFER - THIS WILL CAUSE DEPTH-ONLY RENDERING!\n");
+        throw love::Exception("Framebuffer has no color attachments");
+    }
+    
 
     renderPassState.renderPassConfiguration = std::move(renderPassConfiguration);
     renderPassState.framebufferConfiguration = std::move(framebufferConfiguration);
@@ -3161,22 +3468,31 @@ void Graphics::setDefaultRenderPass()
     // set yet when this is called from within setRenderTargetsInternal.
     if (renderPassState.windowClearRequested)
     {
-        if (renderPassState.mainWindowClearColorValue.hasValue)
-        {
-            renderPassState.renderPassConfiguration.colorAttachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-            renderPassState.clearColors[0].color = Texture::getClearColor(nullptr, renderPassState.mainWindowClearColorValue.value);
+        // std::printf("[CHAILOVE DEBUG] Window clear requested, setting color attachment to CLEAR\n");
+        renderPassState.renderPassConfiguration.colorAttachments.at(0).loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        
+        // Recalculate clear values since we changed the load operation
+        uint32_t newNumClearValues = 0;
+        
+        // Count color attachments that need clearing
+        for (const auto& colorAtt : renderPassState.renderPassConfiguration.colorAttachments) {
+            if (colorAtt.loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR) {
+                newNumClearValues++;
+            }
         }
-
-        if (renderPassState.mainWindowClearDepthValue.hasValue && backbufferHasDepth)
-        {
-            renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.depthLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-            renderPassState.clearColors[1].depthStencil.depth = static_cast<float>(renderPassState.mainWindowClearDepthValue.value);
+        
+        // Count depth/stencil if needed
+        if (dsformat != VK_FORMAT_UNDEFINED && 
+            (depthLoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR || stencilLoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR)) {
+            newNumClearValues++;
         }
-
-        if (renderPassState.mainWindowClearStencilValue.hasValue && backbufferHasStencil)
-        {
-            renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-            renderPassState.clearColors[1].depthStencil.stencil = static_cast<uint32_t>(renderPassState.mainWindowClearStencilValue.value);
+        
+        if (newNumClearValues != renderPassState.beginInfo.clearValueCount) {
+            // std::printf("[CHAILOVE DEBUG] Updating clear value count from %u to %u due to window clear\n", 
+                    //    renderPassState.beginInfo.clearValueCount, newNumClearValues);
+            renderPassState.clearColors.resize(newNumClearValues);
+            renderPassState.beginInfo.clearValueCount = newNumClearValues;
+            renderPassState.beginInfo.pClearValues = newNumClearValues > 0 ? renderPassState.clearColors.data() : nullptr;
         }
     }
 }
@@ -3269,29 +3585,235 @@ void Graphics::setRenderPass(const RenderTargets &rts, int pixelw, int pixelh)
 
 void Graphics::startRenderPass()
 {
-	renderPassState.active = true;
+    if (renderPassState.active)
+        return;
 
-	if (renderPassState.isWindow && renderPassState.windowClearRequested)
-		renderPassState.windowClearRequested = false;
+    // LIBRETRO COMPATIBILITY: Use minimal render pass setup
+    if (libretroMode) {
+        std::printf("[CHAILOVE DEBUG] Using libretro-compatible rendering with minimal render pass\n");
+        
+        // CRITICAL: Create minimal render pass for pipeline compatibility
+        if (renderPassState.beginInfo.renderPass == VK_NULL_HANDLE) {
+            std::printf("[CHAILOVE DEBUG] Creating minimal render pass for libretro\n");
+            
+            RenderPassConfiguration minimalConfig{};
+            
+            // Use RetroArch's expected format
+            ColorAttachment colorAttachment;
+            colorAttachment.format = VK_FORMAT_R8G8B8A8_UNORM; // Standard format
+            colorAttachment.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            colorAttachment.msaaLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD; // LOAD instead of CLEAR for libretro
+            colorAttachment.msaaSamples = VK_SAMPLE_COUNT_1_BIT;
+            
+            minimalConfig.colorAttachments.push_back(colorAttachment);
+            
+            VkRenderPass minimalRenderPass = getRenderPass(minimalConfig);
+            renderPassState.beginInfo.renderPass = minimalRenderPass;
+            
+            std::printf("[CHAILOVE DEBUG] Minimal render pass created: %p\n", (void*)minimalRenderPass);
+        }
+        
+        // CRITICAL: Actually start the render pass for draw commands
+        VkCommandBuffer currentCommandBuffer = commandBuffers.at(currentFrame);
+        
+        // Set up a dummy framebuffer for the render pass
+        // In libretro mode, we don't actually render to this - RetroArch handles the real target
+        if (renderPassState.beginInfo.framebuffer == VK_NULL_HANDLE) {
+            // Create minimal framebuffer configuration
+            FramebufferConfiguration fbConfig{};
+            fbConfig.staticData.renderPass = renderPassState.beginInfo.renderPass;
+            fbConfig.staticData.width = static_cast<uint32_t>(renderPassState.width);
+            fbConfig.staticData.height = static_cast<uint32_t>(renderPassState.height);
+            
+            // Use fakeBackbuffer view if available
+            if (fakeBackbuffer != nullptr) {
+                VkImageView colorView = fakeBackbuffer->getRenderTargetView(0, 0);
+                fbConfig.colorViews.push_back(colorView);
+            }
+            
+            renderPassState.beginInfo.framebuffer = getFramebuffer(fbConfig);
+            std::printf("[CHAILOVE DEBUG] Minimal framebuffer created: %p\n", 
+                (void*)renderPassState.beginInfo.framebuffer);
+        }
+        
+        // Set up render area
+        renderPassState.beginInfo.renderArea.offset = {0, 0};
+        renderPassState.beginInfo.renderArea.extent.width = static_cast<uint32_t>(renderPassState.width);
+        renderPassState.beginInfo.renderArea.extent.height = static_cast<uint32_t>(renderPassState.height);
+        renderPassState.beginInfo.clearValueCount = 0; // No clearing needed
+        renderPassState.beginInfo.pClearValues = nullptr;
+        
+        // CRITICAL: Actually begin the render pass
+        std::printf("[CHAILOVE DEBUG] Beginning minimal render pass for libretro\n");
+        vkCmdBeginRenderPass(currentCommandBuffer, &renderPassState.beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+        
+        // Set viewport
+        VkViewport viewport{};
+        viewport.x = 0.0f;
+        viewport.y = 0.0f;
+        viewport.width = renderPassState.width;
+        viewport.height = renderPassState.height;
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(currentCommandBuffer, 0, 1, &viewport);
+        
+        // Apply scissor
+        applyScissor();
+        
+        renderPassState.active = true;
+        std::printf("[CHAILOVE DEBUG] Libretro minimal render pass active\n");
+        return;
+    }
 
-	VkViewport viewport{};
-	viewport.x = 0.0f;
-	viewport.y = 0.0f;
-	viewport.width = renderPassState.width;
-	viewport.height = renderPassState.height;
-	viewport.minDepth = 0.0f;
-	viewport.maxDepth = 1.0f;
+    // Original render pass logic for non-libretro mode
+    // ... rest of original startRenderPass() code
 
-	vkCmdSetViewport(commandBuffers.at(currentFrame), 0, 1, &viewport);
 
-	renderPassState.beginInfo.renderPass = getRenderPass(renderPassState.renderPassConfiguration);
+    renderPassState.active = true;
 
-	renderPassState.framebufferConfiguration.staticData.renderPass = renderPassState.beginInfo.renderPass;
-	renderPassState.beginInfo.framebuffer = getFramebuffer(renderPassState.framebufferConfiguration);
+    if (renderPassState.isWindow && renderPassState.windowClearRequested)
+        renderPassState.renderPassConfiguration.colorAttachments.at(0).loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 
-	vkCmdBeginRenderPass(commandBuffers.at(currentFrame), &renderPassState.beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+    // CRITICAL FIX: Ensure command buffers are properly initialized
+    if (commandBuffers.empty() || currentFrame >= commandBuffers.size()) {
+        std::printf("[CHAILOVE ERROR] Command buffers not properly initialized!\n");
+        throw love::Exception("Command buffers not available for rendering");
+    }
+    
+    // Additional safety check
+    VkCommandBuffer currentCommandBuffer = commandBuffers.at(currentFrame);
+    if (currentCommandBuffer == VK_NULL_HANDLE) {
+        std::printf("[CHAILOVE ERROR] Current command buffer is VK_NULL_HANDLE at frame %zu\n", currentFrame);
+        throw love::Exception("Command buffer is not valid");
+    }
 
-	applyScissor();
+    // LIBRETRO-COMPATIBLE SOLUTION: Use simplified rendering approach
+    // std::printf("[CHAILOVE DEBUG] Using libretro-compatible rendering approach\n");
+    
+    // Set viewport
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = renderPassState.width;
+    viewport.height = renderPassState.height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    vkCmdSetViewport(currentCommandBuffer, 0, 1, &viewport);
+    
+    // FALLBACK: Direct rendering with manual clearing for libretro
+    // std::printf("[CHAILOVE DEBUG] Using direct rendering with manual clearing for libretro compatibility\n");
+    
+    // Mark as active
+    renderPassState.active = true;
+    
+    // CRITICAL FIX: Perform manual clearing using vkCmdClearColorImage
+    if (renderPassState.isWindow && renderPassState.windowClearRequested) {
+        // std::printf("[CHAILOVE DEBUG] Performing manual color clear for libretro\n");
+        
+        // Get the current swapchain image (in libretro, this should be RetroArch's image)
+        VkImage targetImage = VK_NULL_HANDLE;
+        
+        // In libretro mode, we need to get the current render target image
+        if (libretroMode && fakeBackbuffer != nullptr) {
+            // Use fakeBackbuffer image - getRenderTargetHandle returns the VkImage cast to ptrdiff_t
+            targetImage = reinterpret_cast<VkImage>(fakeBackbuffer->getRenderTargetHandle());
+            // std::printf("[CHAILOVE DEBUG] Using fakeBackbuffer image: %p\n", (void*)targetImage);
+        } else if (!swapChainImages.empty()) {
+            // Use swapchain image
+            targetImage = swapChainImages[imageIndex];
+            // std::printf("[CHAILOVE DEBUG] Using swapchain image[%zu]: %p\n", imageIndex, (void*)targetImage);
+        }
+        
+        if (targetImage != VK_NULL_HANDLE) {
+            // Transition image to transfer destination layout
+            VkImageMemoryBarrier barrier{};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            barrier.image = targetImage;
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            barrier.subresourceRange.baseMipLevel = 0;
+            barrier.subresourceRange.levelCount = 1;
+            barrier.subresourceRange.baseArrayLayer = 0;
+            barrier.subresourceRange.layerCount = 1;
+            barrier.srcAccessMask = 0;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            
+            vkCmdPipelineBarrier(currentCommandBuffer,
+                                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                                VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                0, 0, nullptr, 0, nullptr, 1, &barrier);
+            
+            // FORCE BRIGHT COLOR FOR TESTING: Clear with bright magenta to make it obvious
+            VkClearColorValue clearColor = {};
+            clearColor.float32[0] = 1.0f; // Red
+            clearColor.float32[1] = 0.0f; // Green  
+            clearColor.float32[2] = 1.0f; // Blue (magenta)
+            clearColor.float32[3] = 1.0f; // Alpha
+            
+            // Also try to use the requested clear color if available
+            if (!renderPassState.clearColors.empty()) {
+                VkClearColorValue requestedColor = renderPassState.clearColors[0].color;
+                // std::printf("[CHAILOVE DEBUG] Requested clear color: R=%.2f, G=%.2f, B=%.2f, A=%.2f\n",
+                        //    requestedColor.float32[0], requestedColor.float32[1], requestedColor.float32[2], requestedColor.float32[3]);
+                
+                // Use the requested color instead of magenta
+                clearColor = requestedColor;
+            }
+            
+            // std::printf("[CHAILOVE DEBUG] Actually clearing with color: R=%.2f, G=%.2f, B=%.2f, A=%.2f\n",
+                    //    clearColor.float32[0], clearColor.float32[1], clearColor.float32[2], clearColor.float32[3]);
+            
+            VkImageSubresourceRange range{};
+            range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            range.baseMipLevel = 0;
+            range.levelCount = 1;
+            range.baseArrayLayer = 0;
+            range.layerCount = 1;
+            
+            vkCmdClearColorImage(currentCommandBuffer, targetImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearColor, 1, &range);
+            
+            // Transition back to color attachment layout
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            
+            vkCmdPipelineBarrier(currentCommandBuffer,
+                                VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                0, 0, nullptr, 0, nullptr, 1, &barrier);
+                                
+            // std::printf("[CHAILOVE DEBUG] Manual color clear completed\n");
+        } else {
+            std::printf("[CHAILOVE WARNING] No target image available for clearing\n");
+        }
+    } else {
+        // std::printf("[CHAILOVE DEBUG] Skipping clear: isWindow=%s, windowClearRequested=%s\n", 
+                //    renderPassState.isWindow ? "true" : "false",
+                //    renderPassState.windowClearRequested ? "true" : "false");
+    }
+
+	// VkRenderPass renderPass = getRenderPass(renderPassState.renderPassConfiguration);
+	// renderPassState.beginInfo.renderPass = renderPass;
+	// renderPassState.beginInfo.framebuffer = getFramebuffer(renderPassState.framebufferConfiguration);
+
+	// vkCmdBeginRenderPass(currentCommandBuffer, &renderPassState.beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+    
+    // Set up minimal beginInfo for compatibility
+    renderPassState.beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassState.beginInfo.pNext = nullptr;
+    renderPassState.beginInfo.renderPass = VK_NULL_HANDLE;
+    renderPassState.beginInfo.framebuffer = VK_NULL_HANDLE;
+    renderPassState.beginInfo.renderArea.offset = { 0, 0 };
+    renderPassState.beginInfo.renderArea.extent.width = static_cast<uint32_t>(renderPassState.width);
+    renderPassState.beginInfo.renderArea.extent.height = static_cast<uint32_t>(renderPassState.height);
+    renderPassState.beginInfo.clearValueCount = 0;
+    renderPassState.beginInfo.pClearValues = nullptr;
 }
 
 void Graphics::endRenderPass()
@@ -3458,7 +3980,20 @@ VkPipeline Graphics::createGraphicsPipeline(Shader *shader, const GraphicsPipeli
 	BlendState blendState = BlendState::fromKey(configuration.blendStateKey);
 
 	VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-	colorBlendAttachment.colorWriteMask = Vulkan::getColorMask(configuration.colorChannelMask);
+    colorBlendAttachment.colorWriteMask = Vulkan::getColorMask(configuration.colorChannelMask);
+    
+    // CRITICAL DEBUG: Check color write mask
+    std::printf("[CHAILOVE DEBUG] Pipeline color configuration:\n");
+    std::printf("[CHAILOVE DEBUG] - configuration.colorChannelMask: 0x%X\n", configuration.colorChannelMask);
+    std::printf("[CHAILOVE DEBUG] - colorWriteMask (Vulkan): 0x%X\n", colorBlendAttachment.colorWriteMask);
+    std::printf("[CHAILOVE DEBUG] - numColorAttachments: %u\n", configuration.numColorAttachments);
+    
+    if (colorBlendAttachment.colorWriteMask == 0) {
+        std::printf("[CHAILOVE ERROR] COLOR WRITE MASK IS ZERO - THIS CAUSES DEPTH-ONLY RENDERING!\n");
+        // Force enable all color channels for debugging
+        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        std::printf("[CHAILOVE DEBUG] Forced colorWriteMask to: 0x%X\n", colorBlendAttachment.colorWriteMask);
+    }
 	colorBlendAttachment.blendEnable = Vulkan::getBool(blendState.enable);
 	colorBlendAttachment.srcColorBlendFactor = Vulkan::getBlendFactor(blendState.srcFactorRGB);
 	colorBlendAttachment.dstColorBlendFactor = Vulkan::getBlendFactor(blendState.dstFactorRGB);
@@ -3680,64 +4215,93 @@ VkFormat Graphics::findDepthFormat()
 
 void Graphics::createDepthResources()
 {
-	if (!backbufferHasDepth && !backbufferHasStencil)
-	{
-		depthImage = VK_NULL_HANDLE;
-		depthImageView = VK_NULL_HANDLE;
-		return;
-	}
+    if (!backbufferHasDepth && !backbufferHasStencil)
+    {
+        depthImage = VK_NULL_HANDLE;
+        depthImageView = VK_NULL_HANDLE;
+        return;
+    }
 
-	VkImageCreateInfo imageInfo{};
-	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	imageInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageInfo.format = depthStencilFormat;
+    // CRITICAL FIX: Validate prerequisites before attempting to create resources
+    if (device == VK_NULL_HANDLE) {
+        throw love::Exception("createDepthResources: Vulkan device not initialized");
+    }
+    
+    if (vmaAllocator == VK_NULL_HANDLE) {
+        throw love::Exception("createDepthResources: VMA allocator not initialized");
+    }
+    
+    if (depthStencilFormat == VK_FORMAT_UNDEFINED) {
+        throw love::Exception("createDepthResources: depthStencilFormat is undefined");
+    }
 
-	// In libretro mode, use window dimensions instead of swapchain extent
+    VkImageCreateInfo imageInfo{};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.format = depthStencilFormat;
+
+    // In libretro mode, use window dimensions instead of swapchain extent
+    // Ensure dimensions are at least 1x1 to prevent Vulkan validation errors
     if (!swapChainImages.empty()) {
         imageInfo.extent.width = swapChainExtent.width;
         imageInfo.extent.height = swapChainExtent.height;
     } else {
-        // Use window dimensions for libretro mode
-        imageInfo.extent.width = static_cast<uint32_t>(pixelWidth);
-        imageInfo.extent.height = static_cast<uint32_t>(pixelHeight);
+        // Use window dimensions for libretro mode, ensure minimum of 1x1
+        imageInfo.extent.width = static_cast<uint32_t>(std::max(1, pixelWidth));
+        imageInfo.extent.height = static_cast<uint32_t>(std::max(1, pixelHeight));
     }
 
-	imageInfo.extent.depth = 1;
-	imageInfo.mipLevels = 1;
-	imageInfo.arrayLayers = 1;
-	imageInfo.samples = msaaSamples;
-	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-	imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    // Additional validation for image dimensions
+    if (imageInfo.extent.width == 0 || imageInfo.extent.height == 0) {
+        throw love::Exception("createDepthResources: Invalid image dimensions (%u x %u)", 
+                             imageInfo.extent.width, imageInfo.extent.height);
+    }
 
-	VmaAllocationCreateInfo allocationInfo{};
-	allocationInfo.usage = VMA_MEMORY_USAGE_AUTO;
-	allocationInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.samples = msaaSamples;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-	if (vmaCreateImage(vmaAllocator, &imageInfo, &allocationInfo, &depthImage, &depthImageAllocation, nullptr) != VK_SUCCESS)
-		throw love::Exception("failed to create depth image");
+    VmaAllocationCreateInfo allocationInfo{};
+    allocationInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    allocationInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
 
-	VkImageViewCreateInfo imageViewInfo{};
-	imageViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	imageViewInfo.image = depthImage;
-	imageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	imageViewInfo.format = depthStencilFormat;
-	imageViewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-	imageViewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-	imageViewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-	imageViewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-	if (backbufferHasDepth)
-		imageViewInfo.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT;
-	if (backbufferHasStencil)
-		imageViewInfo.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-	imageViewInfo.subresourceRange.baseMipLevel = 0;
-	imageViewInfo.subresourceRange.levelCount = 1;
-	imageViewInfo.subresourceRange.baseArrayLayer = 0;
-	imageViewInfo.subresourceRange.layerCount = 1;
+    VkResult imageResult = vmaCreateImage(vmaAllocator, &imageInfo, &allocationInfo, &depthImage, &depthImageAllocation, nullptr);
+    if (imageResult != VK_SUCCESS) {
+        throw love::Exception("failed to create depth image: VkResult = %d", imageResult);
+    }
 
-	if (vkCreateImageView(device, &imageViewInfo, nullptr, &depthImageView) != VK_SUCCESS)
-		throw love::Exception("failed to create depth image view");
+    VkImageViewCreateInfo imageViewInfo{};
+    imageViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    imageViewInfo.image = depthImage;
+    imageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    imageViewInfo.format = depthStencilFormat;
+    imageViewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    imageViewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    imageViewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    imageViewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+    
+    imageViewInfo.subresourceRange.aspectMask = 0;
+    if (backbufferHasDepth)
+        imageViewInfo.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (backbufferHasStencil)
+        imageViewInfo.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+    
+    imageViewInfo.subresourceRange.baseMipLevel = 0;
+    imageViewInfo.subresourceRange.levelCount = 1;
+    imageViewInfo.subresourceRange.baseArrayLayer = 0;
+    imageViewInfo.subresourceRange.layerCount = 1;
+
+    VkResult viewResult = vkCreateImageView(device, &imageViewInfo, nullptr, &depthImageView);
+    if (viewResult != VK_SUCCESS) {
+        // Clean up the image if image view creation fails
+        vmaDestroyImage(vmaAllocator, depthImage, depthImageAllocation);
+        throw love::Exception("failed to create depth image view: VkResult = %d", viewResult);
+    }
 }
 
 void Graphics::createCommandPool()

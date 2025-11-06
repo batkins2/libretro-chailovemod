@@ -1971,7 +1971,7 @@ void chai_mesh::loadSpecular(std::string texture) {
         texture = "/cartridges/test/assets/particles/sunrise.jpg";
     }
             
-    auto cg = ChaiLove::getInstance()->chai_gfx;
+    auto& cg = ChaiLove::getInstance()->chai_gfx;
     SDL_RWops* rw = ChaiLove::getInstance()->filesystem.openRW(texture);
     auto img = new Image(rw);
 

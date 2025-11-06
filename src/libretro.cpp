@@ -633,24 +633,41 @@ void retro_run(void) {
     // Set the clear color (optional, if you want to change the background color)
     // glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
+	// START THE RENDER PASS BEFORE DRAWING
+    if (!app->event.m_pauserendering) {
+        auto& cg = ChaiLove::getInstance()->chai_gfx;
+        
+		love::gfx::OptionalColorD greenColor;
+        greenColor.hasValue = true;
+        greenColor.value = love::ColorD(0.0, 1.0, 0.0, 1.0); // Bright green
+        
+        cg.instance->clear(greenColor, love::OptionalInt(), love::OptionalDouble());
+		// std::printf("[CHAILOVE DEBUG] LIBRETRO: Started render pass with green clear color before app->draw()\n");
+    }
+
 	// Render the game.
 	app->draw();
 
 	// Copy the video buffer to the screen.
 	// video_cb(app->videoBuffer, app->config.window.width, app->config.window.height, app->config.window.width << 2);
 	if (!app->event.m_pauserendering) {
-				
+		auto& cg = ChaiLove::getInstance()->chai_gfx;
+		
+		auto* vulkanGraphics = static_cast<love::gfx::vulkan::Graphics*>(cg.instance);
+		
+			
 		vulkan->wait_sync_index(vulkan->handle);
 
 		vk.index = vulkan->get_sync_index(vulkan->handle);
+
+		VkCommandBuffer cmd[] = { cg.instance->getCommandBufferForDataTransfer() };
 		
-		auto cg = ChaiLove::getInstance()->chai_gfx;
+		vulkanGraphics->submitGpuCommands(love::gfx::vulkan::SUBMIT_NOPRESENT, nullptr);
+
 		retro_vulkan_image image;
-		// cg.instance->present(nullptr);
 		image.image_view = cg.instance->getCurrentSwapchainImageView();
 		image.image_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		image.create_info = cg.instance->getCurrentSwapchainImageViewCreateInfo();
-		VkCommandBuffer cmd[] = { cg.instance->getCommandBufferForDataTransfer() };
 		vulkan->set_image(vulkan->handle, &image, 0, NULL, VK_QUEUE_FAMILY_IGNORED);
    		vulkan->set_command_buffers(vulkan->handle, 1, cmd);
 		video_cb(RETRO_HW_FRAME_BUFFER_VALID, app->chai_gfx.width, app->chai_gfx.height, 0);

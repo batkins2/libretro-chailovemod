@@ -167,7 +167,7 @@ void chai_particles::draw() {
         // auto mat = Matrix4();
         // mat.setIdentity();
         // setParticleSystem(tex, sz);
-        auto cg = ChaiLove::getInstance()->chai_gfx;
+        auto& cg = ChaiLove::getInstance()->chai_gfx;
         ps->draw(cg.instance, mat);
         // cg.instance->setShader(); // Reset shader after drawing
     } else {

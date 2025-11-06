@@ -37,7 +37,7 @@ int chai_gui::addElement(std::string type, std::string image, std::string text, 
 void chai_gui::draw(chai_shader *shader, std::vector<chaiscript::Boxed_Value> viewMatrix1, bool debug)
 {
     // glDisable(GL_DEPTH_TEST);
-    auto cg = ChaiLove::getInstance()->chai_gfx;
+    auto& cg = ChaiLove::getInstance()->chai_gfx;
     
     for (const auto &element : guiElements)
     {
@@ -62,7 +62,7 @@ void chai_gui::draw(chai_shader *shader, std::vector<chaiscript::Boxed_Value> vi
             if (element->texture)
             {
                 // Draw the image using the texture
-                auto cg = ChaiLove::getInstance()->chai_gfx;
+                auto& cg = ChaiLove::getInstance()->chai_gfx;
                 auto x = stof(element->options[0]);
                 auto y = stof(element->options[1]);
                 auto w = stof(element->options[2]);
