@@ -60,6 +60,8 @@ public:
 	VkAccessFlags getBarrierDstAccessFlags() const { return barrierDstAccessFlags; }
 	VkPipelineStageFlags getBarrierDstStageFlags() const { return barrierDstStageFlags; }
 
+	bool fillImmediate(size_t offset, size_t size, const void *data);
+
 private:
 
 	void clearInternal(size_t offset, size_t size) override;

@@ -1397,45 +1397,52 @@ void Graphics::setColor(Colorf c)
 
 void Graphics::applyScissor()
 {
-	VkRect2D scissor{};
+    VkRect2D scissor{};
 
-	bool win = renderPassState.isWindow;
-	scissor.extent.width = win ? swapChainExtent.width : renderPassState.width;
-	scissor.extent.height = win ? swapChainExtent.height : renderPassState.height;
+    bool win = renderPassState.isWindow;
+    
+    // LIBRETRO FIX: In libretro mode, always use renderPassState dimensions
+    if (libretroMode) {
+        scissor.extent.width = static_cast<uint32_t>(renderPassState.width);
+        scissor.extent.height = static_cast<uint32_t>(renderPassState.height);
+    } else {
+        scissor.extent.width = win ? swapChainExtent.width : renderPassState.width;
+        scissor.extent.height = win ? swapChainExtent.height : renderPassState.height;
+    }
 
-	if (states.back().scissor)
-	{
-		const Rect &rect = states.back().scissorRect;
-		double dpiScale = getCurrentDPIScale();
+    if (states.back().scissor)
+    {
+        const Rect &rect = states.back().scissorRect;
+        double dpiScale = getCurrentDPIScale();
 
-		int minScissorX = (int)(rect.x * dpiScale);
-		int minScissorY = (int)(rect.y * dpiScale);
+        int minScissorX = (int)(rect.x * dpiScale);
+        int minScissorY = (int)(rect.y * dpiScale);
 
-		int maxScissorX = minScissorX + (int)(rect.w * dpiScale) - 1;
-		int maxScissorY = minScissorY + (int)(rect.h * dpiScale) - 1;
+        int maxScissorX = minScissorX + (int)(rect.w * dpiScale) - 1;
+        int maxScissorY = minScissorY + (int)(rect.h * dpiScale) - 1;
 
-		// Avoid negative offsets.
-		int minX = std::max(scissor.offset.x, minScissorX);
-		int minY = std::max(scissor.offset.y, minScissorY);
+        // Avoid negative offsets.
+        int minX = std::max(scissor.offset.x, minScissorX);
+        int minY = std::max(scissor.offset.y, minScissorY);
 
-		int maxX = std::min(scissor.offset.x + (int)scissor.extent.width - 1, maxScissorX);
-		int maxY = std::min(scissor.offset.y + (int)scissor.extent.height - 1, maxScissorY);
+        int maxX = std::min(scissor.offset.x + (int)scissor.extent.width - 1, maxScissorX);
+        int maxY = std::min(scissor.offset.y + (int)scissor.extent.height - 1, maxScissorY);
 
-		if (maxX >= minX && maxY >= minY)
-		{
-			scissor.offset.x = minX;
-			scissor.offset.y = minY;
-			scissor.extent.width = (maxX - minX) + 1;
-			scissor.extent.height = (maxY - minY) + 1;
-		}
-		else
-		{
-			scissor.extent.width = 0;
-			scissor.extent.height = 0;
-		}
-	}
+        if (maxX >= minX && maxY >= minY)
+        {
+            scissor.offset.x = minX;
+            scissor.offset.y = minY;
+            scissor.extent.width = (maxX - minX) + 1;
+            scissor.extent.height = (maxY - minY) + 1;
+        }
+        else
+        {
+            scissor.extent.width = 0;
+            scissor.extent.height = 0;
+        }
+    }
 
-	vkCmdSetScissor(commandBuffers.at(currentFrame), 0, 1, &scissor);
+    vkCmdSetScissor(commandBuffers.at(currentFrame), 0, 1, &scissor);
 }
 
 void Graphics::setScissor(const Rect &rect)
@@ -2929,84 +2936,104 @@ VkRenderPass Graphics::getRenderPass(RenderPassConfiguration &configuration)
 }
 
 void Graphics::createVulkanVertexFormat(
-	Shader *shader,
-	const VertexAttributes &attributes,
-	std::vector<VkVertexInputBindingDescription> &bindingDescriptions,
-	std::vector<VkVertexInputAttributeDescription> &attributeDescriptions)
+    Shader *shader,
+    const VertexAttributes &attributes,
+    std::vector<VkVertexInputBindingDescription> &bindingDescriptions,
+    std::vector<VkVertexInputAttributeDescription> &attributeDescriptions)
 {
-	std::set<uint32_t> usedBuffers;
+    std::set<uint32_t> usedBuffers;
+    
+    // DEBUG: Print shader vertex attributes
+    std::printf("[VULKAN DEBUG] createVulkanVertexFormat:\n");
+    std::printf("[VULKAN DEBUG] - attributes.enableBits: 0x%X\n", attributes.enableBits);
+    std::printf("[VULKAN DEBUG] - shader vertex attributes:\n");
+    for (const auto &pair : shader->getVertexAttributeIndices()) {
+        std::printf("[VULKAN DEBUG]   - '%s' -> index=%d, baseType=%d\n", 
+                   pair.first.c_str(), pair.second.index, (int)pair.second.baseType);
+    }
 
-	for (const auto &pair : shader->getVertexAttributeIndices())
-	{
-		int i = pair.second.index;
-		uint32 bit = 1u << i;
+    for (const auto &pair : shader->getVertexAttributeIndices())
+    {
+        int i = pair.second.index;
+        uint32 bit = 1u << i;
+        
+        std::printf("[VULKAN DEBUG] Processing attribute %d ('%s'):\n", i, pair.first.c_str());
+        std::printf("[VULKAN DEBUG] - bit: 0x%X\n", bit);
+        std::printf("[VULKAN DEBUG] - enableBits & bit: 0x%X\n", attributes.enableBits & bit);
 
-		VkVertexInputAttributeDescription attribdesc{};
-		attribdesc.location = i;
+        VkVertexInputAttributeDescription attribdesc{};
+        attribdesc.location = i;
 
-		if (attributes.enableBits & bit)
-		{
-			const auto &attrib = attributes.attribs[i];
+        if (attributes.enableBits & bit)
+        {
+            std::printf("[VULKAN DEBUG] - Using custom buffer (enabled)\n");
+            const auto &attrib = attributes.attribs[i];
 
-			int bufferbinding = VERTEX_BUFFER_BINDING_START + attrib.bufferIndex;
+            int bufferbinding = VERTEX_BUFFER_BINDING_START + attrib.bufferIndex;
+            std::printf("[VULKAN DEBUG] - bufferIndex: %d, calculated binding: %d\n", 
+                       attrib.bufferIndex, bufferbinding);
 
-			attribdesc.binding = bufferbinding;
-			attribdesc.offset = attrib.offsetFromVertex;
-			attribdesc.format = Vulkan::getVulkanVertexFormat(attrib.getFormat());
+            attribdesc.binding = bufferbinding;
+            attribdesc.offset = attrib.offsetFromVertex;
+            attribdesc.format = Vulkan::getVulkanVertexFormat(attrib.getFormat());
 
-			if (usedBuffers.find(bufferbinding) == usedBuffers.end())
-			{
-				usedBuffers.insert(bufferbinding);
+            if (usedBuffers.find(bufferbinding) == usedBuffers.end())
+            {
+                usedBuffers.insert(bufferbinding);
 
-				VkVertexInputBindingDescription bindingdesc{};
-				bindingdesc.binding = bufferbinding;
-				if (attributes.instanceBits & (1u << attrib.bufferIndex))
-					bindingdesc.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
-				else
-					bindingdesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-				bindingdesc.stride = attributes.bufferLayouts[attrib.bufferIndex].stride;
-				bindingDescriptions.push_back(bindingdesc);
-			}
-		}
-		else
-		{
-			attribdesc.binding = DEFAULT_VERTEX_BUFFER_BINDING;
+                VkVertexInputBindingDescription bindingdesc{};
+                bindingdesc.binding = bufferbinding;
+                if (attributes.instanceBits & (1u << attrib.bufferIndex))
+                    bindingdesc.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+                else
+                    bindingdesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+                bindingdesc.stride = attributes.bufferLayouts[attrib.bufferIndex].stride;
+                bindingDescriptions.push_back(bindingdesc);
+            }
+        }
+        else
+        {
+            std::printf("[VULKAN DEBUG] - Using default buffer (NOT enabled)\n");
+            attribdesc.binding = DEFAULT_VERTEX_BUFFER_BINDING;
 
-			// Indices should match the creation parameters for defaultVertexBuffer.
-			switch (pair.second.baseType)
-			{
-			case DATA_BASETYPE_INT:
-				attribdesc.offset = defaultVertexBuffer->getDataMember(1).offset;
-				attribdesc.format = Vulkan::getVulkanVertexFormat(DATAFORMAT_INT32_VEC4);
-				break;
-			case DATA_BASETYPE_UINT:
-				attribdesc.offset = defaultVertexBuffer->getDataMember(1).offset;
-				attribdesc.format = Vulkan::getVulkanVertexFormat(DATAFORMAT_UINT32_VEC4);
-				break;
-			case DATA_BASETYPE_FLOAT:
-			default:
-				if (i == ATTRIB_COLOR)
-					attribdesc.offset = defaultVertexBuffer->getDataMember(2).offset;
-				else
-					attribdesc.offset = defaultVertexBuffer->getDataMember(0).offset;
-				attribdesc.format = Vulkan::getVulkanVertexFormat(DATAFORMAT_FLOAT_VEC4);
-				break;
-			}
+            // Indices should match the creation parameters for defaultVertexBuffer.
+            switch (pair.second.baseType)
+            {
+            case DATA_BASETYPE_INT:
+                attribdesc.offset = defaultVertexBuffer->getDataMember(1).offset;
+                attribdesc.format = Vulkan::getVulkanVertexFormat(DATAFORMAT_INT32_VEC4);
+                break;
+            case DATA_BASETYPE_UINT:
+                attribdesc.offset = defaultVertexBuffer->getDataMember(1).offset;
+                attribdesc.format = Vulkan::getVulkanVertexFormat(DATAFORMAT_UINT32_VEC4);
+                break;
+            case DATA_BASETYPE_FLOAT:
+            default:
+                if (i == ATTRIB_COLOR)
+                    attribdesc.offset = defaultVertexBuffer->getDataMember(2).offset;
+                else
+                    attribdesc.offset = defaultVertexBuffer->getDataMember(0).offset;
+                attribdesc.format = Vulkan::getVulkanVertexFormat(DATAFORMAT_FLOAT_VEC4);
+                break;
+            }
 
-			if (usedBuffers.find(DEFAULT_VERTEX_BUFFER_BINDING) == usedBuffers.end())
-			{
-				usedBuffers.insert(DEFAULT_VERTEX_BUFFER_BINDING);
+            if (usedBuffers.find(DEFAULT_VERTEX_BUFFER_BINDING) == usedBuffers.end())
+            {
+                usedBuffers.insert(DEFAULT_VERTEX_BUFFER_BINDING);
 
-				VkVertexInputBindingDescription bindingdesc{};
-				bindingdesc.binding = DEFAULT_VERTEX_BUFFER_BINDING;
-				bindingdesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-				bindingdesc.stride = 0; // no stride, will always read the same coord multiple times.
-				bindingDescriptions.push_back(bindingdesc);
-			}
-		}
+                VkVertexInputBindingDescription bindingdesc{};
+                bindingdesc.binding = DEFAULT_VERTEX_BUFFER_BINDING;
+                bindingdesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+                bindingdesc.stride = 0; // no stride, will always read the same coord multiple times.
+                bindingDescriptions.push_back(bindingdesc);
+            }
+        }
 
-		attributeDescriptions.push_back(attribdesc);
-	}
+        attributeDescriptions.push_back(attribdesc);
+    }
+    
+    std::printf("[VULKAN DEBUG] Final result: %zu bindings, %zu attributes\n", 
+               bindingDescriptions.size(), attributeDescriptions.size());
 }
 
 void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &buffers, gfx::Texture *texture, PrimitiveType primitiveType, CullMode cullmode)
@@ -3351,7 +3378,7 @@ void Graphics::setDefaultRenderPass()
         }
     }
     
-    // Count depth/stencil attachment if it needs clearing
+    // Count depth/stencil if needed
     if (dsformat != VK_FORMAT_UNDEFINED && 
         (depthLoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR || stencilLoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR)) {
         numClearValues++;
@@ -3592,6 +3619,14 @@ void Graphics::startRenderPass()
     if (libretroMode) {
         std::printf("[CHAILOVE DEBUG] Using libretro-compatible rendering with minimal render pass\n");
         
+        // CRITICAL FIX: Initialize render pass dimensions for libretro
+        if (renderPassState.width <= 0 || renderPassState.height <= 0) {
+            renderPassState.width = 1440.0f;  // Default RetroArch resolution
+            renderPassState.height = 1080.0f;
+            std::printf("[CHAILOVE DEBUG] Initialized libretro render pass dimensions: %fx%f\n", 
+                renderPassState.width, renderPassState.height);
+        }
+        
         // CRITICAL: Create minimal render pass for pipeline compatibility
         if (renderPassState.beginInfo.renderPass == VK_NULL_HANDLE) {
             std::printf("[CHAILOVE DEBUG] Creating minimal render pass for libretro\n");
@@ -3617,7 +3652,8 @@ void Graphics::startRenderPass()
         // CRITICAL: Actually start the render pass for draw commands
         VkCommandBuffer currentCommandBuffer = commandBuffers.at(currentFrame);
         
-        // Set up a dummy framebuffer for the render pass
+        
+                // Set up a dummy framebuffer for the render pass
         // In libretro mode, we don't actually render to this - RetroArch handles the real target
         if (renderPassState.beginInfo.framebuffer == VK_NULL_HANDLE) {
             // Create minimal framebuffer configuration
@@ -3630,11 +3666,31 @@ void Graphics::startRenderPass()
             if (fakeBackbuffer != nullptr) {
                 VkImageView colorView = fakeBackbuffer->getRenderTargetView(0, 0);
                 fbConfig.colorViews.push_back(colorView);
+                std::printf("[CHAILOVE DEBUG] Using fakeBackbuffer for framebuffer: %p\n", fakeBackbuffer.get());
+            } else {
+				std::printf("[CHAILOVE ERROR] fakeBackbuffer is null! Creating dummy image for libretro compatibility\n");
+					
+					// Create a minimal dummy texture for the framebuffer directly using Texture::Settings
+					Texture::Settings texSettings;
+					texSettings.type = TEXTURE_2D;
+					texSettings.format = love::PixelFormat::PIXELFORMAT_RGBA8_UNORM;
+					texSettings.width = static_cast<int>(renderPassState.width);
+					texSettings.height = static_cast<int>(renderPassState.height);
+					texSettings.layers = 1;
+					texSettings.mipmaps = love::gfx::Texture::MipmapsMode::MIPMAPS_NONE;
+					texSettings.readable = false;
+					texSettings.renderTarget = true;
+					
+					StrongRef<Texture> dummyTexture(new Texture(this, texSettings, nullptr), Acquire::NORETAIN);
+					VkImageView colorView = dummyTexture->getRenderTargetView(0, 0);
+					fbConfig.colorViews.push_back(colorView);
+					
+					std::printf("[CHAILOVE DEBUG] Created dummy texture for libretro framebuffer\n");
             }
             
             renderPassState.beginInfo.framebuffer = getFramebuffer(fbConfig);
-            std::printf("[CHAILOVE DEBUG] Minimal framebuffer created: %p\n", 
-                (void*)renderPassState.beginInfo.framebuffer);
+            std::printf("[CHAILOVE DEBUG] Minimal framebuffer created: %p with %zu color views\n", 
+                (void*)renderPassState.beginInfo.framebuffer, fbConfig.colorViews.size());
         }
         
         // Set up render area
@@ -3818,15 +3874,18 @@ void Graphics::startRenderPass()
 
 void Graphics::endRenderPass()
 {
-	renderPassState.active = false;
+    renderPassState.active = false;
 
-	vkCmdEndRenderPass(commandBuffers.at(currentFrame));
+    vkCmdEndRenderPass(commandBuffers.at(currentFrame));
 
-	for (auto &colorAttachment : renderPassState.renderPassConfiguration.colorAttachments)
-		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    for (auto &colorAttachment : renderPassState.renderPassConfiguration.colorAttachments)
+        colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 
-	renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.depthLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-	renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.depthLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+
+    // REMOVED: Deferred upload processing (unsafe pointer usage)
+    // We now allow buffer uploads to end render passes directly
 }
 
 VkSampler Graphics::createSampler(const SamplerState &samplerState)
@@ -3905,9 +3964,12 @@ VkPipeline Graphics::createGraphicsPipeline(Shader *shader, const GraphicsPipeli
 	std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
 
 	VertexAttributes vertexAttributes;
-	findVertexAttributes(configuration.attributesID, vertexAttributes);
+    if (!findVertexAttributes(configuration.attributesID, vertexAttributes)) {
+        // If ID lookup fails, use the direct attributes from configuration
+        vertexAttributes = configuration.attributes;
+    }
 
-	createVulkanVertexFormat(shader, vertexAttributes, bindingDescriptions, attributeDescriptions);
+    createVulkanVertexFormat(shader, vertexAttributes, bindingDescriptions, attributeDescriptions);
 
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
 	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -4453,6 +4515,16 @@ love::gfx::Graphics *createInstance()
 	}
 
 	return instance;
+}
+
+void Graphics::deferBufferUpload(Buffer* buffer, size_t offset, size_t size, const void* data)
+{
+    // Store the upload for processing when render pass ends
+    deferredUploads.emplace_back(buffer, offset, size, data);
+    
+    // Debug output
+    std::printf("[LIBRETRO] Deferring buffer upload: buffer=%p, offset=%zu, size=%zu\n", 
+           buffer, offset, size);
 }
 
 } // vulkan

@@ -235,50 +235,200 @@ void *Buffer::map(MapType map, size_t offset, size_t size)
 
 bool Buffer::fill(size_t offset, size_t size, const void *data)
 {
-	if (size == 0 || isImmutable() || dataUsage == BUFFERDATAUSAGE_READBACK)
-		return false;
+    if (size == 0 || isImmutable() || dataUsage == BUFFERDATAUSAGE_READBACK)
+        return false;
 
-	if (!Range(0, getSize()).contains(Range(offset, size)))
-		return false;
+    if (!Range(0, getSize()).contains(Range(offset, size)))
+        return false;
 
-	VkBufferCreateInfo bufferInfo{};
-	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferInfo.size = size;
-	bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    printf("[LIBRETRO] Buffer upload START: buffer=%p, offset=%zu, size=%zu\n", this, offset, size);
+    
+    // Validate inputs
+    if (!allocator || !data) {
+        printf("[LIBRETRO] ERROR: Invalid allocator or data\n");
+        return false;
+    }
 
-	VmaAllocationCreateInfo allocInfo{};
-	allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
-	allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+    // Create staging buffer
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = size;
+    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
-	VkBuffer fillBuffer;
-	VmaAllocation fillAllocation;
-	VmaAllocationInfo fillAllocInfo;
+    VmaAllocationCreateInfo allocInfo{};
+    allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
-	if (vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &fillBuffer, &fillAllocation, &fillAllocInfo) != VK_SUCCESS)
-		throw love::Exception("failed to create fill buffer");
+    VkBuffer fillBuffer;
+    VmaAllocation fillAllocation;
+    VmaAllocationInfo fillAllocInfo;
 
-	memcpy(fillAllocInfo.pMappedData, data, size);
+    VkResult result = vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &fillBuffer, &fillAllocation, &fillAllocInfo);
+    if (result != VK_SUCCESS) {
+        printf("[LIBRETRO] ERROR: vmaCreateBuffer failed with result=%d\n", result);
+        return false;
+    }
 
-	VkMemoryPropertyFlags memoryProperties;
-	vmaGetAllocationMemoryProperties(allocator, fillAllocation, &memoryProperties);
-	if (~memoryProperties & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
-		vmaFlushAllocation(allocator, fillAllocation, 0, size);
+    // Copy data to staging buffer
+    memcpy(fillAllocInfo.pMappedData, data, size);
+    
+	// Add this to Buffer.cpp fill() method right before the memcpy line
 
-	VkBufferCopy bufferCopy{};
-	bufferCopy.srcOffset = 0;
-	bufferCopy.dstOffset = offset;
-	bufferCopy.size = size;
+	printf("[LIBRETRO] Buffer fill debug: offset=%zu, size=%zu, data ptr=%p\n", offset, size, data);
+	if (data && size > 0) {
+		printf("[LIBRETRO] First 32 bytes of data: ");
+		const uint8_t* bytes = static_cast<const uint8_t*>(data);
+		size_t debug_size = (size < 32) ? size : 32;
+		for (size_t i = 0; i < debug_size; i++) {
+			printf("%02x ", bytes[i]);
+		}
+		printf("\n");
+	}
 
-	auto cmd = vgfx->getCommandBufferForDataTransfer();
-	vkCmdCopyBuffer(cmd, fillBuffer, buffer, 1, &bufferCopy);
+	// Also add debug after memcpy to verify staging buffer contents
+	printf("[LIBRETRO] After memcpy to staging buffer: ");
+	const uint8_t* staged = static_cast<const uint8_t*>(fillAllocInfo.pMappedData);
+	for (size_t i = 0; i < (size < 32 ? size : 32); i++) {
+		printf("%02x ", staged[i]);
+	}
+	printf("\n");
 
-	postGPUWriteBarrier(cmd);
+    VkMemoryPropertyFlags memoryProperties;
+    vmaGetAllocationMemoryProperties(allocator, fillAllocation, &memoryProperties);
+    if (~memoryProperties & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) {
+        vmaFlushAllocation(allocator, fillAllocation, 0, size);
+    }
 
-	vgfx->queueCleanUp([allocator = allocator, fillBuffer = fillBuffer, fillAllocation = fillAllocation]() {
-		vmaDestroyBuffer(allocator, fillBuffer, fillAllocation);
-	});
+    // LIBRETRO FIX: Create separate command buffer for immediate transfer
+    VkCommandBuffer transferCmd = VK_NULL_HANDLE;
+    VkCommandPool commandPool = vgfx->getCommandPool();
+    
+    VkCommandBufferAllocateInfo allocInfoCmd{};
+    allocInfoCmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfoCmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfoCmd.commandPool = commandPool;
+    allocInfoCmd.commandBufferCount = 1;
 
-	return true;
+    if (vkAllocateCommandBuffers(vgfx->getDevice(), &allocInfoCmd, &transferCmd) != VK_SUCCESS) {
+        printf("[LIBRETRO] ERROR: Failed to allocate transfer command buffer\n");
+        vmaDestroyBuffer(allocator, fillBuffer, fillAllocation);
+        return false;
+    }
+
+    // Begin transfer command buffer
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    if (vkBeginCommandBuffer(transferCmd, &beginInfo) != VK_SUCCESS) {
+        printf("[LIBRETRO] ERROR: Failed to begin transfer command buffer\n");
+        vkFreeCommandBuffers(vgfx->getDevice(), commandPool, 1, &transferCmd);
+        vmaDestroyBuffer(allocator, fillBuffer, fillAllocation);
+        return false;
+    }
+
+    // Record transfer commands
+    VkBufferCopy bufferCopy{};
+    bufferCopy.srcOffset = 0;
+    bufferCopy.dstOffset = offset;
+    bufferCopy.size = size;
+
+    vkCmdCopyBuffer(transferCmd, fillBuffer, buffer, 1, &bufferCopy);
+    
+    // Add memory barrier
+    VkMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = barrierDstAccessFlags;
+
+    vkCmdPipelineBarrier(transferCmd, VK_PIPELINE_STAGE_TRANSFER_BIT, barrierDstStageFlags, 0, 1, &barrier, 0, nullptr, 0, nullptr);
+
+    // End command buffer
+    if (vkEndCommandBuffer(transferCmd) != VK_SUCCESS) {
+        printf("[LIBRETRO] ERROR: Failed to end transfer command buffer\n");
+        vkFreeCommandBuffers(vgfx->getDevice(), commandPool, 1, &transferCmd);
+        vmaDestroyBuffer(allocator, fillBuffer, fillAllocation);
+        return false;
+    }
+
+    // Submit immediately and wait
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &transferCmd;
+
+    // Get the queue (assumes we have access to it in libretro mode)
+    VkQueue queue = vgfx->getQueue(); // We'll need to add this method
+    
+    if (vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+        printf("[LIBRETRO] ERROR: Failed to submit transfer commands\n");
+        vkFreeCommandBuffers(vgfx->getDevice(), commandPool, 1, &transferCmd);
+        vmaDestroyBuffer(allocator, fillBuffer, fillAllocation);
+        return false;
+    }
+
+    // Wait for completion
+    vkQueueWaitIdle(queue);
+    
+    printf("[LIBRETRO] Transfer completed and synchronized\n");
+
+    // Cleanup
+    vkFreeCommandBuffers(vgfx->getDevice(), commandPool, 1, &transferCmd);
+    vmaDestroyBuffer(allocator, fillBuffer, fillAllocation);
+
+    printf("[LIBRETRO] Buffer upload completed successfully\n");
+    return true;
+}
+
+// Add this method after the fill() method:
+
+bool Buffer::fillImmediate(size_t offset, size_t size, const void *data)
+{
+    if (size == 0 || isImmutable() || dataUsage == BUFFERDATAUSAGE_READBACK)
+        return false;
+
+    if (!Range(0, getSize()).contains(Range(offset, size)))
+        return false;
+
+    // Direct upload without checking render pass state
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = size;
+    bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+    VmaAllocationCreateInfo allocInfo{};
+    allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+    VkBuffer fillBuffer;
+    VmaAllocation fillAllocation;
+    VmaAllocationInfo fillAllocInfo;
+
+    if (vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &fillBuffer, &fillAllocation, &fillAllocInfo) != VK_SUCCESS)
+        throw love::Exception("failed to create fill buffer");
+
+    memcpy(fillAllocInfo.pMappedData, data, size);
+
+    VkMemoryPropertyFlags memoryProperties;
+    vmaGetAllocationMemoryProperties(allocator, fillAllocation, &memoryProperties);
+    if (~memoryProperties & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+        vmaFlushAllocation(allocator, fillAllocation, 0, size);
+
+    VkBufferCopy bufferCopy{};
+    bufferCopy.srcOffset = 0;
+    bufferCopy.dstOffset = offset;
+    bufferCopy.size = size;
+
+    auto cmd = vgfx->getCommandBufferForDataTransfer();
+    vkCmdCopyBuffer(cmd, fillBuffer, buffer, 1, &bufferCopy);
+
+    postGPUWriteBarrier(cmd);
+
+    vgfx->queueCleanUp([allocator = allocator, fillBuffer = fillBuffer, fillAllocation = fillAllocation]() {
+        vmaDestroyBuffer(allocator, fillBuffer, fillAllocation);
+    });
+
+    return true;
 }
 
 void Buffer::unmap(size_t usedoffset, size_t usedsize)

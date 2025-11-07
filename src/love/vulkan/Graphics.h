@@ -298,6 +298,15 @@ public:
                                   VkQueue queue, VkCommandPool commandPool);
 	VkCommandPool getCommandPool() { return commandPool; }
 
+	// Add these methods in the public section around line 275, after getCommandBufferForDataTransfer():
+
+    // LIBRETRO BUFFER UPLOAD FIX
+    bool isInRenderPass() const { return renderPassState.active; }
+    void deferBufferUpload(Buffer* buffer, size_t offset, size_t size, const void* data);
+
+	// Add this in the public section:
+    VkQueue getQueue() const { return graphicsQueue; }
+
 protected:
 	gfx::ShaderStage *newShaderStageInternal(ShaderStageType stage, const std::string &cachekey, const std::string &source, bool gles) override;
 	gfx::Shader *newShaderInternal(StrongRef<love::gfx::ShaderStage> stages[SHADERSTAGE_MAX_ENUM], const Shader::CompileOptions &options) override;
@@ -418,7 +427,7 @@ private:
 	bool libretroMode = false;
 	bool commandBufferRecording = false;  // Track if command buffer is in recording state
 	// Add this member variable in the private section around line 415, after commandBufferRecording
-uint32_t magicNumber = GRAPHICS_MAGIC;  // Magic number for corruption detection
+	uint32_t magicNumber = GRAPHICS_MAGIC;  // Magic number for corruption detection
     VkInstance externalInstance = VK_NULL_HANDLE;
     VkDevice externalDevice = VK_NULL_HANDLE;
     VkPhysicalDevice externalPhysicalDevice = VK_NULL_HANDLE;
@@ -427,6 +436,21 @@ uint32_t magicNumber = GRAPHICS_MAGIC;  // Magic number for corruption detection
 	bool ownsCommandPool = false;  // Track if we created the command pool ourselves
 
 	VmaVulkanFunctions vmaVulkanFunctions = {};
+
+	 struct DeferredBufferUpload {
+        Buffer* buffer;
+        size_t offset;
+        size_t size;
+        std::vector<uint8_t> data;  // Copy the data to avoid dangling pointers
+        
+        DeferredBufferUpload(Buffer* buf, size_t off, size_t sz, const void* dat) 
+            : buffer(buf), offset(off), size(sz), data(sz) {
+            memcpy(data.data(), dat, sz);
+        }
+    };
+
+    // Add this member variable after renderPassState:
+    std::vector<DeferredBufferUpload> deferredUploads;
 };
 
 } // vulkan
