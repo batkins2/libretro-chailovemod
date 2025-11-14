@@ -137,9 +137,29 @@ public:
 		Access access;
 	};
 
+	struct UniformBufferInfo
+    {
+        std::string name;
+        size_t size;
+        uint32_t binding;
+        uint32_t set;
+        love::gfx::Buffer *buffer = nullptr;
+        VkDescriptorBufferInfo descriptorInfo;
+    };
+
+    // Add this method declaration in the private section (around line 185):
+    void buildUniformBlockMembers(spirv_cross::Compiler &comp, const spirv_cross::SPIRType &type, size_t baseoff, const std::string &basename, const std::string &blockName);
+
+    // Add this member variable in the private section (around line 235):
+    std::unordered_map<std::string, UniformBufferInfo> uniformBufferBlocks;
+
+	void setUniformBuffer(const std::string &name, love::gfx::Buffer *buffer);
+
 	Shader(StrongRef<love::gfx::ShaderStage> stages[], const CompileOptions &options);
 	virtual ~Shader();
 
+	void updateBufferInternal(std::string name, const void *data, size_t size);
+	
 	bool loadVolatile() override;
 	void unloadVolatile() override;
 
@@ -179,6 +199,7 @@ private:
 	void createDescriptorSetLayout();
 	void createPipelineLayout();
 	void createDescriptorPoolSizes();
+    gfx::Shader::UniformType getUniformBaseType(const spirv_cross::SPIRType &type);
 	void buildLocalUniforms(spirv_cross::Compiler &comp, const spirv_cross::SPIRType &type, size_t baseoff, const std::string &basename);
 	void createDescriptorPool();
 	VkDescriptorSet allocateDescriptorSet();

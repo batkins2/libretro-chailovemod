@@ -226,49 +226,37 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, const std::st
         love::gfx::Shader::CompileOptions options;
         bool shaderFound = false;
         while (std::getline(s, line)) {
+            // Skip empty lines and comments
             if (!line.length() || (line[0] == '/' && line[1] == '/')) {
                 continue;
             }
 
-            if (shaderFound || strstr(line.c_str(), "vec4 position(") != NULL || strstr(line.c_str(), "void vertexmain(") != NULL) {
-                if (!shaderFound || 
-                    strstr(line.c_str(), "for (") != NULL || 
-                    strstr(line.c_str(), "if (") != NULL || 
-                    strstr(line.c_str(), "else {") != NULL || 
-                    strstr(line.c_str(), "else if (") != NULL) {
-
+            // For uniform buffer blocks, just pass them through completely unchanged
+            if (strstr(line.c_str(), "layout(") != NULL) {
+                // This is likely a uniform buffer block - don't parse it, just pass it through
+                lines.push_back(line);
+                
+                // Keep adding lines until we complete the buffer block
+                while (std::getline(s, line)) {
                     lines.push_back(line);
-                    shaderFound = true;
-                } else {
-                    int delim = line.find_last_of(";");
-                    if (delim > 0 && delim < line.length()) {
-                        std::string trimmed = line.substr(0, delim+1);
-                        shaderFunc.append(trimmed);
+                    if (strstr(line.c_str(), "};") != NULL) {
+                        break;
                     }
-                    delim = line.find_last_of("{");
-                    if (delim > 0 && delim < line.length()) {
-                        std::string trimmed = line.substr(0, delim+1);
-                        shaderFunc.append(trimmed);
-                    }
-                    delim = line.find_last_of("}");
-                    if (delim >= 0 && delim < line.length()) {
-                        std::string trimmed = line.substr(0, delim+1);
-                        shaderFunc.append(trimmed);
-                    }
-                    lines.push_back(shaderFunc);
-                    shaderFunc = "";
                 }
-            } else {
-                int delim = line.find_last_of(";");
-                if (delim > 0 && delim < line.length()) {
-                    std::string trimmed = line.substr(0, delim+1);
-                    lines.push_back(trimmed);
-                    // delim = trimmed.find_last_of(" ");
-                    // std::string last = trimmed.substr(0, delim);
-                    // std::string first = trimmed.substr(delim+1,trimmed.length()-1);
-                    // options.defines.emplace(first, last);
-                }
+                continue;
             }
+
+            // Handle shader functions
+            if (shaderFound || strstr(line.c_str(), "vec4 position(") != NULL || 
+                strstr(line.c_str(), "void vertexmain(") != NULL ||
+                strstr(line.c_str(), "void main(") != NULL) {
+                lines.push_back(line);
+                shaderFound = true;
+                continue;
+            }
+
+            // For all other lines (uniforms, attributes, etc.), just add them as-is
+            lines.push_back(line);
         }
 
         std::string a;

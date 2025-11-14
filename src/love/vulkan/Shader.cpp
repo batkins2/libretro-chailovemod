@@ -456,481 +456,679 @@ void Shader::buildLocalUniforms(spirv_cross::Compiler &comp, const spirv_cross::
 	}
 }
 
+// Add this function before the buildUniformBlockMembers function (around line 465):
+
+gfx::Shader::UniformType Shader::getUniformBaseType(const spirv_cross::SPIRType &type)
+{
+    using namespace spirv_cross;
+
+    switch (type.basetype)
+    {
+    case SPIRType::Float:
+        return type.columns > 1 ? UNIFORM_MATRIX : UNIFORM_FLOAT;
+    case SPIRType::Int:
+        return UNIFORM_INT;
+    case SPIRType::UInt:
+        return UNIFORM_UINT;
+    case SPIRType::Boolean:
+        return UNIFORM_BOOL;
+    default:
+        return UNIFORM_UNKNOWN;
+    }
+}
+
+void Shader::buildUniformBlockMembers(spirv_cross::Compiler &comp, const spirv_cross::SPIRType &type, size_t baseoff, const std::string &basename, const std::string &blockName)
+{
+    std::printf("[UBO DEBUG] buildUniformBlockMembers: %zu members in block %s\n", type.member_types.size(), blockName.c_str());
+    
+    for (size_t i = 0; i < type.member_types.size(); i++)
+    {
+        try {
+            auto &membertype = comp.get_type(type.member_types[i]);
+            std::string membername = comp.get_member_name(type.self, i);
+            std::string fullname = basename + membername;
+            
+            std::printf("[UBO DEBUG] Processing member %zu: %s\n", i, fullname.c_str());
+            
+            size_t offset = baseoff + comp.type_struct_member_offset(type, i);
+            size_t membersize = comp.get_declared_struct_member_size(type, i);
+            
+            std::printf("[UBO DEBUG] Member offset: %zu, size: %zu\n", offset, membersize);
+            
+            if (membertype.basetype == spirv_cross::SPIRType::Struct)
+            {
+                std::printf("[UBO DEBUG] Member is nested struct, recursing\n");
+                // Nested struct - recurse
+                buildUniformBlockMembers(comp, membertype, offset, fullname + ".", blockName);
+            }
+            else
+            {
+                std::printf("[UBO DEBUG] Creating UniformInfo for member\n");
+                // Create UniformInfo for this member
+                UniformInfo *info = new UniformInfo();
+                info->name = fullname;
+                info->location = -1; // UBO members don't have locations
+                info->count = std::max(1u, (membertype.array.empty() ? 1u : membertype.array[0]));
+                info->baseType = getUniformBaseType(membertype);
+                info->components = membertype.columns > 1 ? membertype.columns : membertype.vecsize;
+                if (membertype.columns > 1)
+                {
+                    info->matrix.columns = membertype.columns;
+                    info->matrix.rows = membertype.vecsize;
+                }
+                info->data = nullptr;
+                info->dataSize = membersize;
+                info->active = false; // Will be set to true when the UBO is used
+                info->stageMask = 0;
+                info->dataBaseType = DATA_BASETYPE_FLOAT; // Default, could be improved
+                info->textureType = TEXTURE_MAX_ENUM;
+                info->access = ACCESS_READ;
+                info->isDepthSampler = false;
+                info->storageTextureFormat = PIXELFORMAT_UNKNOWN;
+                info->bufferStride = 0;
+                info->bufferMemberCount = 0;
+                info->resourceIndex = -1;
+                info->bindingStartIndex = -1;
+                
+                std::printf("[UBO DEBUG] Adding to reflection: %s\n", fullname.c_str());
+                // Store in reflection
+                reflection.allUniforms[fullname] = info;
+                std::printf("[UBO DEBUG] Successfully added member\n");
+            }
+        } catch (const std::exception& e) {
+            std::printf("[UBO ERROR] Exception processing member %zu: %s\n", i, e.what());
+            throw;
+        } catch (...) {
+            std::printf("[UBO ERROR] Unknown exception processing member %zu\n", i);
+            throw;
+        }
+    }
+    std::printf("[UBO DEBUG] Finished processing all members for block %s\n", blockName.c_str());
+}
+
+void Shader::setUniformBuffer(const std::string &name, love::gfx::Buffer *buffer)
+{
+    auto it = uniformBufferBlocks.find(name);
+    if (it == uniformBufferBlocks.end())
+    {
+        // UBO not found - could be a warning or error
+        return;
+    }
+    
+    UniformBufferInfo &uboInfo = it->second;
+    uboInfo.buffer = buffer;
+    
+    // Set up the descriptor buffer info
+    if (buffer != nullptr)
+    {
+        uboInfo.descriptorInfo.buffer = (VkBuffer)buffer->getHandle();
+        uboInfo.descriptorInfo.offset = 0;
+        uboInfo.descriptorInfo.range = uboInfo.size;
+        
+        // Mark descriptors as dirty so they get updated
+        resourceDescriptorsDirty = true;
+    }
+}
+
+// Replace the compileShaders function with this safer implementation:
+
 void Shader::compileShaders()
 {
-	using namespace glslang;
-	using namespace spirv_cross;
-
-	std::vector<std::unique_ptr<TShader>> glslangShaders;
-
-	auto program = std::make_unique<TProgram>();
-
-	const auto &enabledExtensions = vgfx->getEnabledOptionalDeviceExtensions();
-
-	for (int i = 0; i < SHADERSTAGE_MAX_ENUM; i++)
-	{
-		if (!stages[i])
-			continue;
-
-		auto stage = (ShaderStageType)i;
-
-		if (stage == SHADERSTAGE_COMPUTE)
-			isCompute = true;
-
-		auto glslangShaderStage = getGlslShaderType(stage);
-		auto tshader = std::make_unique<TShader>(glslangShaderStage);
-
-		tshader->setEnvInput(EShSourceGlsl, glslangShaderStage, EShClientVulkan, 450);
-		tshader->setEnvClient(EShClientVulkan, EShTargetVulkan_1_2);
-		if (enabledExtensions.spirv14)
-			tshader->setEnvTarget(EshTargetSpv, EShTargetSpv_1_4);
-		else
-			tshader->setEnvTarget(EshTargetSpv, EShTargetSpv_1_0);
-		tshader->setAutoMapLocations(true);
-		tshader->setAutoMapBindings(true);
-		tshader->setEnvInputVulkanRulesRelaxed();
-		tshader->setGlobalUniformBinding(0);
-		tshader->setGlobalUniformSet(0);
-
-		auto &glsl = stages[i]->getSource();
-		const char *csrc = glsl.c_str();
-		const int sourceLength = static_cast<int>(glsl.length());
-		tshader->setStringsWithLengths(&csrc, &sourceLength, 1);
-
-		int defaultVersion = 450;
-		EProfile defaultProfile = ECoreProfile;
-		bool forceDefault = false;
-		bool forwardCompat = true;
-
-		if (!tshader->parse(GetResources(), defaultVersion, defaultProfile, forceDefault, forwardCompat, EShMsgSuppressWarnings))
-		{
-			const char *stageName = "unknown";
-			ShaderStage::getConstant(stage, stageName);
-
-			std::string err = "Error parsing " + std::string(stageName) + " shader:\n\n"
-				+ std::string(tshader->getInfoLog()) + "\n"
-				+ std::string(tshader->getInfoDebugLog());
-
-			throw love::Exception("%s", err.c_str());
-		}
-
-		program->addShader(tshader.get());
-		glslangShaders.push_back(std::move(tshader));
-	}
-
-	if (!program->link(EShMsgDefault))
-		throw love::Exception("link failed! %s\n", program->getInfoLog());
-
-	if (!program->mapIO())
-		throw love::Exception("mapIO failed");
-
-	BindingMapper bindingMapper(spv::DecorationBinding);
-	BindingMapper ioLocationMapper(spv::DecorationLocation);
-	BindingMapper vertexInputLocationMapper(spv::DecorationLocation);
-
-	for (int i = 0; i < SHADERSTAGE_MAX_ENUM; i++)
-	{
-		auto shaderStage = (ShaderStageType)i;
-		auto glslangStage = getGlslShaderType(shaderStage);
-		auto intermediate = program->getIntermediate(glslangStage);
-
-		if (intermediate == nullptr)
-			continue;
-
-		spv::SpvBuildLogger logger;
-		glslang::SpvOptions opt;
-		opt.validate = true;
-
-		std::vector<uint32> spirv;
-
-		GlslangToSpv(*intermediate, spirv, &logger, &opt);
-
-		auto compiler = std::make_unique<spirv_cross::CompilerGLSL>(spirv);
-		auto &comp = *compiler;
-
-		// We aren't recompiling the SPIR-V to something else, so
-		// set_enabled_interface_variables wouldn't do much.
-		// Vulkan has various rules about making sure bindings to inputs and
-		// resources are valid, so we can't skip inactive ones here.
-		// Unfortunately GlslangToSpv doesn't strip unused resources even
-		// though it knows about them...
-		auto active = compiler->get_active_interface_variables();
-		auto shaderResources = comp.get_shader_resources();
-
-		for (const auto &resource : shaderResources.uniform_buffers)
-		{
-			// TODO: Do something smarter here.
-			if (active.find(resource.id) == active.end())
-				continue;
-
-			if (resource.name == "gl_DefaultUniformBlock")
-			{
-				const auto &type = comp.get_type(resource.base_type_id);
-				size_t defaultUniformBlockSize = comp.get_declared_struct_size(type);
-
-				localUniformStagingData.resize(defaultUniformBlockSize);
-				localUniformData.resize(defaultUniformBlockSize);
-				localUniformLocation = bindingMapper(comp, spirv, resource.name, 1, resource.id);
-
-				memset(localUniformStagingData.data(), 0, defaultUniformBlockSize);
-				memset(localUniformData.data(), 0, defaultUniformBlockSize);
-
-				std::string basename("");
-				buildLocalUniforms(comp, type, 0, basename);
-			}
-			else
-				throw love::Exception("unimplemented: non default uniform blocks.");
-		}
-
-		for (const auto &r : shaderResources.sampled_images)
-		{
-			// TODO: Do something smarter here.
-			if (active.find(r.id) == active.end())
-				continue;
-
-			std::string name = canonicaliizeUniformName(r.name);
-			auto uniformit = reflection.allUniforms.find(name);
-			if (uniformit == reflection.allUniforms.end())
-			{
-				handleUnknownUniformName(name.c_str());
-				continue;
-			}
-
-			UniformInfo &u = *(uniformit->second);
-			u.active = true;
-			u.location = bindingMapper(comp, spirv, name, u.count, r.id);
-
-			BuiltinUniform builtin;
-			if (getConstant(name.c_str(), builtin))
-				builtinUniformInfo[builtin] = &u;
-		}
-
-		for (const auto &r : shaderResources.storage_buffers)
-		{
-			// TODO: Do something smarter here.
-			if (active.find(r.id) == active.end())
-				continue;
-
-			std::string name = canonicaliizeUniformName(r.name);
-			const auto &uniformit = reflection.storageBuffers.find(name);
-			if (uniformit == reflection.storageBuffers.end())
-			{
-				handleUnknownUniformName(name.c_str());
-				continue;
-			}
-
-			UniformInfo &u = uniformit->second;
-			u.active = true;
-			u.location = bindingMapper(comp, spirv, name, u.count, r.id);
-		}
-
-		for (const auto &r : shaderResources.storage_images)
-		{
-			// TODO: Do something smarter here.
-			if (active.find(r.id) == active.end())
-				continue;
-
-			std::string name = canonicaliizeUniformName(r.name);
-			const auto &uniformit = reflection.storageTextures.find(name);
-			if (uniformit == reflection.storageTextures.end())
-			{
-				handleUnknownUniformName(name.c_str());
-				continue;
-			}
-
-			UniformInfo &u = uniformit->second;
-			u.active = true;
-			u.location = bindingMapper(comp, spirv, name, u.count, r.id);
-		}
-
-		if (shaderStage == SHADERSTAGE_VERTEX)
-		{
-			// Create a local vertex inputs map since it's not in the base reflection
-			std::map<std::string, int> vertexInputs;
-			
-			// Initialize vertex inputs from known attributes (if available)
-			for (const auto& attr : attributes)
-			{
-				vertexInputs[attr.first] = attr.second.index;
-			}
-			
-			// Use the mapper on known used inputs first, so their bindings get
-			// put into the map without being changed.
-			for (const auto &r : shaderResources.stage_inputs)
-			{
-				auto it = vertexInputs.find(r.name);
-				if (it != vertexInputs.end() && it->second >= 0)
-					vertexInputLocationMapper(comp, spirv, r.name, 1, r.id);
-			}
-
-			for (const auto &r : shaderResources.stage_inputs)
-			{
-				// Don't skip unused inputs, vulkan still needs to have valid
-				// bindings for them. This will also avoid shuffling intentional
-				// used bindings because of the earlier loop.
-				int index = (int)vertexInputLocationMapper(comp, spirv, r.name, 1, r.id);
-
-				DataBaseType basetype = DATA_BASETYPE_FLOAT;
-
-				switch (comp.get_type(r.base_type_id).basetype)
-				{
-				case spirv_cross::SPIRType::Int:
-					basetype = DATA_BASETYPE_INT;
-					break;
-				case spirv_cross::SPIRType::UInt:
-					basetype = DATA_BASETYPE_UINT;
-					break;
-				default:
-					break;
-				}
-
-				attributes[r.name] = { index, basetype };
-				// Also update the local vertex inputs map
-				vertexInputs[r.name] = index;
-			}
-
-			for (const auto &r : shaderResources.stage_outputs)
-			{
-				const auto &type = comp.get_type(r.base_type_id);
-				int count = type.array.empty() ? 1 : type.array[0];
-				if (type.op == spv::OpTypeMatrix)
-					count *= type.columns;
-
-				ioLocationMapper(comp, spirv, r.name, count, r.id);
-			}
-		}
-		else if (shaderStage == SHADERSTAGE_PIXEL)
-		{
-			for (const auto &r : shaderResources.stage_inputs)
-			{
-				const auto &type = comp.get_type(r.base_type_id);
-				int count = type.array.empty() ? 1 : type.array[0];
-				if (type.op == spv::OpTypeMatrix)
-					count *= type.columns;
-
-				ioLocationMapper(comp, spirv, r.name, count, r.id);
-			}
-		}
-
-		VkShaderModuleCreateInfo createInfo{};
-		createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-		createInfo.codeSize = spirv.size() * sizeof(uint32_t);
-		createInfo.pCode = spirv.data();
-
-		VkShaderModule shaderModule;
-
-		if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
-			throw love::Exception("failed to create shader module");
-
-		std::string debugname = getShaderStageDebugName(shaderStage);
-		if (!debugname.empty() && vgfx->getEnabledOptionalInstanceExtensions().debugInfo)
-		{
-			auto device = vgfx->getDevice();
-
-			VkDebugMarkerObjectNameInfoEXT nameInfo{};
-			nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT;
-			nameInfo.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT;
-			nameInfo.object = (uint64_t)shaderModule;
-			nameInfo.pObjectName = debugname.c_str();
-			vkDebugMarkerSetObjectNameEXT(device, &nameInfo);
-		}
-
-		shaderModules.push_back(shaderModule);
-
-		VkPipelineShaderStageCreateInfo shaderStageInfo{};
-		shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		shaderStageInfo.stage = getStageBit((ShaderStageType)i);
-		shaderStageInfo.module = shaderModule;
-		shaderStageInfo.pName = "main";
-
-		shaderStages.push_back(shaderStageInfo);
-	}
-
-	int numBuffers = 0;
-	int numTextures = 0;
-	int numBufferViews = 0;
-
-	if (localUniformData.size() > 0)
-		numBuffers++;
-
-	for (const auto &kvp : reflection.allUniforms)
-	{
-		if (!kvp.second->active)
-			continue;
-
-		switch (kvp.second->baseType)
-		{
-		case UNIFORM_SAMPLER:
-		case UNIFORM_STORAGETEXTURE:
-			numTextures += kvp.second->count;
-			break;
-		case UNIFORM_STORAGEBUFFER:
-			numBuffers += kvp.second->count;
-			break;
-		case UNIFORM_TEXELBUFFER:
-			numBufferViews += kvp.second->count;
-			break;
-		default:
-			continue;
-		}
-	}
-
-	descriptorWrites.clear();
-
-	descriptorBuffers.clear();
-	descriptorBuffers.reserve(numBuffers);
-
-	descriptorImages.clear();
-	descriptorImages.reserve(numTextures);
-
-	descriptorBufferViews.clear();
-	descriptorBufferViews.reserve(numBufferViews);
-
-	allTextureInfo.clear();
-	allTextureInfo.reserve(numTextures);
-	storageBufferInfo.clear();
-	storageBufferInfo.reserve(numBuffers);
-
-	if (localUniformData.size() > 0)
-	{
-		VkDescriptorBufferInfo bufferInfo{};
-		bufferInfo.range = localUniformData.size();
-
-		descriptorBuffers.push_back(bufferInfo);
-		storageBufferInfo.push_back({ nullptr, ACCESS_READ }); // Dummy value.
-
-		VkWriteDescriptorSet write{};
-		write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		write.dstBinding = localUniformLocation;
-		write.dstArrayElement = 0;
-		write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-		write.descriptorCount = 1;
-		write.pBufferInfo = &descriptorBuffers.back();
-		descriptorWrites.push_back(write);
-	}
-
-	for (auto &u : reflection.sampledTextures)
-	{
-		UniformInfo &info = u.second;
-		if (!info.active)
-			continue;
-
-		info.bindingStartIndex = (int)descriptorImages.size();
-
-		for (int i = 0; i < info.count; i++)
-		{
-			VkDescriptorImageInfo imageInfo{};
-			descriptorImages.push_back(imageInfo);
-
-			allTextureInfo.push_back({ nullptr, info.access });
-
-			auto texture = activeTextures[info.resourceIndex + i];
-			if (texture != nullptr)
-				setTextureDescriptor(&info, texture, i);
-		}
-
-		VkWriteDescriptorSet write{};
-		write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		write.dstBinding = info.location;
-		write.dstArrayElement = 0;
-		write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		write.descriptorCount = static_cast<uint32_t>(info.count);
-		write.pImageInfo = &descriptorImages[info.bindingStartIndex];
-
-		descriptorWrites.push_back(write);
-	}
-
-	for (auto &u : reflection.storageTextures)
-	{
-		UniformInfo &info = u.second;
-		if (!info.active)
-			continue;
-
-		info.bindingStartIndex = (int)descriptorImages.size();
-
-		for (int i = 0; i < info.count; i++)
-		{
-			VkDescriptorImageInfo imageInfo{};
-			descriptorImages.push_back(imageInfo);
-
-			allTextureInfo.push_back({ nullptr, info.access });
-
-			auto texture = activeTextures[info.resourceIndex + i];
-			if (texture != nullptr)
-				setTextureDescriptor(&info, texture, i);
-		}
-
-		VkWriteDescriptorSet write{};
-		write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		write.dstBinding = info.location;
-		write.dstArrayElement = 0;
-		write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		write.descriptorCount = static_cast<uint32_t>(info.count);
-		write.pImageInfo = &descriptorImages[info.bindingStartIndex];
-
-		descriptorWrites.push_back(write);
-	}
-
-	for (auto &u : reflection.texelBuffers)
-	{
-		UniformInfo &info = u.second;
-		if (!info.active)
-			continue;
-
-		info.bindingStartIndex = (int)descriptorBufferViews.size();
-
-		for (int i = 0; i < info.count; i++)
-		{
-			descriptorBufferViews.push_back(VK_NULL_HANDLE);
-
-			auto buffer = activeBuffers[info.resourceIndex + i];
-			if (buffer != nullptr)
-				setBufferDescriptor(&info, buffer, i);
-		}
-
-		VkWriteDescriptorSet write{};
-		write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		write.dstBinding = info.location;
-		write.dstArrayElement = 0;
-		write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
-		write.descriptorCount = info.count;
-		write.pTexelBufferView = &descriptorBufferViews[info.bindingStartIndex];
-
-		descriptorWrites.push_back(write);
-	}
-
-	for (auto &u : reflection.storageBuffers)
-	{
-		UniformInfo &info = u.second;
-		if (!info.active)
-			continue;
-
-		info.bindingStartIndex = (int)descriptorBuffers.size();
-
-		for (int i = 0; i < info.count; i++)
-		{
-			VkDescriptorBufferInfo bufferInfo{};
-			descriptorBuffers.push_back(bufferInfo);
-
-			storageBufferInfo.push_back({ nullptr, info.access });
-
-			auto buffer = activeBuffers[info.resourceIndex + i];
-			if (buffer != nullptr)
-				setBufferDescriptor(&info, buffer, i);
-		}
-
-		VkWriteDescriptorSet write{};
-		write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		write.dstBinding = info.location;
-		write.dstArrayElement = 0;
-		write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		write.descriptorCount = info.count;
-		write.pBufferInfo = &descriptorBuffers[info.bindingStartIndex];
-
-		descriptorWrites.push_back(write);
-	}
-
-	resourceDescriptorsDirty = true;
+    using namespace glslang;
+    using namespace spirv_cross;
+
+    std::printf("[UBO DEBUG] Starting shader compilation\n");
+
+    std::vector<std::unique_ptr<TShader>> glslangShaders;
+    auto program = std::make_unique<TProgram>();
+    const auto &enabledExtensions = vgfx->getEnabledOptionalDeviceExtensions();
+
+    // Instance variable instead of static to prevent memory corruption
+    bool defaultBlockProcessedForThisShader = false;
+
+    for (int i = 0; i < SHADERSTAGE_MAX_ENUM; i++)
+    {
+        if (!stages[i])
+            continue;
+
+        auto stage = (ShaderStageType)i;
+        if (stage == SHADERSTAGE_COMPUTE)
+            isCompute = true;
+
+        auto glslangShaderStage = getGlslShaderType(stage);
+        auto tshader = std::make_unique<TShader>(glslangShaderStage);
+
+        tshader->setEnvInput(EShSourceGlsl, glslangShaderStage, EShClientVulkan, 450);
+        tshader->setEnvClient(EShClientVulkan, EShTargetVulkan_1_2);
+        if (enabledExtensions.spirv14)
+            tshader->setEnvTarget(EshTargetSpv, EShTargetSpv_1_4);
+        else
+            tshader->setEnvTarget(EshTargetSpv, EShTargetSpv_1_0);
+        tshader->setAutoMapLocations(true);
+        tshader->setAutoMapBindings(true);
+        tshader->setEnvInputVulkanRulesRelaxed();
+        tshader->setGlobalUniformBinding(0);
+        tshader->setGlobalUniformSet(0);
+
+        auto &glsl = stages[i]->getSource();
+        const char *csrc = glsl.c_str();
+        const int sourceLength = static_cast<int>(glsl.length());
+        tshader->setStringsWithLengths(&csrc, &sourceLength, 1);
+
+        int defaultVersion = 450;
+        EProfile defaultProfile = ECoreProfile;
+        bool forceDefault = false;
+        bool forwardCompat = true;
+
+        if (!tshader->parse(GetResources(), defaultVersion, defaultProfile, forceDefault, forwardCompat, EShMsgSuppressWarnings))
+        {
+            const char *stageName = "unknown";
+            ShaderStage::getConstant(stage, stageName);
+
+            std::string err = "Error parsing " + std::string(stageName) + " shader:\n\n"
+                + std::string(tshader->getInfoLog()) + "\n"
+                + std::string(tshader->getInfoDebugLog());
+
+            throw love::Exception("%s", err.c_str());
+        }
+
+        program->addShader(tshader.get());
+        glslangShaders.push_back(std::move(tshader));
+    }
+
+    if (!program->link(EShMsgDefault))
+        throw love::Exception("link failed! %s\n", program->getInfoLog());
+
+    if (!program->mapIO())
+        throw love::Exception("mapIO failed");
+
+    BindingMapper bindingMapper(spv::DecorationBinding);
+    BindingMapper ioLocationMapper(spv::DecorationLocation);
+    BindingMapper vertexInputLocationMapper(spv::DecorationLocation);
+
+    std::printf("[UBO DEBUG] Processing shader stages\n");
+
+    for (int i = 0; i < SHADERSTAGE_MAX_ENUM; i++)
+    {
+        auto shaderStage = (ShaderStageType)i;
+        auto glslangStage = getGlslShaderType(shaderStage);
+        auto intermediate = program->getIntermediate(glslangStage);
+
+        if (intermediate == nullptr)
+            continue;
+
+        spv::SpvBuildLogger logger;
+        glslang::SpvOptions opt;
+        opt.validate = true;
+
+        std::vector<uint32> spirv;
+
+        GlslangToSpv(*intermediate, spirv, &logger, &opt);
+
+        auto compiler = std::make_unique<spirv_cross::CompilerGLSL>(spirv);
+        auto &comp = *compiler;
+
+        auto active = compiler->get_active_interface_variables();
+        auto shaderResources = comp.get_shader_resources();
+
+        std::printf("[UBO DEBUG] Processing uniform buffers for stage %d\n", i);
+
+        // Process uniform buffers with safe error handling
+        for (const auto &resource : shaderResources.uniform_buffers)
+        {
+            try {
+                if (active.find(resource.id) == active.end()) {
+                    std::printf("[UBO DEBUG] Skipping inactive uniform buffer: %s\n", resource.name.c_str());
+                    continue;
+                }
+
+                std::printf("[UBO DEBUG] Processing uniform buffer: %s\n", resource.name.c_str());
+
+                if (resource.name == "gl_DefaultUniformBlock")
+                {
+                    // Use instance variable instead of static
+                    if (defaultBlockProcessedForThisShader) {
+                        std::printf("[UBO DEBUG] Default uniform block already processed for this shader\n");
+                        continue;
+                    }
+                    defaultBlockProcessedForThisShader = true;
+                    
+                    std::printf("[UBO DEBUG] Processing default uniform block\n");
+                    
+                    const auto &type = comp.get_type(resource.base_type_id);
+                    size_t defaultUniformBlockSize = comp.get_declared_struct_size(type);
+
+                    localUniformStagingData.resize(defaultUniformBlockSize);
+                    localUniformData.resize(defaultUniformBlockSize);
+                    localUniformLocation = bindingMapper(comp, spirv, resource.name, 1, resource.id);
+
+                    memset(localUniformStagingData.data(), 0, defaultUniformBlockSize);
+                    memset(localUniformData.data(), 0, defaultUniformBlockSize);
+
+                    std::string basename("");
+                    buildLocalUniforms(comp, type, 0, basename);
+                    
+                    std::printf("[UBO DEBUG] Default uniform block processed successfully\n");
+                }
+                else
+                {
+                    // Check if we've already processed this UBO
+                    if (uniformBufferBlocks.find(resource.name) != uniformBufferBlocks.end()) {
+                        std::printf("[UBO DEBUG] UBO %s already processed\n", resource.name.c_str());
+                        continue;
+                    }
+                    
+                    std::printf("[UBO DEBUG] Processing custom UBO: %s\n", resource.name.c_str());
+                    
+                    // Process custom uniform buffer blocks with error handling
+                    std::string blockName = resource.name;
+                    
+                    auto blockType = comp.get_type(resource.base_type_id);
+                    size_t blockSize = comp.get_declared_struct_size(blockType);
+                    
+                    UniformBufferInfo uboInfo;
+                    uboInfo.name = blockName;
+                    uboInfo.size = blockSize;
+                    uboInfo.binding = comp.get_decoration(resource.id, spv::DecorationBinding);
+                    
+                    if (comp.has_decoration(resource.id, spv::DecorationDescriptorSet)) {
+                        uboInfo.set = comp.get_decoration(resource.id, spv::DecorationDescriptorSet);
+                    } else {
+                        uboInfo.set = 0;
+                    }
+                    
+                    // Initialize descriptor info to safe defaults
+                    uboInfo.descriptorInfo.buffer = VK_NULL_HANDLE;
+                    uboInfo.descriptorInfo.offset = 0;
+                    uboInfo.descriptorInfo.range = blockSize;
+                    
+                    uniformBufferBlocks[blockName] = uboInfo;
+                    
+                    std::printf("[UBO DEBUG] UBO info stored, processing members\n");
+                    
+                    // Process members with error handling
+                    std::string basename = blockName + ".";
+                    buildUniformBlockMembers(comp, blockType, 0, basename, blockName);
+                    
+                    std::printf("[UBO DEBUG] Custom UBO %s processed successfully\n", blockName.c_str());
+                }
+            } catch (const std::exception& e) {
+                std::printf("[UBO ERROR] Exception processing uniform buffer %s: %s\n", resource.name.c_str(), e.what());
+                // Continue processing other uniform buffers instead of crashing
+                continue;
+            } catch (...) {
+                std::printf("[UBO ERROR] Unknown exception processing uniform buffer %s\n", resource.name.c_str());
+                continue;
+            }
+        }
+
+        std::printf("[UBO DEBUG] Finished processing uniform buffers for stage %d\n", i);
+
+        // Continue with the rest of the shader processing...
+        // (sampled_images, storage_buffers, etc. - same as original code)
+        
+        for (const auto &r : shaderResources.sampled_images)
+        {
+            if (active.find(r.id) == active.end())
+                continue;
+
+            std::string name = canonicaliizeUniformName(r.name);
+            auto uniformit = reflection.allUniforms.find(name);
+            if (uniformit == reflection.allUniforms.end())
+            {
+                handleUnknownUniformName(name.c_str());
+                continue;
+            }
+
+            UniformInfo &u = *(uniformit->second);
+            u.active = true;
+            u.location = bindingMapper(comp, spirv, name, u.count, r.id);
+
+            BuiltinUniform builtin;
+            if (getConstant(name.c_str(), builtin))
+                builtinUniformInfo[builtin] = &u;
+        }
+
+        for (const auto &r : shaderResources.storage_buffers)
+        {
+            if (active.find(r.id) == active.end())
+                continue;
+
+            std::string name = canonicaliizeUniformName(r.name);
+            const auto &uniformit = reflection.storageBuffers.find(name);
+            if (uniformit == reflection.storageBuffers.end())
+            {
+                handleUnknownUniformName(name.c_str());
+                continue;
+            }
+
+            UniformInfo &u = uniformit->second;
+            u.active = true;
+            u.location = bindingMapper(comp, spirv, name, u.count, r.id);
+        }
+
+        for (const auto &r : shaderResources.storage_images)
+        {
+            if (active.find(r.id) == active.end())
+                continue;
+
+            std::string name = canonicaliizeUniformName(r.name);
+            const auto &uniformit = reflection.storageTextures.find(name);
+            if (uniformit == reflection.storageTextures.end())
+            {
+                handleUnknownUniformName(name.c_str());
+                continue;
+            }
+
+            UniformInfo &u = uniformit->second;
+            u.active = true;
+            u.location = bindingMapper(comp, spirv, name, u.count, r.id);
+        }
+
+        if (shaderStage == SHADERSTAGE_VERTEX)
+        {
+            std::map<std::string, int> vertexInputs;
+            
+            for (const auto& attr : attributes)
+            {
+                vertexInputs[attr.first] = attr.second.index;
+            }
+            
+            for (const auto &r : shaderResources.stage_inputs)
+            {
+                auto it = vertexInputs.find(r.name);
+                if (it != vertexInputs.end() && it->second >= 0)
+                    vertexInputLocationMapper(comp, spirv, r.name, 1, r.id);
+            }
+
+            for (const auto &r : shaderResources.stage_inputs)
+            {
+                int index = (int)vertexInputLocationMapper(comp, spirv, r.name, 1, r.id);
+
+                DataBaseType basetype = DATA_BASETYPE_FLOAT;
+
+                switch (comp.get_type(r.base_type_id).basetype)
+                {
+                case spirv_cross::SPIRType::Int:
+                    basetype = DATA_BASETYPE_INT;
+                    break;
+                case spirv_cross::SPIRType::UInt:
+                    basetype = DATA_BASETYPE_UINT;
+                    break;
+                default:
+                    break;
+                }
+
+                attributes[r.name] = { index, basetype };
+                vertexInputs[r.name] = index;
+            }
+
+            for (const auto &r : shaderResources.stage_outputs)
+            {
+                const auto &type = comp.get_type(r.base_type_id);
+                int count = type.array.empty() ? 1 : type.array[0];
+                if (type.op == spv::OpTypeMatrix)
+                    count *= type.columns;
+
+                ioLocationMapper(comp, spirv, r.name, count, r.id);
+            }
+        }
+        else if (shaderStage == SHADERSTAGE_PIXEL)
+        {
+            for (const auto &r : shaderResources.stage_inputs)
+            {
+                const auto &type = comp.get_type(r.base_type_id);
+                int count = type.array.empty() ? 1 : type.array[0];
+                if (type.op == spv::OpTypeMatrix)
+                    count *= type.columns;
+
+                ioLocationMapper(comp, spirv, r.name, count, r.id);
+            }
+        }
+
+        VkShaderModuleCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        createInfo.codeSize = spirv.size() * sizeof(uint32_t);
+        createInfo.pCode = spirv.data();
+
+        VkShaderModule shaderModule;
+
+        if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
+            throw love::Exception("failed to create shader module");
+
+        std::string debugname = getShaderStageDebugName(shaderStage);
+        if (!debugname.empty() && vgfx->getEnabledOptionalInstanceExtensions().debugInfo)
+        {
+            auto device = vgfx->getDevice();
+
+            VkDebugMarkerObjectNameInfoEXT nameInfo{};
+            nameInfo.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT;
+            nameInfo.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT;
+            nameInfo.object = (uint64_t)shaderModule;
+            nameInfo.pObjectName = debugname.c_str();
+            vkDebugMarkerSetObjectNameEXT(device, &nameInfo);
+        }
+
+        shaderModules.push_back(shaderModule);
+
+        VkPipelineShaderStageCreateInfo shaderStageInfo{};
+        shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        shaderStageInfo.stage = getStageBit((ShaderStageType)i);
+        shaderStageInfo.module = shaderModule;
+        shaderStageInfo.pName = "main";
+
+        shaderStages.push_back(shaderStageInfo);
+    }
+
+    std::printf("[UBO DEBUG] Shader compilation completed successfully\n");
+
+    // Continue with the rest of the function (descriptor setup, etc.)
+    // ... (same as original implementation)
+    
+    int numBuffers = 0;
+    int numTextures = 0;
+    int numBufferViews = 0;
+
+    if (localUniformData.size() > 0)
+        numBuffers++;
+
+    for (const auto &kvp : reflection.allUniforms)
+    {
+        if (!kvp.second->active)
+            continue;
+
+        switch (kvp.second->baseType)
+        {
+        case UNIFORM_SAMPLER:
+        case UNIFORM_STORAGETEXTURE:
+            numTextures += kvp.second->count;
+            break;
+        case UNIFORM_STORAGEBUFFER:
+            numBuffers += kvp.second->count;
+            break;
+        case UNIFORM_TEXELBUFFER:
+            numBufferViews += kvp.second->count;
+            break;
+        default:
+            continue;
+        }
+    }
+
+    descriptorWrites.clear();
+
+    descriptorBuffers.clear();
+    descriptorBuffers.reserve(numBuffers);
+
+    descriptorImages.clear();
+    descriptorImages.reserve(numTextures);
+
+    descriptorBufferViews.clear();
+    descriptorBufferViews.reserve(numBufferViews);
+
+    allTextureInfo.clear();
+    allTextureInfo.reserve(numTextures);
+    storageBufferInfo.clear();
+    storageBufferInfo.reserve(numBuffers);
+
+    if (localUniformData.size() > 0)
+    {
+        VkDescriptorBufferInfo bufferInfo{};
+        bufferInfo.range = localUniformData.size();
+
+        descriptorBuffers.push_back(bufferInfo);
+        storageBufferInfo.push_back({ nullptr, ACCESS_READ });
+
+        VkWriteDescriptorSet write{};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstBinding = localUniformLocation;
+        write.dstArrayElement = 0;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        write.descriptorCount = 1;
+        write.pBufferInfo = &descriptorBuffers.back();
+        descriptorWrites.push_back(write);
+    }
+
+    for (auto &u : reflection.sampledTextures)
+    {
+        UniformInfo &info = u.second;
+        if (!info.active)
+            continue;
+
+        info.bindingStartIndex = (int)descriptorImages.size();
+
+        for (int i = 0; i < info.count; i++)
+        {
+            VkDescriptorImageInfo imageInfo{};
+            descriptorImages.push_back(imageInfo);
+
+            allTextureInfo.push_back({ nullptr, info.access });
+
+            auto texture = activeTextures[info.resourceIndex + i];
+            if (texture != nullptr)
+                setTextureDescriptor(&info, texture, i);
+        }
+
+        VkWriteDescriptorSet write{};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstBinding = info.location;
+        write.dstArrayElement = 0;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        write.descriptorCount = static_cast<uint32_t>(info.count);
+        write.pImageInfo = &descriptorImages[info.bindingStartIndex];
+
+        descriptorWrites.push_back(write);
+    }
+
+    for (auto &u : reflection.storageTextures)
+    {
+        UniformInfo &info = u.second;
+        if (!info.active)
+            continue;
+
+        info.bindingStartIndex = (int)descriptorImages.size();
+
+        for (int i = 0; i < info.count; i++)
+        {
+            VkDescriptorImageInfo imageInfo{};
+            descriptorImages.push_back(imageInfo);
+
+            allTextureInfo.push_back({ nullptr, info.access });
+
+            auto texture = activeTextures[info.resourceIndex + i];
+            if (texture != nullptr)
+                setTextureDescriptor(&info, texture, i);
+        }
+
+        VkWriteDescriptorSet write{};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstBinding = info.location;
+        write.dstArrayElement = 0;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        write.descriptorCount = static_cast<uint32_t>(info.count);
+        write.pImageInfo = &descriptorImages[info.bindingStartIndex];
+
+        descriptorWrites.push_back(write);
+    }
+
+    for (auto &u : reflection.texelBuffers)
+    {
+        UniformInfo &info = u.second;
+        if (!info.active)
+            continue;
+
+        info.bindingStartIndex = (int)descriptorBufferViews.size();
+
+        for (int i = 0; i < info.count; i++)
+        {
+            descriptorBufferViews.push_back(VK_NULL_HANDLE);
+
+            auto buffer = activeBuffers[info.resourceIndex + i];
+            if (buffer != nullptr)
+                setBufferDescriptor(&info, buffer, i);
+        }
+
+        VkWriteDescriptorSet write{};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstBinding = info.location;
+        write.dstArrayElement = 0;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+        write.descriptorCount = info.count;
+        write.pTexelBufferView = &descriptorBufferViews[info.bindingStartIndex];
+
+        descriptorWrites.push_back(write);
+    }
+
+    for (auto &u : reflection.storageBuffers)
+    {
+        UniformInfo &info = u.second;
+        if (!info.active)
+            continue;
+
+        info.bindingStartIndex = (int)descriptorBuffers.size();
+
+        for (int i = 0; i < info.count; i++)
+        {
+            VkDescriptorBufferInfo bufferInfo{};
+            descriptorBuffers.push_back(bufferInfo);
+
+            storageBufferInfo.push_back({ nullptr, info.access });
+
+            auto buffer = activeBuffers[info.resourceIndex + i];
+            if (buffer != nullptr)
+                setBufferDescriptor(&info, buffer, i);
+        }
+
+        VkWriteDescriptorSet write{};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstBinding = info.location;
+        write.dstArrayElement = 0;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        write.descriptorCount = info.count;
+        write.pBufferInfo = &descriptorBuffers[info.bindingStartIndex];
+
+        descriptorWrites.push_back(write);
+    }
+
+    resourceDescriptorsDirty = true;
+}
+
+void Shader::updateBufferInternal(std::string name, const void* data, size_t size)
+{
+    auto ssboIt = reflection.storageBuffers.find(name);
+    if (ssboIt != reflection.storageBuffers.end())
+    {
+        UniformInfo &info = ssboIt->second;
+        if (info.resourceIndex < 0 || info.resourceIndex >= (int)activeBuffers.size())
+            throw love::Exception("Invalid resource index for storage buffer %s.", name.c_str());
+        love::gfx::Buffer* buffer = activeBuffers[info.resourceIndex];
+        if (!buffer)
+            throw love::Exception("No buffer bound for storage buffer %s.", name.c_str());
+        size_t bufferSize = buffer->getSize();
+        if (size > bufferSize)
+            throw love::Exception("Data size exceeds storage buffer %s size.", name.c_str());
+        buffer->fill(0, size, data);
+        return;
+    }
 }
 
 void Shader::createDescriptorSetLayout()

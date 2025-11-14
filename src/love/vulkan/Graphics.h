@@ -307,6 +307,23 @@ public:
 	// Add this in the public section:
     VkQueue getQueue() const { return graphicsQueue; }
 
+	VkDescriptorSet allocateDescriptorSet() {
+		if (descriptorSet != VK_NULL_HANDLE) {
+			return descriptorSet;
+		}
+		VkDescriptorSetAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		allocInfo.descriptorPool = descriptorPool;
+		allocInfo.descriptorSetCount = 1;
+		allocInfo.pSetLayouts = &descriptorSetLayout;
+
+		if (vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet) != VK_SUCCESS) {
+			throw std::runtime_error("failed to allocate descriptor set!");
+		}
+
+		return descriptorSet;
+	}
+
 protected:
 	gfx::ShaderStage *newShaderStageInternal(ShaderStageType stage, const std::string &cachekey, const std::string &source, bool gles) override;
 	gfx::Shader *newShaderInternal(StrongRef<love::gfx::ShaderStage> stages[SHADERSTAGE_MAX_ENUM], const Shader::CompileOptions &options) override;
@@ -381,6 +398,7 @@ private:
 	VkQueue presentQueue = VK_NULL_HANDLE;
 	VkSurfaceKHR surface = VK_NULL_HANDLE;
 	VkSwapchainKHR swapChain = VK_NULL_HANDLE;
+	VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
 	std::vector<VkImage> swapChainImages;
 	StrongRef<Texture> fakeBackbuffer;
 	VkFormat swapChainImageFormat = VK_FORMAT_UNDEFINED;
@@ -437,20 +455,23 @@ private:
 
 	VmaVulkanFunctions vmaVulkanFunctions = {};
 
-	 struct DeferredBufferUpload {
-        Buffer* buffer;
-        size_t offset;
-        size_t size;
-        std::vector<uint8_t> data;  // Copy the data to avoid dangling pointers
-        
-        DeferredBufferUpload(Buffer* buf, size_t off, size_t sz, const void* dat) 
-            : buffer(buf), offset(off), size(sz), data(sz) {
-            memcpy(data.data(), dat, sz);
-        }
-    };
+	VkDescriptorPool descriptorPool = VK_NULL_HANDLE; // Add this line to declare descriptorPool
+	VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE; // Add this line to declare descriptorSetLayout
 
-    // Add this member variable after renderPassState:
-    std::vector<DeferredBufferUpload> deferredUploads;
+	 struct DeferredBufferUpload {
+		Buffer* buffer;
+		size_t offset;
+		size_t size;
+		std::vector<uint8_t> data;  // Copy the data to avoid dangling pointers
+		
+		DeferredBufferUpload(Buffer* buf, size_t off, size_t sz, const void* dat) 
+			: buffer(buf), offset(off), size(sz), data(sz) {
+			memcpy(data.data(), dat, sz);
+		}
+	};
+
+	// Add this member variable after renderPassState:
+	std::vector<DeferredBufferUpload> deferredUploads;
 };
 
 } // vulkan

@@ -199,7 +199,7 @@ Graphics::Graphics()
         throw love::Exception("Failed to create Vulkan instance.");
 
     volkLoadInstance(instance);
-    
+
     // std::printf("[CHAILOVE DEBUG] Graphics::Graphics() constructor completed\n");
 }
 
@@ -864,6 +864,38 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
         drawCalls = 0;
         drawCallsBatched = 0;
 
+        VkDescriptorPoolSize poolSizes[] = {
+            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100 },
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 100 },
+            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 100 }
+        };
+
+        VkDescriptorPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = sizeof(poolSizes) / sizeof(poolSizes[0]);
+        poolInfo.pPoolSizes = poolSizes;
+        poolInfo.maxSets = 100;
+
+        if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor pool!");
+        }
+
+        VkDescriptorSetLayoutBinding uboLayoutBinding{};
+        uboLayoutBinding.binding = 1;
+        uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        uboLayoutBinding.descriptorCount = 1;
+        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        uboLayoutBinding.pImmutableSamplers = nullptr;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = 1;
+        layoutInfo.pBindings = &uboLayoutBinding;
+
+        if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create descriptor set layout!");
+        }
+
         // std::printf("[CHAILOVE DEBUG] Libretro initialization completed successfully\n");
         // RETURN EARLY - don't continue with normal initialization
         return true;
@@ -1298,13 +1330,13 @@ void Graphics::draw(const DrawCommand &cmd)
 	if (cmd.indirectBuffer != nullptr)
     {
         // Debug output for indirect draws
-        std::printf("[CHAILOVE DEBUG] Issuing vkCmdDrawIndirect - this should render geometry\n");
+        // std::printf("[CHAILOVE DEBUG] Issuing vkCmdDrawIndirect - this should render geometry\n");
         vkCmdDrawIndirect(commandBuffers.at(currentFrame), (VkBuffer) cmd.indirectBuffer->getHandle(), cmd.indirectBufferOffset, 1, 0);
     }
     else
     {
         // Debug output for direct draws  
-        std::printf("[CHAILOVE DEBUG] Issuing vkCmdDraw: vertexCount=%d, instanceCount=%d\n", cmd.vertexCount, cmd.instanceCount);
+        // std::printf("[CHAILOVE DEBUG] Issuing vkCmdDraw: vertexCount=%d, instanceCount=%d\n", cmd.vertexCount, cmd.instanceCount);
         vkCmdDraw(commandBuffers.at(currentFrame), cmd.vertexCount, cmd.instanceCount, cmd.vertexStart, 0);
     }
 
@@ -1317,8 +1349,8 @@ void Graphics::draw(const DrawIndexedCommand &cmd)
 
 	// CRITICAL SAFETY CHECK: Vulkan requires active render pass for draw commands
     if (!renderPassState.active) {
-        std::printf("[CHAILOVE ERROR] Cannot issue draw commands - no active render pass!\n");
-        std::printf("[CHAILOVE ERROR] This will cause RenderDoc crashes and validation errors\n");
+        // std::printf("[CHAILOVE ERROR] Cannot issue draw commands - no active render pass!\n");
+        // std::printf("[CHAILOVE ERROR] This will cause RenderDoc crashes and validation errors\n");
         return;
     }
 
@@ -1330,7 +1362,7 @@ void Graphics::draw(const DrawIndexedCommand &cmd)
 
 	if (cmd.indirectBuffer != nullptr)
 	{
-		std::printf("[CHAILOVE DEBUG] Issuing vkCmdDrawIndexedIndirect\n");
+		// std::printf("[CHAILOVE DEBUG] Issuing vkCmdDrawIndexedIndirect\n");
 		vkCmdDrawIndexedIndirect(
 			commandBuffers.at(currentFrame),
 			(VkBuffer) cmd.indirectBuffer->getHandle(),
@@ -1340,7 +1372,7 @@ void Graphics::draw(const DrawIndexedCommand &cmd)
 	}
 	else
 	{
-		std::printf("[CHAILOVE DEBUG] Issuing vkCmdDrawIndexed: indexCount=%d, instanceCount=%d\n", cmd.indexCount, cmd.instanceCount);
+		// std::printf("[CHAILOVE DEBUG] Issuing vkCmdDrawIndexed: indexCount=%d, instanceCount=%d\n", cmd.indexCount, cmd.instanceCount);
 		vkCmdDrawIndexed(
 			commandBuffers.at(currentFrame),
 			(uint32) cmd.indexCount,
@@ -2944,12 +2976,12 @@ void Graphics::createVulkanVertexFormat(
     std::set<uint32_t> usedBuffers;
     
     // DEBUG: Print shader vertex attributes
-    std::printf("[VULKAN DEBUG] createVulkanVertexFormat:\n");
-    std::printf("[VULKAN DEBUG] - attributes.enableBits: 0x%X\n", attributes.enableBits);
-    std::printf("[VULKAN DEBUG] - shader vertex attributes:\n");
+    // std::printf("[VULKAN DEBUG] createVulkanVertexFormat:\n");
+    // std::printf("[VULKAN DEBUG] - attributes.enableBits: 0x%X\n", attributes.enableBits);
+    // std::printf("[VULKAN DEBUG] - shader vertex attributes:\n");
     for (const auto &pair : shader->getVertexAttributeIndices()) {
-        std::printf("[VULKAN DEBUG]   - '%s' -> index=%d, baseType=%d\n", 
-                   pair.first.c_str(), pair.second.index, (int)pair.second.baseType);
+        // std::printf("[VULKAN DEBUG]   - '%s' -> index=%d, baseType=%d\n", 
+        //            pair.first.c_str(), pair.second.index, (int)pair.second.baseType);
     }
 
     for (const auto &pair : shader->getVertexAttributeIndices())
@@ -2957,21 +2989,21 @@ void Graphics::createVulkanVertexFormat(
         int i = pair.second.index;
         uint32 bit = 1u << i;
         
-        std::printf("[VULKAN DEBUG] Processing attribute %d ('%s'):\n", i, pair.first.c_str());
-        std::printf("[VULKAN DEBUG] - bit: 0x%X\n", bit);
-        std::printf("[VULKAN DEBUG] - enableBits & bit: 0x%X\n", attributes.enableBits & bit);
+        // std::printf("[VULKAN DEBUG] Processing attribute %d ('%s'):\n", i, pair.first.c_str());
+        // std::printf("[VULKAN DEBUG] - bit: 0x%X\n", bit);
+        // std::printf("[VULKAN DEBUG] - enableBits & bit: 0x%X\n", attributes.enableBits & bit);
 
         VkVertexInputAttributeDescription attribdesc{};
         attribdesc.location = i;
 
         if (attributes.enableBits & bit)
         {
-            std::printf("[VULKAN DEBUG] - Using custom buffer (enabled)\n");
+            // std::printf("[VULKAN DEBUG] - Using custom buffer (enabled)\n");
             const auto &attrib = attributes.attribs[i];
 
             int bufferbinding = VERTEX_BUFFER_BINDING_START + attrib.bufferIndex;
-            std::printf("[VULKAN DEBUG] - bufferIndex: %d, calculated binding: %d\n", 
-                       attrib.bufferIndex, bufferbinding);
+            // std::printf("[VULKAN DEBUG] - bufferIndex: %d, calculated binding: %d\n", 
+                    //    attrib.bufferIndex, bufferbinding);
 
             attribdesc.binding = bufferbinding;
             attribdesc.offset = attrib.offsetFromVertex;
@@ -2993,7 +3025,7 @@ void Graphics::createVulkanVertexFormat(
         }
         else
         {
-            std::printf("[VULKAN DEBUG] - Using default buffer (NOT enabled)\n");
+            // std::printf("[VULKAN DEBUG] - Using default buffer (NOT enabled)\n");
             attribdesc.binding = DEFAULT_VERTEX_BUFFER_BINDING;
 
             // Indices should match the creation parameters for defaultVertexBuffer.
@@ -3032,97 +3064,97 @@ void Graphics::createVulkanVertexFormat(
         attributeDescriptions.push_back(attribdesc);
     }
     
-    std::printf("[VULKAN DEBUG] Final result: %zu bindings, %zu attributes\n", 
-               bindingDescriptions.size(), attributeDescriptions.size());
+    // std::printf("[VULKAN DEBUG] Final result: %zu bindings, %zu attributes\n", 
+    //            bindingDescriptions.size(), attributeDescriptions.size());
 }
 
 void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &buffers, gfx::Texture *texture, PrimitiveType primitiveType, CullMode cullmode)
 {
     // Add safety check for corrupted Graphics object
     if (this == nullptr) {
-        std::printf("[CHAILOVE ERROR] prepareDraw: Graphics object is null\n");
+        // std::printf("[CHAILOVE ERROR] prepareDraw: Graphics object is null\n");
         return;
     }
     
     // Check if Graphics object is in a valid state
     try {
         if (magicNumber != GRAPHICS_MAGIC) {
-            std::printf("[CHAILOVE ERROR] prepareDraw: Graphics object corrupted (magic: 0x%08X, expected: 0x%08X)\n", 
-                       magicNumber, GRAPHICS_MAGIC);
+            // std::printf("[CHAILOVE ERROR] prepareDraw: Graphics object corrupted (magic: 0x%08X, expected: 0x%08X)\n", 
+            //            magicNumber, GRAPHICS_MAGIC);
             return;
         }
         
         if (!created) {
-            std::printf("[CHAILOVE ERROR] prepareDraw: Graphics object not created\n");
+            // std::printf("[CHAILOVE ERROR] prepareDraw: Graphics object not created\n");
             return;
         }
     } catch (const std::exception& e) {
-        std::printf("[CHAILOVE ERROR] prepareDraw: Exception during validation: %s\n", e.what());
+        // std::printf("[CHAILOVE ERROR] prepareDraw: Exception during validation: %s\n", e.what());
         return;
     } catch (...) {
-        std::printf("[CHAILOVE ERROR] prepareDraw: Unknown exception during validation\n");
+        // std::printf("[CHAILOVE ERROR] prepareDraw: Unknown exception during validation\n");
         return;
     }
 
     // ADD VALIDATION CHECKS FOR VULKAN STATE
-    std::printf("[CHAILOVE DEBUG] prepareDraw validation:\n");
-    std::printf("[CHAILOVE DEBUG] - commandBufferRecording: %s\n", commandBufferRecording ? "true" : "false");
-    std::printf("[CHAILOVE DEBUG] - renderPassState.active: %s\n", renderPassState.active ? "true" : "false");
+    // std::printf("[CHAILOVE DEBUG] prepareDraw validation:\n");
+    // std::printf("[CHAILOVE DEBUG] - commandBufferRecording: %s\n", commandBufferRecording ? "true" : "false");
+    // std::printf("[CHAILOVE DEBUG] - renderPassState.active: %s\n", renderPassState.active ? "true" : "false");
     
     // CRITICAL FIX: Start render pass automatically if none is active
 	if (!renderPassState.active) {
 		if (!commandBufferRecording) {
-			std::printf("[CHAILOVE DEBUG] prepareDraw: Starting command buffer recording\n");
+			// std::printf("[CHAILOVE DEBUG] prepareDraw: Starting command buffer recording\n");
 			startRecordingGraphicsCommands();
 		}else {
 			// Command buffer is already recording, but we still need to set up render pass configuration
-			std::printf("[CHAILOVE DEBUG] prepareDraw: Command buffer already recording, setting up render pass configuration\n");
+			// std::printf("[CHAILOVE DEBUG] prepareDraw: Command buffer already recording, setting up render pass configuration\n");
 			setDefaultRenderPass();
 		}
 
-		std::printf("[CHAILOVE DEBUG] prepareDraw: No active render pass, starting one automatically\n");
+		// std::printf("[CHAILOVE DEBUG] prepareDraw: No active render pass, starting one automatically\n");
 		startRenderPass();
 		
 		// Verify that render pass was successfully started
 		if (!renderPassState.active) {
-			std::printf("[CHAILOVE ERROR] prepareDraw: Failed to start render pass!\n");
+			// std::printf("[CHAILOVE ERROR] prepareDraw: Failed to start render pass!\n");
 			return;
 		}
-		std::printf("[CHAILOVE DEBUG] prepareDraw: Render pass started successfully\n");
+		// std::printf("[CHAILOVE DEBUG] prepareDraw: Render pass started successfully\n");
 	}
     
     // Validate command buffer
     VkCommandBuffer currentCommandBuffer = commandBuffers.at(currentFrame);
     if (currentCommandBuffer == VK_NULL_HANDLE) {
-        std::printf("[CHAILOVE ERROR] prepareDraw: Invalid command buffer!\n");
+        // std::printf("[CHAILOVE ERROR] prepareDraw: Invalid command buffer!\n");
         return;
     }
     
     // ADD SHADER DEBUG OUTPUT
-    std::printf("[CHAILOVE DEBUG] prepareDraw shader status:\n");
-    std::printf("[CHAILOVE DEBUG] - Shader::current: %p\n", Shader::current);
+    // std::printf("[CHAILOVE DEBUG] prepareDraw shader status:\n");
+    // std::printf("[CHAILOVE DEBUG] - Shader::current: %p\n", Shader::current);
     
     auto s = dynamic_cast<Shader*>(Shader::current);
     if (!s) {
-        std::printf("[CHAILOVE ERROR] prepareDraw: No valid shader is currently bound (current=%p)\n", Shader::current);
+        // std::printf("[CHAILOVE ERROR] prepareDraw: No valid shader is currently bound (current=%p)\n", Shader::current);
         
         // Try to use default shader
         if (Shader::standardShaders[Shader::STANDARD_DEFAULT]) {
-            std::printf("[CHAILOVE DEBUG] prepareDraw: Attempting to use default shader\n");
+            // std::printf("[CHAILOVE DEBUG] prepareDraw: Attempting to use default shader\n");
             s = dynamic_cast<Shader*>(Shader::standardShaders[Shader::STANDARD_DEFAULT]);
             if (s) {
                 s->attach();
-                std::printf("[CHAILOVE DEBUG] prepareDraw: Default shader attached successfully\n");
+                // std::printf("[CHAILOVE DEBUG] prepareDraw: Default shader attached successfully\n");
             } else {
-                std::printf("[CHAILOVE ERROR] prepareDraw: Default shader cast failed\n");
+                // std::printf("[CHAILOVE ERROR] prepareDraw: Default shader cast failed\n");
                 return;
             }
         } else {
-            std::printf("[CHAILOVE ERROR] prepareDraw: No default shader available\n");
+            // std::printf("[CHAILOVE ERROR] prepareDraw: No default shader available\n");
             return;
         }
     } else {
-        std::printf("[CHAILOVE DEBUG] prepareDraw: Using shader %p\n", s);
+        // std::printf("[CHAILOVE DEBUG] prepareDraw: Using shader %p\n", s);
     }
 
     usedShadersInFrame.insert(s);
@@ -3134,32 +3166,32 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
     VkRenderPass pipelineRenderPass = renderPassState.beginInfo.renderPass;
     
     if (pipelineRenderPass == VK_NULL_HANDLE) {
-        std::printf("[CHAILOVE ERROR] prepareDraw: No render pass available for pipeline creation!\n");
+        // std::printf("[CHAILOVE ERROR] prepareDraw: No render pass available for pipeline creation!\n");
         
         // Try to start render pass
         if (!renderPassState.active) {
-            std::printf("[CHAILOVE DEBUG] prepareDraw: Attempting to start render pass\n");
+            // std::printf("[CHAILOVE DEBUG] prepareDraw: Attempting to start render pass\n");
             try {
                 startRenderPass();
                 pipelineRenderPass = renderPassState.beginInfo.renderPass;
-                std::printf("[CHAILOVE DEBUG] prepareDraw: Render pass started, new renderPass: %p\n", (void*)pipelineRenderPass);
+                // std::printf("[CHAILOVE DEBUG] prepareDraw: Render pass started, new renderPass: %p\n", (void*)pipelineRenderPass);
             } catch (const std::exception& e) {
-                std::printf("[CHAILOVE ERROR] prepareDraw: Failed to start render pass: %s\n", e.what());
+                // std::printf("[CHAILOVE ERROR] prepareDraw: Failed to start render pass: %s\n", e.what());
                 return;
             }
         }
         
         if (pipelineRenderPass == VK_NULL_HANDLE) {
-            std::printf("[CHAILOVE ERROR] prepareDraw: Still no render pass after startRenderPass()\n");
+            // std::printf("[CHAILOVE ERROR] prepareDraw: Still no render pass after startRenderPass()\n");
             return;
         }
     }
 
     // VALIDATE RENDER PASS AND PIPELINE COMPATIBILITY
-    std::printf("[CHAILOVE DEBUG] Pipeline validation:\n");
-    std::printf("[CHAILOVE DEBUG] - pipelineRenderPass: %p\n", (void*)pipelineRenderPass);
-    std::printf("[CHAILOVE DEBUG] - renderPassState.numColorAttachments: %d\n", renderPassState.numColorAttachments);
-    std::printf("[CHAILOVE DEBUG] - renderPassState.msaa: %d\n", (int)renderPassState.msaa);
+    // std::printf("[CHAILOVE DEBUG] Pipeline validation:\n");
+    // std::printf("[CHAILOVE DEBUG] - pipelineRenderPass: %p\n", (void*)pipelineRenderPass);
+    // std::printf("[CHAILOVE DEBUG] - renderPassState.numColorAttachments: %d\n", renderPassState.numColorAttachments);
+    // std::printf("[CHAILOVE DEBUG] - renderPassState.msaa: %d\n", (int)renderPassState.msaa);
     
     configuration.core.renderPass = pipelineRenderPass;
     configuration.core.attributes = attributes;
@@ -3175,31 +3207,31 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
 
     try {
         pipeline = s->getCachedGraphicsPipeline(this, configuration);
-        std::printf("[CHAILOVE DEBUG] Pipeline retrieved successfully: %p\n", (void*)pipeline);
+        // std::printf("[CHAILOVE DEBUG] Pipeline retrieved successfully: %p\n", (void*)pipeline);
     } catch (const std::exception& e) {
-        std::printf("[CHAILOVE ERROR] Failed to get graphics pipeline: %s\n", e.what());
+        // std::printf("[CHAILOVE ERROR] Failed to get graphics pipeline: %s\n", e.what());
         return;
     }
 
     if (pipeline == VK_NULL_HANDLE) {
-        std::printf("[CHAILOVE ERROR] prepareDraw: Failed to create/get graphics pipeline\n");
+        // std::printf("[CHAILOVE ERROR] prepareDraw: Failed to create/get graphics pipeline\n");
         return;
     }
 
     if (pipeline != renderPassState.pipeline) {
-        std::printf("[CHAILOVE DEBUG] Binding new pipeline: %p (was %p)\n", (void*)pipeline, (void*)renderPassState.pipeline);
+        // std::printf("[CHAILOVE DEBUG] Binding new pipeline: %p (was %p)\n", (void*)pipeline, (void*)renderPassState.pipeline);
         vkCmdBindPipeline(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
         renderPassState.pipeline = pipeline;
     }
 
     // VALIDATE DESCRIPTOR SETS BEFORE BINDING
-    std::printf("[CHAILOVE DEBUG] Setting up descriptor sets\n");
+    // std::printf("[CHAILOVE DEBUG] Setting up descriptor sets\n");
     try {
         s->setMainTex(texture);
         s->cmdPushDescriptorSets(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS);
-        std::printf("[CHAILOVE DEBUG] Descriptor sets bound successfully\n");
+        // std::printf("[CHAILOVE DEBUG] Descriptor sets bound successfully\n");
     } catch (const std::exception& e) {
-        std::printf("[CHAILOVE ERROR] Failed to bind descriptor sets: %s\n", e.what());
+        // std::printf("[CHAILOVE ERROR] Failed to bind descriptor sets: %s\n", e.what());
         return;
     }
 
@@ -3222,11 +3254,11 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
     }
 
     if (buffercount > 0) {
-        std::printf("[CHAILOVE DEBUG] Binding %u vertex buffers\n", buffercount);
+        // std::printf("[CHAILOVE DEBUG] Binding %u vertex buffers\n", buffercount);
         vkCmdBindVertexBuffers(commandBuffers.at(currentFrame), VERTEX_BUFFER_BINDING_START, buffercount, vkbuffers, vkoffsets);
     }
     
-    std::printf("[CHAILOVE DEBUG] prepareDraw completed successfully\n");
+    // std::printf("[CHAILOVE DEBUG] prepareDraw completed successfully\n");
 }
 
 void Graphics::setDefaultRenderPass()
@@ -3327,7 +3359,7 @@ void Graphics::setDefaultRenderPass()
         }
         
         if (colorFormat == VK_FORMAT_UNDEFINED) {
-            std::printf("[CHAILOVE ERROR] No supported color format found! Using fallback.\n");
+            // std::printf("[CHAILOVE ERROR] No supported color format found! Using fallback.\n");
             colorFormat = VK_FORMAT_R8G8B8A8_UNORM; // Force fallback
         }
     }
@@ -3436,34 +3468,34 @@ void Graphics::setDefaultRenderPass()
         // No MSAA - use fakeBackbuffer directly
         if (!swapChainImages.empty()) {
             framebufferConfiguration.colorViews.push_back(swapChainImageViews[0]);
-            std::printf("[CHAILOVE DEBUG] Added swapchain color view: %p\n", swapChainImageViews[0]);
+            // std::printf("[CHAILOVE DEBUG] Added swapchain color view: %p\n", swapChainImageViews[0]);
         } else if (fakeBackbuffer) {
             // Use fakeBackbuffer image view
             auto texture = dynamic_cast<Texture*>(fakeBackbuffer.get());
             if (texture) {
                 VkImageView colorView = texture->getRenderTargetView(0, 0);
-                std::printf("[CHAILOVE DEBUG] fakeBackbuffer render target view: %p\n", colorView);
+                // std::printf("[CHAILOVE DEBUG] fakeBackbuffer render target view: %p\n", colorView);
                 
                 if (colorView != VK_NULL_HANDLE) {
                     framebufferConfiguration.colorViews.push_back(colorView);
-                    std::printf("[CHAILOVE DEBUG] Successfully added fakeBackbuffer color view\n");
+                    // std::printf("[CHAILOVE DEBUG] Successfully added fakeBackbuffer color view\n");
                 } else {
-                    std::printf("[CHAILOVE ERROR] fakeBackbuffer render target view is VK_NULL_HANDLE!\n");
+                    // std::printf("[CHAILOVE ERROR] fakeBackbuffer render target view is VK_NULL_HANDLE!\n");
                     throw love::Exception("fakeBackbuffer render target view is invalid");
                 }
             } else {
-                std::printf("[CHAILOVE ERROR] fakeBackbuffer is not a valid Texture!\n");
+                // std::printf("[CHAILOVE ERROR] fakeBackbuffer is not a valid Texture!\n");
                 throw love::Exception("Invalid fakeBackbuffer texture");
             }
         } else {
-            std::printf("[CHAILOVE ERROR] No color attachment available - no swapchain and no fakeBackbuffer!\n");
+            // std::printf("[CHAILOVE ERROR] No color attachment available - no swapchain and no fakeBackbuffer!\n");
         }
     }
     else
     {
         // MSAA enabled - use color image as resolve target
         framebufferConfiguration.colorViews.push_back(colorImageView);
-        std::printf("[CHAILOVE DEBUG] Added MSAA color view: %p\n", colorImageView);
+        // std::printf("[CHAILOVE DEBUG] Added MSAA color view: %p\n", colorImageView);
         
         if (!swapChainImages.empty()) {
             framebufferConfiguration.colorResolveViews.push_back(swapChainImageViews[0]);
@@ -3477,13 +3509,13 @@ void Graphics::setDefaultRenderPass()
     }
     
     // CRITICAL DEBUG: Verify framebuffer configuration before using it
-    std::printf("[CHAILOVE DEBUG] Final framebuffer configuration:\n");
-    std::printf("[CHAILOVE DEBUG] - colorViews.size(): %zu\n", framebufferConfiguration.colorViews.size());
-    std::printf("[CHAILOVE DEBUG] - colorResolveViews.size(): %zu\n", framebufferConfiguration.colorResolveViews.size());
-    std::printf("[CHAILOVE DEBUG] - depthView: %p\n", framebufferConfiguration.staticData.depthView);
+    // std::printf("[CHAILOVE DEBUG] Final framebuffer configuration:\n");
+    // std::printf("[CHAILOVE DEBUG] - colorViews.size(): %zu\n", framebufferConfiguration.colorViews.size());
+    // std::printf("[CHAILOVE DEBUG] - colorResolveViews.size(): %zu\n", framebufferConfiguration.colorResolveViews.size());
+    // std::printf("[CHAILOVE DEBUG] - depthView: %p\n", framebufferConfiguration.staticData.depthView);
     
     if (framebufferConfiguration.colorViews.empty()) {
-        std::printf("[CHAILOVE ERROR] NO COLOR VIEWS IN FRAMEBUFFER - THIS WILL CAUSE DEPTH-ONLY RENDERING!\n");
+        // std::printf("[CHAILOVE ERROR] NO COLOR VIEWS IN FRAMEBUFFER - THIS WILL CAUSE DEPTH-ONLY RENDERING!\n");
         throw love::Exception("Framebuffer has no color attachments");
     }
     
@@ -3617,19 +3649,19 @@ void Graphics::startRenderPass()
 
     // LIBRETRO COMPATIBILITY: Use minimal render pass setup
     if (libretroMode) {
-        std::printf("[CHAILOVE DEBUG] Using libretro-compatible rendering with minimal render pass\n");
+        // std::printf("[CHAILOVE DEBUG] Using libretro-compatible rendering with minimal render pass\n");
         
         // CRITICAL FIX: Initialize render pass dimensions for libretro
         if (renderPassState.width <= 0 || renderPassState.height <= 0) {
             renderPassState.width = 1440.0f;  // Default RetroArch resolution
             renderPassState.height = 1080.0f;
-            std::printf("[CHAILOVE DEBUG] Initialized libretro render pass dimensions: %fx%f\n", 
-                renderPassState.width, renderPassState.height);
+            // std::printf("[CHAILOVE DEBUG] Initialized libretro render pass dimensions: %fx%f\n", 
+                // renderPassState.width, renderPassState.height);
         }
         
         // CRITICAL: Create minimal render pass for pipeline compatibility
         if (renderPassState.beginInfo.renderPass == VK_NULL_HANDLE) {
-            std::printf("[CHAILOVE DEBUG] Creating minimal render pass for libretro\n");
+            // std::printf("[CHAILOVE DEBUG] Creating minimal render pass for libretro\n");
             
             RenderPassConfiguration minimalConfig{};
             
@@ -3646,7 +3678,7 @@ void Graphics::startRenderPass()
             VkRenderPass minimalRenderPass = getRenderPass(minimalConfig);
             renderPassState.beginInfo.renderPass = minimalRenderPass;
             
-            std::printf("[CHAILOVE DEBUG] Minimal render pass created: %p\n", (void*)minimalRenderPass);
+            // std::printf("[CHAILOVE DEBUG] Minimal render pass created: %p\n", (void*)minimalRenderPass);
         }
         
         // CRITICAL: Actually start the render pass for draw commands
@@ -3666,9 +3698,9 @@ void Graphics::startRenderPass()
             if (fakeBackbuffer != nullptr) {
                 VkImageView colorView = fakeBackbuffer->getRenderTargetView(0, 0);
                 fbConfig.colorViews.push_back(colorView);
-                std::printf("[CHAILOVE DEBUG] Using fakeBackbuffer for framebuffer: %p\n", fakeBackbuffer.get());
+                // std::printf("[CHAILOVE DEBUG] Using fakeBackbuffer for framebuffer: %p\n", fakeBackbuffer.get());
             } else {
-				std::printf("[CHAILOVE ERROR] fakeBackbuffer is null! Creating dummy image for libretro compatibility\n");
+				// std::printf("[CHAILOVE ERROR] fakeBackbuffer is null! Creating dummy image for libretro compatibility\n");
 					
 					// Create a minimal dummy texture for the framebuffer directly using Texture::Settings
 					Texture::Settings texSettings;
@@ -3685,12 +3717,12 @@ void Graphics::startRenderPass()
 					VkImageView colorView = dummyTexture->getRenderTargetView(0, 0);
 					fbConfig.colorViews.push_back(colorView);
 					
-					std::printf("[CHAILOVE DEBUG] Created dummy texture for libretro framebuffer\n");
+					// std::printf("[CHAILOVE DEBUG] Created dummy texture for libretro framebuffer\n");
             }
             
             renderPassState.beginInfo.framebuffer = getFramebuffer(fbConfig);
-            std::printf("[CHAILOVE DEBUG] Minimal framebuffer created: %p with %zu color views\n", 
-                (void*)renderPassState.beginInfo.framebuffer, fbConfig.colorViews.size());
+            // std::printf("[CHAILOVE DEBUG] Minimal framebuffer created: %p with %zu color views\n", 
+                // (void*)renderPassState.beginInfo.framebuffer, fbConfig.colorViews.size());
         }
         
         // Set up render area
@@ -3701,7 +3733,7 @@ void Graphics::startRenderPass()
         renderPassState.beginInfo.pClearValues = nullptr;
         
         // CRITICAL: Actually begin the render pass
-        std::printf("[CHAILOVE DEBUG] Beginning minimal render pass for libretro\n");
+        // std::printf("[CHAILOVE DEBUG] Beginning minimal render pass for libretro\n");
         vkCmdBeginRenderPass(currentCommandBuffer, &renderPassState.beginInfo, VK_SUBPASS_CONTENTS_INLINE);
         
         // Set viewport
@@ -3718,7 +3750,7 @@ void Graphics::startRenderPass()
         applyScissor();
         
         renderPassState.active = true;
-        std::printf("[CHAILOVE DEBUG] Libretro minimal render pass active\n");
+        // std::printf("[CHAILOVE DEBUG] Libretro minimal render pass active\n");
         return;
     }
 
@@ -3733,14 +3765,14 @@ void Graphics::startRenderPass()
 
     // CRITICAL FIX: Ensure command buffers are properly initialized
     if (commandBuffers.empty() || currentFrame >= commandBuffers.size()) {
-        std::printf("[CHAILOVE ERROR] Command buffers not properly initialized!\n");
+        // std::printf("[CHAILOVE ERROR] Command buffers not properly initialized!\n");
         throw love::Exception("Command buffers not available for rendering");
     }
     
     // Additional safety check
     VkCommandBuffer currentCommandBuffer = commandBuffers.at(currentFrame);
     if (currentCommandBuffer == VK_NULL_HANDLE) {
-        std::printf("[CHAILOVE ERROR] Current command buffer is VK_NULL_HANDLE at frame %zu\n", currentFrame);
+        // std::printf("[CHAILOVE ERROR] Current command buffer is VK_NULL_HANDLE at frame %zu\n", currentFrame);
         throw love::Exception("Command buffer is not valid");
     }
 
@@ -3846,7 +3878,7 @@ void Graphics::startRenderPass()
                                 
             // std::printf("[CHAILOVE DEBUG] Manual color clear completed\n");
         } else {
-            std::printf("[CHAILOVE WARNING] No target image available for clearing\n");
+            // std::printf("[CHAILOVE WARNING] No target image available for clearing\n");
         }
     } else {
         // std::printf("[CHAILOVE DEBUG] Skipping clear: isWindow=%s, windowClearRequested=%s\n", 
@@ -4045,16 +4077,16 @@ VkPipeline Graphics::createGraphicsPipeline(Shader *shader, const GraphicsPipeli
     colorBlendAttachment.colorWriteMask = Vulkan::getColorMask(configuration.colorChannelMask);
     
     // CRITICAL DEBUG: Check color write mask
-    std::printf("[CHAILOVE DEBUG] Pipeline color configuration:\n");
-    std::printf("[CHAILOVE DEBUG] - configuration.colorChannelMask: 0x%X\n", configuration.colorChannelMask);
-    std::printf("[CHAILOVE DEBUG] - colorWriteMask (Vulkan): 0x%X\n", colorBlendAttachment.colorWriteMask);
-    std::printf("[CHAILOVE DEBUG] - numColorAttachments: %u\n", configuration.numColorAttachments);
+    // std::printf("[CHAILOVE DEBUG] Pipeline color configuration:\n");
+    // std::printf("[CHAILOVE DEBUG] - configuration.colorChannelMask: 0x%X\n", configuration.colorChannelMask);
+    // std::printf("[CHAILOVE DEBUG] - colorWriteMask (Vulkan): 0x%X\n", colorBlendAttachment.colorWriteMask);
+    // std::printf("[CHAILOVE DEBUG] - numColorAttachments: %u\n", configuration.numColorAttachments);
     
     if (colorBlendAttachment.colorWriteMask == 0) {
-        std::printf("[CHAILOVE ERROR] COLOR WRITE MASK IS ZERO - THIS CAUSES DEPTH-ONLY RENDERING!\n");
+        // std::printf("[CHAILOVE ERROR] COLOR WRITE MASK IS ZERO - THIS CAUSES DEPTH-ONLY RENDERING!\n");
         // Force enable all color channels for debugging
         colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-        std::printf("[CHAILOVE DEBUG] Forced colorWriteMask to: 0x%X\n", colorBlendAttachment.colorWriteMask);
+        // std::printf("[CHAILOVE DEBUG] Forced colorWriteMask to: 0x%X\n", colorBlendAttachment.colorWriteMask);
     }
 	colorBlendAttachment.blendEnable = Vulkan::getBool(blendState.enable);
 	colorBlendAttachment.srcColorBlendFactor = Vulkan::getBlendFactor(blendState.srcFactorRGB);
@@ -4523,8 +4555,8 @@ void Graphics::deferBufferUpload(Buffer* buffer, size_t offset, size_t size, con
     deferredUploads.emplace_back(buffer, offset, size, data);
     
     // Debug output
-    std::printf("[LIBRETRO] Deferring buffer upload: buffer=%p, offset=%zu, size=%zu\n", 
-           buffer, offset, size);
+    // std::printf("[LIBRETRO] Deferring buffer upload: buffer=%p, offset=%zu, size=%zu\n", 
+    //        buffer, offset, size);
 }
 
 } // vulkan

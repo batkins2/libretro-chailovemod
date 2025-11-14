@@ -173,6 +173,10 @@ void chai_scene::drawMeshes(bool shadows, int view) {
     // OptionalInt clearstencil(0);
     // OptionalDouble cleardepth(1.0);
     auto& cg = ChaiLove::getInstance()->chai_gfx;
+    // Get the command buffer and pipeline layout properly
+    auto commandBuffer = cg.instance->getCommandBufferForDataTransfer();
+    auto vulkanShader = static_cast<gfx::vulkan::Shader*>(sceneShader->shader);
+    auto pipelineLayout = vulkanShader->getGraphicsPipelineLayout();
     // cg.instance->clear(clearcolor, clearstencil, cleardepth);
     glm::mat4 vMatrix = glm::mat4(1.0f);
     glm::mat4 t2 = glm::mat4(1.0f);
@@ -247,7 +251,7 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         sceneShader->send("modelMatrix", v);
 
         sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
-
+        
         sceneShader->send("lightIntensity", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1.2f) }));
 
         sceneShader->send("ambientColor", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0.9f), chaiscript::Boxed_Value(0.9f), chaiscript::Boxed_Value(0.9f) }));
@@ -270,7 +274,7 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         for (int c = 0; c < 16; ++c) {
             viewMatrix.push_back(chaiscript::Boxed_Value(vm[c]));
         }
-        sceneShader->send("viewMatrix", viewMatrix);
+        // sceneShader->send("viewMatrix", viewMatrix);
 
         // Draw a fullscreen quad (replace with your engine's quad draw if needed)
         gfx::Texture::Settings settings;
@@ -288,7 +292,10 @@ void chai_scene::drawMeshes(bool shadows, int view) {
             rect.h = mesh->specularH;
             background_tex->replacePixels(mesh->specData, mesh->specularW*mesh->specularH*4, 0, 0, rect, false);
         }
+        // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+
         background_tex->draw(gfx, mat);
+    
         // glEnable(GL_DEPTH_TEST);
     }
 
@@ -451,7 +458,9 @@ void chai_scene::drawMeshes(bool shadows, int view) {
             i++;
             continue;
         }
-        
+        // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+
+        // gfx::Graphics::flushBatchedDrawsGlobal();
         auto matrix = matrices[i];
         mesh->draw(cg.instance, matrix, sceneShader, deltaTime);
         if (meshChildren.find(i) != meshChildren.end()) {
@@ -471,10 +480,13 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                         0.0f, 0.0f, 1.0f, 0.0f,
                         0.0f, 0.0f, 0.0f, 1.0f
                     });
+                    // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+
                     child->meshes[j]->draw(cg.instance, m);
                 }
             }
         }
+        // cg.instance->present(nullptr);
         i++;
     }
     // Draw deferred child meshes in order of same index
@@ -497,6 +509,9 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                     auto drawnPair = std::make_pair(parentId, j);
                     // printf("Drawing child mesh %d of parent mesh %d\n", j, parentId);
                     drawnPairs.push_back(drawnPair);
+                    // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+                    // gfx::Graphics::flushBatchedDrawsGlobal();
+                   
                     // Draw the parent mesh first
                     meshes[parentId]->draw(cg.instance, matrices[parentId], sceneShader, deltaTime);
                     Matrix4 m = Matrix4(new float[16]{
@@ -505,7 +520,10 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                         0.0f, 0.0f, 1.0f, 0.0f,
                         0.0f, 0.0f, 0.0f, 1.0f
                     });
+                    // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+
                     child->meshes[j]->draw(cg.instance, m);
+                    // cg.instance->present(nullptr);
                 }
                 j++;
             }
@@ -518,6 +536,9 @@ void chai_scene::drawMeshes(bool shadows, int view) {
     for (auto meshIndex : deferredMeshIndices) {
         auto mesh = meshes[meshIndex];
         auto matrix = matrices[meshIndex];
+        // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+        // gfx::Graphics::flushBatchedDrawsGlobal();
+
         mesh->draw(cg.instance, matrix, sceneShader, deltaTime);
         if (meshChildren.find(meshIndex) != meshChildren.end()) {
             for (auto child : meshChildren[meshIndex]) {
@@ -531,17 +552,22 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                         0.0f, 0.0f, 1.0f, 0.0f,
                         0.0f, 0.0f, 0.0f, 1.0f
                     });
+                    // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+
                     child->meshes[j]->draw(cg.instance, m);
                 }
             }
         }
+        // cg.instance->present(nullptr);
     }
     if (shadows == false) {
         for (auto ps : particleSystems) {
             // if (ps->visible == false) {
             //     continue;
             // }
+            // gfx::Graphics::flushBatchedDrawsGlobal();
             ps->draw();
+            // cg.instance->present(nullptr);
         }
     }
 }
@@ -577,143 +603,146 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
         printf("Reinit\n");
     } else {
         cg.instance->setShader(sceneShader->shader);
+        sceneShader->newFrame();
         gfx::OptionalColorD clearcolor;
         clearcolor = ColorD(1.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
         OptionalInt clearstencil(0);
         OptionalDouble cleardepth(1.0);
         cg.instance->clear(clearcolor, clearstencil, cleardepth);
+        sceneShader->send("viewMatrix", viewMatrix1); 
+                 
         drawMeshes(false, 0);
         // Add this new function after the existing print function:
 
-        if (!cg.instance || !cg.instance->isCreated()) {
-            std::printf("[CHAILOVE DEBUG] Cannot draw triangle - graphics not created\n");
-            return;
-        }
+//         if (!cg.instance || !cg.instance->isCreated()) {
+//             std::printf("[CHAILOVE DEBUG] Cannot draw triangle - graphics not created\n");
+//             return;
+//         }
         
-        std::printf("[CHAILOVE DEBUG] Drawing test triangle...\n");
+//         std::printf("[CHAILOVE DEBUG] Drawing test triangle...\n");
 
-// Use the engine's default shader by calling setShader() with no arguments
-        cg.instance->setShader();
-        std::printf("[CHAILOVE DEBUG] Using Love2D default shader (setShader())\n");
+// // Use the engine's default shader by calling setShader() with no arguments
+//         cg.instance->setShader();
+//         std::printf("[CHAILOVE DEBUG] Using Love2D default shader (setShader())\n");
 
-// ...existing code...
+// // ...existing code...
 
-// Replace the triangle test section with this corrected version:
+// // Replace the triangle test section with this corrected version:
 
-// Replace the entire triangle test section with this:
+// // Replace the entire triangle test section with this:
 
-struct TextureVertex {
-    float x, y, z, w;           // position (4 floats = 16 bytes) - shader expects vec4
-    float u, v, s, t;           // texture coords (4 floats = 16 bytes) - shader expects vec4  
-    float r, g, b, a;           // color as floats (4 floats = 16 bytes) - shader expects vec4
-    // Total: 48 bytes per vertex
-};
+// struct TextureVertex {
+//     float x, y, z, w;           // position (4 floats = 16 bytes) - shader expects vec4
+//     float u, v, s, t;           // texture coords (4 floats = 16 bytes) - shader expects vec4  
+//     float r, g, b, a;           // color as floats (4 floats = 16 bytes) - shader expects vec4
+//     // Total: 48 bytes per vertex
+// };
 
-// Create a fullscreen triangle that should definitely be visible
-// Using coordinates that work with the projection matrix we saw in uniforms
-TextureVertex vertices[3] = {
-    // Fullscreen triangle covering entire screen
-    // The projection matrix expects large coordinates based on screen size (1440x1080)
-    { 0.0f, -540.0f, 0.0f, 1.0f,   0.5f, 0.0f, 0.0f, 1.0f,   1.0f, 0.0f, 0.0f, 1.0f },    // Top - RED
-    {-720.0f, 540.0f, 0.0f, 1.0f,   0.0f, 1.0f, 0.0f, 1.0f,   0.0f, 1.0f, 0.0f, 1.0f },    // Left - GREEN  
-    { 720.0f, 540.0f, 0.0f, 1.0f,   1.0f, 1.0f, 0.0f, 1.0f,   0.0f, 0.0f, 1.0f, 1.0f }     // Right - BLUE
-};
+// // Create a fullscreen triangle that should definitely be visible
+// // Using coordinates that work with the projection matrix we saw in uniforms
+// TextureVertex vertices[3] = {
+//     // Fullscreen triangle covering entire screen
+//     // The projection matrix expects large coordinates based on screen size (1440x1080)
+//     { 0.0f, -540.0f, 0.0f, 1.0f,   0.5f, 0.0f, 0.0f, 1.0f,   1.0f, 0.0f, 0.0f, 1.0f },    // Top - RED
+//     {-720.0f, 540.0f, 0.0f, 1.0f,   0.0f, 1.0f, 0.0f, 1.0f,   0.0f, 1.0f, 0.0f, 1.0f },    // Left - GREEN  
+//     { 720.0f, 540.0f, 0.0f, 1.0f,   1.0f, 1.0f, 0.0f, 1.0f,   0.0f, 0.0f, 1.0f, 1.0f }     // Right - BLUE
+// };
 
-// Create format with proper names matching the engine's expectations
-std::vector<love::gfx::Buffer::DataDeclaration> format;
-format.push_back(love::gfx::Buffer::DataDeclaration("VertexPosition", love::gfx::DATAFORMAT_FLOAT_VEC4));
-format.push_back(love::gfx::Buffer::DataDeclaration("VertexTexCoord", love::gfx::DATAFORMAT_FLOAT_VEC4));  
-format.push_back(love::gfx::Buffer::DataDeclaration("VertexColor", love::gfx::DATAFORMAT_FLOAT_VEC4));
+// // Create format with proper names matching the engine's expectations
+// std::vector<love::gfx::Buffer::DataDeclaration> format;
+// format.push_back(love::gfx::Buffer::DataDeclaration("VertexPosition", love::gfx::DATAFORMAT_FLOAT_VEC4));
+// format.push_back(love::gfx::Buffer::DataDeclaration("VertexTexCoord", love::gfx::DATAFORMAT_FLOAT_VEC4));  
+// format.push_back(love::gfx::Buffer::DataDeclaration("VertexColor", love::gfx::DATAFORMAT_FLOAT_VEC4));
 
-std::printf("[TRIANGLE TEST] Using fullscreen triangle with screen-space coordinates\n");
-std::printf("[TRIANGLE TEST] Vertex 0: pos(%.1f, %.1f, %.1f, %.1f) color(%.1f, %.1f, %.1f, %.1f)\n", 
-            vertices[0].x, vertices[0].y, vertices[0].z, vertices[0].w,
-            vertices[0].r, vertices[0].g, vertices[0].b, vertices[0].a);
+// std::printf("[TRIANGLE TEST] Using fullscreen triangle with screen-space coordinates\n");
+// std::printf("[TRIANGLE TEST] Vertex 0: pos(%.1f, %.1f, %.1f, %.1f) color(%.1f, %.1f, %.1f, %.1f)\n", 
+//             vertices[0].x, vertices[0].y, vertices[0].z, vertices[0].w,
+//             vertices[0].r, vertices[0].g, vertices[0].b, vertices[0].a);
 
-// Create the buffer with vertex data
-love::gfx::Buffer::Settings bufferSettings(love::gfx::BUFFERUSAGEFLAG_VERTEX, love::gfx::BUFFERDATAUSAGE_STATIC);
-auto buffer = cg.instance->newBuffer(bufferSettings, format, vertices, sizeof(vertices), 0);
+// // Create the buffer with vertex data
+// love::gfx::Buffer::Settings bufferSettings(love::gfx::BUFFERUSAGEFLAG_VERTEX, love::gfx::BUFFERDATAUSAGE_STATIC);
+// auto buffer = cg.instance->newBuffer(bufferSettings, format, vertices, sizeof(vertices), 0);
 
-love::gfx::BufferBindings buffers;
-buffers.set(2, buffer, 0);
+// love::gfx::BufferBindings buffers;
+// buffers.set(2, buffer, 0);
 
-// Set vertex attributes - try using the CommonFormat approach instead of manual setup
-love::gfx::VertexAttributes attributes;
-// Clear and reset to ensure clean state
-// attributes.clear();
+// // Set vertex attributes - try using the CommonFormat approach instead of manual setup
+// love::gfx::VertexAttributes attributes;
+// // Clear and reset to ensure clean state
+// // attributes.clear();
 
-// Use the engine's standard attribute locations
-attributes.set(love::gfx::ATTRIB_POS, love::gfx::DATAFORMAT_FLOAT_VEC4, 0, 1);                                    
-attributes.set(love::gfx::ATTRIB_TEXCOORD, love::gfx::DATAFORMAT_FLOAT_VEC4, sizeof(float) * 4, 1);                   
-attributes.set(love::gfx::ATTRIB_COLOR, love::gfx::DATAFORMAT_FLOAT_VEC4, sizeof(float) * 8, 1);                   
-attributes.setBufferLayout(1, sizeof(TextureVertex), love::gfx::STEP_PER_VERTEX);               
+// // Use the engine's standard attribute locations
+// attributes.set(love::gfx::ATTRIB_POS, love::gfx::DATAFORMAT_FLOAT_VEC4, 0, 1);                                    
+// attributes.set(love::gfx::ATTRIB_TEXCOORD, love::gfx::DATAFORMAT_FLOAT_VEC4, sizeof(float) * 4, 1);                   
+// attributes.set(love::gfx::ATTRIB_COLOR, love::gfx::DATAFORMAT_FLOAT_VEC4, sizeof(float) * 8, 1);                   
+// attributes.setBufferLayout(1, sizeof(TextureVertex), love::gfx::STEP_PER_VERTEX);               
 
-std::printf("[TRIANGLE DEBUG] enableBits after setup: 0x%X\n", attributes.enableBits);
-std::printf("[TRIANGLE DEBUG] Expected enableBits: 0x%X\n", (1u << love::gfx::ATTRIB_POS) | (1u << love::gfx::ATTRIB_TEXCOORD) | (1u << love::gfx::ATTRIB_COLOR));
+// std::printf("[TRIANGLE DEBUG] enableBits after setup: 0x%X\n", attributes.enableBits);
+// std::printf("[TRIANGLE DEBUG] Expected enableBits: 0x%X\n", (1u << love::gfx::ATTRIB_POS) | (1u << love::gfx::ATTRIB_TEXCOORD) | (1u << love::gfx::ATTRIB_COLOR));
 
-// Check each attribute individually:
-std::printf("[TRIANGLE DEBUG] ATTRIB_POS bit (1<<%d): 0x%X - %s\n", 
-            love::gfx::ATTRIB_POS, (1u << love::gfx::ATTRIB_POS),
-            (attributes.enableBits & (1u << love::gfx::ATTRIB_POS)) ? "ENABLED" : "DISABLED");
+// // Check each attribute individually:
+// std::printf("[TRIANGLE DEBUG] ATTRIB_POS bit (1<<%d): 0x%X - %s\n", 
+//             love::gfx::ATTRIB_POS, (1u << love::gfx::ATTRIB_POS),
+//             (attributes.enableBits & (1u << love::gfx::ATTRIB_POS)) ? "ENABLED" : "DISABLED");
             
-std::printf("[TRIANGLE DEBUG] ATTRIB_TEXCOORD bit (1<<%d): 0x%X - %s\n", 
-            love::gfx::ATTRIB_TEXCOORD, (1u << love::gfx::ATTRIB_TEXCOORD),
-            (attributes.enableBits & (1u << love::gfx::ATTRIB_TEXCOORD)) ? "ENABLED" : "DISABLED");
+// std::printf("[TRIANGLE DEBUG] ATTRIB_TEXCOORD bit (1<<%d): 0x%X - %s\n", 
+//             love::gfx::ATTRIB_TEXCOORD, (1u << love::gfx::ATTRIB_TEXCOORD),
+//             (attributes.enableBits & (1u << love::gfx::ATTRIB_TEXCOORD)) ? "ENABLED" : "DISABLED");
             
-std::printf("[TRIANGLE DEBUG] ATTRIB_COLOR bit (1<<%d): 0x%X - %s\n", 
-            love::gfx::ATTRIB_COLOR, (1u << love::gfx::ATTRIB_COLOR),
-            (attributes.enableBits & (1u << love::gfx::ATTRIB_COLOR)) ? "ENABLED" : "DISABLED");
+// std::printf("[TRIANGLE DEBUG] ATTRIB_COLOR bit (1<<%d): 0x%X - %s\n", 
+//             love::gfx::ATTRIB_COLOR, (1u << love::gfx::ATTRIB_COLOR),
+//             (attributes.enableBits & (1u << love::gfx::ATTRIB_COLOR)) ? "ENABLED" : "DISABLED");
 
-std::printf("[TRIANGLE TEST] Vertex attributes set - enableBits: 0x%X\n", attributes.enableBits);
-std::printf("[TRIANGLE TEST] Buffer layout - stride: %zu bytes\n", sizeof(TextureVertex));
+// std::printf("[TRIANGLE TEST] Vertex attributes set - enableBits: 0x%X\n", attributes.enableBits);
+// std::printf("[TRIANGLE TEST] Buffer layout - stride: %zu bytes\n", sizeof(TextureVertex));
 
-// Debug the buffer binding calculation
-std::printf("[TRIANGLE DEBUG] Buffer binding calculation:\n");
-std::printf("[TRIANGLE DEBUG] VERTEX_BUFFER_BINDING_START = %d\n", 1); // We know this is 1
-std::printf("[TRIANGLE DEBUG] Buffer index for ATTRIB_POS: %d\n", 1);
-std::printf("[TRIANGLE DEBUG] Calculated binding for ATTRIB_POS: %d\n", 1 + 1);
+// // Debug the buffer binding calculation
+// std::printf("[TRIANGLE DEBUG] Buffer binding calculation:\n");
+// std::printf("[TRIANGLE DEBUG] VERTEX_BUFFER_BINDING_START = %d\n", 1); // We know this is 1
+// std::printf("[TRIANGLE DEBUG] Buffer index for ATTRIB_POS: %d\n", 1);
+// std::printf("[TRIANGLE DEBUG] Calculated binding for ATTRIB_POS: %d\n", 1 + 1);
 
-// Debug the buffer layout
-std::printf("[TRIANGLE DEBUG] Buffer layout for index 1:\n");
-std::printf("[TRIANGLE DEBUG] Stride: %d bytes\n", attributes.bufferLayouts[1].stride);
+// // Debug the buffer layout
+// std::printf("[TRIANGLE DEBUG] Buffer layout for index 1:\n");
+// std::printf("[TRIANGLE DEBUG] Stride: %d bytes\n", attributes.bufferLayouts[1].stride);
 
-// Debug what's actually in the BufferBindings
-std::printf("[TRIANGLE DEBUG] BufferBindings debug:\n");
-std::printf("[TRIANGLE DEBUG] useBits: 0x%X\n", buffers.useBits);
-for (int i = 0; i < 8; i++) {
-    if (buffers.useBits & (1u << i)) {
-        std::printf("[TRIANGLE DEBUG] Buffer %d: resource=%p, offset=%zu\n", 
-                    i, buffers.info[i].buffer, buffers.info[i].offset);
-    }
-}
+// // Debug what's actually in the BufferBindings
+// std::printf("[TRIANGLE DEBUG] BufferBindings debug:\n");
+// std::printf("[TRIANGLE DEBUG] useBits: 0x%X\n", buffers.useBits);
+// for (int i = 0; i < 8; i++) {
+//     if (buffers.useBits & (1u << i)) {
+//         std::printf("[TRIANGLE DEBUG] Buffer %d: resource=%p, offset=%zu\n", 
+//                     i, buffers.info[i].buffer, buffers.info[i].offset);
+//     }
+// }
 
-// Use identity transform for simple 2D rendering
-love::Matrix4 transform;  // Identity matrix
+// // Use identity transform for simple 2D rendering
+// love::Matrix4 transform;  // Identity matrix
 
-// Temporarily disable depth testing
-cg.instance->setDepthMode(gfx::CompareMode::COMPARE_ALWAYS, false);
-std::printf("[CHAILOVE DEBUG] Disabled depth testing for triangle test\n");
+// // Temporarily disable depth testing
+// cg.instance->setDepthMode(gfx::CompareMode::COMPARE_ALWAYS, false);
+// std::printf("[CHAILOVE DEBUG] Disabled depth testing for triangle test\n");
 
-love::gfx::Graphics::TempTransform tempTransform(cg.instance, transform);
+// love::gfx::Graphics::TempTransform tempTransform(cg.instance, transform);
 
-// Get or create a default white texture for MainTex
-love::gfx::Texture* whiteTexture = cg.instance->getTextureOrDefaultForActiveShader(nullptr);
+// // Get or create a default white texture for MainTex
+// love::gfx::Texture* whiteTexture = cg.instance->getTextureOrDefaultForActiveShader(nullptr);
 
-love::gfx::Graphics::DrawCommand cmd(&attributes, &buffers);
-cmd.primitiveType = love::gfx::PRIMITIVE_TRIANGLES;
-cmd.vertexCount = 3;
-cmd.instanceCount = 1;
-cmd.texture = whiteTexture;  // This provides the MainTex uniform
+// love::gfx::Graphics::DrawCommand cmd(&attributes, &buffers);
+// cmd.primitiveType = love::gfx::PRIMITIVE_TRIANGLES;
+// cmd.vertexCount = 3;
+// cmd.instanceCount = 1;
+// cmd.texture = whiteTexture;  // This provides the MainTex uniform
 
-std::printf("[TRIANGLE TEST] Draw command setup complete - issuing draw...\n");
+// std::printf("[TRIANGLE TEST] Draw command setup complete - issuing draw...\n");
 
-cg.instance->draw(cmd);
+// cg.instance->draw(cmd);
 
-// Re-enable depth testing
-cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+// // Re-enable depth testing
+// cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
 
-std::printf("[CHAILOVE DEBUG] Fullscreen triangle test completed\n");
-std::printf("[CHAILOVE DEBUG] Simple white triangle draw command issued with default shader\n");
+// std::printf("[CHAILOVE DEBUG] Fullscreen triangle test completed\n");
+// std::printf("[CHAILOVE DEBUG] Simple white triangle draw command issued with default shader\n");
         
     
     

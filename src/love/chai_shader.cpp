@@ -79,6 +79,9 @@ void chai_shader::sendMap(const std::string &uniform, const std::map<int, glm::m
 
 
         int startidx = 0;
+        // if (uniform == "jointMatrix") {
+        //     startidx = modelCount;
+        // }
         std::vector<float> prepD;
         for (auto j : order) {   
             auto m = data.find(j)->second;
@@ -94,6 +97,10 @@ void chai_shader::sendMap(const std::string &uniform, const std::map<int, glm::m
                 startidx+=4;
             }          
         }
+        // if (uniform == "jointMatrix") {
+        //     this->send("jointOffset", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(modelJointOffset) }));
+        //     modelJointOffset += order.size();
+        // }
         std::memcpy(info->floats, prepD.data(), prepD.size()*sizeof(float));
 
         shader->updateUniform(info, startidx/(info->matrix.columns*info->matrix.rows));
@@ -115,6 +122,14 @@ void chai_shader::send(const std::string &uniform, const std::vector<chaiscript:
 
         if (info->baseType == gfx::Shader::UNIFORM_INT) {
             int startidx = 0;
+            // if (uniform == "jointCount") {
+            //     startidx = modelCount;
+            //     this->send("id", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(modelCount) }));
+            //     modelCount++;
+            // } 
+            // if (uniform == "jointOffset") {     
+            //     startidx = modelCount-1;
+            // }
             std::vector<int> prepD;
             for (auto d : data) {
                 auto v = chaiscript::boxed_cast<int>(d);

@@ -241,11 +241,11 @@ bool Buffer::fill(size_t offset, size_t size, const void *data)
     if (!Range(0, getSize()).contains(Range(offset, size)))
         return false;
 
-    printf("[LIBRETRO] Buffer upload START: buffer=%p, offset=%zu, size=%zu\n", this, offset, size);
+    // std::printf("[LIBRETRO] Buffer upload START: buffer=%p, offset=%zu, size=%zu\n", this, offset, size);
     
     // Validate inputs
     if (!allocator || !data) {
-        printf("[LIBRETRO] ERROR: Invalid allocator or data\n");
+        // std::printf("[LIBRETRO] ERROR: Invalid allocator or data\n");
         return false;
     }
 
@@ -265,7 +265,7 @@ bool Buffer::fill(size_t offset, size_t size, const void *data)
 
     VkResult result = vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &fillBuffer, &fillAllocation, &fillAllocInfo);
     if (result != VK_SUCCESS) {
-        printf("[LIBRETRO] ERROR: vmaCreateBuffer failed with result=%d\n", result);
+        // std::printf("[LIBRETRO] ERROR: vmaCreateBuffer failed with result=%d\n", result);
         return false;
     }
 
@@ -274,24 +274,24 @@ bool Buffer::fill(size_t offset, size_t size, const void *data)
     
 	// Add this to Buffer.cpp fill() method right before the memcpy line
 
-	printf("[LIBRETRO] Buffer fill debug: offset=%zu, size=%zu, data ptr=%p\n", offset, size, data);
-	if (data && size > 0) {
-		printf("[LIBRETRO] First 32 bytes of data: ");
-		const uint8_t* bytes = static_cast<const uint8_t*>(data);
-		size_t debug_size = (size < 32) ? size : 32;
-		for (size_t i = 0; i < debug_size; i++) {
-			printf("%02x ", bytes[i]);
-		}
-		printf("\n");
-	}
+	// std::printf("[LIBRETRO] Buffer fill debug: offset=%zu, size=%zu, data ptr=%p\n", offset, size, data);
+	// if (data && size > 0) {
+	// 	// std::printf("[LIBRETRO] First 32 bytes of data: ");
+	// 	const uint8_t* bytes = static_cast<const uint8_t*>(data);
+	// 	size_t debug_size = (size < 32) ? size : 32;
+	// 	for (size_t i = 0; i < debug_size; i++) {
+	// 		// std::printf("%02x ", bytes[i]);
+	// 	}
+	// 	// std::printf("\n");
+	// }
 
 	// Also add debug after memcpy to verify staging buffer contents
-	printf("[LIBRETRO] After memcpy to staging buffer: ");
-	const uint8_t* staged = static_cast<const uint8_t*>(fillAllocInfo.pMappedData);
-	for (size_t i = 0; i < (size < 32 ? size : 32); i++) {
-		printf("%02x ", staged[i]);
-	}
-	printf("\n");
+	// std::printf("[LIBRETRO] After memcpy to staging buffer: ");
+	// const uint8_t* staged = static_cast<const uint8_t*>(fillAllocInfo.pMappedData);
+	// for (size_t i = 0; i < (size < 32 ? size : 32); i++) {
+	// 	// std::printf("%02x ", staged[i]);
+	// }
+	// std::printf("\n");
 
     VkMemoryPropertyFlags memoryProperties;
     vmaGetAllocationMemoryProperties(allocator, fillAllocation, &memoryProperties);
@@ -310,7 +310,7 @@ bool Buffer::fill(size_t offset, size_t size, const void *data)
     allocInfoCmd.commandBufferCount = 1;
 
     if (vkAllocateCommandBuffers(vgfx->getDevice(), &allocInfoCmd, &transferCmd) != VK_SUCCESS) {
-        printf("[LIBRETRO] ERROR: Failed to allocate transfer command buffer\n");
+        // std::printf("[LIBRETRO] ERROR: Failed to allocate transfer command buffer\n");
         vmaDestroyBuffer(allocator, fillBuffer, fillAllocation);
         return false;
     }
@@ -321,7 +321,7 @@ bool Buffer::fill(size_t offset, size_t size, const void *data)
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
     if (vkBeginCommandBuffer(transferCmd, &beginInfo) != VK_SUCCESS) {
-        printf("[LIBRETRO] ERROR: Failed to begin transfer command buffer\n");
+        // std::printf("[LIBRETRO] ERROR: Failed to begin transfer command buffer\n");
         vkFreeCommandBuffers(vgfx->getDevice(), commandPool, 1, &transferCmd);
         vmaDestroyBuffer(allocator, fillBuffer, fillAllocation);
         return false;
@@ -345,7 +345,7 @@ bool Buffer::fill(size_t offset, size_t size, const void *data)
 
     // End command buffer
     if (vkEndCommandBuffer(transferCmd) != VK_SUCCESS) {
-        printf("[LIBRETRO] ERROR: Failed to end transfer command buffer\n");
+        // std::printf("[LIBRETRO] ERROR: Failed to end transfer command buffer\n");
         vkFreeCommandBuffers(vgfx->getDevice(), commandPool, 1, &transferCmd);
         vmaDestroyBuffer(allocator, fillBuffer, fillAllocation);
         return false;
@@ -361,7 +361,7 @@ bool Buffer::fill(size_t offset, size_t size, const void *data)
     VkQueue queue = vgfx->getQueue(); // We'll need to add this method
     
     if (vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
-        printf("[LIBRETRO] ERROR: Failed to submit transfer commands\n");
+        // std::printf("[LIBRETRO] ERROR: Failed to submit transfer commands\n");
         vkFreeCommandBuffers(vgfx->getDevice(), commandPool, 1, &transferCmd);
         vmaDestroyBuffer(allocator, fillBuffer, fillAllocation);
         return false;
@@ -370,13 +370,13 @@ bool Buffer::fill(size_t offset, size_t size, const void *data)
     // Wait for completion
     vkQueueWaitIdle(queue);
     
-    printf("[LIBRETRO] Transfer completed and synchronized\n");
+    // std::printf("[LIBRETRO] Transfer completed and synchronized\n");
 
     // Cleanup
     vkFreeCommandBuffers(vgfx->getDevice(), commandPool, 1, &transferCmd);
     vmaDestroyBuffer(allocator, fillBuffer, fillAllocation);
 
-    printf("[LIBRETRO] Buffer upload completed successfully\n");
+    // std::printf("[LIBRETRO] Buffer upload completed successfully\n");
     return true;
 }
 

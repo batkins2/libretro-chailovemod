@@ -511,7 +511,7 @@ static Shader::Language getTargetLanguage(const std::string &src)
 {
 	std::regex r("^\\s*#pragma language (\\w+)");
 	std::smatch m;
-	std::string langstr = std::regex_search(src, m, r) && m.size() > 1 ? m[1] : std::string("glsl3");
+	std::string langstr = std::regex_search(src, m, r) && m.size() > 1 ? m[1] : std::string("glsl4");
 	Shader::Language lang = Shader::LANGUAGE_MAX_ENUM;
 	Shader::getConstant(langstr.c_str(), lang);
 	return lang;
@@ -731,6 +731,15 @@ Shader::~Shader()
 		if (buffer)
 			buffer->release();
 	}
+}
+
+void Shader::updateBuffer(std::string name, const void *data, size_t size)
+{
+	const UniformInfo *info = getUniformInfo(name);
+	if (info == nullptr)
+		return;
+
+	updateBufferInternal(name, data, size);
 }
 
 bool Shader::hasStage(ShaderStageType stage)

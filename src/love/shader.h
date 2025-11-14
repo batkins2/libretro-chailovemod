@@ -199,6 +199,8 @@ public:
 	Shader(StrongRef<ShaderStage> stages[], const CompileOptions &options);
 	virtual ~Shader();
 
+	void updateBuffer(std::string name, const void *data, size_t size);
+
 	/**
 	 * Check whether a Shader has a stage.
 	 **/
@@ -345,6 +347,9 @@ protected:
 	std::string debugName;
 
 	std::string unsetVertexInputLocationsString;
+
+private:
+	virtual void updateBufferInternal(std::string name, const void *data, size_t size) = 0;
 
 }; // Shader
 
