@@ -350,6 +350,29 @@ const Shader::UniformInfo *Shader::getUniformInfo(BuiltinUniform builtin) const
 	return builtinUniformInfo[builtin];
 }
 
+void Shader::setPushConstant(const UniformInfo *info, const void *data, int count)
+{
+    if (!info)
+        return;
+
+    // Determine stage flags for this push constant
+    VkShaderStageFlags stageFlags = getStageFlags((ShaderStageMask)info->stageMask);
+
+    // Calculate size: if count is given, use count * info->dataSize, else use info->dataSize
+    uint32_t size = info->dataSize;
+    if (count > 0)
+        size = count * info->dataSize;
+
+    // Offset: if you support multiple push constant ranges, use info->offset, else 0
+    uint32_t offset = 0; // Assuming single range for simplicity
+
+    // Vulkan requires size to be a multiple of 4 and <= 128 bytes (or device limit)
+    // if (size == 0 || (size % 4) != 0)
+    //     return;
+
+    vgfx->setPushConstants(pipelineLayout, stageFlags, offset, count, data);
+}
+
 void Shader::updateUniform(const UniformInfo *info, int count)
 {
 	if (current == this)
@@ -827,6 +850,29 @@ void Shader::compileShaders()
 
         if (shaderStage == SHADERSTAGE_VERTEX)
         {
+            auto pushConstants = comp.get_shader_resources().push_constant_buffers;
+            for (const auto& pc : pushConstants) {
+                const auto& type = comp.get_type(pc.base_type_id);
+                size_t size = comp.get_declared_struct_size(type);
+                uint32_t offset = 0; // Usually 0
+
+                // Accumulate stage flags if the same block is used in multiple stages
+                bool found = false;
+                for (auto& range : pushConstantRanges) {
+                    if (range.offset == offset && range.size == size) {
+                        range.stageFlags |= getStageBit(shaderStage);
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    VkPushConstantRange range = {};
+                    range.stageFlags = getStageBit(shaderStage);
+                    range.offset = offset;
+                    range.size = (uint32_t)size;
+                    pushConstantRanges.push_back(range);
+                }
+            }
             std::map<std::string, int> vertexInputs;
             
             for (const auto& attr : attributes)
@@ -1112,7 +1158,7 @@ void Shader::compileShaders()
     resourceDescriptorsDirty = true;
 }
 
-void Shader::updateBufferInternal(std::string name, const void* data, size_t size)
+void Shader::updateBufferInternal(std::string name, const void* data, size_t size, size_t offset)
 {
     auto ssboIt = reflection.storageBuffers.find(name);
     if (ssboIt != reflection.storageBuffers.end())
@@ -1124,9 +1170,21 @@ void Shader::updateBufferInternal(std::string name, const void* data, size_t siz
         if (!buffer)
             throw love::Exception("No buffer bound for storage buffer %s.", name.c_str());
         size_t bufferSize = buffer->getSize();
+        std::printf("[DEBUG] Updating storage buffer %s (data size: %zu, buffer size: %zu)\n", name.c_str(), size, bufferSize);
         if (size > bufferSize)
             throw love::Exception("Data size exceeds storage buffer %s size.", name.c_str());
-        buffer->fill(0, size, data);
+        
+        // std::printf("[DEBUG] Buffer handle: %p, size: %zu\n", (void*)buffer->getHandle(), buffer->getSize());
+        // std::printf("[DEBUG] Filling buffer at offset %zu, size %zu\n", 0, size);
+        // const uint8_t* bytes = static_cast<const uint8_t*>(data);
+        // for (size_t i = 0; i < std::min(size_t(32), size); ++i)
+        //     std::printf("%02x ", bytes[i]);
+        // std::printf("\n");
+        buffer->fill(offset, size, data);
+
+        // Force descriptor update
+        // resourceDescriptorsDirty = true;
+        // setBufferDescriptor(&info, buffer, 0);
         return;
     }
 }
@@ -1182,7 +1240,8 @@ void Shader::createPipelineLayout()
 	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipelineLayoutInfo.setLayoutCount = 1;
 	pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
-	pipelineLayoutInfo.pushConstantRangeCount = 0;
+	pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size());
+	pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.data();
 
 	if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
 		throw love::Exception("failed to create pipeline layout");

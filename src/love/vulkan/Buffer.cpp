@@ -424,6 +424,17 @@ bool Buffer::fillImmediate(size_t offset, size_t size, const void *data)
 
     postGPUWriteBarrier(cmd);
 
+	// vkEndCommandBuffer(cmd);
+
+	// VkSubmitInfo submitInfo{};
+	// submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	// submitInfo.commandBufferCount = 1;
+	// submitInfo.pCommandBuffers = &cmd;
+
+	// VkQueue queue = vgfx->getQueue(); // Make sure this returns a valid queue
+	// vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+	// vkQueueWaitIdle(queue);
+
     vgfx->queueCleanUp([allocator = allocator, fillBuffer = fillBuffer, fillAllocation = fillAllocation]() {
         vmaDestroyBuffer(allocator, fillBuffer, fillAllocation);
     });

@@ -733,15 +733,15 @@ bool Window::setWindow(int width, int height, WindowSettings *settings)
                 context = nullptr;  // External Vulkan context already set up
                 
                 // Check if Graphics is already initialized with Vulkan (libretro mode)
-                auto currentRenderer = graphics->getRenderer();
-                if (currentRenderer == gfx::RENDERER_VULKAN) {
-                    std::cerr << "DEBUG: Graphics already initialized with Vulkan, skipping setMode" << std::endl;
-                    // Just update the backbuffer instead
-                    graphics->backbufferChanged((int) scaledw, (int) scaledh, pixelWidth, pixelHeight, f.stencil, f.depth, f.msaa);
-                } else {
+                // auto currentRenderer = graphics->getRenderer();
+                // if (currentRenderer == gfx::RENDERER_VULKAN) {
+                //     std::cerr << "DEBUG: Graphics already initialized with Vulkan, skipping setMode" << std::endl;
+                //     // Just update the backbuffer instead
+                //     graphics->backbufferChanged((int) scaledw, (int) scaledh, pixelWidth, pixelHeight, f.stencil, f.depth, f.msaa);
+                // } else {
                     // Normal Vulkan initialization
                     graphics->setMode(context, (int) scaledw, (int) scaledh, pixelWidth, pixelHeight, f.stencil, f.depth, f.msaa);
-                }
+                // }
             } else {
                 graphics->setMode(context, (int) scaledw, (int) scaledh, pixelWidth, pixelHeight, f.stencil, f.depth, f.msaa);
             }

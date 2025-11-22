@@ -231,7 +231,10 @@ Buffer::Buffer(Graphics *gfx, const Settings &settings, const std::vector<DataDe
 
 	this->arrayStride = stride;
 	this->arrayLength = arraylength;
+	if (storagebuffer)
+		size = size * 4;
 	this->size = size;
+	
 
 	// if (texelbuffer && arraylength * dataMembers.size() > caps.limits[Graphics::LIMIT_TEXEL_BUFFER_SIZE])
 	// 	throw love::Exception("Cannot create texel buffer: total number of values in the buffer (%d * %d) is too large for this system (maximum %d).",

@@ -1398,8 +1398,8 @@ void TParseVersions::vulkanRemoved(const TSourceLoc& loc, const char* op)
 // Call for any operation that requires Vulkan.
 void TParseVersions::requireVulkan(const TSourceLoc& loc, const char* op)
 {
-    if (spvVersion.vulkan == 0)
-        error(loc, "only allowed when using GLSL for Vulkan", op, "");
+    // if (spvVersion.vulkan == 0)
+        // error(loc, "only allowed when using GLSL for Vulkan", op, "");
 }
 
 // Call for any operation that requires SPIR-V.

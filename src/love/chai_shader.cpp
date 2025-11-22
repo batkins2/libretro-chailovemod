@@ -64,24 +64,24 @@ void chai_shader::sendInt(const std::string &uniform, int data) {
     }
 }
 
-void chai_shader::sendMap(const std::string &uniform, const std::map<int, glm::mat4> &data, const std::vector<int> &order) {
+size_t chai_shader::sendMap(const std::string &uniform, const std::map<int, glm::mat4> &data, const std::vector<int> &order) {
     if (instance->isCreated()) {
         const love::gfx::Shader::UniformInfo* info = nullptr;
         try {
             info = shader->getUniformInfo(uniform);
         } catch (std::exception &e) {
             printf("Error: %s\n", e.what());
-            return;
+            return 0;
         }
         if (info == nullptr || info->baseType == gfx::Shader::UNIFORM_SAMPLER || info->baseType == gfx::Shader::UNIFORM_STORAGETEXTURE
             || info->baseType == gfx::Shader::UNIFORM_TEXELBUFFER || info->baseType == gfx::Shader::UNIFORM_STORAGEBUFFER)
-            return;
-
+            return 0;
 
         int startidx = 0;
-        // if (uniform == "jointMatrix") {
-        //     startidx = modelCount;
-        // }
+        if (uniform == "jointMatrix") {
+            // this->sendConstant("jointOffset", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(modelJointOffset) }));
+            startidx = modelJointOffset;
+        }
         std::vector<float> prepD;
         for (auto j : order) {   
             auto m = data.find(j)->second;
@@ -97,29 +97,85 @@ void chai_shader::sendMap(const std::string &uniform, const std::map<int, glm::m
                 startidx+=4;
             }          
         }
-        // if (uniform == "jointMatrix") {
-        //     this->send("jointOffset", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(modelJointOffset) }));
-        //     modelJointOffset += order.size();
-        // }
-        std::memcpy(info->floats, prepD.data(), prepD.size()*sizeof(float));
+        auto returnOffset = modelJointOffset;
+        if (uniform == "jointMatrix") {
+            modelJointOffset += order.size();
+        }
+        std::memcpy(info->floats + returnOffset * info->matrix.columns * info->matrix.rows, prepD.data(), prepD.size()*sizeof(float));
+        shader->updateUniform(info, startidx/(info->matrix.columns*info->matrix.rows) + (uniform == "jointMatrix" ? returnOffset : 0));
+        return returnOffset;
+        // shader->setPushConstant(info, prepD.data(), startidx/(info->matrix.columns*info->matrix.rows));
+    }
+    return 0;
+}
 
-        shader->updateUniform(info, startidx/(info->matrix.columns*info->matrix.rows));
+void chai_shader::sendConstant(const std::string &uniform, const std::vector<chaiscript::Boxed_Value> &data) {
+    if (!instance || !instance->isCreated())
+        return;
+
+    const love::gfx::Shader::UniformInfo* info = nullptr;
+    try {
+        info = shader->getUniformInfo(uniform);
+    } catch (std::exception &e) {
+        printf("Error: %s\n", e.what());
+        return;
+    }
+    if (!info || info->baseType == gfx::Shader::UNIFORM_SAMPLER ||
+        info->baseType == gfx::Shader::UNIFORM_STORAGETEXTURE ||
+        info->baseType == gfx::Shader::UNIFORM_TEXELBUFFER ||
+        info->baseType == gfx::Shader::UNIFORM_STORAGEBUFFER)
+        return;
+
+    int startidx = 0;
+    if (info->baseType == gfx::Shader::UNIFORM_INT) {
+        std::vector<int> prepD;
+        for (const auto& d : data) {
+            prepD.push_back(chaiscript::boxed_cast<int>(d));
+            startidx++;
+        }
+        shader->setPushConstant(info, prepD.data(), prepD.size() * sizeof(int));
+    } else if (info->baseType == gfx::Shader::UNIFORM_FLOAT) {
+        std::vector<float> prepD;
+        for (const auto& d : data) {
+            prepD.push_back(chaiscript::boxed_cast<float>(d));
+            startidx++;
+        }
+        shader->setPushConstant(info, prepD.data(), prepD.size() * sizeof(float));
+    } else if (info->baseType == gfx::Shader::UNIFORM_MATRIX && uniform == "jointMatrix") {
+        std::vector<float> prepD;
+        for (const auto& d : data) {
+            for (const auto& v : chaiscript::boxed_cast<std::vector<chaiscript::Boxed_Value>>(d)) {
+                auto m = chaiscript::boxed_cast<std::vector<chaiscript::Boxed_Value>>(v);
+                for (const auto& f : m) {
+                    prepD.push_back(chaiscript::boxed_cast<float>(f));
+                    startidx++;
+                }
+            }
+        }
+        shader->setPushConstant(info, prepD.data(), prepD.size() * sizeof(float));
+    } else if (info->baseType == gfx::Shader::UNIFORM_MATRIX) {
+        std::vector<float> prepD;
+        for (const auto& d : data) {
+            prepD.push_back(chaiscript::boxed_cast<float>(d));
+            startidx++;
+        }
+        int count = startidx / (info->matrix.columns * info->matrix.rows);
+        shader->setPushConstant(info, prepD.data(), prepD.size() * sizeof(float));
     }
 }
 
-void chai_shader::send(const std::string &uniform, const std::vector<chaiscript::Boxed_Value> &data) {
+int chai_shader::send(const std::string &uniform, const std::vector<chaiscript::Boxed_Value> &data) {
     if (instance->isCreated()) {
         const love::gfx::Shader::UniformInfo* info = nullptr;
         try {
             info = shader->getUniformInfo(uniform);
         } catch (std::exception &e) {
             printf("Error: %s\n", e.what());
-            return;
+            return -1;
         }
         if (info == nullptr || info->baseType == gfx::Shader::UNIFORM_SAMPLER || info->baseType == gfx::Shader::UNIFORM_STORAGETEXTURE
             || info->baseType == gfx::Shader::UNIFORM_TEXELBUFFER || info->baseType == gfx::Shader::UNIFORM_STORAGEBUFFER)
-            return;
-
+            return -1;
         if (info->baseType == gfx::Shader::UNIFORM_INT) {
             int startidx = 0;
             // if (uniform == "jointCount") {
@@ -170,17 +226,24 @@ void chai_shader::send(const std::string &uniform, const std::vector<chaiscript:
                 prepD.push_back(v);
                 startidx++;
             }
-            std::memcpy(info->floats, prepD.data(), prepD.size()*sizeof(float));
-
+            if (uniform == "modelMatrix") {
+                std::memcpy(info->floats + modelCount * (info->matrix.columns * info->matrix.rows), prepD.data(), prepD.size()*sizeof(float));
+            } else {
+                std::memcpy(info->floats, prepD.data(), prepD.size()*sizeof(float));
+            }
             if (info->matrix.rows != 0) {
-                shader->updateUniform(info, startidx/(info->matrix.columns*info->matrix.rows));
+                shader->updateUniform(info, startidx/(info->matrix.columns*info->matrix.rows) * (uniform == "modelMatrix" ? modelCount + 1 : 1));
             } else {
                 shader->updateUniform(info, startidx / info->matrix.columns);
             }
-
-        }
-        
+            auto returnIdx = modelCount;
+            if (uniform == "modelMatrix") {
+                modelCount++;
+            }
+            return returnIdx;
+        }        
     }
+    return -1;
 }
 
 chai_shader *chai_shader::newShader() const {

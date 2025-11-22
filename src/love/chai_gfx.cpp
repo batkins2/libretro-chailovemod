@@ -41,13 +41,15 @@ bool chai_gfx::init() {
     if (!init) {
         instance = new gfx::vulkan::Graphics();
     }
+    auto vkGfx = dynamic_cast<gfx::vulkan::Graphics *>(instance);
     if (vulkan != nullptr) {
-        auto vkGfx = dynamic_cast<gfx::vulkan::Graphics*>(instance);
+        
         if (vkGfx) {
             // Set up the external Vulkan context from RetroArch
             // retro_hw_render_interface_vulkan does not provide a command_pool; pass VK_NULL_HANDLE instead
             vkGfx->setLibretroVulkanContext(vulkan->instance, vulkan->device, vulkan->gpu, 
                                            vulkan->queue, VK_NULL_HANDLE);
+            
         }
     }
     
@@ -55,7 +57,7 @@ bool chai_gfx::init() {
     instance->hw_render = hw_render;
     instance->FRAMEBUFFER = FRAMEBUFFER;
     instance->COLORATTACH = COLORATTACH;
-    instance->setMeshCullMode(gfx::CULL_BACK);
+    
     // printf("ColorAttach: %d\n", COLORATTACH);
     // instance->setProjection(Matrix4::perspective(120000.0f, 800.0f/600.0f, 0.1f, 100.0f));
     
@@ -94,7 +96,7 @@ bool chai_gfx::init() {
         win->setGraphics(instance);
         win->setVSync(0);
         win->setWindow(width, height, winset);
-        instance->setMode(nullptr, width, height, width, height, true, 16, 0);
+        // instance->setMode(nullptr, width, height, width, height, true, true, 0);
         
         instance->setActive(true);
         // instance->present(nullptr);
@@ -147,7 +149,9 @@ bool chai_gfx::init() {
     // wrap_newShader(&vertFile, &pixFile, shader);
     // scene->setShader(shader);
     // scene->loadingScreen();
-
+    instance->setDepthMode(gfx::COMPARE_ALWAYS, true);
+    vkGfx->setDepthMode(gfx::COMPARE_ALWAYS, true);
+    vkGfx->setMeshCullMode(gfx::CULL_BACK);
     // print("LOADING...", 0, 0, 255, 255, 255, 255);
     return true;
 }

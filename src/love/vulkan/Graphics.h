@@ -324,6 +324,8 @@ public:
 		return descriptorSet;
 	}
 
+	void setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void *data);
+
 protected:
 	gfx::ShaderStage *newShaderStageInternal(ShaderStageType stage, const std::string &cachekey, const std::string &source, bool gles) override;
 	gfx::Shader *newShaderInternal(StrongRef<love::gfx::ShaderStage> stages[SHADERSTAGE_MAX_ENUM], const Shader::CompileOptions &options) override;

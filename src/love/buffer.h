@@ -138,6 +138,8 @@ public:
 	 */
 	virtual bool fill(size_t offset, size_t size, const void *data) = 0;
 
+	virtual bool fillImmediate(size_t offset, size_t size, const void *data) = 0;
+
 	/**
 	 * Reset the given portion of this buffer's data to 0.
 	 */

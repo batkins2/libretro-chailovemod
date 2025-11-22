@@ -58,6 +58,8 @@ struct GraphicsPipelineConfigurationCore
 	uint32_t numColorAttachments;
 	PrimitiveType primitiveType;
 	uint64 packedColorAttachmentFormats;
+	VkBool32 depthWriteEnable;
+	VkCompareOp depthCompareOp;
 
 	GraphicsPipelineConfigurationCore()
 	{
@@ -80,7 +82,7 @@ struct GraphicsPipelineConfigurationCoreHasher
 
 struct GraphicsPipelineConfigurationNoDynamicState
 {
-	CullMode cullmode = CULL_NONE;
+	CullMode cullmode = CULL_BACK;
 	Winding winding = WINDING_MAX_ENUM;
 	StencilAction stencilAction = STENCIL_MAX_ENUM;
 	CompareMode stencilCompare = COMPARE_MAX_ENUM;
@@ -158,7 +160,9 @@ public:
 	Shader(StrongRef<love::gfx::ShaderStage> stages[], const CompileOptions &options);
 	virtual ~Shader();
 
-	void updateBufferInternal(std::string name, const void *data, size_t size);
+	void setPushConstant(const UniformInfo *info, const void *data, int count);
+
+	void updateBufferInternal(std::string name, const void *data, size_t size, size_t offset) override;
 	
 	bool loadVolatile() override;
 	void unloadVolatile() override;
@@ -228,6 +232,8 @@ private:
 
 	std::vector<TextureInfo> allTextureInfo;
 	std::vector<BufferInfo> storageBufferInfo;
+
+	std::vector<VkPushConstantRange> pushConstantRanges;
 
 	Graphics *vgfx = nullptr;
 	VkDevice device = VK_NULL_HANDLE;

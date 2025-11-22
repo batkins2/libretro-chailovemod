@@ -2140,6 +2140,11 @@ void Graphics::flushBatchedDraws()
 		cmd.indexType = INDEX_UINT16;
 		cmd.indexBufferOffset = sbstate.indexBuffer->unmap(usedsizes[2]);
 		cmd.texture = getTextureOrDefaultForActiveShader(sbstate.texture);
+		// Add debugging info
+		std::printf("Flushing batched draw: primitiveType=%d, indexCount=%d, indexBufferOffset=%zu\n",
+			(int)cmd.primitiveType, cmd.indexCount, cmd.indexBufferOffset);
+		
+		
 		draw(cmd);
 
 		sbstate.indexBufferMap = StreamBuffer::MapInfo();

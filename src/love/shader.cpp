@@ -733,13 +733,24 @@ Shader::~Shader()
 	}
 }
 
-void Shader::updateBuffer(std::string name, const void *data, size_t size)
+size_t Shader::updateBuffer(std::string name, const void *data, size_t size, size_t offset)
 {
 	const UniformInfo *info = getUniformInfo(name);
 	if (info == nullptr)
-		return;
+		return 0;
 
-	updateBufferInternal(name, data, size);
+	auto returnedSize = bufferOffsets[name] + offset;
+
+	updateBufferInternal(name, data, size, bufferOffsets[name] + offset);
+
+	setBufferOffset(name, bufferOffsets[name] + size);
+
+	return returnedSize;
+}
+
+void Shader::setBufferOffset(std::string name, size_t offset)
+{
+	bufferOffsets[name] = offset;
 }
 
 bool Shader::hasStage(ShaderStageType stage)

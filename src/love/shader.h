@@ -199,8 +199,8 @@ public:
 	Shader(StrongRef<ShaderStage> stages[], const CompileOptions &options);
 	virtual ~Shader();
 
-	void updateBuffer(std::string name, const void *data, size_t size);
-
+	size_t updateBuffer(std::string name, const void *data, size_t size, size_t offset);
+	void setBufferOffset(std::string name, size_t offset);
 	/**
 	 * Check whether a Shader has a stage.
 	 **/
@@ -245,6 +245,7 @@ public:
 	const UniformInfo *getUniformInfo(const std::string &name) const;
 	virtual const UniformInfo *getUniformInfo(BuiltinUniform builtin) const = 0;
 
+	virtual void setPushConstant(const UniformInfo *info, const void *data, int count) = 0;
 	virtual void updateUniform(const UniformInfo *info, int count) = 0;
 
 	void sendTextures(const UniformInfo *info, Texture **textures, int count);
@@ -349,8 +350,8 @@ protected:
 	std::string unsetVertexInputLocationsString;
 
 private:
-	virtual void updateBufferInternal(std::string name, const void *data, size_t size) = 0;
-
+	virtual void updateBufferInternal(std::string name, const void *data, size_t size, size_t offset) = 0;
+	std::map<std::string, size_t> bufferOffsets;
 }; // Shader
 
 } // graphics

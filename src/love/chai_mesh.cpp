@@ -1898,70 +1898,7 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                 }
             }
 
-            // if (jointList[i].size() > 0) {
-                // shader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value((int)jointList[i].size()) }));
-                // shader->sendMap("jointMatrix", jointMatrix[i], jointList[i]);
-
-
-            // } else {
-            //     shader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
-            // }
-
-            if (jointMatrix[i].size() > 0) {
-                // Create a large buffer containing ALL joint matrices
-                gfx::Buffer::Settings bufferSettings(gfx::BUFFERUSAGEFLAG_SHADER_STORAGE, gfx::BUFFERDATAUSAGE_STATIC);
-                // Pack all joint matrices into one buffer (column-major)
-                std::vector<float> allJointMatrices;
-                allJointMatrices.reserve(jointMatrix[i].size() * 16); // All joints * 16 floats per matrix
-                
-                // Add ALL joint matrices to the buffer (not just the ones in jointList)
-                for (const auto& jointPair : jointMatrix[i]) {
-                    glm::mat4 mat = jointPair.second;
-                    // Add matrix elements in column-major order
-                    for (int col = 0; col < 4; col++) {
-                        for (int row = 0; row < 4; row++) {
-                            allJointMatrices.push_back(mat[col][row]);
-                        }
-                    }
-                }
-
-                shader->shader->updateBuffer("JointMatrixBuffer", allJointMatrices.data(),
-                                             allJointMatrices.size() * sizeof(float));
-                
-                // Create joint matrix buffer (this will be bound as a storage buffer or texture)
-                // auto jointMatrixBuffer = gfx->newBuffer(bufferSettings, gfx::DATAFORMAT_FLOAT,
-                //                                         allJointMatrices.data(),
-                //                                         allJointMatrices.size() * sizeof(float),
-                //                                         jointMatrix[i].size());
-                // gfx::Shader::UniformInfo ui;
-                // ui.baseType = gfx::Shader::UNIFORM_STORAGEBUFFER;
-                // ui.name = "JointMatrixBuffer";
-                // ui.count = 1;
-                // ui.location = 4;
-
-                // shader->shader->sendBuffers(&ui, &jointMatrixBuffer, 1);
-
-                // auto* vkGfx = dynamic_cast<love::gfx::vulkan::Graphics*>(gfx);
-                
-                // VkDescriptorBufferInfo bufferInfo = {};
-                // bufferInfo.buffer = (VkBuffer)allJointMatrices.data();
-                // bufferInfo.offset = 0;
-                // bufferInfo.range = allJointMatrices.size() * sizeof(float);
-
-                // VkWriteDescriptorSet descriptorWrite = {};
-                // descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                // descriptorWrite.dstSet = vkGfx->allocateDescriptorSet();
-                // descriptorWrite.dstBinding = 1;
-                // descriptorWrite.dstArrayElement = 0;
-                // descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-                // descriptorWrite.descriptorCount = 1;
-                // descriptorWrite.pBufferInfo = &bufferInfo;
-
-                // vkUpdateDescriptorSets(vkGfx->getDevice(), 1, &descriptorWrite, 0, nullptr);
-                // shader->send("jointMatrixBuffer", std::vector<chaiscript::Boxed_Value>({
-                //     chaiscript::Boxed_Value(jointMatrixBuffer)
-                // }));
-            }
+            
 
             auto tempMat = matrices[i] * m;
             // printf("Matrix: %f %f %f %f\n", tempMat.getColumn(0).x, tempMat.getColumn(0).y, tempMat.getColumn(0).z, tempMat.getColumn(0).w);
@@ -1990,12 +1927,91 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                 v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).z));
                 v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).w));
             }
-            shader->send("modelMatrix", v);
+            auto modelIdx = shader->send("modelMatrix", v);
             
             if (specular.size() > j && specular[j]) {               
                 shader->send("isSpecular", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1) }));
             } else {
                 shader->send("isSpecular", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+            }
+
+            if (jointList[i].size() > 0) {
+                // shader->sendConstant("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value((int)jointList[i].size()) }));
+                // shader->sendMap("jointMatrix", jointMatrix[i], jointList[i]);
+
+
+            } else {
+                shader->sendConstant("jointInfo", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0.0f), chaiscript::Boxed_Value(0.0f), chaiscript::Boxed_Value((float)modelIdx), chaiscript::Boxed_Value(0.0f) }));
+            }
+
+            if (jointMatrix[i].size() > 0) {
+            //     // Create a large buffer containing ALL joint matrices
+            //     gfx::Buffer::Settings bufferSettings(gfx::BUFFERUSAGEFLAG_SHADER_STORAGE, gfx::BUFFERDATAUSAGE_STATIC);
+            //     // Pack all joint matrices into one buffer (column-major)
+                std::vector<float> allJointMatrices;
+                allJointMatrices.reserve(jointMatrix[i].size() * 16); // All joints * 16 floats per matrix
+                
+                // Add ALL joint matrices to the buffer (not just the ones in jointList)
+                for (const auto& jointPair : jointMatrix[i]) {
+                    glm::mat4 mat = jointPair.second;
+                    // Add matrix elements in column-major order
+                    for (int col = 0; col < 4; col++) {
+                        for (int row = 0; row < 4; row++) {
+                            allJointMatrices.push_back(mat[col][row]);
+                        }
+                    }
+                }
+
+            //     int v = jointList[i].size();
+            //     int* data = &v;
+                // auto offset =shader->shader->updateBuffer("JointMatrixBlock", allJointMatrices.data(),
+                //                              allJointMatrices.size() * sizeof(float), 0);
+            //     shader->shader->updateBuffer("JointCountBuffer", data,
+            //                                  1 * sizeof(int));
+                auto offset = shader->sendMap("jointMatrix", jointMatrix[i], jointList[i]);
+                shader->sendConstant("jointInfo", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value((float)jointMatrix[i].size()), chaiscript::Boxed_Value((float)offset), chaiscript::Boxed_Value((float)modelIdx), chaiscript::Boxed_Value(0.0f) }));
+            //     // Create joint matrix buffer (this will be bound as a storage buffer or texture)
+            //     // auto jointMatrixBuffer = gfx->newBuffer(bufferSettings, gfx::DATAFORMAT_FLOAT,
+            //     //                                         allJointMatrices.data(),
+            //     //                                         allJointMatrices.size() * sizeof(float),
+            //     //                                         jointMatrix[i].size());
+            //     // gfx::Shader::UniformInfo ui;
+            //     // ui.baseType = gfx::Shader::UNIFORM_STORAGEBUFFER;
+            //     // ui.name = "JointMatrixBuffer";
+            //     // ui.count = 1;
+            //     // ui.location = 4;
+
+            //     // shader->shader->sendBuffers(&ui, &jointMatrixBuffer, 1);
+
+                
+                
+            //     // VkDescriptorBufferInfo bufferInfo = {};
+            //     // bufferInfo.buffer = (VkBuffer)allJointMatrices.data();
+            //     // bufferInfo.offset = 0;
+            //     // bufferInfo.range = allJointMatrices.size() * sizeof(float);
+
+            //     // VkWriteDescriptorSet descriptorWrite = {};
+            //     // descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            //     // descriptorWrite.dstSet = vkGfx->allocateDescriptorSet();
+            //     // descriptorWrite.dstBinding = 1;
+            //     // descriptorWrite.dstArrayElement = 0;
+            //     // descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            //     // descriptorWrite.descriptorCount = 1;
+            //     // descriptorWrite.pBufferInfo = &bufferInfo;
+
+            //     // vkUpdateDescriptorSets(vkGfx->getDevice(), 1, &descriptorWrite, 0, nullptr);
+            //     // shader->send("jointMatrixBuffer", std::vector<chaiscript::Boxed_Value>({
+            //     //     chaiscript::Boxed_Value(jointMatrixBuffer)
+            //     // }));
+            } else {
+                
+        
+            //     int v = 0;
+            //     int* data = &v;
+            //     // shader->shader->updateBuffer("JointMatrixBuffer", allJointMatrices.data(),
+            //     //                              allJointMatrices.size() * sizeof(float));
+            //     shader->shader->updateBuffer("JointCountBuffer", data,
+            //                                  1 * sizeof(int));
             }
            
             // auto vboIt = cachedVBOs.find(j);
@@ -2006,8 +2022,12 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
             std::printf("Drawing mesh %d\n", this->id);
                 
             if (msh != nullptr) {
+                // auto* vkGfx = dynamic_cast<love::gfx::vulkan::Graphics*>(gfx);
+                // vkGfx->flushBatchedDraws();
                 msh->draw(gfx, m);
+                
             }
+
             i++;            
         }
         currentTime = dt;

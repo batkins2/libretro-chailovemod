@@ -58,6 +58,11 @@ ShaderStage::ShaderStage(Graphics */*gfx*/, ShaderStageType stage, const std::st
 	bool forcedefault = false;
 	bool forwardcompat = true;
 
+	// glslangShader->setEnvInput(glslang::EShSourceGlsl, glslangStage, glslang::EShClientVulkan, 450); // GLSL for Vulkan 1.1
+	// glslangShader->setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_2);      // Vulkan 1.2
+	// glslangShader->setEnvTarget(glslang::EshTargetSpv, glslang::EShTargetSpv_1_4);            // SPIR-V 1.4
+	// glslangShader->setEnvInputVulkanRulesRelaxed();     
+
 	if (!glslangShader->parse(GetResources(), defaultversion, defaultprofile, forcedefault, forwardcompat, EShMsgSuppressWarnings))
 	{
 		const char *stagename = "unknown";

@@ -166,7 +166,7 @@ Graphics::Graphics()
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
     createInfo.pNext = nullptr;
-
+   
     // GetInstanceExtensions works with a null window parameter as long as
     // SDL_Vulkan_LoadLibrary has been called (which we do earlier).
     unsigned int count = 0;
@@ -376,8 +376,8 @@ void Graphics::clear(const std::vector<OptionalColorD> &colors, OptionalInt sten
 			renderPassState.mainWindowClearDepthValue = depth;
 			renderPassState.mainWindowClearStencilValue = stencil;
 		}
-		else
-			startRenderPass();
+		// else
+		// 	startRenderPass();
 	}
 }
 
@@ -436,7 +436,7 @@ void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallback
             // std::printf("[CHAILOVE DEBUG] Set default clear color to bright GREEN\n");
         }
         
-        startRenderPass();
+        // startRenderPass();
         // std::printf("[CHAILOVE DEBUG] startRenderPass() called successfully before submit\n");
     } else {
         // std::printf("[CHAILOVE DEBUG] NOT triggering libretro fix because:\n");
@@ -573,15 +573,15 @@ void Graphics::present(void *screenshotCallbackdata)
         // std::printf("[CHAILOVE DEBUG] LIBRETRO MODE: Forcing startRenderPass() to trigger clearing\n");
         
         // Force windowClearRequested if not already set
-        if (!renderPassState.windowClearRequested) {
-            // std::printf("[CHAILOVE DEBUG] Setting windowClearRequested = true for libretro\n");
-            renderPassState.windowClearRequested = true;
+        // if (!renderPassState.windowClearRequested) {
+        //     // std::printf("[CHAILOVE DEBUG] Setting windowClearRequested = true for libretro\n");
+        //     renderPassState.windowClearRequested = true;
             
-            // Set a default clear color if none is set
-            renderPassState.mainWindowClearColorValue.hasValue = true;
-            renderPassState.mainWindowClearColorValue.value = ColorD(1.0, 0.0, 1.0, 1.0); // Bright magenta for visibility
-            // std::printf("[CHAILOVE DEBUG] Set default clear color to bright magenta\n");
-        }
+        //     // Set a default clear color if none is set
+        //     renderPassState.mainWindowClearColorValue.hasValue = true;
+        //     renderPassState.mainWindowClearColorValue.value = ColorD(1.0, 0.0, 1.0, 1.0); // Bright magenta for visibility
+        //     // std::printf("[CHAILOVE DEBUG] Set default clear color to bright magenta\n");
+        // }
         
         startRenderPass();
         // std::printf("[CHAILOVE DEBUG] startRenderPass() called successfully\n");
@@ -784,6 +784,9 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
                     depthStencilFormat = findDepthFormat();
                     switch (depthStencilFormat)
                     {
+                    case VK_FORMAT_D32_SFLOAT:
+                        depthStencilPixelFormat = PIXELFORMAT_DEPTH32_FLOAT;
+                        break;
                     case VK_FORMAT_D32_SFLOAT_S8_UINT:
                         depthStencilPixelFormat = PIXELFORMAT_DEPTH32_FLOAT_STENCIL8;
                         break;
@@ -1178,7 +1181,7 @@ void Graphics::initCapabilities()
     capabilities.textureTypes[TEXTURE_2D] = true;
     capabilities.textureTypes[TEXTURE_2D_ARRAY] = true;
     capabilities.textureTypes[TEXTURE_VOLUME] = true;
-    capabilities.textureTypes[TEXTURE_CUBE] = true;
+    capabilities.textureTypes[TEXTURE_CUBE] = true; 
 
     // std::printf("[CHAILOVE DEBUG] Set TEXTURE_2D = %d to true, current value = %s\n", 
         //    TEXTURE_2D, capabilities.textureTypes[TEXTURE_2D] ? "true" : "false");
@@ -1353,6 +1356,8 @@ void Graphics::draw(const DrawIndexedCommand &cmd)
         // std::printf("[CHAILOVE ERROR] This will cause RenderDoc crashes and validation errors\n");
         return;
     }
+
+    // return;
 
 	vkCmdBindIndexBuffer(
 		commandBuffers.at(currentFrame),
@@ -1983,19 +1988,19 @@ void Graphics::startRecordingGraphicsCommands()
     setDefaultRenderPass();
 
     // For libretro mode, automatically request a clear with background color
-    if (libretroMode && !renderPassState.windowClearRequested) {
-        renderPassState.windowClearRequested = true;
-        // Use the current background color - convert from Colorf to ColorT<double>
-        renderPassState.mainWindowClearColorValue.hasValue = true;
-        auto bgColor = getBackgroundColor();
-        renderPassState.mainWindowClearColorValue.value = ColorD(bgColor.r, bgColor.g, bgColor.b, bgColor.a);
-        renderPassState.mainWindowClearDepthValue.hasValue = true;
-        renderPassState.mainWindowClearDepthValue.value = 1.0;
-        renderPassState.mainWindowClearStencilValue.hasValue = true;
-        renderPassState.mainWindowClearStencilValue.value = 0;
+    // if (libretroMode && !renderPassState.windowClearRequested) {
+    //     renderPassState.windowClearRequested = true;
+    //     // Use the current background color - convert from Colorf to ColorT<double>
+    //     renderPassState.mainWindowClearColorValue.hasValue = true;
+    //     auto bgColor = getBackgroundColor();
+    //     renderPassState.mainWindowClearColorValue.value = ColorD(bgColor.r, bgColor.g, bgColor.b, bgColor.a);
+    //     renderPassState.mainWindowClearDepthValue.hasValue = true;
+    //     renderPassState.mainWindowClearDepthValue.value = 1.0;
+    //     renderPassState.mainWindowClearStencilValue.hasValue = true;
+    //     renderPassState.mainWindowClearStencilValue.value = 0;
         
-        // std::printf("[CHAILOVE DEBUG] Auto-requesting clear for libretro mode with background color\n");
-    }
+    //     // std::printf("[CHAILOVE DEBUG] Auto-requesting clear for libretro mode with background color\n");
+    // }
 
     if (defaultVertexBuffer)
     {
@@ -2014,6 +2019,21 @@ void Graphics::endRecordingGraphicsCommands()
 		throw love::Exception("failed to record command buffer");
 	
 	commandBufferRecording = false;
+}
+
+void Graphics::setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void *data)
+{
+    std::printf("Pushing %u bytes to push constant at offset %u\n", size, offset);
+    for (uint32_t i = 0; i < size / 4; ++i)
+        std::printf("%08x ", ((uint32_t*)data)[i]);
+    std::printf("\n");
+    vkCmdPushConstants(
+        commandBuffers.at(currentFrame),
+        pipelineLayout,
+        stageFlags,
+        offset,
+        size,
+        data);
 }
 
 VkCommandBuffer Graphics::getCommandBufferForDataTransfer()
@@ -2153,6 +2173,9 @@ void Graphics::pickPhysicalDevice()
 	depthStencilFormat = findDepthFormat();
 	switch (depthStencilFormat)
 	{
+    case VK_FORMAT_D32_SFLOAT:
+        depthStencilPixelFormat = PIXELFORMAT_DEPTH32_FLOAT;
+        break;
 	case VK_FORMAT_D32_SFLOAT_S8_UINT:
 		depthStencilPixelFormat = PIXELFORMAT_DEPTH32_FLOAT_STENCIL8;
 		break;
@@ -2979,11 +3002,7 @@ void Graphics::createVulkanVertexFormat(
     // std::printf("[VULKAN DEBUG] createVulkanVertexFormat:\n");
     // std::printf("[VULKAN DEBUG] - attributes.enableBits: 0x%X\n", attributes.enableBits);
     // std::printf("[VULKAN DEBUG] - shader vertex attributes:\n");
-    for (const auto &pair : shader->getVertexAttributeIndices()) {
-        // std::printf("[VULKAN DEBUG]   - '%s' -> index=%d, baseType=%d\n", 
-        //            pair.first.c_str(), pair.second.index, (int)pair.second.baseType);
-    }
-
+   
     for (const auto &pair : shader->getVertexAttributeIndices())
     {
         int i = pair.second.index;
@@ -3202,6 +3221,9 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
     configuration.core.numColorAttachments = renderPassState.numColorAttachments;
     configuration.core.packedColorAttachmentFormats = renderPassState.packedColorAttachmentFormats;
     configuration.core.primitiveType = primitiveType;
+    configuration.core.depthWriteEnable = states.back().depthWrite;
+    // if (states.back().depthTest == COMPARE_ALWAYS)
+    configuration.core.depthCompareOp = VK_COMPARE_OP_LESS;
 
     VkPipeline pipeline = VK_NULL_HANDLE;
 
@@ -3666,15 +3688,40 @@ void Graphics::startRenderPass()
             RenderPassConfiguration minimalConfig{};
             
             // Use RetroArch's expected format
-            ColorAttachment colorAttachment;
-            colorAttachment.format = VK_FORMAT_R8G8B8A8_UNORM; // Standard format
-            colorAttachment.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            colorAttachment.msaaLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD; // LOAD instead of CLEAR for libretro
-            colorAttachment.msaaSamples = VK_SAMPLE_COUNT_1_BIT;
-            
-            minimalConfig.colorAttachments.push_back(colorAttachment);
-            
+            VkAttachmentDescription colorAttachment = {};
+            colorAttachment.format = VK_FORMAT_B8G8R8A8_UNORM;
+            colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+            colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            colorAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+            VkAttachmentDescription depthAttachment = {};
+            depthAttachment.format = VK_FORMAT_D24_UNORM_S8_UINT;
+            depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+            depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            minimalConfig.colorAttachments.push_back({
+                colorAttachment.format,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                colorAttachment.loadOp,
+                VK_SAMPLE_COUNT_1_BIT
+            });
+            minimalConfig.staticData.depthStencilAttachment = {
+                depthAttachment.format,
+                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                depthAttachment.loadOp,
+                depthAttachment.stencilLoadOp,
+                VK_SAMPLE_COUNT_1_BIT
+            };
+
             VkRenderPass minimalRenderPass = getRenderPass(minimalConfig);
             renderPassState.beginInfo.renderPass = minimalRenderPass;
             
@@ -3698,6 +3745,7 @@ void Graphics::startRenderPass()
             if (fakeBackbuffer != nullptr) {
                 VkImageView colorView = fakeBackbuffer->getRenderTargetView(0, 0);
                 fbConfig.colorViews.push_back(colorView);
+                fbConfig.staticData.depthView = depthImageView;
                 // std::printf("[CHAILOVE DEBUG] Using fakeBackbuffer for framebuffer: %p\n", fakeBackbuffer.get());
             } else {
 				// std::printf("[CHAILOVE ERROR] fakeBackbuffer is null! Creating dummy image for libretro compatibility\n");
@@ -3716,6 +3764,8 @@ void Graphics::startRenderPass()
 					StrongRef<Texture> dummyTexture(new Texture(this, texSettings, nullptr), Acquire::NORETAIN);
 					VkImageView colorView = dummyTexture->getRenderTargetView(0, 0);
 					fbConfig.colorViews.push_back(colorView);
+
+                    fbConfig.staticData.depthView = depthImageView;
 					
 					// std::printf("[CHAILOVE DEBUG] Created dummy texture for libretro framebuffer\n");
             }
@@ -3729,9 +3779,87 @@ void Graphics::startRenderPass()
         renderPassState.beginInfo.renderArea.offset = {0, 0};
         renderPassState.beginInfo.renderArea.extent.width = static_cast<uint32_t>(renderPassState.width);
         renderPassState.beginInfo.renderArea.extent.height = static_cast<uint32_t>(renderPassState.height);
-        renderPassState.beginInfo.clearValueCount = 0; // No clearing needed
-        renderPassState.beginInfo.pClearValues = nullptr;
+        // Clear color, depth, and stencil values ARE NEEDED for proper operation
+        // renderPassState.beginInfo.clearValueCount = 1;
+        // VkClearValue clearValues[1];
+        // clearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}}; // Clear color
+        // clearValues[0].depthStencil = {1.0f, 0}; // Clear depth and stencil
+        // renderPassState.clearColors[0] = clearValues[0];
+        // renderPassState.beginInfo.pClearValues = clearValues;
+               
+        renderPassState.active = true;
+
+        // if (renderPassState.isWindow && renderPassState.windowClearRequested)
+        //     renderPassState.renderPassConfiguration.colorAttachments.at(0).loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+
+        // VkImageMemoryBarrier barrierToGeneralColor{};
+        // barrierToGeneralColor.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        // barrierToGeneralColor.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        // barrierToGeneralColor.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        // barrierToGeneralColor.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        // barrierToGeneralColor.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        // barrierToGeneralColor.image = fakeBackbuffer != nullptr ? 
+        //                             reinterpret_cast<VkImage>(fakeBackbuffer->getRenderTargetHandle()) : 
+        //                             VK_NULL_HANDLE;
+        // barrierToGeneralColor.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+        // barrierToGeneralColor.subresourceRange.baseMipLevel = 0;
+        // barrierToGeneralColor.subresourceRange.levelCount = 1;
+        // barrierToGeneralColor.subresourceRange.baseArrayLayer = 0;
+        // barrierToGeneralColor.subresourceRange.layerCount = 1;
+        // barrierToGeneralColor.srcAccessMask = 0;
+        // barrierToGeneralColor.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        // vkCmdPipelineBarrier(currentCommandBuffer,
+        //                      VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        //                      VK_PIPELINE_STAGE_TRANSFER_BIT,
+        //                      0,
+        //                      0, nullptr,
+        //                      0, nullptr,
+        //                      1, &barrierToGeneralColor);
+        // setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+        // gfx::OptionalColorD clearcolor;
+        // OptionalInt clearstencil(0);
+        // OptionalDouble cleardepth(1.0);
+        // clear(clearcolor, clearstencil, cleardepth);
+
+		// VkImageSubresourceRange colorSubresourceRange = {};
+		// colorSubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		// colorSubresourceRange.baseMipLevel = 0;
+		// colorSubresourceRange.levelCount = 1;
+		// colorSubresourceRange.baseArrayLayer = 0;
+		// colorSubresourceRange.layerCount = 1;
+
+		// vkCmdClearColorImage(currentCommandBuffer,
+		// 					 fakeBackbuffer != nullptr ? 
+		// 						reinterpret_cast<VkImage>(fakeBackbuffer->getRenderTargetHandle()) : 
+		// 						VK_NULL_HANDLE,
+		// 					 VK_IMAGE_LAYOUT_GENERAL,
+		// 					 &renderPassState.clearColors[0].color,
+		// 					 1,
+		// 					 &colorSubresourceRange);
+
+		// VkImageSubresourceRange depthSubresourceRange = {};
+		// depthSubresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+		// depthSubresourceRange.baseMipLevel = 0;
+		// depthSubresourceRange.levelCount = 1;
+		// depthSubresourceRange.baseArrayLayer = 0;
+		// depthSubresourceRange.layerCount = 1;
+
+		// vkCmdClearDepthStencilImage(currentCommandBuffer,
+		// 							depthImage != VK_NULL_HANDLE ? depthImage : VK_NULL_HANDLE,
+		// 							VK_IMAGE_LAYOUT_GENERAL,
+		// 							&renderPassState.clearColors[1].depthStencil,
+		// 							1,
+		// 							&depthSubresourceRange);
         
+        // vkCmdPipelineBarrier(currentCommandBuffer,
+        //                      VK_PIPELINE_STAGE_TRANSFER_BIT,
+        //                      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        //                      0,
+        //                      0, nullptr,
+        //                      0, nullptr,
+        //                      1, &barrierToGeneralColor);
+
         // CRITICAL: Actually begin the render pass
         // std::printf("[CHAILOVE DEBUG] Beginning minimal render pass for libretro\n");
         vkCmdBeginRenderPass(currentCommandBuffer, &renderPassState.beginInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -3748,8 +3876,7 @@ void Graphics::startRenderPass()
         
         // Apply scissor
         applyScissor();
-        
-        renderPassState.active = true;
+
         // std::printf("[CHAILOVE DEBUG] Libretro minimal render pass active\n");
         return;
     }
@@ -3760,8 +3887,8 @@ void Graphics::startRenderPass()
 
     renderPassState.active = true;
 
-    if (renderPassState.isWindow && renderPassState.windowClearRequested)
-        renderPassState.renderPassConfiguration.colorAttachments.at(0).loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    // if (renderPassState.isWindow && renderPassState.windowClearRequested)
+    //     renderPassState.renderPassConfiguration.colorAttachments.at(0).loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 
     // CRITICAL FIX: Ensure command buffers are properly initialized
     if (commandBuffers.empty() || currentFrame >= commandBuffers.size()) {
@@ -3814,7 +3941,7 @@ void Graphics::startRenderPass()
             // std::printf("[CHAILOVE DEBUG] Using swapchain image[%zu]: %p\n", imageIndex, (void*)targetImage);
         }
         
-        if (targetImage != VK_NULL_HANDLE) {
+        if (false && targetImage != VK_NULL_HANDLE) {
             // Transition image to transfer destination layout
             VkImageMemoryBarrier barrier{};
             barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -3918,6 +4045,45 @@ void Graphics::endRenderPass()
 
     // REMOVED: Deferred upload processing (unsafe pointer usage)
     // We now allow buffer uploads to end render passes directly
+
+	VkImageMemoryBarrier barrier{};
+	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+	// Fix: Use the correct image for the barrier
+	VkImage targetImage = VK_NULL_HANDLE;
+	if (!swapChainImages.empty()) {
+		targetImage = swapChainImages[imageIndex];
+	} else if (fakeBackbuffer) {
+		targetImage = reinterpret_cast<VkImage>(fakeBackbuffer->getRenderTargetHandle());
+	}
+	barrier.image = targetImage;
+
+	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	barrier.subresourceRange.baseMipLevel = 0;
+	barrier.subresourceRange.levelCount = 1;
+	barrier.subresourceRange.baseArrayLayer = 0;
+	barrier.subresourceRange.layerCount = 1;
+	barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+	vkCmdPipelineBarrier(
+		commandBuffers.at(currentFrame),
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		0,
+		0, nullptr,
+		0, nullptr,
+		1, &barrier
+	);
+
+	//
+	// Removed erroneous descriptor update code that referenced undefined variables.
+	// If descriptor updates are needed here, implement them with valid handles and context.
+	//
 }
 
 VkSampler Graphics::createSampler(const SamplerState &samplerState)
@@ -4047,8 +4213,10 @@ VkPipeline Graphics::createGraphicsPipeline(Shader *shader, const GraphicsPipeli
 	depthStencil.depthTestEnable = VK_TRUE;
 	if (!optionalDeviceExtensions.extendedDynamicState)
 	{
-		depthStencil.depthWriteEnable = Vulkan::getBool(noDynamicStateConfiguration->depthState.write);
-		depthStencil.depthCompareOp = Vulkan::getCompareOp(noDynamicStateConfiguration->depthState.compare);
+		// depthStencil.depthWriteEnable = Vulkan::getBool(noDynamicStateConfiguration->depthState.write);
+		// depthStencil.depthCompareOp = Vulkan::getCompareOp(noDynamicStateConfiguration->depthState.compare);
+        depthStencil.depthWriteEnable = configuration.depthWriteEnable ? VK_TRUE : VK_FALSE;
+        depthStencil.depthCompareOp = VK_COMPARE_OP_ALWAYS;
 	}
 	depthStencil.depthBoundsTestEnable = VK_FALSE;
 	depthStencil.minDepthBounds = 0.0f;
@@ -4301,9 +4469,9 @@ VkFormat Graphics::findSupportedFormat(const std::vector<VkFormat> &candidates, 
 VkFormat Graphics::findDepthFormat()
 {
 	return findSupportedFormat(
-		{ VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+		{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
 		VK_IMAGE_TILING_OPTIMAL,
-		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+		VK_FORMAT_FEATURE_2_DEPTH_STENCIL_ATTACHMENT_BIT
 	);
 }
 

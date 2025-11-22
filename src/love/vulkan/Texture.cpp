@@ -176,7 +176,7 @@ bool Texture::loadVolatile()
 		else if (renderTarget && isPixelFormatDepthStencil(format))
 			imageData.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		else if (renderTarget)
-			imageData.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			imageData.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		else // TODO: is there a better layout for this situation?
 			imageData.layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 
@@ -193,7 +193,7 @@ bool Texture::loadVolatile()
 			if (renderTarget && isPixelFormatDepthStencil(format))
 				msaaImageData.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 			else if (renderTarget)
-				msaaImageData.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+				msaaImageData.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			else // TODO: is there a better layout for this situation?
 				msaaImageData.layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 

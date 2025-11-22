@@ -248,10 +248,8 @@ void chai_scene::drawMeshes(bool shadows, int view) {
             v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).z));
             v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).w));
         }
-        sceneShader->send("modelMatrix", v);
+        auto modelIdx = sceneShader->send("modelMatrix", v);
 
-        sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
-        
         sceneShader->send("lightIntensity", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1.2f) }));
 
         sceneShader->send("ambientColor", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0.9f), chaiscript::Boxed_Value(0.9f), chaiscript::Boxed_Value(0.9f) }));
@@ -277,24 +275,25 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         // sceneShader->send("viewMatrix", viewMatrix);
 
         // Draw a fullscreen quad (replace with your engine's quad draw if needed)
-        gfx::Texture::Settings settings;
-        settings.width = mesh->specularW;
-        settings.height = mesh->specularH;
-        settings.format = PIXELFORMAT_RGBA8_UNORM;
-        auto slices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
-        auto gfx = Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS);
-        if (background_tex == nullptr) {
-            background_tex = gfx->newTexture(settings, &slices);
+        // gfx::Texture::Settings settings;
+        // settings.width = mesh->specularW;
+        // settings.height = mesh->specularH;
+        // settings.format = PIXELFORMAT_RGBA8_UNORM;
+        // auto slices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
+        // auto gfx = Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS);
+        // if (background_tex == nullptr) {
+        //     background_tex = gfx->newTexture(settings, &slices);
         
         
-            Rect rect = Rect();
-            rect.w = mesh->specularW;
-            rect.h = mesh->specularH;
-            background_tex->replacePixels(mesh->specData, mesh->specularW*mesh->specularH*4, 0, 0, rect, false);
-        }
-        // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+        //     Rect rect = Rect();
+        //     rect.w = mesh->specularW;
+        //     rect.h = mesh->specularH;
+        //     background_tex->replacePixels(mesh->specData, mesh->specularW*mesh->specularH*4, 0, 0, rect, false);
+        // }
+        // // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
 
-        background_tex->draw(gfx, mat);
+        // sceneShader->sendConstant("jointInfo", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0.0f), chaiscript::Boxed_Value(0.0f), chaiscript::Boxed_Value((float)modelIdx), chaiscript::Boxed_Value(0.0f) }));
+        // background_tex->draw(gfx, mat);
     
         // glEnable(GL_DEPTH_TEST);
     }
@@ -396,12 +395,16 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                 viewMatrix.clear();
                 auto mat = sceneShader->shader->getUniformInfo("viewMatrix");
                 auto data = mat->floats;
-                vMatrix = glm::mat4(
-                    data[0], data[1], data[2], data[3],
-                    data[4], data[5], data[6], data[7],
-                    data[8], data[9], data[10], data[11],
-                    data[12], data[13], data[14], data[15]
-                );
+                if (data == nullptr) {
+                    vMatrix = glm::mat4(1.0f);
+                } else {
+                    vMatrix = glm::mat4(
+                        data[0], data[1], data[2], data[3],
+                        data[4], data[5], data[6], data[7],
+                        data[8], data[9], data[10], data[11],
+                        data[12], data[13], data[14], data[15]
+                    );
+                }
                 viewProjectionMatrix = t2 * vMatrix;
             }
             // printf("viewMatrix: \n");
@@ -602,16 +605,28 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
         cg.hasReinit();
         printf("Reinit\n");
     } else {
+        
+       
         cg.instance->setShader(sceneShader->shader);
+        cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
         sceneShader->newFrame();
-        gfx::OptionalColorD clearcolor;
-        clearcolor = ColorD(1.0, 0.0, 0.0, 1.0); // Set the clear color to black with full opacity
-        OptionalInt clearstencil(0);
-        OptionalDouble cleardepth(1.0);
-        cg.instance->clear(clearcolor, clearstencil, cleardepth);
-        sceneShader->send("viewMatrix", viewMatrix1); 
-                 
+        
+        sceneShader->send("viewMatrix", viewMatrix1);
+        
+        // sceneShader->shader->setBufferOffset("JointMatrixBlock", 0);
         drawMeshes(false, 0);
+       
+
+        // cg.instance->setShader();
+
+        // cg.instance->setShader(sceneShader->shader);
+        // sceneShader->newFrame();
+        
+        // cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+        
+        // sceneShader->send("viewMatrix", viewMatrix1);
+
+        // drawMeshes(false, 0);
         // Add this new function after the existing print function:
 
 //         if (!cg.instance || !cg.instance->isCreated()) {
@@ -746,7 +761,8 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
         
     
     
-        cg.instance->setShader();
+        cg.instance->setShader();       
+        
         // cg.instance->setActive(true);
         // cg.instance->setShader();
         // cg.instance->setShader(sceneShader->shader);
