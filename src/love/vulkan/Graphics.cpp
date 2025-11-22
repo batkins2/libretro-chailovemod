@@ -4046,39 +4046,120 @@ void Graphics::endRenderPass()
     // REMOVED: Deferred upload processing (unsafe pointer usage)
     // We now allow buffer uploads to end render passes directly
 
-	VkImageMemoryBarrier barrier{};
-	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-	barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-	barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	// VkImageMemoryBarrier barrier{};
+	// barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	// barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	// barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	// barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	// barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
-	// Fix: Use the correct image for the barrier
-	VkImage targetImage = VK_NULL_HANDLE;
-	if (!swapChainImages.empty()) {
-		targetImage = swapChainImages[imageIndex];
-	} else if (fakeBackbuffer) {
-		targetImage = reinterpret_cast<VkImage>(fakeBackbuffer->getRenderTargetHandle());
-	}
-	barrier.image = targetImage;
+	// // Fix: Use the correct image for the barrier
+	// VkImage targetImage = VK_NULL_HANDLE;
+	// if (!swapChainImages.empty()) {
+	// 	targetImage = swapChainImages[imageIndex];
+	// } else if (fakeBackbuffer) {
+	// 	targetImage = reinterpret_cast<VkImage>(fakeBackbuffer->getRenderTargetHandle());
+	// }
+	// barrier.image = targetImage;
 
-	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	barrier.subresourceRange.baseMipLevel = 0;
-	barrier.subresourceRange.levelCount = 1;
-	barrier.subresourceRange.baseArrayLayer = 0;
-	barrier.subresourceRange.layerCount = 1;
-	barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	// barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	// barrier.subresourceRange.baseMipLevel = 0;
+	// barrier.subresourceRange.levelCount = 1;
+	// barrier.subresourceRange.baseArrayLayer = 0;
+	// barrier.subresourceRange.layerCount = 1;
+	// barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	// barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-	vkCmdPipelineBarrier(
-		commandBuffers.at(currentFrame),
-		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-		0,
-		0, nullptr,
-		0, nullptr,
-		1, &barrier
-	);
+	// vkCmdPipelineBarrier(
+	// 	commandBuffers.at(currentFrame),
+	// 	VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+	// 	VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+	// 	0,
+	// 	0, nullptr,
+	// 	0, nullptr,
+	// 	1, &barrier
+	// );
+
+    // // Transition depth image to transfer src
+    // if (depthImage != VK_NULL_HANDLE) {
+    //     VkImageMemoryBarrier depthBarrier{};
+    //     depthBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    //     depthBarrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    //     depthBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    //     depthBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    //     depthBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    //     depthBarrier.image = depthImage;
+    //     depthBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+    //     depthBarrier.subresourceRange.baseMipLevel = 0;
+    //     depthBarrier.subresourceRange.levelCount = 1;
+    //     depthBarrier.subresourceRange.baseArrayLayer = 0;
+    //     depthBarrier.subresourceRange.layerCount = 1;
+    //     depthBarrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    //     depthBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+    //     vkCmdPipelineBarrier(
+    //         commandBuffers.at(currentFrame),
+    //         VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+    //         VK_PIPELINE_STAGE_TRANSFER_BIT,
+    //         0,
+    //         0, nullptr,
+    //         0, nullptr,
+    //         1, &depthBarrier
+    //     );
+    // }
+
+    // // Create a buffer or image for the copy
+    // // vkCmdCopyImage or vkCmdCopyImageToBuffer
+
+	// if (depthImage != VK_NULL_HANDLE) {
+	// 	// Declare and create a buffer for depth readback if not already present
+	// 	static VkBuffer depthReadbackBuffer = VK_NULL_HANDLE;
+	// 	static VmaAllocation depthReadbackBufferAllocation = VK_NULL_HANDLE;
+
+	// 	// Calculate the size needed for the depth buffer (assuming 4 bytes per pixel for float depth)
+	// 	VkDeviceSize depthBufferSize = renderPassState.framebufferConfiguration.staticData.width *
+	// 								  renderPassState.framebufferConfiguration.staticData.height * sizeof(float);
+
+	// 	if (depthReadbackBuffer == VK_NULL_HANDLE) {
+	// 		VkBufferCreateInfo bufferInfo{};
+	// 		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	// 		bufferInfo.size = depthBufferSize;
+	// 		bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	// 		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+	// 		VmaAllocationCreateInfo allocInfo{};
+	// 		allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+	// 		allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+	// 		if (vmaCreateBuffer(vmaAllocator, &bufferInfo, &allocInfo, &depthReadbackBuffer, &depthReadbackBufferAllocation, nullptr) != VK_SUCCESS) {
+	// 			throw love::Exception("failed to create depth readback buffer");
+	// 		}
+	// 	}
+
+	// 	VkBufferImageCopy region{};
+	// 	region.bufferOffset = 0;
+	// 	region.bufferRowLength = 0; // tightly packed
+	// 	region.bufferImageHeight = 0;
+	// 	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT; // or include STENCIL if needed
+	// 	region.imageSubresource.mipLevel = 0;
+	// 	region.imageSubresource.baseArrayLayer = 0;
+	// 	region.imageSubresource.layerCount = 1;
+	// 	region.imageOffset = {0, 0, 0};
+	// 	region.imageExtent = {
+	// 		renderPassState.framebufferConfiguration.staticData.width,
+	// 		renderPassState.framebufferConfiguration.staticData.height,
+	// 		1
+	// 	};
+
+	// 	vkCmdCopyImageToBuffer(
+	// 		commandBuffers.at(currentFrame),
+	// 		depthImage,
+	// 		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+	// 		depthReadbackBuffer,
+	// 		1,
+	// 		&region
+	// 	);
+	// }
 
 	//
 	// Removed erroneous descriptor update code that referenced undefined variables.
@@ -4216,7 +4297,7 @@ VkPipeline Graphics::createGraphicsPipeline(Shader *shader, const GraphicsPipeli
 		// depthStencil.depthWriteEnable = Vulkan::getBool(noDynamicStateConfiguration->depthState.write);
 		// depthStencil.depthCompareOp = Vulkan::getCompareOp(noDynamicStateConfiguration->depthState.compare);
         depthStencil.depthWriteEnable = configuration.depthWriteEnable ? VK_TRUE : VK_FALSE;
-        depthStencil.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+        depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
 	}
 	depthStencil.depthBoundsTestEnable = VK_FALSE;
 	depthStencil.minDepthBounds = 0.0f;
