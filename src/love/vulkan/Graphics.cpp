@@ -2023,10 +2023,10 @@ void Graphics::endRecordingGraphicsCommands()
 
 void Graphics::setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void *data)
 {
-    std::printf("Pushing %u bytes to push constant at offset %u\n", size, offset);
-    for (uint32_t i = 0; i < size / 4; ++i)
-        std::printf("%08x ", ((uint32_t*)data)[i]);
-    std::printf("\n");
+    // std::printf("Pushing %u bytes to push constant at offset %u\n", size, offset);
+    // for (uint32_t i = 0; i < size / 4; ++i)
+    //     std::printf("%08x ", ((uint32_t*)data)[i]);
+    // std::printf("\n");
     vkCmdPushConstants(
         commandBuffers.at(currentFrame),
         pipelineLayout,

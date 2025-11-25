@@ -235,20 +235,20 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         // glBindTexture(GL_TEXTURE_2D, 0);
         // glActiveTexture(GL_TEXTURE0); // Switch back to texture unit 0 for the main texture
         // glDisable(GL_DEPTH_TEST);
-        auto mat = Matrix4(new float[16] {
-            1.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 1.0f, 0.0f,
-            0.0f, 0.0f, -1.0f, 1.0f
-        });
-        auto v = std::vector<chaiscript::Boxed_Value>();
-        for (int c = 0; c < 4; ++c) {
-            v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).x));
-            v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).y));
-            v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).z));
-            v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).w));
-        }
-        auto modelIdx = sceneShader->send("modelMatrix", v);
+        // auto mat = Matrix4(new float[16] {
+        //     1.0f, 0.0f, 0.0f, 0.0f,
+        //     0.0f, 1.0f, 0.0f, 0.0f,
+        //     0.0f, 0.0f, 1.0f, 0.0f,
+        //     0.0f, 0.0f, -1.0f, 1.0f
+        // });
+        // auto v = std::vector<chaiscript::Boxed_Value>();
+        // for (int c = 0; c < 4; ++c) {
+        //     v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).x));
+        //     v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).y));
+        //     v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).z));
+        //     v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).w));
+        // }
+        // auto modelIdx = sceneShader->send("modelMatrix", v);
 
         sceneShader->send("lightIntensity", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1.2f) }));
 
@@ -293,7 +293,16 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         // // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
 
         // sceneShader->sendConstant("jointInfo", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0.0f), chaiscript::Boxed_Value(0.0f), chaiscript::Boxed_Value((float)modelIdx), chaiscript::Boxed_Value(0.0f) }));
-        // background_tex->draw(gfx, mat);
+        // // MVP matrix
+        // Matrix4 mvpMat = Matrix4(
+        //     new float[16] {
+        //         t2[0][0], t2[0][1], t2[0][2], t2[0][3],
+        //         t2[1][0], t2[1][1], t2[1][2], t2[1][3],
+        //         t2[2][0], t2[2][1], t2[2][2], t2[2][3],
+        //         t2[3][0], t2[3][1], t2[3][2], t2[3][3]
+        //     }
+        // );
+        // background_tex->draw3D(gfx, mvpMat, Colorf(1.0f, 1.0f, 1.0f, 1.0f));
     
         // glEnable(GL_DEPTH_TEST);
     }
@@ -406,6 +415,78 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                     );
                 }
                 viewProjectionMatrix = t2 * vMatrix;
+
+                gfx::Texture::Settings settings;
+                settings.width = mesh->specularW;
+                settings.height = mesh->specularH;
+                settings.format = PIXELFORMAT_RGBA8_UNORM;
+                auto slices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
+                auto gfx = Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS);
+                if (background_tex == nullptr) {
+                    background_tex = gfx->newTexture(settings, &slices);
+                
+                
+                    Rect rect = Rect();
+                    rect.w = mesh->specularW;
+                    rect.h = mesh->specularH;
+                    background_tex->replacePixels(mesh->specData, mesh->specularW*mesh->specularH*4, 0, 0, rect, false);
+                }
+                // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+
+                auto xpos = cameraParams.at("position")[0];
+                auto ypos = cameraParams.at("position")[1];
+                auto zpos = cameraParams.at("position")[2];
+
+                auto height = 2 * zpos * tan(fov / 2.0f);
+                auto width = aspectRatio * height;
+
+                auto bmat = Matrix4(new float[16] {
+                    width, 0.0f, 0.0f, 0.0,
+                    0.0f, height, 0.0f, 0.0f,
+                    0.0f, 0.0f, 1.0f, 0.0f,
+                    -data[12], ypos*(1.0f/3.0f), -zpos*0.9f, 1.0f
+                });
+                auto v = std::vector<chaiscript::Boxed_Value>();
+                for (int c = 0; c < 4; ++c) {
+                    v.push_back(chaiscript::Boxed_Value(bmat.getColumn(c).x));
+                    v.push_back(chaiscript::Boxed_Value(bmat.getColumn(c).y));
+                    v.push_back(chaiscript::Boxed_Value(bmat.getColumn(c).z));
+                    v.push_back(chaiscript::Boxed_Value(bmat.getColumn(c).w));
+                }
+                auto modelIdx = sceneShader->send("modelMatrix", v);
+
+                sceneShader->sendConstant("jointInfo", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0.0f), chaiscript::Boxed_Value(0.0f), chaiscript::Boxed_Value((float)modelIdx), chaiscript::Boxed_Value(0.0f) }));
+                // float verticalfov = fov;
+                // float aspect = aspectRatio;
+                // float n = nearClip;
+                // float f = farClip;
+                
+                // Matrix4 mvpMat = mvpMat.perspective(verticalfov, aspect, n, f);
+                // mvpMat = Matrix4(
+                //     new float[16] {
+                //         data[0], data[1], data[2], data[3],
+                //         data[4], data[5], data[6], data[7],
+                //         data[8], data[9], data[10], data[11],
+                //         data[12], data[13], data[14], data[15]
+                //     }
+                // ) * mvpMat;
+
+
+                // mvpMat = mvpMat * Matrix4(new float[16] {
+                //     t2[0][0], t2[0][1], t2[0][2], t2[0][3],
+                //     t2[1][0], t2[1][1], t2[1][2], t2[1][3],
+                //     t2[2][0], t2[2][1], t2[2][2], t2[2][3],
+                //     t2[3][0], t2[3][1], t2[3][2], t2[3][3]
+                // });
+                
+                auto iMat = Matrix4(new float[16] {
+                    1.0f, 0.0f, 0.0f, 0.0f,
+                    0.0f, 1.0f, 0.0f, 0.0f,
+                    0.0f, 0.0f, 1.0f, 0.0f,
+                    0.0f, 0.0f, 0.0f, 1.0f
+                });
+
+                background_tex->draw3D(gfx, iMat, Colorf(1.0f, 1.0f, 1.0f, 1.0f));
             }
             // printf("viewMatrix: \n");
             // for (int r = 0; r < 4; ++r) {

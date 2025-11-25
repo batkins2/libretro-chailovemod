@@ -499,30 +499,67 @@ void Texture::draw(Graphics *gfx, const Matrix4 &m)
 void Texture::draw3D(Graphics *gfx, const Matrix4 &m, const Colorf &c)
 {
 	// Set shader modelMatrix uniform to the provided matrix.
-	const love::gfx::Shader::UniformInfo* info = nullptr;
-	if (gfx->getShader() != nullptr) {
-		info = gfx->getShader()->getUniformInfo("modelMatrix");
-		if (info == nullptr)
-			throw love::Exception("Shader does not have a 'modelMatrix' uniform.");
-		std::memcpy(info->data, m.getElements(), info->matrix.columns*info->matrix.rows * sizeof(float));
-		gfx->getShader()->updateUniform(info, 1);
+	// const love::gfx::Shader::UniformInfo* info = nullptr;
+	// if (gfx->getShader() != nullptr) {
+	// 	info = gfx->getShader()->getUniformInfo("modelMatrix");
+	// 	if (info == nullptr)
+	// 		throw love::Exception("Shader does not have a 'modelMatrix' uniform.");
+	// 	std::memcpy(info->data, m.getElements(), info->matrix.columns*info->matrix.rows * sizeof(float));
+	// 	gfx->getShader()->updateUniform(info, 1);
 
-		info = gfx->getShader()->getUniformInfo("jointCount");
-		if (info == nullptr)
-			throw love::Exception("Shader does not have a 'modelMatrix' uniform.");
-		int jointCount = 0;
-		std::memcpy(info->data, &jointCount, sizeof(int));
-		gfx->getShader()->updateUniform(info, 1);
-	}
+	// 	info = gfx->getShader()->getUniformInfo("jointCount");
+	// 	if (info == nullptr)
+	// 		throw love::Exception("Shader does not have a 'modelMatrix' uniform.");
+	// 	int jointCount = 0;
+	// 	std::memcpy(info->data, &jointCount, sizeof(int));
+	// 	gfx->getShader()->updateUniform(info, 1);
+	// }
 	
-	// Define quad vertices (XYZUVRGBA)
-    static const float quadVerts[4][9] = {
-        {-0.5f, -0.5f, 0.0f, 0.0f, 1.0f, c.r, c.g, c.b, c.a}, // Bottom-left
-		{ 0.5f, -0.5f, 0.0f, 1.0f, 1.0f, c.r, c.g, c.b, c.a}, // Bottom-right
-		{ 0.5f,  0.5f, 0.0f, 1.0f, 0.0f, c.r, c.g, c.b, c.a}, // Top-right
-		{-0.5f,  0.5f, 0.0f, 0.0f, 0.0f, c.r, c.g, c.b, c.a}  // Top-left
-	};
+	// Local quad positions
+    static const float localQuad[4][3] = {       
+		{-1.0f,  1.0f, 0.0f},
+		{ 1.0f,  1.0f, 0.0f},
+		{ 1.0f, -1.0f, 0.0f},
+		{-1.0f, -1.0f, 0.0f}
+    };
+    static const float uvs[4][2] = {
+        {0.0f, 0.0f},
+        {1.0f, 0.0f},
+        {1.0f, 1.0f},
+        {0.0f, 1.0f}
+    };
     static const uint16_t quadIndices[6] = {0, 1, 2, 0, 2, 3};
+
+    // Fill vertex data with transformed positions and all attributes
+    float quadVerts[4][20];
+    for (int i = 0; i < 4; ++i)
+    {
+        float tx, ty, tz;
+		tx = m.getColumn(0).x * localQuad[i][0] + m.getColumn(1).x * localQuad[i][1] + m.getColumn(2).x * localQuad[i][2] + m.getColumn(3).x;
+		ty = m.getColumn(0).y * localQuad[i][0] + m.getColumn(1).y * localQuad[i][1] + m.getColumn(2).y * localQuad[i][2] + m.getColumn(3).y;
+		tz = m.getColumn(0).z * localQuad[i][0] + m.getColumn(1).z * localQuad[i][1] + m.getColumn(2).z * localQuad[i][2] + m.getColumn(3).z;
+		
+		quadVerts[i][0] = tx;
+		quadVerts[i][1] = ty;
+		quadVerts[i][2] = tz;
+        quadVerts[i][3] = uvs[i][0];
+        quadVerts[i][4] = uvs[i][1];
+        quadVerts[i][5] = c.r;
+        quadVerts[i][6] = c.g;
+        quadVerts[i][7] = c.b;
+        quadVerts[i][8] = c.a;
+        quadVerts[i][9]  = 1.0f; // Weight[0]
+        quadVerts[i][10] = 0.0f; // Weight[1]
+        quadVerts[i][11] = 0.0f; // Weight[2]
+        quadVerts[i][12] = 0.0f; // Weight[3]
+        quadVerts[i][13] = 0.0f; // Normal.x
+        quadVerts[i][14] = 0.0f; // Normal.y
+        quadVerts[i][15] = 1.0f; // Normal.z
+        quadVerts[i][16] = 0.0f; // Joint[0]
+        quadVerts[i][17] = 0.0f; // Joint[1]
+        quadVerts[i][18] = 0.0f; // Joint[2]
+        quadVerts[i][19] = 0.0f; // Joint[3]
+    }
 
 	// Create vertex buffer
 	std::vector<Buffer::DataDeclaration> vertexFormat = std::vector<gfx::Buffer::DataDeclaration>();
@@ -530,7 +567,12 @@ void Texture::draw3D(Graphics *gfx, const Matrix4 &m, const Colorf &c)
 	Buffer::Settings vbSettings(BUFFERUSAGEFLAG_VERTEX, BUFFERDATAUSAGE_STATIC);
 
 	vertexFormat.push_back(gfx::Buffer::DataDeclaration("VertexPosition", gfx::DATAFORMAT_FLOAT_VEC3, sizeof(float) * 3)); // XYZ
-	vertexFormat.push_back(gfx::Buffer::DataDeclaration("VertexTexCoord", gfx::DATAFORMAT_FLOAT_VEC2, sizeof(float) * 2)); // UV
+    vertexFormat.push_back(gfx::Buffer::DataDeclaration("VertexTexCoord", gfx::DATAFORMAT_FLOAT_VEC2, sizeof(float) * 2)); // UV
+    vertexFormat.push_back(gfx::Buffer::DataDeclaration("VertexColor", gfx::DATAFORMAT_FLOAT_VEC4, sizeof(float) * 4));    // RGBA
+    vertexFormat.push_back(gfx::Buffer::DataDeclaration("VertexWeight", gfx::DATAFORMAT_FLOAT_VEC4, sizeof(float) * 4));   // Weight
+    vertexFormat.push_back(gfx::Buffer::DataDeclaration("VertexNormal", gfx::DATAFORMAT_FLOAT_VEC3, sizeof(float) * 3));   // Normal
+    vertexFormat.push_back(gfx::Buffer::DataDeclaration("VertexJoint", gfx::DATAFORMAT_FLOAT_VEC4, sizeof(float) * 4));    // Joint
+	
 	StrongRef<Buffer> vertexBuffer(gfx->newBuffer(
 		vbSettings,
 		vertexFormat,
@@ -554,9 +596,12 @@ void Texture::draw3D(Graphics *gfx, const Matrix4 &m, const Colorf &c)
     BufferBindings buffers;
 
     attributes.set(0, gfx::DATAFORMAT_FLOAT_VEC3, 0, 0); // VertexPosition
-	attributes.set(1, gfx::DATAFORMAT_FLOAT_VEC2, sizeof(float) * 3, 0); // VertexTexCoord
-	attributes.set(2, gfx::DATAFORMAT_FLOAT_VEC4, sizeof(float) * 5, 0); // VertexColor
-    attributes.setBufferLayout(0, sizeof(float) * 9, STEP_PER_VERTEX);
+    attributes.set(1, gfx::DATAFORMAT_FLOAT_VEC2, sizeof(float) * 3, 0); // VertexTexCoord
+    attributes.set(2, gfx::DATAFORMAT_FLOAT_VEC4, sizeof(float) * 5, 0); // VertexColor
+    attributes.set(3, gfx::DATAFORMAT_FLOAT_VEC4, sizeof(float) * 9, 0); // VertexWeight
+    attributes.set(4, gfx::DATAFORMAT_FLOAT_VEC3, sizeof(float) * 13, 0); // VertexNormal
+    attributes.set(5, gfx::DATAFORMAT_FLOAT_VEC4, sizeof(float) * 16, 0); // VertexJoint
+    attributes.setBufferLayout(0, sizeof(float) * 20, STEP_PER_VERTEX);
 
     buffers.set(0, vertexBuffer, 0);
 

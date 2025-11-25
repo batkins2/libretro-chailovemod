@@ -856,7 +856,7 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
                 }
                 cm->lightParams[count]["position"] = std::vector<float> { lightPosition.x, lightPosition.y, lightPosition.z };
                 cm->lightParams[count]["color"] = std::vector<float> { lightNode.color[0], lightNode.color[1], lightNode.color[2] };
-                cm->lightParams[count]["intensity"] = std::vector<float> { lightNode.intensity/1800.0f };
+                cm->lightParams[count]["intensity"] = std::vector<float> { lightNode.intensity/2500.0f };
 
                 if (lightNode.type == "directional") {
                     // glm::vec3 lightDirection(0.0f, -1.0f, 0.0f); // Default direction
@@ -2019,7 +2019,7 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
             //     glBindBuffer(GL_ARRAY_BUFFER, vboIt->second);
             //     // Use cached VBO for drawing
             //     msh->draw(gfx, m);
-            std::printf("Drawing mesh %d\n", this->id);
+            // std::printf("Drawing mesh %d\n", this->id);
                 
             if (msh != nullptr) {
                 // auto* vkGfx = dynamic_cast<love::gfx::vulkan::Graphics*>(gfx);
