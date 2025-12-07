@@ -383,6 +383,7 @@ private:
 		PrimitiveType, CullMode);
 	void setRenderPass(const RenderTargets &rts, int pixelw, int pixelh);
 	void setDefaultRenderPass();
+	void setSplitScreenViewport(int playerIndex, int totalPlayers);
 	void startRenderPass();
 	void endRenderPass();
 	void applyScissor();

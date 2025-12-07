@@ -514,7 +514,7 @@ void Texture::draw3D(Graphics *gfx, const Matrix4 &m, const Colorf &c)
 	// 	std::memcpy(info->data, &jointCount, sizeof(int));
 	// 	gfx->getShader()->updateUniform(info, 1);
 	// }
-	
+
 	// Local quad positions
     static const float localQuad[4][3] = {       
 		{-1.0f,  1.0f, 0.0f},
@@ -617,7 +617,7 @@ void Texture::draw3D(Graphics *gfx, const Matrix4 &m, const Colorf &c)
     cmd.cullMode = gfx->getMeshCullMode();
     cmd.indexBufferOffset = 0;
     cmd.indexCount = 6;
-
+	
     gfx->draw(cmd);
 }
 

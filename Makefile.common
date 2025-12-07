@@ -381,6 +381,12 @@ FLAGS += -I$(CORE_DIR)/vendor/cppcodec
 # FLAGS += -DCMAKE_BUILD_TYPE=Release
 # FLAGS += -DBT_NO_PROFILE=1
 
+# MemPlumber
+FLAGS += -I$(CORE_DIR)/vendor/MemPlumber
+SOURCES_CXX += $(wildcard \
+	$(CORE_DIR)/vendor/MemPlumber/*.cpp \
+)
+
 # Jolt Physics
 FLAGS += -I$(CORE_DIR)/vendor/jolt
 SOURCES_CXX += $(wildcard \

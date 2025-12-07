@@ -14,6 +14,7 @@ chai_async::chai_async() {
 }
 
 chai_async::~chai_async() {
+    m_tasks.clear();  // Clear tasks containing Boxed_Value results
     LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] [chai_async] Destroyed" << std::endl;
 }
 

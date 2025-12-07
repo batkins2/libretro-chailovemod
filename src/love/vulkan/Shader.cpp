@@ -37,6 +37,7 @@ namespace vulkan
 {
 
 static const uint32_t DESCRIPTOR_POOL_SIZE = 1000;
+static const uint32_t MAX_DESCRIPTOR_POOLS_PER_FRAME = 100;  // Cap pools at 100 (100k descriptor sets per frame max)
 
 class BindingMapper
 {
@@ -223,6 +224,22 @@ void Shader::unloadVolatile()
 	shaderModules.clear();
 	shaderStages.clear();
 	descriptorPools.clear();
+	attributes.clear();
+	uniformBufferBlocks.clear();
+	graphicsPipelinesDynamicState.clear();
+	graphicsPipelinesNoDynamicState.clear();
+	
+	// Clear descriptor-related vectors
+	descriptorPoolSizes.clear();
+	descriptorBuffers.clear();
+	descriptorImages.clear();
+	descriptorBufferViews.clear();
+	descriptorWrites.clear();
+	allTextureInfo.clear();
+	storageBufferInfo.clear();
+	pushConstantRanges.clear();
+	localUniformData.clear();
+	localUniformStagingData.clear();
 }
 
 const std::vector<VkPipelineShaderStageCreateInfo> &Shader::getShaderStages() const
@@ -1170,7 +1187,7 @@ void Shader::updateBufferInternal(std::string name, const void* data, size_t siz
         if (!buffer)
             throw love::Exception("No buffer bound for storage buffer %s.", name.c_str());
         size_t bufferSize = buffer->getSize();
-        std::printf("[DEBUG] Updating storage buffer %s (data size: %zu, buffer size: %zu)\n", name.c_str(), size, bufferSize);
+        // std::printf("[DEBUG] Updating storage buffer %s (data size: %zu, buffer size: %zu)\n", name.c_str(), size, bufferSize);
         if (size > bufferSize)
             throw love::Exception("Data size exceeds storage buffer %s size.", name.c_str());
         
@@ -1248,11 +1265,11 @@ void Shader::createPipelineLayout()
 
 	if (isCompute)
 	{
-		assert(shaderStages.size() == 1);
+		// assert(shaderStages.size() == 1);
 
 		VkComputePipelineCreateInfo computeInfo{};
 		computeInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-		computeInfo.stage = shaderStages.at(0);
+		computeInfo.stage = shaderStages.at(1);
 		computeInfo.layout = pipelineLayout;
 
 		if (vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &computeInfo, nullptr, &computePipeline) != VK_SUCCESS)
@@ -1351,6 +1368,12 @@ void Shader::setBufferDescriptor(const UniformInfo *info, love::gfx::Buffer *buf
 
 void Shader::createDescriptorPool()
 {
+	// Prevent unbounded pool growth - cap at MAX_DESCRIPTOR_POOLS_PER_FRAME
+	if (descriptorPools[currentFrame].size() >= MAX_DESCRIPTOR_POOLS_PER_FRAME)
+	{
+		throw love::Exception("Exceeded maximum descriptor pools per frame (%d). Consider increasing DESCRIPTOR_POOL_SIZE.", MAX_DESCRIPTOR_POOLS_PER_FRAME);
+	}
+
 	VkDescriptorPoolCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	createInfo.maxSets = DESCRIPTOR_POOL_SIZE;
@@ -1366,14 +1389,32 @@ void Shader::createDescriptorPool()
 
 VkDescriptorSet Shader::allocateDescriptorSet()
 {
+	// Safety checks to prevent segfaults
+	if (device == VK_NULL_HANDLE)
+		throw love::Exception("Cannot allocate descriptor set: device is null");
+	
+	if (descriptorSetLayout == VK_NULL_HANDLE)
+		throw love::Exception("Cannot allocate descriptor set: descriptorSetLayout is null");
+	
+	if (currentFrame >= MAX_FRAMES_IN_FLIGHT)
+		throw love::Exception("Cannot allocate descriptor set: currentFrame (%zu) is out of range", currentFrame);
+
 	if (descriptorPools[currentFrame].empty())
 		createDescriptorPool();
 
 	while (true)
 	{
+		// Verify pool exists before using it
+		if (currentDescriptorPool >= descriptorPools[currentFrame].size())
+			throw love::Exception("currentDescriptorPool index out of range");
+		
+		VkDescriptorPool pool = descriptorPools[currentFrame][currentDescriptorPool];
+		if (pool == VK_NULL_HANDLE)
+			throw love::Exception("Descriptor pool is null at index %zu", currentDescriptorPool);
+
 		VkDescriptorSetAllocateInfo allocInfo{};
 		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		allocInfo.descriptorPool = descriptorPools[currentFrame][currentDescriptorPool];
+		allocInfo.descriptorPool = pool;
 		allocInfo.descriptorSetCount = 1;
 		allocInfo.pSetLayouts = &descriptorSetLayout;
 

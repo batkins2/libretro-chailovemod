@@ -112,3 +112,6 @@
 [submodule "vendor/jolt"]
 	path = vendor/jolt
 	url = https://github.com/jrouwe/JoltPhysics.git
+[submodule "vendor/MemPlumber"]
+	path = vendor/MemPlumber
+	url = https://github.com/seladb/MemPlumber.git

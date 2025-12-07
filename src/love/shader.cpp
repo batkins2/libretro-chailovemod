@@ -679,8 +679,8 @@ Shader::Shader(StrongRef<ShaderStage> _stages[], const CompileOptions &options)
 		if (u.resourceIndex < 0)
 			continue;
 
-		if ((u.access & ACCESS_WRITE) != 0)
-			continue;
+		// if ((u.access & ACCESS_WRITE) != 0)
+		// 	continue;
 
 		if (u.baseType == UNIFORM_SAMPLER || u.baseType == UNIFORM_STORAGETEXTURE)
 		{
@@ -695,7 +695,7 @@ Shader::Shader(StrongRef<ShaderStage> _stages[], const CompileOptions &options)
 		{
 			auto buffer = u.baseType == UNIFORM_TEXELBUFFER
 				? gfx->getDefaultTexelBuffer(u.dataBaseType)
-				: gfx->getDefaultStorageBuffer();
+				: gfx->getDefaultStorageBuffer(DATA_BASETYPE_MAX_ENUM, u.name);
 
 			for (int i = 0; i < u.count; i++)
 			{
@@ -731,6 +731,21 @@ Shader::~Shader()
 		if (buffer)
 			buffer->release();
 	}
+
+	// Clear reflection maps to prevent leaks
+	reflection.vertexInputs.clear();
+	reflection.texelBuffers.clear();
+	reflection.storageBuffers.clear();
+	reflection.sampledTextures.clear();
+	reflection.storageTextures.clear();
+	reflection.localUniforms.clear();
+	reflection.allUniforms.clear();
+	reflection.localUniformInitializerValues.clear();
+	reflection.bufferFormats.clear();
+	
+	bufferOffsets.clear();
+	activeTextures.clear();
+	activeBuffers.clear();
 }
 
 size_t Shader::updateBuffer(std::string name, const void *data, size_t size, size_t offset)
@@ -739,13 +754,13 @@ size_t Shader::updateBuffer(std::string name, const void *data, size_t size, siz
 	if (info == nullptr)
 		return 0;
 
-	auto returnedSize = bufferOffsets[name] + offset;
+	// auto returnedSize = bufferOffsets[name] + offset;
 
 	updateBufferInternal(name, data, size, bufferOffsets[name] + offset);
 
-	setBufferOffset(name, bufferOffsets[name] + size);
+	// setBufferOffset(name, bufferOffsets[name] + size);
 
-	return returnedSize;
+	return size + offset;
 }
 
 void Shader::setBufferOffset(std::string name, size_t offset)
@@ -914,7 +929,7 @@ void Shader::sendBuffers(const UniformInfo *info, Buffer **buffers, int count, b
 			if (basetype == UNIFORM_TEXELBUFFER)
 				buffer = gfx->getDefaultTexelBuffer(info->dataBaseType);
 			else
-				buffer = gfx->getDefaultStorageBuffer();
+				buffer = gfx->getDefaultStorageBuffer(-1, "");
 		}
 
 		buffer->retain();

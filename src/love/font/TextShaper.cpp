@@ -96,6 +96,9 @@ TextShaper::TextShaper(Rasterizer *rasterizer)
 
 TextShaper::~TextShaper()
 {
+	// Clear maps to prevent leaks
+	glyphAdvances.clear();
+	kerning.clear();
 }
 
 float TextShaper::getHeight() const

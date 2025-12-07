@@ -487,7 +487,7 @@ public:
 
 	Texture *getDefaultTexture(TextureType type, DataBaseType dataType, bool depthSample);
 	Buffer *getDefaultTexelBuffer(DataBaseType dataType);
-	Buffer *getDefaultStorageBuffer();
+	Buffer *getDefaultStorageBuffer(int index, const std::string &name);
 	Texture *getTextureOrDefaultForActiveShader(Texture *tex);
 
 	/**
@@ -521,6 +521,8 @@ public:
 	virtual VkImageView getCurrentSwapchainImageView() = 0;
 	virtual VkImageViewCreateInfo getCurrentSwapchainImageViewCreateInfo() = 0;
 	virtual VkCommandBuffer getCommandBufferForDataTransfer() = 0;
+	
+	virtual void setSplitScreenViewport(int playerIndex, int totalPlayers) = 0;
 
 	/**
 	 * Un-sets the current graphics display mode (uninitializing objects if
@@ -1122,7 +1124,7 @@ private:
 
 	Texture *defaultTextures[TEXTURE_MAX_ENUM][DATA_BASETYPE_MAX_ENUM][2];
 	Buffer *defaultTexelBuffers[DATA_BASETYPE_MAX_ENUM];
-	Buffer *defaultStorageBuffer;
+	Buffer *defaultStorageBuffers[DATA_BASETYPE_MAX_ENUM];
 
 	std::vector<uint8> scratchBuffer;
 

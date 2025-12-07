@@ -94,9 +94,10 @@ class chai_mesh {
     void stopAnimations();
     bool isAnimationPlaying(const std::string &name);
     float getAnimationPercent(const std::string &name);
-    void draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt);
+    void draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt, chai_shader *computeShader);
     void setVisible(bool visible);
     void reloadMesh();
+    // void preloadAnimations();
     void update(std::vector<float> position, std::vector<float> rotation, std::vector<float> scale, chai_debug *debug);
     float calculateAnimationDuration(const std::string &name);
     std::pair<glm::vec3, glm::vec3> getBoundingBox(const glm::mat4 &viewProjectionMatrix);
@@ -136,6 +137,12 @@ class chai_mesh {
             >        
         >
     > animations;
+    std::map<std::string, std::map<float, std::map<int, glm::mat4>>> animationFrameMatrixCache;
+    std::vector<float> m_modelMatrixCacheRaw;
+    std::vector<glm::mat4> m_matrixCache;
+    std::vector<int> m_isSpecularCache0;  // Pre-initialized with Boxed_Value(0)
+    std::vector<int> m_isSpecularCache1;  // Pre-initialized with Boxed_Value(1)
+    std::vector<glm::vec4> m_jointInfoCache;
     float currentTime = 0.0f;
     std::vector<int> nodes;
     std::map<std::string, int> nodeNames;

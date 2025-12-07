@@ -3,6 +3,7 @@
 // #include "filesystem/Filesystem.h"
 #include "../ChaiLove.h"
 #include "filesystem.h"
+#include <memplumber.h>
 namespace love
 {
 
@@ -19,9 +20,17 @@ chai_gfx::~chai_gfx() {
     // delete shader;
     // delete instance;
     // delete win;
+    __mem_leak_check(leakCountAfter, leakSizeAfter, false, "", false);
+    
+    printf("Leak delta: %zu objects, %llu bytes\n", 
+        leakCountAfter - leakCountBefore,
+        leakSizeAfter - leakSizeBefore);
 }
 
 bool chai_gfx::init() {
+        
+    __mem_leak_check(leakCountBefore, leakSizeBefore, false, "", false); 
+        
     auto init = false;
     if (instance != nullptr) {
         init = true; 
@@ -65,9 +74,9 @@ bool chai_gfx::init() {
         win = new windowmod::sdl::Window();   
     }
     
-    auto winset = new windowmod::WindowSettings();
-    winset->displayindex = 0;
-    winset->depth = 16;
+    windowmod::WindowSettings winset;
+    winset.displayindex = 0;
+    winset.depth = 16;
     
     // width = 1920;
     // height = 1080;
@@ -95,7 +104,7 @@ bool chai_gfx::init() {
         // instance->bindVAO();
         win->setGraphics(instance);
         win->setVSync(0);
-        win->setWindow(width, height, winset);
+        win->setWindow(width, height, &winset);
         // instance->setMode(nullptr, width, height, width, height, true, true, 0);
         
         instance->setActive(true);
@@ -218,6 +227,7 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, const std::st
         // instance->bindVAO();
         auto file = new filesystem();
         std::string data = file->read(FileName->c_str());
+        delete file;
         // auto file = Module::getInstance<filesystemmod::Filesystem>(Module::M_FILESYSTEM);
         // auto fn = FileName->c_str();
         // auto fd = file->read(fn);
@@ -302,6 +312,7 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, const std::st
         if (PixFileName && PixFileName->length() > 0) {
             file = new filesystem();
             data = file->read(PixFileName->c_str());
+            delete file;
             std::stringstream s(data);
             lines = std::vector<std::string>();
             shaderFunc = "";
@@ -497,11 +508,12 @@ void chai_gfx::draw(chai_mesh *m) {
             // auto rt = gfx::Graphics::RenderTarget(canvas, 0, 0);
             // instance->setRenderTarget(rt, 0);        
         }    
-        auto matrix = Matrix4(new float[16] {
+        float matrixArr[16] = {
             1.0f, 0.0f, 0.0f, 0.0f,
             0.0f, 1.0f, 0.0f, 0.0f,
             0.0f, 0.0f, 1.0f, 0.0f,
-            0.0f, 0.0f, 0.0f, 1.0f});  
+            0.0f, 0.0f, 0.0f, 1.0f};
+        auto matrix = Matrix4(matrixArr);
         // m->draw(instance, matrix, shader);
     }
 
@@ -523,6 +535,7 @@ void chai_gfx::drawCanvas() {
     // dstrect.y = 0;
     // SDL_BlitSurface(surf, NULL, cl->screen, &dstrect);
     memcpy(cl->videoBuffer, img->getData(), img->getSize());
+    delete img;
 }
 
 void chai_gfx::print(const std::string &text, int x, int y, int r, int g, int b, int a) {

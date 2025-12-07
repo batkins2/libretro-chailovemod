@@ -368,7 +368,7 @@ script::script(const std::string& file) {
 	chai.add(constructor<chai_shader(const chai_shader &)>(), "chai_shader");
 	chai.add(fun(&chai_shader::operator=), "=");
 	chai.add(fun(&chai_shader::newShader), "newShader");
-	chai.add(fun(&chai_shader::send), "send");
+	chai.add(fun(static_cast<int (chai_shader::*)(const std::string&, const std::vector<chaiscript::Boxed_Value>&)>(&chai_shader::send)), "send");
 	chai.add(fun(&chai_shader::sendInt), "sendInt");
 	chai.add(user_type<chai_particles>(), "chai_particles");
 	chai.add(constructor<chai_particles(const chai_particles &)>(), "chai_particles");
@@ -404,6 +404,34 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_mesh::update), "update");
 	chai.add(user_type<chai_meshData>(), "chai_meshData");
 	chai.add(fun(&chai_meshData::clone), "clone");
+	
+	// Wrapper functions to convert ChaiScript Boxed_Value vectors to glm::mat4
+	auto chai_scene_setMatrix_wrapper = [](chai_scene* scene, const std::vector<Boxed_Value>& matrix, int index) {
+		glm::mat4 mat;
+		float* ptr = glm::value_ptr(mat);
+		for (int i = 0; i < 16 && i < matrix.size(); i++) {
+			ptr[i] = boxed_cast<float>(matrix[i]);
+		}
+		scene->setMatrix(mat, index);
+	};
+	
+	auto chai_scene_draw_wrapper = [](chai_scene* scene, 
+		const std::vector<Boxed_Value>& vm1,
+		const std::vector<Boxed_Value>& vm2,
+		const std::vector<Boxed_Value>& vm3,
+		const std::vector<Boxed_Value>& vm4,
+		int viewCount) {
+		auto convertToMat4 = [](const std::vector<Boxed_Value>& vec) -> glm::mat4 {
+			glm::mat4 mat;
+			float* ptr = glm::value_ptr(mat);
+			for (int i = 0; i < 16 && i < vec.size(); i++) {
+				ptr[i] = boxed_cast<float>(vec[i]);
+			}
+			return mat;
+		};
+		scene->draw(convertToMat4(vm1), convertToMat4(vm2), convertToMat4(vm3), convertToMat4(vm4), viewCount);
+	};
+	
 	chai.add(user_type<chai_scene>(), "chai_scene");
 	chai.add(constructor<chai_scene(const chai_scene &)>(), "chai_scene");
 	chai.add(fun(&chai_scene::operator=), "=");	
@@ -412,8 +440,8 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_scene::hideMesh), "hideMesh");
 	chai.add(fun(&chai_scene::showMesh), "showMesh");
 	chai.add(fun(&chai_scene::setShader), "setShader");
-	chai.add(fun(&chai_scene::setMatrix), "setMatrix");
-	chai.add(fun(&chai_scene::draw), "draw");
+	chai.add(fun(chai_scene_setMatrix_wrapper), "setMatrix");
+	chai.add(fun(chai_scene_draw_wrapper), "draw");
 	chai.add(fun(&chai_scene::newScene), "newScene");
 	chai.add(fun(&chai_scene::destroy), "destroy");
 	chai.add(fun(&chai_scene::prepareScreen), "prepareScreen");

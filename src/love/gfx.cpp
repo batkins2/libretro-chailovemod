@@ -201,7 +201,7 @@ Graphics::Graphics(const char *name)
 	, capabilities()
 	, defaultTextures()
 	, defaultTexelBuffers()
-	, defaultStorageBuffer(nullptr)
+	, defaultStorageBuffers()
 	, cachedShaderStages()
 {
 	transformStack.reserve(16);
@@ -389,6 +389,12 @@ Shader *Graphics::newShader(const std::vector<std::string> &stagessource, const 
 	bool validstages[SHADERSTAGE_MAX_ENUM] = {};
 	validstages[SHADERSTAGE_VERTEX] = true;
 	validstages[SHADERSTAGE_PIXEL] = true;
+	validstages[SHADERSTAGE_COMPUTE] = true;
+
+	bool foundstages[SHADERSTAGE_MAX_ENUM] = {};
+	foundstages[SHADERSTAGE_VERTEX] = false;
+	foundstages[SHADERSTAGE_PIXEL] = false;
+	foundstages[SHADERSTAGE_COMPUTE] = false;
 
 	for (const std::string &source : stagessource)
 	{
@@ -404,6 +410,7 @@ Shader *Graphics::newShader(const std::vector<std::string> &stagessource, const 
 			{
 				isanystage = true;
 				stages[i].set(newShaderStage((ShaderStageType) i, source, options, info, true), Acquire::NORETAIN);
+				foundstages[i] = true;
 			}
 		}
 
@@ -414,7 +421,7 @@ Shader *Graphics::newShader(const std::vector<std::string> &stagessource, const 
 	for (int i = 0; i < SHADERSTAGE_MAX_ENUM; i++)
 	{
 		auto stype = (ShaderStageType) i;
-		if (validstages[i] && stages[i].get() == nullptr)
+		if (foundstages[i] && stages[i].get() == nullptr)
 		{
 			const std::string &source = Shader::getDefaultCode(Shader::STANDARD_DEFAULT, stype);
 			Shader::SourceInfo info = Shader::getSourceInfo(source);
@@ -667,18 +674,41 @@ Buffer *Graphics::getDefaultTexelBuffer(DataBaseType dataType)
 	return buffer;
 }
 
-Buffer *Graphics::getDefaultStorageBuffer()
+Buffer *Graphics::getDefaultStorageBuffer(int index, const std::string &name)
 {
-	if (defaultStorageBuffer != nullptr)
-		return defaultStorageBuffer;
-
+	if (!name.empty()) {
+		for (int i = 0; i < DATA_BASETYPE_MAX_ENUM; i++) {
+			std::string bufname = "default_storagebuffer_"+name;
+			if (defaultStorageBuffers[i] != nullptr && bufname == defaultStorageBuffers[i]->getDebugName()) {
+				return defaultStorageBuffers[i];
+			}
+		}
+	}
+	if (index < 0) {
+		for (int i = 0; i < DATA_BASETYPE_MAX_ENUM; i++) {
+			if (defaultStorageBuffers[i] == nullptr && i > 0)
+				index = i-1;
+			else if (defaultStorageBuffers[i] == nullptr) 
+				index = i;
+			if (index >= 0)
+				break;
+		}
+	}
+	if (index >= DATA_BASETYPE_MAX_ENUM)
+		for (int i = 0; i < DATA_BASETYPE_MAX_ENUM; i++) {
+			if (defaultStorageBuffers[i] == nullptr)
+				index = i;
+			if (index < DATA_BASETYPE_MAX_ENUM)
+				break;
+		}
+	
 	Buffer::Settings settings(BUFFERUSAGEFLAG_SHADER_STORAGE, BUFFERDATAUSAGE_STATIC);
 	settings.zeroInitialize = true;
-	settings.debugName = "default_storagebuffer";
+	settings.debugName = "default_storagebuffer_"+name;
 
-	defaultStorageBuffer = newBuffer(settings, DATAFORMAT_FLOAT, nullptr, Buffer::SHADER_STORAGE_BUFFER_MAX_STRIDE, 0);
+	defaultStorageBuffers[index] = newBuffer(settings, DATAFORMAT_FLOAT, nullptr, Buffer::SHADER_STORAGE_BUFFER_MAX_STRIDE, 0);
 
-	return defaultStorageBuffer;
+	return defaultStorageBuffers[index];
 }
 
 void Graphics::releaseDefaultResources()
@@ -703,9 +733,12 @@ void Graphics::releaseDefaultResources()
 		defaultTexelBuffers[dataType] = nullptr;
 	}
 
-	if (defaultStorageBuffer)
-		defaultStorageBuffer->release();
-	defaultStorageBuffer = nullptr;
+	for (int i = 0; i < DATA_BASETYPE_MAX_ENUM; i++)
+	{
+		if (defaultStorageBuffers[i])
+			defaultStorageBuffers[i]->release();
+		defaultStorageBuffers[i] = nullptr;
+	}
 }
 
 Texture *Graphics::getTextureOrDefaultForActiveShader(Texture *tex)

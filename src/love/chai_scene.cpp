@@ -1,12 +1,32 @@
 #include "chai_scene.h"
 #include "../ChaiLove.h"
 
+#include <memplumber.h>
+
 namespace love {
 chai_scene::chai_scene() {
     
 }
 chai_scene::~chai_scene() {
-    
+    // Explicitly clear all cache vectors to ensure proper cleanup
+    viewMatrix.clear();  // Member variable, not just cache
+    m_lightDirectionCache.clear();
+    m_lightColorCache.clear();
+    m_ambientColorCache.clear();
+    m_intensityCache.clear();
+    m_projectionMatrixCache.clear();
+    m_lightSpaceMatrixCache.clear();
+    m_vmCache.clear();
+    m_modelMatrixCache.clear();
+    m_lightIntensityCache.clear();
+    m_ambientColorCache2.clear();
+    m_projectionMatrixCache2.clear();
+    m_viewMatrixCache.clear();
+    m_shadowCache.clear();
+    m_viewMatrixCache2.clear();
+    m_jointInfoCache.clear();
+    m_projectionMatrixBoxedCache.clear();
+    m_viewMatrixBoxedCache.clear();
 }
 
 bool chai_scene::destroy() {
@@ -37,11 +57,12 @@ void chai_scene::addMesh(chai_mesh *mesh) {
     // mesh->getBoundingBox(glm::mat4(1.0f));
     printf("Adding mesh to scene %p\n", mesh);
     meshes.push_back(mesh);
-    matrices.push_back(Matrix4(new float[16] {
+    float arr[16] = {
         1.0f, 0.0f, 0.0f, 0.0f,
         0.0f, 1.0f, 0.0f, 0.0f,
         0.0f, 0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 0.0f, 1.0f}));
+        0.0f, 0.0f, 0.0f, 1.0f};
+    matrices.push_back(Matrix4(arr));
     meshGroups[mesh->getId()] += 1;
 }
 
@@ -86,22 +107,17 @@ void chai_scene::showMesh(chai_mesh *mesh) {
     }
 }
 
-void chai_scene::setShader(chai_shader *shader) {
-    if (sceneShader != nullptr) {
-        // glDeleteShader(sceneShader->shader->getHandle());
-        // sceneShader->shader->~Shader();
-    }
+void chai_scene::setShader(chai_shader *shader, chai_shader *compute) {
+    computeShader = compute;
     sceneShader = shader;   
 }
 
-void chai_scene::setMatrix(std::vector<chaiscript::Boxed_Value> matrix, int index) {
-    auto mat = new float[16] {
-        1.0f, 0.0f, 0.0f, 0.0f,
-        0.0f, 1.0f, 0.0f, 0.0f,
-        0.0f, 0.0f, 1.0f, 0.0f,
-        0.0f, 0.0f, 0.0f, 1.0f};
+void chai_scene::setMatrix(const glm::mat4 &matrix, int index) {
+    // Convert glm::mat4 to Matrix4
+    float mat[16];
+    const float *ptr = glm::value_ptr(matrix);
     for (int i = 0; i < 16; i++) {
-        mat[i] = chaiscript::boxed_cast<float>(matrix[i]);
+        mat[i] = ptr[i];
     }
     matrices[index] = Matrix4(mat);
 }
@@ -174,9 +190,9 @@ void chai_scene::drawMeshes(bool shadows, int view) {
     // OptionalDouble cleardepth(1.0);
     auto& cg = ChaiLove::getInstance()->chai_gfx;
     // Get the command buffer and pipeline layout properly
-    auto commandBuffer = cg.instance->getCommandBufferForDataTransfer();
-    auto vulkanShader = static_cast<gfx::vulkan::Shader*>(sceneShader->shader);
-    auto pipelineLayout = vulkanShader->getGraphicsPipelineLayout();
+    // auto commandBuffer = cg.instance->getCommandBufferForDataTransfer();
+    // auto vulkanShader = static_cast<gfx::vulkan::Shader*>(sceneShader->shader);
+    // auto pipelineLayout = vulkanShader->getGraphicsPipelineLayout();
     // cg.instance->clear(clearcolor, clearstencil, cleardepth);
     glm::mat4 vMatrix = glm::mat4(1.0f);
     glm::mat4 t2 = glm::mat4(1.0f);
@@ -250,29 +266,47 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         // }
         // auto modelIdx = sceneShader->send("modelMatrix", v);
 
-        sceneShader->send("lightIntensity", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1.2f) }));
+        printf("Testing for memory leaks around shader uniform updates\n");
+        size_t leakCountBefore, leakCountAfter;
+        uint64_t leakSizeBefore, leakSizeAfter;
+        
+        __mem_leak_check(leakCountBefore, leakSizeBefore, false, "", false);
+        
+        m_lightIntensityCache.clear();
+        m_lightIntensityCache.push_back(glm::vec3(1.2f));
+        sceneShader->send("lightIntensity", 1.2f);
 
-        sceneShader->send("ambientColor", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0.9f), chaiscript::Boxed_Value(0.9f), chaiscript::Boxed_Value(0.9f) }));
+        __mem_leak_check(leakCountAfter, leakSizeAfter, false, "", false);
+    
+        printf("Leak delta: %zu objects, %llu bytes\n", 
+            leakCountAfter - leakCountBefore,
+            leakSizeAfter - leakSizeBefore);
+
+        m_ambientColorCache2.clear();
+        m_ambientColorCache2.push_back(glm::vec3(0.9f, 0.9f, 0.9f));
+        sceneShader->send("ambientColor", glm::vec3(0.9f, 0.9f, 0.9f));
 
         // Ortho projection matrix for fullscreen quad
         // This assumes the quad covers the entire screen, adjust as needed
         auto t2 = glm::ortho(0.0f, static_cast<float>(mesh->specularW),
             static_cast<float>(mesh->specularH), 0.0f, -1.0f, 1.0f);
         auto pm = glm::value_ptr(t2);
-        std::vector<chaiscript::Boxed_Value> projectionMatrix;
-        for (int c = 0; c < 16; ++c) {
-            projectionMatrix.push_back(chaiscript::Boxed_Value(pm[c]));
-        }
-        sceneShader->send("projectionMatrix", projectionMatrix);
+        printf("Testing for memory leaks around shader uniform updates\n");
+        m_projectionMatrixCache2.clear();
+        __mem_leak_check(leakCountBefore, leakSizeBefore, false, "", false);
+        m_projectionMatrixCache2.push_back(t2);
+        sceneShader->send("projectionMatrix", m_projectionMatrixCache2);
+        __mem_leak_check(leakCountAfter, leakSizeAfter, false, "", false);
+    
+        printf("Leak delta: %zu objects, %llu bytes\n", 
+            leakCountAfter - leakCountBefore,
+            leakSizeAfter - leakSizeBefore);
 
         // Set the view matrix to identity for fullscreen quad
         auto vMatrix = glm::mat4(1.0f);
-        auto vm = glm::value_ptr(vMatrix);
-        std::vector<chaiscript::Boxed_Value> viewMatrix;
-        for (int c = 0; c < 16; ++c) {
-            viewMatrix.push_back(chaiscript::Boxed_Value(vm[c]));
-        }
-        // sceneShader->send("viewMatrix", viewMatrix);
+        m_viewMatrixCache.clear();
+        // m_viewMatrixCache.push_back(vMatrix);
+        // sceneShader->send("viewMatrix", m_viewMatrixCache[0]);
 
         // Draw a fullscreen quad (replace with your engine's quad draw if needed)
         // gfx::Texture::Settings settings;
@@ -329,30 +363,29 @@ void chai_scene::drawMeshes(bool shadows, int view) {
 
             auto lightParams = mesh->lightParams[view];
 
-            auto direction = std::vector<chaiscript::Boxed_Value>();
+            m_lightDirectionCache.clear();
+            // TODO: lightParams returns what type? Store as vec3
             for (auto axis : lightParams["direction"]) {
-                direction.push_back(chaiscript::Boxed_Value(axis));
+                m_lightDirectionCache.push_back(glm::vec3(axis));
             }
-            sceneShader->send("lightDirection", direction);
+            sceneShader->send("lightDirection", m_lightDirectionCache[0]);
 
-            auto color = std::vector<chaiscript::Boxed_Value>();
+            m_lightColorCache.clear();
+            // TODO: lightParams returns what type? Store as vec3
             for (auto c : lightParams["color"]) {
-                color.push_back(chaiscript::Boxed_Value(c));
+                m_lightColorCache.push_back(glm::vec3(c));
             }
-            sceneShader->send("lightColor", color);
+            sceneShader->send("lightColor", m_lightColorCache[0]);
 
-            auto ambientColor = std::vector<chaiscript::Boxed_Value>();
+            m_ambientColorCache.clear();
+            m_ambientColorCache.push_back(glm::vec3(1.0f, 1.0f, 1.0f));
+            // TODO: Need send overload for vec3
+            sceneShader->send("ambientColor", m_ambientColorCache[0]);
 
-            ambientColor.push_back(chaiscript::Boxed_Value(1.0f));
-            ambientColor.push_back(chaiscript::Boxed_Value(1.0f));
-            ambientColor.push_back(chaiscript::Boxed_Value(1.0f));
-
-            sceneShader->send("ambientColor", ambientColor);
-
-            auto intensity = std::vector<chaiscript::Boxed_Value>();
-            intensity.push_back(chaiscript::Boxed_Value(lightParams["intensity"][0]));
-
-            sceneShader->send("lightIntensity", intensity);
+            m_intensityCache.clear();
+            // TODO: lightParams["intensity"][0] returns what type?
+            // m_intensityCache.push_back(glm::vec3());
+            sceneShader->send("lightIntensity", lightParams["intensity"][0]);
 
             // Calculate lightSpaceMatrix
             glm::vec3 lightPos = glm::vec3(lightParams["position"][0], lightParams["position"][1], lightParams["position"][2]);
@@ -362,26 +395,20 @@ void chai_scene::drawMeshes(bool shadows, int view) {
             glm::mat4 lightProjection = glm::ortho(-7.5f, 7.5f, -7.5f, 7.5f, 1.0f, 1000.0f);
             glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
-            auto lightSpaceMatrixBoxed = std::vector<chaiscript::Boxed_Value>();
-            for (int i = 0; i < 16; ++i) {
-                lightSpaceMatrixBoxed.push_back(chaiscript::Boxed_Value(glm::value_ptr(lightSpaceMatrix)[i]));
-            }
-            sceneShader->send("lightSpaceMatrix", lightSpaceMatrixBoxed);
+            m_lightSpaceMatrixCache.clear();
+            m_lightSpaceMatrixCache.push_back(lightSpaceMatrix);
+            sceneShader->send("lightSpaceMatrix", m_lightSpaceMatrixCache[0]);
 
-            std::vector<chaiscript::Boxed_Value> projectionMatrix;
-            if (shadows == true) {            
-                for (int i = 0; i < 16; ++i) {
-                    projectionMatrix.push_back(chaiscript::Boxed_Value(glm::value_ptr(lightProjection)[i]));
-                }
+            m_projectionMatrixCache.clear();
+            if (shadows == true) {
+                m_projectionMatrixCache.push_back(lightProjection);
             } else {
-                for (int c = 0; c < 16; ++c) {
-                    projectionMatrix.push_back(chaiscript::Boxed_Value(pm[c]));
-                }
+                m_projectionMatrixCache.push_back(t2);
             }
-            sceneShader->send("projectionMatrix", projectionMatrix);
+            sceneShader->send("projectionMatrix", m_projectionMatrixCache);
 
             if (shadows == true) {
-                sceneShader->send("shadow", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1) }));
+                sceneShader->sendInt("shadow", 1);
                 auto mat = sceneShader->shader->getUniformInfo("viewMatrix");
                 auto data = mat->floats;
                 vMatrix = glm::mat4(
@@ -390,14 +417,17 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                     data[8], data[9], data[10], data[11],
                     data[12], data[13], data[14], data[15]
                 );
-                for (int i = 0; i < 16; ++i) {
-                    viewMatrix.push_back(chaiscript::Boxed_Value(data[i]));                    
-                }
-                std::vector<chaiscript::Boxed_Value> vm;
-                for (int i = 0; i < 16; ++i) {
-                    vm.push_back(chaiscript::Boxed_Value(glm::value_ptr(lightView)[i]));
-                }
-                sceneShader->send("viewMatrix", vm);
+                glm::mat4 viewMat = glm::mat4(
+                    data[0], data[1], data[2], data[3],
+                    data[4], data[5], data[6], data[7],
+                    data[8], data[9], data[10], data[11],
+                    data[12], data[13], data[14], data[15]
+                );
+                m_viewMatrixCache2.clear();
+                m_viewMatrixCache2.push_back(viewMat);
+                m_vmCache.clear();
+                m_vmCache.push_back(lightView);
+                sceneShader->send("viewMatrix", m_vmCache[0]);
                 viewProjectionMatrix = lightSpaceMatrix;
             } else {
                 sceneShader->send("viewMatrix", viewMatrix);
@@ -440,22 +470,37 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                 auto height = 2 * zpos * tan(fov / 2.0f);
                 auto width = aspectRatio * height;
 
-                auto bmat = Matrix4(new float[16] {
+                float bmatData[16] = {
                     width, 0.0f, 0.0f, 0.0,
                     0.0f, height, 0.0f, 0.0f,
                     0.0f, 0.0f, 1.0f, 0.0f,
                     -data[12], ypos*(1.0f/3.0f), -zpos*0.9f, 1.0f
-                });
-                auto v = std::vector<chaiscript::Boxed_Value>();
-                for (int c = 0; c < 4; ++c) {
-                    v.push_back(chaiscript::Boxed_Value(bmat.getColumn(c).x));
-                    v.push_back(chaiscript::Boxed_Value(bmat.getColumn(c).y));
-                    v.push_back(chaiscript::Boxed_Value(bmat.getColumn(c).z));
-                    v.push_back(chaiscript::Boxed_Value(bmat.getColumn(c).w));
-                }
-                auto modelIdx = sceneShader->send("modelMatrix", v);
+                };
+                auto bmat = Matrix4(bmatData);
+                glm::mat4 modelMat = glm::mat4(
+                    bmat.getColumn(0).x, bmat.getColumn(0).y, bmat.getColumn(0).z, bmat.getColumn(0).w,
+                    bmat.getColumn(1).x, bmat.getColumn(1).y, bmat.getColumn(1).z, bmat.getColumn(1).w,
+                    bmat.getColumn(2).x, bmat.getColumn(2).y, bmat.getColumn(2).z, bmat.getColumn(2).w,
+                    bmat.getColumn(3).x, bmat.getColumn(3).y, bmat.getColumn(3).z, bmat.getColumn(3).w
+                );
+                m_modelMatrixCache.clear();
+                m_modelMatrixCache.push_back(modelMat);
+                
 
-                sceneShader->sendConstant("jointInfo", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0.0f), chaiscript::Boxed_Value(0.0f), chaiscript::Boxed_Value((float)modelIdx), chaiscript::Boxed_Value(0.0f) }));
+                auto modelIdx = sceneShader->send("modelMatrix", m_modelMatrixCache[0]);
+                // size_t leakCountBefore, leakCountAfter;
+                // uint64_t leakSizeBefore, leakSizeAfter;
+                
+                // __mem_leak_check(leakCountBefore, leakSizeBefore, false, "", false);
+                std::vector<glm::vec4> jointInfoVec = {
+                    glm::vec4(0.0f, 0.0f, (float)modelIdx, 0.0f)
+                };
+                sceneShader->sendConstant("jointInfo", jointInfoVec);
+                // __mem_leak_check(leakCountAfter, leakSizeAfter, false, "", false);
+    
+                // printf("Leak delta: %zu objects, %llu bytes\n", 
+                //     leakCountAfter - leakCountBefore,
+                    // leakSizeAfter - leakSizeBefore);
                 // float verticalfov = fov;
                 // float aspect = aspectRatio;
                 // float n = nearClip;
@@ -479,12 +524,13 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                 //     t2[3][0], t2[3][1], t2[3][2], t2[3][3]
                 // });
                 
-                auto iMat = Matrix4(new float[16] {
+                float iMatArr[16] = {
                     1.0f, 0.0f, 0.0f, 0.0f,
                     0.0f, 1.0f, 0.0f, 0.0f,
                     0.0f, 0.0f, 1.0f, 0.0f,
                     0.0f, 0.0f, 0.0f, 1.0f
-                });
+                };
+                auto iMat = Matrix4(iMatArr);
 
                 background_tex->draw3D(gfx, iMat, Colorf(1.0f, 1.0f, 1.0f, 1.0f));
             }
@@ -546,8 +592,8 @@ void chai_scene::drawMeshes(bool shadows, int view) {
 
         // gfx::Graphics::flushBatchedDrawsGlobal();
         auto matrix = matrices[i];
-        mesh->draw(cg.instance, matrix, sceneShader, deltaTime);
-        if (meshChildren.find(i) != meshChildren.end()) {
+        mesh->draw(cg.instance, matrix, sceneShader, deltaTime, computeShader);
+        if (meshChildren.find(i) != meshChildren.end() && computeShader == nullptr) {
             // if (i == 4) {
             //     printf("Mesh %p breakpoint\n", mesh);
             //     isMeshInFrustum(mesh, viewProjectionMatrix);
@@ -558,12 +604,13 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                     continue;
                 }
                 for (int j = 0; j < child->meshes.size(); ++j) {
-                    Matrix4 m = Matrix4(new float[16]{
+                    float mArr[16] = {
                         1.0f, 0.0f, 0.0f, 0.0f,
                         0.0f, 1.0f, 0.0f, 0.0f,
                         0.0f, 0.0f, 1.0f, 0.0f,
                         0.0f, 0.0f, 0.0f, 1.0f
-                    });
+                    };
+                    Matrix4 m = Matrix4(mArr);
                     // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
 
                     child->meshes[j]->draw(cg.instance, m);
@@ -597,16 +644,19 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                     // gfx::Graphics::flushBatchedDrawsGlobal();
                    
                     // Draw the parent mesh first
-                    meshes[parentId]->draw(cg.instance, matrices[parentId], sceneShader, deltaTime);
-                    Matrix4 m = Matrix4(new float[16]{
+                    meshes[parentId]->draw(cg.instance, matrices[parentId], sceneShader, deltaTime, computeShader);
+                    float identityData[16] = {
                         1.0f, 0.0f, 0.0f, 0.0f,
                         0.0f, 1.0f, 0.0f, 0.0f,
                         0.0f, 0.0f, 1.0f, 0.0f,
                         0.0f, 0.0f, 0.0f, 1.0f
-                    });
+                    };
+                    Matrix4 m = Matrix4(identityData);
                     // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
 
-                    child->meshes[j]->draw(cg.instance, m);
+                    if (computeShader == nullptr) {
+                        child->meshes[j]->draw(cg.instance, m);
+                    }
                     // cg.instance->present(nullptr);
                 }
                 j++;
@@ -623,28 +673,30 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
         // gfx::Graphics::flushBatchedDrawsGlobal();
 
-        mesh->draw(cg.instance, matrix, sceneShader, deltaTime);
+        mesh->draw(cg.instance, matrix, sceneShader, deltaTime, computeShader);
         if (meshChildren.find(meshIndex) != meshChildren.end()) {
             for (auto child : meshChildren[meshIndex]) {
                 if (child->visible == false) {
                     continue;
                 }
                 for (int j = 0; j < child->meshes.size(); ++j) {
-                    Matrix4 m = Matrix4(new float[16]{
+                    float identityData[16] = {
                         1.0f, 0.0f, 0.0f, 0.0f,
                         0.0f, 1.0f, 0.0f, 0.0f,
                         0.0f, 0.0f, 1.0f, 0.0f,
                         0.0f, 0.0f, 0.0f, 1.0f
-                    });
+                    };
+                    Matrix4 m = Matrix4(identityData);
                     // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
-
-                    child->meshes[j]->draw(cg.instance, m);
+                    if (computeShader == nullptr) {
+                        child->meshes[j]->draw(cg.instance, m);
+                    }
                 }
             }
         }
         // cg.instance->present(nullptr);
     }
-    if (shadows == false) {
+    if (shadows == false && computeShader == nullptr) {
         for (auto ps : particleSystems) {
             // if (ps->visible == false) {
             //     continue;
@@ -656,7 +708,7 @@ void chai_scene::drawMeshes(bool shadows, int view) {
     }
 }
 
-void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vector<chaiscript::Boxed_Value> viewMatrix2, std::vector<chaiscript::Boxed_Value> viewMatrix3, std::vector<chaiscript::Boxed_Value> viewMatrix4, int viewCount) {
+void chai_scene::draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2, const glm::mat4 &viewMatrix3, const glm::mat4 &viewMatrix4, int viewCount) {
     auto& cg = ChaiLove::getInstance()->chai_gfx;
     // ChaiLove::getInstance()->chai_collisions.processDebug(1.0f / 60.0f, viewMatrix1);
     
@@ -685,18 +737,63 @@ void chai_scene::draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vec
     if (false && cg.reinit) {
         cg.hasReinit();
         printf("Reinit\n");
-    } else {
+    } else {  
         
-       
-        cg.instance->setShader(sceneShader->shader);
-        cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
-        sceneShader->newFrame();
         
-        sceneShader->send("viewMatrix", viewMatrix1);
+        
         
         // sceneShader->shader->setBufferOffset("JointMatrixBlock", 0);
-        drawMeshes(false, 0);
-       
+        // drawMeshes(false, 0);
+        // cg.instance->dispatchThreadgroups(computeShader->shader, 16, 16, 16);
+        // auto cs = computeShader;
+        computeShader = nullptr;
+        if (viewCount == 1) {
+            size_t leakCountBefore, leakCountAfter;
+            uint64_t leakSizeBefore, leakSizeAfter;
+            
+            __mem_leak_check(leakCountBefore, leakSizeBefore, false, "", false);
+            cg.instance->setShader(sceneShader->shader);
+            cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+            sceneShader->newFrame();
+            sceneShader->send("viewMatrix", viewMatrix1);
+            drawMeshes(false, 0);
+            __mem_leak_check(leakCountAfter, leakSizeAfter, false, "", false);
+    
+            printf("Leak delta: %zu objects, %llu bytes\n", 
+                leakCountAfter - leakCountBefore,
+                leakSizeAfter - leakSizeBefore);
+        }
+        if (viewCount == 2) {
+            
+            cg.instance->setShader(sceneShader->shader);
+            cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+            sceneShader->newFrame();
+            sceneShader->send("viewMatrix", viewMatrix1);
+            cg.instance->setSplitScreenViewport(0, 2);
+            drawMeshes(false, 0);
+            sceneShader->send("viewMatrix", viewMatrix2);            
+            cg.instance->setSplitScreenViewport(1, 2);
+            drawMeshes(false, 1);
+        }
+        if (viewCount == 3) {
+            sceneShader->send("viewMatrix", viewMatrix1);
+            drawMeshes(false, 0);
+            sceneShader->send("viewMatrix", viewMatrix2);
+            drawMeshes(false, 1);
+            sceneShader->send("viewMatrix", viewMatrix3);
+            drawMeshes(false, 2);
+        }
+        if (viewCount == 4) {
+            sceneShader->send("viewMatrix", viewMatrix1);
+            drawMeshes(false, 0);
+            sceneShader->send("viewMatrix", viewMatrix2);
+            drawMeshes(false, 1);
+            sceneShader->send("viewMatrix", viewMatrix3);
+            drawMeshes(false, 2);
+            sceneShader->send("viewMatrix", viewMatrix4);
+            drawMeshes(false, 3);
+        }        
+        // computeShader = cs;
 
         // cg.instance->setShader();
 
@@ -1286,19 +1383,15 @@ void chai_scene::prepareScreen() {
     // Set the projection matrix for the loading screen to an orthographic projection
     glm::mat4 projectionMatrix = glm::ortho(0.0f, static_cast<float>(cg.width), static_cast<float>(cg.height), 0.0f, -1.0f, 1.0f);
     
-    std::vector<chaiscript::Boxed_Value> projectionMatrixBoxed;
-    for (int i = 0; i < 16; ++i) {
-        projectionMatrixBoxed.push_back(chaiscript::Boxed_Value(glm::value_ptr(projectionMatrix)[i]));
-    }
-    sceneShader->send("projectionMatrix", projectionMatrixBoxed);
+    m_projectionMatrixBoxedCache.clear();
+    m_projectionMatrixBoxedCache.push_back(projectionMatrix);
+    sceneShader->send("projectionMatrix", m_projectionMatrixBoxedCache);
     // Set the view matrix for the loading screen
     glm::mat4 viewMatrix = glm::mat4(1.0f); // Identity matrix for the loading screen
     
-    std::vector<chaiscript::Boxed_Value> viewMatrixBoxed;
-    for (int i = 0; i < 16; ++i) {
-        viewMatrixBoxed.push_back(chaiscript::Boxed_Value(glm::value_ptr(viewMatrix)[i]));
-    }
-    sceneShader->send("viewMatrix", viewMatrixBoxed);
+    m_viewMatrixBoxedCache.clear();
+    m_viewMatrixBoxedCache.push_back(viewMatrix);
+    sceneShader->send("viewMatrix", m_viewMatrixBoxedCache);
     
 }
 

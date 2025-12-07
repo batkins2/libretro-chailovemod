@@ -1855,6 +1855,9 @@ void Graphics::beginFrame()
 	for (auto &cleanUpFn : cleanUpFunctions.at(currentFrame))
 		cleanUpFn();
 	cleanUpFunctions.at(currentFrame).clear();
+	
+	// Clear deferred buffer uploads from previous frame to prevent memory leak
+	deferredUploads.clear();
 
 	startRecordingGraphicsCommands();
 
@@ -2015,8 +2018,9 @@ void Graphics::endRecordingGraphicsCommands()
 	if (renderPassState.active)
 		endRenderPass();
 
-	if (vkEndCommandBuffer(commandBuffers.at(currentFrame)) != VK_SUCCESS)
-		throw love::Exception("failed to record command buffer");
+	if (vkEndCommandBuffer(commandBuffers.at(currentFrame)) != VK_SUCCESS) {
+		// throw love::Exception("failed to record command buffer");
+    }
 	
 	commandBufferRecording = false;
 }
@@ -2027,6 +2031,15 @@ void Graphics::setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFl
     // for (uint32_t i = 0; i < size / 4; ++i)
     //     std::printf("%08x ", ((uint32_t*)data)[i]);
     // std::printf("\n");
+
+    // vkCmdBindPipeline(
+    //     commandBuffers.at(currentFrame),
+    //     VK_PIPELINE_BIND_POINT_GRAPHICS,
+    //     renderPassState.pipeline);
+
+    if (!commandBufferRecording)
+        startRecordingGraphicsCommands();
+
     vkCmdPushConstants(
         commandBuffers.at(currentFrame),
         pipelineLayout,
@@ -3664,6 +3677,31 @@ void Graphics::setRenderPass(const RenderTargets &rts, int pixelw, int pixelh)
 		renderPassState.packedColorAttachmentFormats |= ((uint64)rts.colors[i].texture->getPixelFormat()) << (i * 8ull);
 }
 
+void Graphics::setSplitScreenViewport(int playerIndex, int totalPlayers)
+{
+    VkViewport viewport;
+    VkRect2D scissor;
+    
+    if (totalPlayers == 2) {
+        // Horizontal split
+        viewport.x = (playerIndex * renderPassState.width) * 0.5f;
+        viewport.y = 0.0f;
+        viewport.width = renderPassState.width * 0.5f;
+        viewport.height = renderPassState.height;
+        
+        scissor.offset.x = viewport.x;
+        scissor.offset.y = 0;
+        scissor.extent.width = viewport.width;
+        scissor.extent.height = viewport.height;
+    }
+    
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    
+    vkCmdSetViewport(commandBuffers.at(currentFrame), 0, 1, &viewport);
+    vkCmdSetScissor(commandBuffers.at(currentFrame), 0, 1, &scissor);
+}
+
 void Graphics::startRenderPass()
 {
     if (renderPassState.active)
@@ -4705,6 +4743,9 @@ void Graphics::cleanup()
 		for (auto &cleanUpFn : cleanUpFns)
 			cleanUpFn();
 	cleanUpFunctions.clear();
+	
+	// Clear any remaining deferred uploads
+	deferredUploads.clear();
 
 	vmaDestroyAllocator(vmaAllocator);
 
@@ -4735,6 +4776,7 @@ void Graphics::cleanup()
 	for (const auto &entry : framebuffers)
 		vkDestroyFramebuffer(device, entry.second, nullptr);
 	framebuffers.clear();
+	framebufferUsages.clear();
 
 	vkDestroyCommandPool(device, commandPool, nullptr);
 	vkDestroyPipelineCache(device, pipelineCache, nullptr);

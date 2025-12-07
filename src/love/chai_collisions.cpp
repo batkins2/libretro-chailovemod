@@ -100,14 +100,14 @@ public:
                         float normalZ = inManifold.mWorldSpaceNormal.GetZ();
                         // Get penetration depth
                         float penetrationDepth = inManifold.mPenetrationDepth;
-                        printf("Contact normal for character %s: (%.2f, %.2f, %.2f)\n", cc->charId.c_str(), inManifold.mWorldSpaceNormal.GetX(), inManifold.mWorldSpaceNormal.GetY(), inManifold.mWorldSpaceNormal.GetZ());
+                        // printf("Contact normal for character %s: (%.2f, %.2f, %.2f)\n", cc->charId.c_str(), inManifold.mWorldSpaceNormal.GetX(), inManifold.mWorldSpaceNormal.GetY(), inManifold.mWorldSpaceNormal.GetZ());
                         // auto vel = cc->character->GetLinearVelocity();
                         if (normalZ < 0) {
-                            printf("Front collision detected for character %s\n", cc->charId.c_str());
+                            // printf("Front collision detected for character %s\n", cc->charId.c_str());
                             // cc->collidedZ = true;
                             cc->perimeterPenetration = penetrationDepth;
                         } else if (normalZ > 0) {
-                            printf("Back collision detected for character %s\n", cc->charId.c_str());
+                            // printf("Back collision detected for character %s\n", cc->charId.c_str());
                             // cc->collidedX = true;
                             cc->perimeterPenetration = penetrationDepth;
                         } else {
@@ -230,12 +230,12 @@ public:
                         float penetrationDepth = inManifold.mPenetrationDepth;
                         // auto vel = cc->character->GetLinearVelocity();
                         if (normalZ < 0) {
-                            printf("Front collision detected for character %s\n", cc->charId.c_str());
+                            // printf("Front collision detected for character %s\n", cc->charId.c_str());
                             // cc->collidedZ = true;
                             cc->perimeterPenetration = penetrationDepth;
 
                         } else if (normalZ > 0) {
-                            printf("Back collision detected for character %s\n", cc->charId.c_str());
+                            // printf("Back collision detected for character %s\n", cc->charId.c_str());
                             // cc->collidedZ = true;
                             cc->perimeterPenetration = penetrationDepth;
                         } else {
@@ -298,7 +298,7 @@ public:
             vel2.SetX(0);
             vel1.SetZ(0);
             vel2.SetZ(0);
-            printf("Character collision: Setting velocities to zero\n");
+            // printf("Character collision: Setting velocities to zero\n");
             // bodyInterface.SetLinearVelocity(event.character1ID, vel1);
             // bodyInterface.SetLinearVelocity(event.character2ID, vel2);
         }
@@ -341,7 +341,7 @@ public:
         // Get what we hit
         JPH::ObjectLayer hitLayer = bodyInterface.GetObjectLayer(inBodyID2);
         
-        printf("Character %s contacted layer %d\n", characterController->charId.c_str(), hitLayer);
+        // printf("Character %s contacted layer %d\n", characterController->charId.c_str(), hitLayer);
         
         // Handle different collision types
         switch (hitLayer) {
@@ -351,14 +351,14 @@ public:
                 characterController->collidedZ = true;
                 ioSettings.mCanPushCharacter = false;      // AI can't push this character
                 ioSettings.mCanReceiveImpulses = false;    // Character won't receive impulses from AI
-                printf("Character %s hit AI - blocking movement\n", characterController->charId.c_str());
+                // printf("Character %s hit AI - blocking movement\n", characterController->charId.c_str());
                 break;
                 
             case Layers::MOVING:
                 // Character hit moving object - allow some interaction
                 ioSettings.mCanPushCharacter = true;       // Moving objects can push character
                 ioSettings.mCanReceiveImpulses = true;     // Character can receive impulses
-                printf("Character %s hit moving object\n", characterController->charId.c_str());
+                // printf("Character %s hit moving object\n", characterController->charId.c_str());
                 break;
                 
             case Layers::NON_MOVING:
@@ -367,7 +367,7 @@ public:
                 characterController->collidedZ = true;
                 ioSettings.mCanPushCharacter = false;      // Static objects can't be pushed
                 ioSettings.mCanReceiveImpulses = false;    // No impulses from static objects
-                printf("Character %s hit static geometry - full stop\n", characterController->charId.c_str());
+                // printf("Character %s hit static geometry - full stop\n", characterController->charId.c_str());
                 break;
                 
             case Layers::BOUNDARY:
@@ -376,7 +376,7 @@ public:
                 characterController->collidedZ = true;
                 ioSettings.mCanPushCharacter = false;
                 ioSettings.mCanReceiveImpulses = false;
-                printf("Character %s hit boundary - hard stop\n", characterController->charId.c_str());
+                // printf("Character %s hit boundary - hard stop\n", characterController->charId.c_str());
                 break;
         }
         
@@ -411,14 +411,14 @@ public:
                 ioNewCharacterVelocity.SetX(0.0f);
                 ioNewCharacterVelocity.SetZ(0.0f);
                 // Keep Y velocity for gravity/jumping
-                printf("Character %s velocity stopped due to AI collision\n", characterController->charId.c_str());
+                // printf("Character %s velocity stopped due to AI collision\n", characterController->charId.c_str());
                 break;
                 
             case Layers::MOVING:
                 // Reduce velocity when hitting moving objects
                 ioNewCharacterVelocity = ioNewCharacterVelocity * 0.5f;
                 ioNewCharacterVelocity.SetY(inCharacterVelocity.GetY()); // Preserve Y velocity
-                printf("Character %s velocity reduced due to moving object collision\n", characterController->charId.c_str());
+                // printf("Character %s velocity reduced due to moving object collision\n", characterController->charId.c_str());
                 break;
                 
             case Layers::NON_MOVING:
@@ -426,7 +426,7 @@ public:
                 // Project velocity along the surface for wall sliding
                 JPH::Vec3 projectedVelocity = inCharacterVelocity - inContactNormal * inCharacterVelocity.Dot(inContactNormal);
                 ioNewCharacterVelocity = projectedVelocity;
-                printf("Character %s sliding along surface\n", characterController->charId.c_str());
+                // printf("Character %s sliding along surface\n", characterController->charId.c_str());
                 break;
         }
     }
@@ -441,22 +441,22 @@ private:
         // Block movement in specific directions based on contact normal
         if (normalX > 0.7f) {
             cc->collidedX = true;
-            printf("Character %s X movement blocked\n", cc->charId.c_str());
+            // printf("Character %s X movement blocked\n", cc->charId.c_str());
         }
         if (normalZ > 0.7f) {
             cc->collidedZ = true;
-            printf("Character %s Z movement blocked\n", cc->charId.c_str());
+            // printf("Character %s Z movement blocked\n", cc->charId.c_str());
         }
         
         // Handle ground contact
         if (normalY > 0.8f && contactNormal.GetY() > 0) {
             // Character is on ground - enable full friction
             ioSettings.mCanPushCharacter = false;
-            printf("Character %s on ground - full friction\n", cc->charId.c_str());
+            // printf("Character %s on ground - full friction\n", cc->charId.c_str());
         } else if (normalY > 0.3f) {
             // Character on slope - reduced friction
             ioSettings.mCanPushCharacter = true;
-            printf("Character %s on slope - reduced friction\n", cc->charId.c_str());
+            // printf("Character %s on slope - reduced friction\n", cc->charId.c_str());
         }
     }
 };
@@ -1792,7 +1792,8 @@ void chai_collisions::destroy()
             int group = rm->group[i];
             if (worlds->worlds.find(group) != worlds->worlds.end()) {
 
-                JPH::BodyInterface& bodyInterface = JPH::PhysicsSystem().GetBodyInterface();
+                auto ps = worlds->worlds[rm->group[i]]->physics_system;
+                JPH::BodyInterface& bodyInterface = ps->GetBodyInterface();
                 bodyInterface.RemoveBody(rm->bodyID);
                 bodyInterface.DestroyBody(rm->bodyID);                
             }

@@ -25,7 +25,14 @@ class chai_shader {
     void sendInt(const std::string &uniform, int data);
     size_t sendMap(const std::string &uniform, const std::map<int, glm::mat4> &data, const std::vector<int> &order);
     void sendConstant(const std::string &uniform, const std::vector<chaiscript::Boxed_Value> &data);
+    void sendConstant(const std::string &uniform, const std::vector<glm::vec4> &data);
     int send(const std::string &uniform, const std::vector<chaiscript::Boxed_Value> &data);
+    int send(const std::string &uniform, const std::vector<glm::mat4> &data);
+    int send(const std::string &uniform, const glm::mat4 &data);
+    int send(const std::string &uniform, const std::vector<int> &data);
+    void send(const std::string &uniform, float data);
+    void send(const std::string &uniform, const glm::vec3 &data);
+    void send(const std::string &uniform, const std::vector<glm::vec3> &data);
     void newFrame() {
         modelCount = 0;
         modelJointOffset = 0;
@@ -35,5 +42,8 @@ class chai_shader {
     gfx::Shader *fragmentShader;
     int modelCount = 0;
     int modelJointOffset = 0;
+    std::vector<float> m_floatCache;
+    std::vector<int> m_intCache;
+    std::vector<glm::mat4> m_mat4Cache;
 };
 }

@@ -10,6 +10,7 @@
 #include <retro_dirent.h>
 #include <streams/file_stream.h>
 #include "libretro_vulkan.h"
+#include <MemPlumber.h>
 
 // #if defined(HAVE_PSGL)
 // #define RARCH_GL_FRAMEBUFFER GL_FRAMEBUFFER_OES
@@ -535,6 +536,9 @@ static bool retro_init_hw_context(void)
  * libretro callback; Initialize the core.
  */
 void retro_init(void) {
+
+	MemPlumber::start();
+
 	// Pixel Format
 	enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
 	if (!ChaiLove::environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt)) {
@@ -567,6 +571,11 @@ void retro_init(void) {
 void retro_deinit(void) {
 	LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] retro_deinit()" << std::endl;
 	ChaiLove::destroy();
+	size_t memLeakCount;
+	uint64_t memLeakSize;
+	MemPlumber::memLeakCheck(memLeakCount, memLeakSize, true);
+
+	std::printf("[ChaiLove] MemPlumber detected %zu memory leaks totaling %llu bytes.\n", memLeakCount, memLeakSize);
 }
 
 /**

@@ -106,6 +106,7 @@ public:
 	~Variant();
 
 	Variant &operator = (const Variant &v);
+	Variant &operator = (Variant &&v) noexcept;
 
 	Type getType() const { return type; }
 	const Data &getData() const { return data; }

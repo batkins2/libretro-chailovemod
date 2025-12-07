@@ -232,7 +232,7 @@ Buffer::Buffer(Graphics *gfx, const Settings &settings, const std::vector<DataDe
 	this->arrayStride = stride;
 	this->arrayLength = arraylength;
 	if (storagebuffer)
-		size = size * 4;
+		size = 1024768;
 	this->size = size;
 	
 

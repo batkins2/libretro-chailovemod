@@ -81,6 +81,7 @@ SpriteBatch::SpriteBatch(Graphics *gfx, Texture *texture, int size, BufferDataUs
 
 SpriteBatch::~SpriteBatch()
 {
+	attached_attributes.clear();
 	free(vertex_data);
 }
 

@@ -106,20 +106,26 @@ Variant::Variant(Variant &&v)
 	, data(std::move(v.data))
 {
 	v.type = NIL;
+	memset(&v.data, 0, sizeof(v.data));
 }
 
 Variant::~Variant()
 {
-	if (type == STRING)
+	if (type == STRING && data.string != nullptr)
 		data.string->release();
 	else if (type == LOVEOBJECT && data.objectproxy.object != nullptr)
 		data.objectproxy.object->release();
-	else if (type == TABLE)
+	else if (type == TABLE && data.table != nullptr)
 		data.table->release();
 }
 
 Variant &Variant::operator = (const Variant &v)
 {
+	// Handle self-assignment
+	if (this == &v)
+		return *this;
+
+	// Retain new resources first (exception safety)
 	if (v.type == STRING)
 		v.data.string->retain();
 	else if (v.type == LOVEOBJECT && v.data.objectproxy.object != nullptr)
@@ -127,15 +133,42 @@ Variant &Variant::operator = (const Variant &v)
 	else if (v.type == TABLE)
 		v.data.table->retain();
 
-	if (type == STRING)
+	// Release old resources
+	if (type == STRING && data.string != nullptr)
 		data.string->release();
 	else if (type == LOVEOBJECT && data.objectproxy.object != nullptr)
 		data.objectproxy.object->release();
-	else if (type == TABLE)
+	else if (type == TABLE && data.table != nullptr)
 		data.table->release();
 
+	// Assign new values
 	type = v.type;
 	data = v.data;
+
+	return *this;
+}
+
+Variant &Variant::operator = (Variant &&v) noexcept
+{
+	// Handle self-assignment
+	if (this == &v)
+		return *this;
+
+	// Clean up current contents first
+	if (type == STRING && data.string != nullptr)
+		data.string->release();
+	else if (type == LOVEOBJECT && data.objectproxy.object != nullptr)
+		data.objectproxy.object->release();
+	else if (type == TABLE && data.table != nullptr)
+		data.table->release();
+
+	// Take ownership of v's contents
+	type = v.type;
+	data = v.data;
+
+	// Leave v in a valid empty state so its destructor is safe
+	v.type = NIL;
+	memset(&v.data, 0, sizeof(v.data));
 
 	return *this;
 }

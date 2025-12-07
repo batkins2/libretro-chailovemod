@@ -74,5 +74,8 @@ class chai_gfx {
     // GLuint shadowMapFBO = 0;
     // GLuint shadowMap = 0;
     bool reinit = false;
+
+    size_t leakCountBefore = 0, leakCountAfter = 0;
+    uint64_t leakSizeBefore = 0, leakSizeAfter = 0;
 };
 }

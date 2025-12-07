@@ -13,6 +13,8 @@
 #include "../../vendor/tinygltf/tiny_gltf.h"
 #endif
 
+#include <memplumber.h>
+
 namespace love
 {
 chai_mesh::chai_mesh(std::vector<chai_meshData*> &data) {
@@ -157,6 +159,7 @@ void loadTexture(gfx::Mesh *mesh, std::string texture) {
 
     auto tex = gfx->newTexture(settings, &slices);
     tex->replacePixels(copyOfPixelData, dataSize*4, 0, 0, rect, false);
+    delete[] copyOfPixelData;  // Free allocated pixel buffer
 
     mesh->setTexture(tex);
 }
@@ -616,6 +619,7 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
             rect.w = 64;
             rect.h = 64;
             tex->replacePixels(blackPixel, 4*64*64, 0, 0, rect, true);
+            delete[] blackPixel;  // Free allocated pixel buffer
             gfx::SamplerState sampler = gfx::SamplerState();
 
             sampler.wrapU = gfx::SamplerState::WrapMode::WRAP_REPEAT;
@@ -770,20 +774,22 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
         }
     }
 
-    auto matrix = Matrix4(new float[16] {
+    float matrixData[16] = {
         modelMatrix[0][0], modelMatrix[0][1], modelMatrix[0][2], modelMatrix[0][3],
         modelMatrix[1][0], modelMatrix[1][1], modelMatrix[1][2], modelMatrix[1][3],
         modelMatrix[2][0], modelMatrix[2][1], modelMatrix[2][2], modelMatrix[2][3],
         modelMatrix[3][0], modelMatrix[3][1], modelMatrix[3][2], modelMatrix[3][3]
-    });
+    };
+    auto matrix = Matrix4(matrixData);
 
     cm->matrices.push_back(matrix);
-    cm->offsetMatrices.push_back(Matrix4(new float[16] {
+    float identityData[16] = {
         1.0f, 0.0f, 0.0f, 0.0f,
         0.0f, 1.0f, 0.0f, 0.0f,
         0.0f, 0.0f, 1.0f, 0.0f,
         0.0f, 0.0f, 0.0f, 1.0f
-    }));
+    };
+    cm->offsetMatrices.push_back(Matrix4(identityData));
 
     for (int count = 0; count < 4; count++) {
         cm->cameraParams.push_back(std::map<std::string, std::vector<float>>());
@@ -1125,6 +1131,7 @@ bool LoadImageData(tinygltf::Image *image, const int image_idx, std::string *err
 
     auto tex = cm->instance->newTexture(settings, &slices);
     tex->replacePixels(copyOfPixelData, dataSize*4, 0, 0, rect, false);
+    delete[] copyOfPixelData;  // Free allocated pixel buffer
 
     gfx::SamplerState sampler = gfx::SamplerState();
 
@@ -1322,6 +1329,7 @@ bool chai_mesh::wrap_setTexture(const std::string &texture) {
 
     tex = gfx->newTexture(settings, &slices);
     tex->replacePixels(copyOfPixelData, dataSize*4, 0, 0, rect, false);
+    delete[] copyOfPixelData;  // Free allocated pixel buffer
     // image.push_back(i->newImageData(w, h, settings.format, pixelData, false));
     // auto image = i->newImageData(w, h, settings.format, copyOfPixelData, false);
 
@@ -1615,12 +1623,13 @@ void chai_mesh::update(std::vector<float> position, std::vector<float> rotation,
         // matrix = glm::scale(matrix, glm::vec3(0.4f, 0.4f, 0.4f)); // Scale the model matrix to match the original scale
 
         auto diff = physMat;
-        offsetMatrices[i] = Matrix4(new float[16] {
+        float diffData[16] = {
             diff[0][0], diff[0][1], diff[0][2], diff[0][3],
             diff[1][0], diff[1][1], diff[1][2], diff[1][3],
             diff[2][0], diff[2][1], diff[2][2], diff[2][3],
             diff[3][0], diff[3][1], diff[3][2], diff[3][3]
-        });
+        };
+        offsetMatrices[i] = Matrix4(diffData);
 
         debug->visualizeMatrix(physMat);
 
@@ -1635,12 +1644,258 @@ void chai_mesh::update(std::vector<float> position, std::vector<float> rotation,
 
 }
 
-void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt) {
+// void chai_mesh::preloadAnimations() {
+//     std::map<std::string, std::map<int, glm::mat4>> animationsMatrices;
+//     for (const auto& animPair : animations) {
+//         int i = 0;
+//         const std::string& name = animPair.first;
+//         // Calculate and cache the matrix data for the animation
+//         if (jointList.size() > i) {                    
+//             jointList[i] = std::vector<int>();
+//             jointMatrix[i] = std::map<int, glm::mat4>();
+//         } else {
+//             jointList.push_back(std::vector<int>());
+//             jointMatrix.push_back(std::map<int, glm::mat4>());
+//         }
+//         auto jointIBMatrix = std::map<int, glm::mat4>();
+
+//         if (jointOrder.find(i) != jointOrder.end()) {
+//             for (auto joint : jointOrder[i]) {
+//                 auto matrix = skins[i][joint];
+//                 jointIBMatrix[joint] = glm::mat4(
+//                     matrix[0], matrix[1], matrix[2], matrix[3],
+//                     matrix[4], matrix[5], matrix[6], matrix[7],
+//                     matrix[8], matrix[9], matrix[10], matrix[11],
+//                     matrix[12], matrix[13], matrix[14], matrix[15]
+//                 );
+//                 jointMatrix[i][joint] = glm::mat4(1.0);
+//                 jointList[i].push_back(joint);
+
+//                 nodeActiveMatrix[joint] = glm::inverse(jointIBMatrix[joint]);
+//             }
+//         }
+
+//         auto animPlaying = -1;
+//         int nodeIndex = -1;
+
+//         for (const auto& channel : animPair.second) {           
+//             auto chan = channel.first;
+//             for (const auto& keyframe : channel.second) {
+//                 nodeIndex = keyframe.first;
+//                 auto animTime = keyframe.second.back().first;
+                
+
+//                 if (jointMatrix[i].find(nodeIndex) == jointMatrix[i].end()) {
+//                     continue;
+//                 }
+//                 const auto& keyframes = keyframe.second;
+
+//                 // Find the two keyframes to interpolate between
+//                 auto it = std::lower_bound(keyframes.begin(), keyframes.end(), animTime,
+//                     [](const std::pair<float, glm::vec4>& a, float b) {
+//                         return a.first < b;
+//                     });
+
+//                 if (it == keyframes.end()) {
+//                     // Use the last keyframe if the current time is beyond the last keyframe
+//                     it = keyframes.end() - 1;
+//                 }
+
+//                 auto nextIt = it + 1;
+//                 if (nextIt == keyframes.end()) {
+//                     nextIt = it;
+//                 }
+
+//                 float t1 = it->first;
+//                 float t2 = nextIt->first;
+
+//                 const glm::vec4& v1 = it->second;
+//                 const glm::vec4& v2 = nextIt->second;
+
+//                 // Interpolate between the two keyframes
+//                 float t = (t1 - animTime) / (t2 - t1);
+//                 glm::vec4 interpolatedValue = glm::vec4(1.0);
+//                 if (chan != "rotation") {
+//                     interpolatedValue = glm::mix(v1, v2, t);
+//                 }
+                
+//                 if (animPlaying == -1) {
+//                     animPlaying = 0;
+//                 }
+
+//                 if (glm::all(glm::isnan(interpolatedValue)) == false) {
+//                     auto nodes = std::vector<int>();
+//                     nodes.push_back(nodeIndex);
+//                     int parent = -1;
+//                     int root = -1;
+//                     int subroot = -1;
+//                     auto offset = glm::mat4(1.0f);
+//                     auto hierarchy = std::vector<int>();
+//                     int np = nodeIndex;
+
+//                     // Initialize the hierarchy vector with np
+//                     hierarchy.push_back(np);
+
+//                     // Traverse the nodeParent pairs to find the parent of the current node
+//                     while (true) {
+//                         bool found = false;
+//                         for (const auto& pair : nodeParent) {
+//                             if (pair.first == np) {   
+//                                 subroot = np;                                         
+//                                 np = pair.second;
+//                                 hierarchy.push_back(np);
+//                                 found = true;
+//                                 break;
+//                             }
+//                         }
+//                         if (!found) {
+//                             root = np;
+//                             // root = 61;
+//                             // subroot = np; // Set subroot to the last node in hierarchy
+//                             // root = 0; // Set root to the current nodeIndex
+//                             break; // Reached the root node
+//                         }
+//                     }
+
+//                     // subroot = 61;
+                    
+//                     for (auto node : nodeChildren) {
+//                         for (auto n : node.second) {
+//                             if (n == nodeIndex) {
+//                                 parent = node.first;
+//                                 break;
+//                             }
+                            
+//                         }
+//                         if (parent != -1) {
+//                             break;
+//                         }
+                        
+//                     }
+//                     for (auto nodeChild : nodeChildren[nodeIndex]) {
+//                         nodes = getChildNodes(nodeChildren, nodeChild, nodes);
+//                     }
+//                     for (auto node : nodes) {
+//                         if (false && node == root) {
+//                             glm::mat4 trs = jointMatrix[i][node];
+
+//                             // Apply translation
+//                             if (chan == "translation") {
+//                                 animPlaying = 1;
+//                                 printf("NodeIndex: %d\n", nodeIndex);
+//                                 printf("AnimTime: %f\n", animTime);
+//                                 printf("t1: %f, t2: %f, t: %f\n", t1, t2, t);
+//                                 printf("v1: %f %f %f %f\n", v1.x, v1.y, v1.z, v1.w);
+//                                 printf("v2: %f %f %f %f\n", v2.x, v2.y, v2.z, v2.w);
+//                                 printf("Translate: %d %f %f %f\n", node, interpolatedValue.x, interpolatedValue.y, interpolatedValue.z);
+//                                 jointMatrix[i][node] = glm::translate(glm::mat4(1.0f), glm::vec3(interpolatedValue.w, interpolatedValue.z, interpolatedValue.y)) * jointMatrix[i][node];
+//                             }
+
+//                             // Apply rotation
+//                             if (chan == "rotation" && t <= 1.0f && t >= 0.0f) {
+//                                 // glm::quat rotation = glm::slerp(glm::quat(v2.w, v2.x, v2.y, v2.z), glm::quat(v1.w, v1.x, v1.y, v1.z), t);
+//                                 // trs *= glm::mat4_cast(rotation);
+//                             }
+
+//                             // Apply scale
+//                             if (chan == "scale") {
+//                                 // glm::vec3 v(interpolatedValue);
+//                                 // trs = glm::scale(trs, v);
+//                             }
+
+//                             // Combine with inverse bind matrix if needed
+//                             // jointMatrix[i][node] = trs;
+//                         } else if (true) {
+//                             if (chan == "translation") {
+
+//                                 animPlaying = 1;
+//                                 jointMatrix[i][node] = glm::translate(glm::mat4(1.0f), glm::vec3(interpolatedValue.x, interpolatedValue.z, interpolatedValue.y)) * jointMatrix[i][node];
+//                                 // glm::vec3 v(interpolatedValue);
+//                                 // jointMatrix[i][node] = glm::translate(jointMatrix[i][node], v) * jointMatrix[i][node];
+//                                 // printf("Translate: %d %f %f %f\n", node, interpolatedValue.x, interpolatedValue.y, interpolatedValue.z);
+//                             } else if (chan == "rotation" && t <= 1.0f && t >= 0.0f) {
+//                                 animPlaying = 1;
+//                                 glm::quat rotation = glm::quat(1.0f, 1.0f, 1.0f, 1.0f);
+//                                 auto bindMatrix = glm::inverse(jointIBMatrix[node]);
+//                                 if (node == nodes[0]) {
+//                                     rotation = glm::slerp(glm::quat(v2.w, v2.x, v2.y, v2.z), glm::quat(v1.w, v1.x, v1.y, v1.z), t);
+//                                     auto parentMatrix = glm::mat4(1.0f);
+//                                     if (true || parent != root) {
+//                                         parentMatrix = jointIBMatrix[root];
+//                                     }
+                                    
+//                                     auto invMatrix = glm::inverse(nodeMatrix[node]);
+                                    
+//                                     auto hierarchyRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+//                                     auto hierarchyRotation2 = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+//                                     for (auto h = hierarchy.rbegin(); h != hierarchy.rend(); ++h) {
+//                                         if (node == subroot) {
+//                                             hierarchyRotation = hierarchyRotation * glm::quat_cast(jointMatrix[i][*h]);
+//                                             hierarchyRotation2 = hierarchyRotation2 * glm::quat_cast(glm::inverse(nodeMatrix[*h]));
+//                                         } else {
+//                                             if (*h == node) {
+//                                                 hierarchyRotation = hierarchyRotation * glm::quat_cast(jointMatrix[i][*h]);
+//                                                 hierarchyRotation2 = hierarchyRotation2 * glm::quat_cast(glm::inverse(nodeMatrix[*h]));
+//                                             }
+//                                         }
+//                                     }
+
+//                                     rotation = hierarchyRotation * rotation;
+//                                     rotation = hierarchyRotation2 * rotation;
+                                                                                    
+//                                     rotation = glm::normalize(rotation);
+                                    
+//                                     jointMatrix[i][node] = bindMatrix * glm::mat4_cast(rotation) * jointIBMatrix[node] * jointMatrix[i][node];
+//                                     parent = node;
+//                                 } else {
+//                                     // Child node
+//                                     jointMatrix[i][node] = jointMatrix[i][parent] * jointMatrix[i][node];
+//                                 }
+//                             } else if (chan == "scale") {
+//                                 animPlaying = 1;
+//                                 glm::vec3 v(interpolatedValue);
+//                                 jointMatrix[i][node] = glm::scale(jointMatrix[i][node], v) * jointMatrix[i][node];
+//                             }
+
+//                             nodeActiveMatrix[node] = jointMatrix[i][node] * glm::inverse(jointIBMatrix[node]); 
+//                         }
+//                         animationsMatrices[name][node] = nodeActiveMatrix[node];
+//                     }
+//                 }              
+//             }            
+//         }
+//     }
+//     std::printf("Preloaded Animations Matrices\n");
+// }
+
+void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt, chai_shader *computeShader) {
+    nodeActiveMatrix.clear();
+
+    if (m_modelMatrixCacheRaw.size() != 16) {
+        m_modelMatrixCacheRaw.resize(16, 0.0f);
+    }
+    
+    if (m_isSpecularCache0.empty()) {
+        m_isSpecularCache0.push_back(0);
+    }
+    
+    if (m_isSpecularCache1.empty()) {
+        m_isSpecularCache1.push_back(1);
+    }
+    
+    if (m_jointInfoCache.size() != 4) {
+        m_jointInfoCache.resize(4);
+    }
+    
+    // size_t leakCountBefore, leakCountAfter;
+    // uint64_t leakSizeBefore, leakSizeAfter;
+    
+    // __mem_leak_check(leakCountBefore, leakSizeBefore, true, "", false);
+
     if (mesh != nullptr) {
         mesh->draw(gfx, m);
     } else {
-        
-        
+        // preloadAnimations();
         int i = 0;
         for (int j = 0; j < meshes.size(); j++) {                      
             auto msh = meshes[j];
@@ -1654,8 +1909,8 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
 
             if (currentTime != dt) {
                 if (jointList.size() > i) {                    
-                    jointList[i] = std::vector<int>();
-                    jointMatrix[i] = std::map<int, glm::mat4>();
+                    jointList[i].clear();
+                    jointMatrix[i].clear();
                 } else {
                     jointList.push_back(std::vector<int>());
                     jointMatrix.push_back(std::map<int, glm::mat4>());
@@ -1683,213 +1938,411 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                 std::string name = "";
                 std::map<std::string, bool> eraseAnimations;
 
-                for (auto activeAnimation : activeAnimations) {
-                    name = activeAnimation.first;
-                    animTime = activeAnimation.second.first;
-                    // animTime = 2.5f;
-                    // animTime = 0.1f;
-                    loop = activeAnimation.second.second;
+                if (true || computeShader != nullptr) {
+                    std::vector<float> packedData;
+                    // if (msh == nullptr && jointList[i].size() > 0) {    
+                    //     packedData.push_back((float)jointList[i].size()); // Placeholder for alignment
+                    //     packedData.push_back(0.0f); // Placeholder for alignment
+                    //     packedData.push_back(0.0f); // Placeholder for alignment
+                    //     packedData.push_back(0.0f); // Placeholder for alignment
+                    // }
+                    for (auto activeAnimation : activeAnimations) {
+                        name = activeAnimation.first;
+                        animTime = activeAnimation.second.first;
+                        // animTime = 2.5f;
+                        // animTime = 0.1f;
+                        loop = activeAnimation.second.second;
 
-                    auto animPlaying = -1;
+                        auto animPlaying = -1;
 
-                    auto animation = animations[name];
-                    int nodeIndex = -1;
+                        auto animation = animations[name];
+                        int nodeIndex = -1;
 
-                    for (const auto& channel : animation) {
+                        if (false) {
+                            for (const auto& channel : animation) {
 
-                        auto chan = channel.first;
-                        for (const auto& keyframe : channel.second) {
-                            nodeIndex = keyframe.first;
+                                auto chan = channel.first;
+                                for (const auto& keyframe : channel.second) {
+                                    nodeIndex = keyframe.first;
 
-                            if (jointMatrix[i].find(nodeIndex) == jointMatrix[i].end()) {
-                                continue;
-                            }
-                            const auto& keyframes = keyframe.second;
-
-                            // Find the two keyframes to interpolate between
-                            auto it = std::lower_bound(keyframes.begin(), keyframes.end(), animTime,
-                                [](const std::pair<float, glm::vec4>& a, float b) {
-                                    return a.first < b;
-                                });
-
-                            if (it == keyframes.end()) {
-                                // Use the last keyframe if the current time is beyond the last keyframe
-                                it = keyframes.end() - 1;
-                            }
-
-                            auto nextIt = it + 1;
-                            if (nextIt == keyframes.end()) {
-                                nextIt = it;
-                            }
-
-                            float t1 = it->first;
-                            float t2 = nextIt->first;
-
-                            const glm::vec4& v1 = it->second;
-                            const glm::vec4& v2 = nextIt->second;
-
-                            // Interpolate between the two keyframes
-                            float t = (t1 - animTime) / (t2 - t1);
-                            glm::vec4 interpolatedValue = glm::vec4(1.0);
-                            if (chan != "rotation") {
-                                interpolatedValue = glm::mix(v1, v2, t);
-                            }
-
-                            if (animPlaying == -1) {
-                                animPlaying = 0;
-                            }
-
-                            // Update the joint matrix
-                            if (glm::all(glm::isnan(interpolatedValue)) == false) {
-                                auto nodes = std::vector<int>();
-                                nodes.push_back(nodeIndex);
-                                int parent = -1;
-                                int root = -1;
-                                int subroot = -1;
-                                auto offset = glm::mat4(1.0f);
-                                auto hierarchy = std::vector<int>();
-                                int np = nodeIndex;
-
-                                // Initialize the hierarchy vector with np
-                                hierarchy.push_back(np);
-
-                                // Traverse the nodeParent pairs to find the parent of the current node
-                                while (true) {
-                                    bool found = false;
-                                    for (const auto& pair : nodeParent) {
-                                        if (pair.first == np) {   
-                                            subroot = np;                                         
-                                            np = pair.second;
-                                            hierarchy.push_back(np);
-                                            found = true;
-                                            break;
-                                        }
+                                    if (jointMatrix[i].find(nodeIndex) == jointMatrix[i].end()) {
+                                        continue;
                                     }
-                                    if (!found) {
-                                        root = np;
-                                        // root = 61;
-                                        // subroot = np; // Set subroot to the last node in hierarchy
-                                        // root = 0; // Set root to the current nodeIndex
-                                        break; // Reached the root node
-                                    }
-                                }
+                                    const auto& keyframes = keyframe.second;
 
-                                // subroot = 61;
-                                
-                                for (auto node : nodeChildren) {
-                                    for (auto n : node.second) {
-                                        if (n == nodeIndex) {
-                                            parent = node.first;
-                                            break;
-                                        }
-                                        
+                                    // Find the two keyframes to interpolate between
+                                    auto it = std::lower_bound(keyframes.begin(), keyframes.end(), animTime,
+                                        [](const std::pair<float, glm::vec4>& a, float b) {
+                                            return a.first < b;
+                                        });
+
+                                    if (it == keyframes.end()) {
+                                        // Use the last keyframe if the current time is beyond the last keyframe
+                                        it = keyframes.end() - 1;
                                     }
-                                    if (parent != -1) {
-                                        break;
+
+                                    auto nextIt = it + 1;
+                                    if (nextIt == keyframes.end()) {
+                                        nextIt = it;
+                                    }
+
+                                    float t1 = it->first;
+                                    float t2 = nextIt->first;
+
+                                    const glm::vec4& v1 = it->second;
+                                    const glm::vec4& v2 = nextIt->second;
+
+                                    // Interpolate between the two keyframes
+                                    float t = (t1 - animTime) / (t2 - t1);
+                                    glm::vec4 interpolatedValue = glm::vec4(1.0);
+                                    if (chan != "rotation") {
+                                        interpolatedValue = glm::mix(v1, v2, t);
                                     }
                                     
-                                }
-                                for (auto nodeChild : nodeChildren[nodeIndex]) {
-                                    nodes = getChildNodes(nodeChildren, nodeChild, nodes);
-                                }
-                                for (auto node : nodes) {
-                                    if (false && node == root) {
-                                        glm::mat4 trs = jointMatrix[i][node];
+                                    if (animPlaying == -1) {
+                                        animPlaying = 0;
+                                    }
 
-                                        // Apply translation
-                                        if (chan == "translation") {
-                                            animPlaying = 1;
-                                            printf("NodeIndex: %d\n", nodeIndex);
-                                            printf("AnimTime: %f\n", animTime);
-                                            printf("t1: %f, t2: %f, t: %f\n", t1, t2, t);
-                                            printf("v1: %f %f %f %f\n", v1.x, v1.y, v1.z, v1.w);
-                                            printf("v2: %f %f %f %f\n", v2.x, v2.y, v2.z, v2.w);
-                                            printf("Translate: %d %f %f %f\n", node, interpolatedValue.x, interpolatedValue.y, interpolatedValue.z);
-                                            jointMatrix[i][node] = glm::translate(glm::mat4(1.0f), glm::vec3(interpolatedValue.w, interpolatedValue.z, interpolatedValue.y)) * jointMatrix[i][node];
-                                        }
+                                    if (glm::all(glm::isnan(interpolatedValue)) == false) {
+                                        auto nodes = std::vector<int>();
+                                        nodes.push_back(nodeIndex);
+                                        int parent = -1;
+                                        int root = -1;
+                                        int subroot = -1;
+                                        auto offset = glm::mat4(1.0f);
+                                        auto hierarchy = std::vector<int>();
+                                        int np = nodeIndex;
 
-                                        // Apply rotation
-                                        if (chan == "rotation" && t <= 1.0f && t >= 0.0f) {
-                                            // glm::quat rotation = glm::slerp(glm::quat(v2.w, v2.x, v2.y, v2.z), glm::quat(v1.w, v1.x, v1.y, v1.z), t);
-                                            // trs *= glm::mat4_cast(rotation);
-                                        }
+                                        // Initialize the hierarchy vector with np
+                                        hierarchy.push_back(np);
 
-                                        // Apply scale
-                                        if (chan == "scale") {
-                                            // glm::vec3 v(interpolatedValue);
-                                            // trs = glm::scale(trs, v);
-                                        }
-
-                                        // Combine with inverse bind matrix if needed
-                                        // jointMatrix[i][node] = trs;
-                                    } else if (true) {
-                                        if (chan == "translation") {
-
-                                            animPlaying = 1;
-                                            jointMatrix[i][node] = glm::translate(glm::mat4(1.0f), glm::vec3(interpolatedValue.x, interpolatedValue.z, interpolatedValue.y)) * jointMatrix[i][node];
-                                            // glm::vec3 v(interpolatedValue);
-                                            // jointMatrix[i][node] = glm::translate(jointMatrix[i][node], v) * jointMatrix[i][node];
-                                            // printf("Translate: %d %f %f %f\n", node, interpolatedValue.x, interpolatedValue.y, interpolatedValue.z);
-                                        } else if (chan == "rotation" && t <= 1.0f && t >= 0.0f) {
-                                            animPlaying = 1;
-                                            glm::quat rotation = glm::quat(1.0f, 1.0f, 1.0f, 1.0f);
-                                            auto bindMatrix = glm::inverse(jointIBMatrix[node]);
-                                            if (node == nodes[0]) {
-                                                rotation = glm::slerp(glm::quat(v2.w, v2.x, v2.y, v2.z), glm::quat(v1.w, v1.x, v1.y, v1.z), t);
-                                                auto parentMatrix = glm::mat4(1.0f);
-                                                if (true || parent != root) {
-                                                    parentMatrix = jointIBMatrix[root];
+                                        // Traverse the nodeParent pairs to find the parent of the current node
+                                        while (true) {
+                                            bool found = false;
+                                            for (const auto& pair : nodeParent) {
+                                                if (pair.first == np) {   
+                                                    subroot = np;                                         
+                                                    np = pair.second;
+                                                    hierarchy.push_back(np);
+                                                    found = true;
+                                                    break;
                                                 }
-                                                
-                                                auto invMatrix = glm::inverse(nodeMatrix[node]);
-                                                
-                                                auto hierarchyRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-                                                auto hierarchyRotation2 = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-                                                for (auto h = hierarchy.rbegin(); h != hierarchy.rend(); ++h) {
-                                                    if (node == subroot) {
-                                                        hierarchyRotation = hierarchyRotation * glm::quat_cast(jointMatrix[i][*h]);
-                                                        hierarchyRotation2 = hierarchyRotation2 * glm::quat_cast(glm::inverse(nodeMatrix[*h]));
-                                                    } else {
-                                                        if (*h == node) {
-                                                            hierarchyRotation = hierarchyRotation * glm::quat_cast(jointMatrix[i][*h]);
-                                                            hierarchyRotation2 = hierarchyRotation2 * glm::quat_cast(glm::inverse(nodeMatrix[*h]));
-                                                        }
-                                                    }
-                                                }
-
-                                                rotation = hierarchyRotation * rotation;
-                                                rotation = hierarchyRotation2 * rotation;
-                                                                                                
-                                                rotation = glm::normalize(rotation);
-                                                
-                                                jointMatrix[i][node] = bindMatrix * glm::mat4_cast(rotation) * jointIBMatrix[node] * jointMatrix[i][node];
-                                                parent = node;
-                                            } else {
-                                                // Child node
-                                                jointMatrix[i][node] = jointMatrix[i][parent] * jointMatrix[i][node];
                                             }
-                                        } else if (chan == "scale") {
-                                            animPlaying = 1;
-                                            glm::vec3 v(interpolatedValue);
-                                            jointMatrix[i][node] = glm::scale(jointMatrix[i][node], v) * jointMatrix[i][node];
+                                            if (!found) {
+                                                root = np;
+                                                // root = 61;
+                                                // subroot = np; // Set subroot to the last node in hierarchy
+                                                // root = 0; // Set root to the current nodeIndex
+                                                break; // Reached the root node
+                                            }
                                         }
 
-                                        nodeActiveMatrix[node] = jointMatrix[i][node] * glm::inverse(jointIBMatrix[node]);
+                                        // subroot = 61;
+                                        
+                                        for (auto node : nodeChildren) {
+                                            for (auto n : node.second) {
+                                                if (n == nodeIndex) {
+                                                    parent = node.first;
+                                                    break;
+                                                }
+                                                
+                                            }
+                                            if (parent != -1) {
+                                                break;
+                                            }
+                                            
+                                        }
+                                        for (auto nodeChild : nodeChildren[nodeIndex]) {
+                                            nodes = getChildNodes(nodeChildren, nodeChild, nodes);
+                                        }
+                                        for (auto node : nodes) {
+                                            animPlaying = 1;
+                                            packedData[3] = 1.0f; // Indicate that there is animation data
+                                            packedData.push_back(static_cast<float>(node));
+                                            packedData.push_back(static_cast<float>(chan == "translation" ? 0 : (chan == "rotation" ? 1 : 2)));
+                                            packedData.push_back(t1);
+                                            packedData.push_back(t2);
+                                            packedData.push_back(t);
+                                            packedData.push_back(v1.x);
+                                            packedData.push_back(v1.y);
+                                            packedData.push_back(v1.z);
+                                            packedData.push_back(v1.w);
+                                            packedData.push_back(v2.x);
+                                            packedData.push_back(v2.y);
+                                            packedData.push_back(v2.z);
+                                            packedData.push_back(v2.w);
+                                            packedData.push_back(interpolatedValue.x);
+                                            packedData.push_back(interpolatedValue.y);
+                                            packedData.push_back(interpolatedValue.z);
+                                            packedData.push_back(interpolatedValue.w);
+                                            packedData.push_back(jointMatrix[i][nodeIndex][0][0]);
+                                            packedData.push_back(jointMatrix[i][nodeIndex][0][1]);
+                                            packedData.push_back(jointMatrix[i][nodeIndex][0][2]);
+                                            packedData.push_back(jointMatrix[i][nodeIndex][0][3]);
+                                            packedData.push_back(jointMatrix[i][nodeIndex][1][0]);
+                                            packedData.push_back(jointMatrix[i][nodeIndex][1][1]);
+                                            packedData.push_back(jointMatrix[i][nodeIndex][1][2]);
+                                            packedData.push_back(jointMatrix[i][nodeIndex][1][3]);
+                                            packedData.push_back(jointMatrix[i][nodeIndex][2][0]);
+                                            packedData.push_back(jointMatrix[i][nodeIndex][2][1]);
+                                            packedData.push_back(jointMatrix[i][nodeIndex][2][2]);
+                                            packedData.push_back(jointMatrix[i][nodeIndex][2][3]);
+                                            packedData.push_back(jointMatrix[i][nodeIndex][3][0]);
+                                            packedData.push_back(jointMatrix[i][nodeIndex][3][1]);
+                                            packedData.push_back(jointMatrix[i][nodeIndex][3][2]);
+                                            packedData.push_back(jointMatrix[i][nodeIndex][3][3]);
+                                            packedData.push_back(jointIBMatrix[nodeIndex][0][0]);
+                                            packedData.push_back(jointIBMatrix[nodeIndex][0][1]);
+                                            packedData.push_back(jointIBMatrix[nodeIndex][0][2]);
+                                            packedData.push_back(jointIBMatrix[nodeIndex][0][3]);
+                                            packedData.push_back(jointIBMatrix[nodeIndex][1][0]);
+                                            packedData.push_back(jointIBMatrix[nodeIndex][1][1]);
+                                            packedData.push_back(jointIBMatrix[nodeIndex][1][2]);
+                                            packedData.push_back(jointIBMatrix[nodeIndex][1][3]);
+                                            packedData.push_back(jointIBMatrix[nodeIndex][2][0]);
+                                            packedData.push_back(jointIBMatrix[nodeIndex][2][1]);
+                                            packedData.push_back(jointIBMatrix[nodeIndex][2][2]);
+                                            packedData.push_back(jointIBMatrix[nodeIndex][2][3]);
+                                            packedData.push_back(jointIBMatrix[nodeIndex][3][0]);
+                                            packedData.push_back(jointIBMatrix[nodeIndex][3][1]);
+                                            packedData.push_back(jointIBMatrix[nodeIndex][3][2]);
+                                            packedData.push_back(jointIBMatrix[nodeIndex][3][3]);
+                                        }
                                     }
                                 }
                             } 
                         }
-                    }
-                    if (animPlaying == 1) {
-                        activeAnimations[name].first += dt; // Increment animation time
-                    } else if (animPlaying == 0) {
-                        if (loop) {
-                            activeAnimations[name].first = 0.1f;
-                        } else {
-                            eraseAnimations[name] = true;
+                                           
+
+                        
+                        // auto info = computeShader->shader->getUniformInfo("InputBuffer");
+                        // gfx::Buffer *buffer = gfx->getDefaultStorageBuffer();
+                        // computeShader->shader->sendBuffers(info, &buffer, 1);
+
+                        if (true) {
+                            for (const auto& channel : animation) {
+
+                                auto chan = channel.first;
+                                for (const auto& keyframe : channel.second) {
+                                    nodeIndex = keyframe.first;
+
+                                    if (jointMatrix[i].find(nodeIndex) == jointMatrix[i].end()) {
+                                        continue;
+                                    }
+                                    const auto& keyframes = keyframe.second;
+
+                                    // Find the two keyframes to interpolate between
+                                    auto it = std::lower_bound(keyframes.begin(), keyframes.end(), animTime,
+                                        [](const std::pair<float, glm::vec4>& a, float b) {
+                                            return a.first < b;
+                                        });
+
+                                    if (it == keyframes.end()) {
+                                        // Use the last keyframe if the current time is beyond the last keyframe
+                                        it = keyframes.end() - 1;
+                                    }
+
+                                    auto nextIt = it + 1;
+                                    if (nextIt == keyframes.end()) {
+                                        nextIt = it;
+                                    }
+
+                                    float t1 = it->first;
+                                    float t2 = nextIt->first;
+
+                                    const glm::vec4& v1 = it->second;
+                                    const glm::vec4& v2 = nextIt->second;
+
+                                    // Interpolate between the two keyframes
+                                    float t = (t1 - animTime) / (t2 - t1);
+                                    glm::vec4 interpolatedValue = glm::vec4(1.0);
+                                    if (chan != "rotation") {
+                                        interpolatedValue = glm::mix(v1, v2, t);
+                                    }
+
+                                    if (animPlaying == -1) {
+                                        animPlaying = 0;
+                                    }
+
+                                    auto &jointCache = animationFrameMatrixCache[name][animTime];
+                                    auto iter = jointCache.find(nodeIndex);
+                                    if (iter != jointCache.end() && glm::all(glm::isnan(interpolatedValue)) == false) {
+                                        // Use cached matrix
+                                        // std::printf("Using cached matrix for node %d at time %f\n", nodeIndex, animTime);
+                                        // std::printf("Matrix: %f %f %f %f\n", iter->second[0][0], iter->second[0][1], iter->second[0][2], iter->second[0][3]);
+                                        // std::printf("Matrix: %f %f %f %f\n", iter->second[1][0], iter->second[1][1], iter->second[1][2], iter->second[1][3]);
+                                        // std::printf("Matrix: %f %f %f %f\n", iter->second[2][0], iter->second[2][1], iter->second[2][2], iter->second[2][3]);
+                                        // std::printf("Matrix: %f %f %f %f\n", iter->second[3][0], iter->second[3][1], iter->second[3][2], iter->second[3][3]);
+                                        jointMatrix[i][nodeIndex] = iter->second;
+                                        nodeActiveMatrix[nodeIndex] = jointMatrix[i][nodeIndex] * glm::inverse(jointIBMatrix[nodeIndex]);
+                                        
+                                        if (jointCache.size() > 100) {
+                                            // Remove oldest frame
+                                            auto oldest = animationFrameMatrixCache[name].begin();
+                                            animationFrameMatrixCache[name].erase(oldest);
+                                        }
+                                        animPlaying = 1;
+                                    } else if (glm::all(glm::isnan(interpolatedValue)) == false) {
+                                        auto nodes = std::vector<int>();
+                                        nodes.push_back(nodeIndex);
+                                        int parent = -1;
+                                        int root = -1;
+                                        int subroot = -1;
+                                        auto offset = glm::mat4(1.0f);
+                                        auto hierarchy = std::vector<int>();
+                                        int np = nodeIndex;
+
+                                        // Initialize the hierarchy vector with np
+                                        hierarchy.push_back(np);
+
+                                        // Traverse the nodeParent pairs to find the parent of the current node
+                                        while (true) {
+                                            bool found = false;
+                                            for (const auto& pair : nodeParent) {
+                                                if (pair.first == np) {   
+                                                    subroot = np;                                         
+                                                    np = pair.second;
+                                                    hierarchy.push_back(np);
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                            if (!found) {
+                                                root = np;
+                                                // root = 61;
+                                                // subroot = np; // Set subroot to the last node in hierarchy
+                                                // root = 0; // Set root to the current nodeIndex
+                                                break; // Reached the root node
+                                            }
+                                        }
+
+                                        // subroot = 61;
+                                        
+                                        for (auto node : nodeChildren) {
+                                            for (auto n : node.second) {
+                                                if (n == nodeIndex) {
+                                                    parent = node.first;
+                                                    break;
+                                                }
+                                                
+                                            }
+                                            if (parent != -1) {
+                                                break;
+                                            }
+                                            
+                                        }
+                                        for (auto nodeChild : nodeChildren[nodeIndex]) {
+                                            nodes = getChildNodes(nodeChildren, nodeChild, nodes);
+                                        }
+                                        for (auto node : nodes) {
+                                            if (false && node == root) {
+                                                glm::mat4 trs = jointMatrix[i][node];
+
+                                                // Apply translation
+                                                if (chan == "translation") {
+                                                    animPlaying = 1;
+                                                    printf("NodeIndex: %d\n", nodeIndex);
+                                                    printf("AnimTime: %f\n", animTime);
+                                                    printf("t1: %f, t2: %f, t: %f\n", t1, t2, t);
+                                                    printf("v1: %f %f %f %f\n", v1.x, v1.y, v1.z, v1.w);
+                                                    printf("v2: %f %f %f %f\n", v2.x, v2.y, v2.z, v2.w);
+                                                    printf("Translate: %d %f %f %f\n", node, interpolatedValue.x, interpolatedValue.y, interpolatedValue.z);
+                                                    jointMatrix[i][node] = glm::translate(glm::mat4(1.0f), glm::vec3(interpolatedValue.w, interpolatedValue.z, interpolatedValue.y)) * jointMatrix[i][node];
+                                                }
+
+                                                // Apply rotation
+                                                if (chan == "rotation" && t <= 1.0f && t >= 0.0f) {
+                                                    // glm::quat rotation = glm::slerp(glm::quat(v2.w, v2.x, v2.y, v2.z), glm::quat(v1.w, v1.x, v1.y, v1.z), t);
+                                                    // trs *= glm::mat4_cast(rotation);
+                                                }
+
+                                                // Apply scale
+                                                if (chan == "scale") {
+                                                    // glm::vec3 v(interpolatedValue);
+                                                    // trs = glm::scale(trs, v);
+                                                }
+
+                                                // Combine with inverse bind matrix if needed
+                                                // jointMatrix[i][node] = trs;
+                                            } else if (true) {
+                                                if (chan == "translation") {
+
+                                                    animPlaying = 1;
+                                                    jointMatrix[i][node] = glm::translate(glm::mat4(1.0f), glm::vec3(interpolatedValue.x, interpolatedValue.z, interpolatedValue.y)) * jointMatrix[i][node];
+                                                    // glm::vec3 v(interpolatedValue);
+                                                    // jointMatrix[i][node] = glm::translate(jointMatrix[i][node], v) * jointMatrix[i][node];
+                                                    // printf("Translate: %d %f %f %f\n", node, interpolatedValue.x, interpolatedValue.y, interpolatedValue.z);
+                                                } else if (chan == "rotation" && t <= 1.0f && t >= 0.0f) {
+                                                    animPlaying = 1;
+                                                    glm::quat rotation = glm::quat(1.0f, 1.0f, 1.0f, 1.0f);
+                                                    auto bindMatrix = glm::inverse(jointIBMatrix[node]);
+                                                    if (node == nodes[0]) {
+                                                        rotation = glm::slerp(glm::quat(v2.w, v2.x, v2.y, v2.z), glm::quat(v1.w, v1.x, v1.y, v1.z), t);
+                                                        auto parentMatrix = glm::mat4(1.0f);
+                                                        if (true || parent != root) {
+                                                            parentMatrix = jointIBMatrix[root];
+                                                        }
+                                                        
+                                                        auto invMatrix = glm::inverse(nodeMatrix[node]);
+                                                        
+                                                        auto hierarchyRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+                                                        auto hierarchyRotation2 = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+                                                        for (auto h = hierarchy.rbegin(); h != hierarchy.rend(); ++h) {
+                                                            if (node == subroot) {
+                                                                hierarchyRotation = hierarchyRotation * glm::quat_cast(jointMatrix[i][*h]);
+                                                                hierarchyRotation2 = hierarchyRotation2 * glm::quat_cast(glm::inverse(nodeMatrix[*h]));
+                                                            } else {
+                                                                if (*h == node) {
+                                                                    hierarchyRotation = hierarchyRotation * glm::quat_cast(jointMatrix[i][*h]);
+                                                                    hierarchyRotation2 = hierarchyRotation2 * glm::quat_cast(glm::inverse(nodeMatrix[*h]));
+                                                                }
+                                                            }
+                                                        }
+
+                                                        rotation = hierarchyRotation * rotation;
+                                                        rotation = hierarchyRotation2 * rotation;
+                                                                                                        
+                                                        rotation = glm::normalize(rotation);
+                                                        
+                                                        jointMatrix[i][node] = bindMatrix * glm::mat4_cast(rotation) * jointIBMatrix[node] * jointMatrix[i][node];
+                                                        parent = node;
+                                                    } else {
+                                                        // Child node
+                                                        jointMatrix[i][node] = jointMatrix[i][parent] * jointMatrix[i][node];
+                                                    }
+                                                } else if (chan == "scale") {
+                                                    animPlaying = 1;
+                                                    glm::vec3 v(interpolatedValue);
+                                                    jointMatrix[i][node] = glm::scale(jointMatrix[i][node], v) * jointMatrix[i][node];
+                                                }
+
+                                                nodeActiveMatrix[node] = jointMatrix[i][node] * glm::inverse(jointIBMatrix[node]);
+                                                jointCache[node] = jointMatrix[i][node];
+                                            }
+                                        }
+                                    } 
+                                }
+                            }
+                        }   
+                        if (animPlaying == 1) {
+                            activeAnimations[name].first += dt; // Increment animation time
+                        } else if (animPlaying == 0) {
+                            if (loop) {
+                                activeAnimations[name].first = 0.1f;
+                            } else {
+                                eraseAnimations[name] = true;
+                            }
                         }
                     }
+                    // if (msh == nullptr && jointList[i].size() > 0) {
+                    //     auto offset = computeShader->shader->updateBuffer("InputBuffer", packedData.data(),
+                    //                                     packedData.size() * sizeof(float), 0);
+                    // }
                 }
+
+                // if (activeAnimations.size() == 0) {
+                //     gfx->dispatchThreadgroups(computeShader->shader, 1, 1, 1);
+                // }
                 
                 
 
@@ -1920,19 +2373,31 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
             // printf("Matrix: %f %f %f %f\n", mat.getColumn(1).x, mat.getColumn(1).y, mat.getColumn(1).z, mat.getColumn(1).w);
             // printf("Matrix: %f %f %f %f\n", mat.getColumn(2).x, mat.getColumn(2).y, mat.getColumn(2).z, mat.getColumn(2).w);
             // printf("Matrix: %f %f %f %f\n", mat.getColumn(3).x, mat.getColumn(3).y, mat.getColumn(3).z, mat.getColumn(3).w);
-            std::vector<chaiscript::Boxed_Value> v;
-            for (int c = 0; c < 4; ++c) {
-                v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).x));
-                v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).y));
-                v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).z));
-                v.push_back(chaiscript::Boxed_Value(mat.getColumn(c).w));
-            }
-            auto modelIdx = shader->send("modelMatrix", v);
             
-            if (specular.size() > j && specular[j]) {               
-                shader->send("isSpecular", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1) }));
+            int idx = 0;
+            for (int c = 0; c < 4; ++c) {
+                m_modelMatrixCacheRaw[idx++] = mat.getColumn(c).x;
+                m_modelMatrixCacheRaw[idx++] = mat.getColumn(c).y;
+                m_modelMatrixCacheRaw[idx++] = mat.getColumn(c).z;
+                m_modelMatrixCacheRaw[idx++] = mat.getColumn(c).w;
+            }
+            int modelIdx = -1;
+            {
+                // Build glm::mat4 from the raw float array
+                glm::mat4 modelMat = glm::mat4(
+                    mat.getColumn(0).x, mat.getColumn(0).y, mat.getColumn(0).z, mat.getColumn(0).w,
+                    mat.getColumn(1).x, mat.getColumn(1).y, mat.getColumn(1).z, mat.getColumn(1).w,
+                    mat.getColumn(2).x, mat.getColumn(2).y, mat.getColumn(2).z, mat.getColumn(2).w,
+                    mat.getColumn(3).x, mat.getColumn(3).y, mat.getColumn(3).z, mat.getColumn(3).w
+                );
+                m_matrixCache.clear();
+                m_matrixCache.push_back(modelMat);
+                modelIdx = shader->send("modelMatrix", m_matrixCache);
+            }
+            if (specular.size() > j && specular[j]) {
+                shader->send("isSpecular", m_isSpecularCache1);
             } else {
-                shader->send("isSpecular", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+                shader->send("isSpecular", m_isSpecularCache0);
             }
 
             if (jointList[i].size() > 0) {
@@ -1941,26 +2406,28 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
 
 
             } else {
-                shader->sendConstant("jointInfo", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0.0f), chaiscript::Boxed_Value(0.0f), chaiscript::Boxed_Value((float)modelIdx), chaiscript::Boxed_Value(0.0f) }));
+                
+                m_jointInfoCache[0] = glm::vec4(0.0f, 0.0f, (float)modelIdx, 0.0f);
+                shader->sendConstant("jointInfo", m_jointInfoCache);
             }
 
             if (jointMatrix[i].size() > 0) {
             //     // Create a large buffer containing ALL joint matrices
             //     gfx::Buffer::Settings bufferSettings(gfx::BUFFERUSAGEFLAG_SHADER_STORAGE, gfx::BUFFERDATAUSAGE_STATIC);
             //     // Pack all joint matrices into one buffer (column-major)
-                std::vector<float> allJointMatrices;
-                allJointMatrices.reserve(jointMatrix[i].size() * 16); // All joints * 16 floats per matrix
+                // std::vector<float> allJointMatrices;
+                // allJointMatrices.reserve(jointMatrix[i].size() * 16); // All joints * 16 floats per matrix
                 
-                // Add ALL joint matrices to the buffer (not just the ones in jointList)
-                for (const auto& jointPair : jointMatrix[i]) {
-                    glm::mat4 mat = jointPair.second;
-                    // Add matrix elements in column-major order
-                    for (int col = 0; col < 4; col++) {
-                        for (int row = 0; row < 4; row++) {
-                            allJointMatrices.push_back(mat[col][row]);
-                        }
-                    }
-                }
+                // // Add ALL joint matrices to the buffer (not just the ones in jointList)
+                // for (const auto& jointPair : jointMatrix[i]) {
+                //     glm::mat4 mat = jointPair.second;
+                //     // Add matrix elements in column-major order
+                //     for (int col = 0; col < 4; col++) {
+                //         for (int row = 0; row < 4; row++) {
+                //             allJointMatrices.push_back(mat[col][row]);
+                //         }
+                //     }
+                // }
 
             //     int v = jointList[i].size();
             //     int* data = &v;
@@ -1968,8 +2435,19 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                 //                              allJointMatrices.size() * sizeof(float), 0);
             //     shader->shader->updateBuffer("JointCountBuffer", data,
             //                                  1 * sizeof(int));
+                // size_t leakCountBefore, leakCountAfter;
+                // uint64_t leakSizeBefore, leakSizeAfter;
+                
+                // __mem_leak_check(leakCountBefore, leakSizeBefore, false, "", false);
                 auto offset = shader->sendMap("jointMatrix", jointMatrix[i], jointList[i]);
-                shader->sendConstant("jointInfo", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value((float)jointMatrix[i].size()), chaiscript::Boxed_Value((float)offset), chaiscript::Boxed_Value((float)modelIdx), chaiscript::Boxed_Value(0.0f) }));
+                // __mem_leak_check(leakCountAfter, leakSizeAfter, false, "", false);
+    
+                // printf("Leak delta: %zu objects, %llu bytes\n", 
+                //     leakCountAfter - leakCountBefore,
+                //     leakSizeAfter - leakSizeBefore);
+                
+                m_jointInfoCache[0] = glm::vec4((float)jointMatrix[i].size(), (float)offset, (float)modelIdx, 0.0f);
+                shader->sendConstant("jointInfo", m_jointInfoCache);
             //     // Create joint matrix buffer (this will be bound as a storage buffer or texture)
             //     // auto jointMatrixBuffer = gfx->newBuffer(bufferSettings, gfx::DATAFORMAT_FLOAT,
             //     //                                         allJointMatrices.data(),
@@ -2032,6 +2510,12 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
         }
         currentTime = dt;
     }
+
+    // __mem_leak_check(leakCountAfter, leakSizeAfter, true, "", false);
+    
+    // printf("Leak delta: %zu objects, %llu bytes\n", 
+    //     leakCountAfter - leakCountBefore,
+    //     leakSizeAfter - leakSizeBefore);
 }
 
 Matrix4 chai_mesh::getNodeMatrix(const std::string &node) {
@@ -2043,12 +2527,13 @@ Matrix4 chai_mesh::getNodeMatrix(const std::string &node) {
     // return activeMatrix;
     // printf("Node Matrix: %s\n", node.c_str());
     // printf("Matrix: %f %f %f %f\n", m[3][0], m[3][1], m[3][2], m[3][3]);
-    return matrices[0] * activeMatrix * Matrix4(new float[16] {
+    float matrixData[16] = {
         m[0][0], m[0][1], m[0][2], m[0][3],
         m[1][0], m[1][1], m[1][2], m[1][3],
         m[2][0], m[2][1], m[2][2], m[2][3],
         m[3][0], m[3][1], m[3][2], m[3][3] 
-    });
+    };
+    return matrices[0] * activeMatrix * Matrix4(matrixData);
 }
 
 void chai_mesh::loadSpecular(std::string texture) {
@@ -2213,6 +2698,23 @@ std::vector<float> chai_mesh::getMeshBoundingBox() {
 }
 
 chai_mesh::~chai_mesh() {
+    // Explicitly clear all Boxed_Value caches to ensure proper cleanup
+    m_matrixCache.clear();
+    m_isSpecularCache0.clear();
+    m_isSpecularCache1.clear();
+    m_jointInfoCache.clear();
+    
+    // Clear map containers to prevent leaks
+    skins.clear();
+    jointOrder.clear();
+    nodeChildren.clear();
+    
+    // Free specular data buffer if allocated
+    if (specData != nullptr) {
+        delete[] specData;
+        specData = nullptr;
+    }
+    
     // delete mesh;
     // delete instance;
     // mesh->~Mesh();

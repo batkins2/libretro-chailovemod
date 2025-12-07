@@ -161,6 +161,11 @@ BMFontRasterizer::BMFontRasterizer(love::filesystemmod::FileData *fontdef, const
 
 BMFontRasterizer::~BMFontRasterizer()
 {
+	// Clear all map containers to prevent leaks
+	images.clear();
+	characters.clear();
+	characterIndices.clear();
+	kerning.clear();
 }
 
 void BMFontRasterizer::parseConfig(const std::string &configtext)

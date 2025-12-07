@@ -29,11 +29,11 @@ public:
     void addParticleSystem(chai_particles *ps);
     void hideMesh(chai_mesh *mesh);
     void showMesh(chai_mesh *mesh);
-    void setShader(chai_shader *shader);
-    void setMatrix(std::vector<chaiscript::Boxed_Value> matrix, int index);
+    void setShader(chai_shader *shader, chai_shader *compute);
+    void setMatrix(const glm::mat4 &matrix, int index);
     void finalize();    
     void drawMeshes(bool shadows, int view);
-    void draw(std::vector<chaiscript::Boxed_Value> viewMatrix1, std::vector<chaiscript::Boxed_Value> viewMatrix2, std::vector<chaiscript::Boxed_Value> viewMatrix3, std::vector<chaiscript::Boxed_Value> viewMatrix4, int viewCount);
+    void draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2, const glm::mat4 &viewMatrix3, const glm::mat4 &viewMatrix4, int viewCount);
     void prepareScreen();
     void update(float dt);
     void initFramebuffer();
@@ -48,10 +48,11 @@ private:
     std::map<int, std::vector<chai_mesh *>> meshChildren;
     std::vector<chai_particles *> particleSystems;
     chai_shader *sceneShader = nullptr;
+    chai_shader *computeShader = nullptr;
     std::vector<Matrix4> matrices;
     float currentTime = 0.01f;
     float deltaTime = 0.01f;
-    std::vector<chaiscript::Boxed_Value> viewMatrix;
+    std::vector<glm::mat4> viewMatrix;
     // GLuint shadowMapFBO = 0;
     // GLuint shadowMap = 0;
     love::gfx::Texture *background_tex = nullptr;
@@ -62,6 +63,24 @@ private:
     // GLuint sceneDepthTexture = 0;
     bool framebufferInitialized = false;
     std::map<int, int> meshGroups;
+    // Cached vectors to avoid repeated allocations
+    std::vector<glm::vec3> m_lightDirectionCache;
+    std::vector<glm::vec3> m_lightColorCache;
+    std::vector<glm::vec3> m_ambientColorCache;
+    std::vector<glm::vec3> m_intensityCache;
+    std::vector<glm::mat4> m_projectionMatrixCache;
+    std::vector<glm::mat4> m_lightSpaceMatrixCache;
+    std::vector<glm::mat4> m_vmCache;
+    std::vector<glm::mat4> m_modelMatrixCache;
+    std::vector<glm::vec3> m_lightIntensityCache;
+    std::vector<glm::vec3> m_ambientColorCache2;
+    std::vector<glm::mat4> m_projectionMatrixCache2;
+    std::vector<glm::mat4> m_viewMatrixCache;
+    std::vector<glm::mat4> m_shadowCache;
+    std::vector<glm::mat4> m_viewMatrixCache2;
+    std::vector<glm::mat4> m_jointInfoCache;
+    std::vector<glm::mat4> m_projectionMatrixBoxedCache;
+    std::vector<glm::mat4> m_viewMatrixBoxedCache;
     // Framerate tracking
     float m_frameTime = 0.0f;
     float m_fps = 0.0f;

@@ -98,6 +98,8 @@ FontMod::FontMod(love::fontmod::Rasterizer *r, const SamplerState &s)
 
 FontMod::~FontMod()
 {
+	// Clear glyph cache to prevent leaks
+	glyphs.clear();
 	--fontCount;
 }
 
