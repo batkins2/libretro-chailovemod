@@ -36,8 +36,8 @@ namespace gfx
 namespace vulkan
 {
 
-static const uint32_t DESCRIPTOR_POOL_SIZE = 1000;
-static const uint32_t MAX_DESCRIPTOR_POOLS_PER_FRAME = 100;  // Cap pools at 100 (100k descriptor sets per frame max)
+static const uint32_t DESCRIPTOR_POOL_SIZE = 1000;  // Descriptors per pool
+static const uint32_t MAX_DESCRIPTOR_POOLS_PER_FRAME = 100;  // Allow more pools if needed
 
 class BindingMapper
 {
@@ -240,6 +240,11 @@ void Shader::unloadVolatile()
 	pushConstantRanges.clear();
 	localUniformData.clear();
 	localUniformStagingData.clear();
+	
+	// Free allocated UniformInfo objects
+	for (auto &kvp : reflection.allUniforms)
+		delete kvp.second;
+	reflection.allUniforms.clear();
 }
 
 const std::vector<VkPipelineShaderStageCreateInfo> &Shader::getShaderStages() const
@@ -260,13 +265,36 @@ VkPipeline Shader::getComputePipeline() const
 void Shader::newFrame()
 {
 	currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
-
 	currentDescriptorPool = 0;
 	currentDescriptorSet = VK_NULL_HANDLE;
 	resourceDescriptorsDirty = true;
-
-	for (VkDescriptorPool pool : descriptorPools[currentFrame])
-		vkResetDescriptorPool(device, pool, 0);
+	
+	// Don't destroy pools every frame - let them accumulate to a reasonable cap
+	// Destroying and recreating constantly causes VMA fragmentation
+	const size_t MAX_POOLS_PER_FRAME = 10;
+	if (descriptorPools[currentFrame].size() > MAX_POOLS_PER_FRAME)
+	{
+		// Only destroy excess pools beyond the cap
+		for (size_t i = MAX_POOLS_PER_FRAME; i < descriptorPools[currentFrame].size(); i++)
+			vkDestroyDescriptorPool(device, descriptorPools[currentFrame][i], nullptr);
+		descriptorPools[currentFrame].resize(MAX_POOLS_PER_FRAME);
+	}
+	
+	// Destroy pipelines every 120 frames to prevent accumulation
+	static int frameCounter = 0;
+	frameCounter++;
+	if (frameCounter >= 120)
+	{
+		frameCounter = 0;
+		
+		for (const auto &kvp : graphicsPipelinesDynamicState)
+			vkDestroyPipeline(device, kvp.second, nullptr);
+		graphicsPipelinesDynamicState.clear();
+		
+		for (const auto &kvp : graphicsPipelinesNoDynamicState)
+			vkDestroyPipeline(device, kvp.second, nullptr);
+		graphicsPipelinesNoDynamicState.clear();
+	}
 }
 
 void Shader::cmdPushDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBindPoint bindPoint)
@@ -1368,12 +1396,6 @@ void Shader::setBufferDescriptor(const UniformInfo *info, love::gfx::Buffer *buf
 
 void Shader::createDescriptorPool()
 {
-	// Prevent unbounded pool growth - cap at MAX_DESCRIPTOR_POOLS_PER_FRAME
-	if (descriptorPools[currentFrame].size() >= MAX_DESCRIPTOR_POOLS_PER_FRAME)
-	{
-		throw love::Exception("Exceeded maximum descriptor pools per frame (%d). Consider increasing DESCRIPTOR_POOL_SIZE.", MAX_DESCRIPTOR_POOLS_PER_FRAME);
-	}
-
 	VkDescriptorPoolCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	createInfo.maxSets = DESCRIPTOR_POOL_SIZE;
@@ -1399,18 +1421,15 @@ VkDescriptorSet Shader::allocateDescriptorSet()
 	if (currentFrame >= MAX_FRAMES_IN_FLIGHT)
 		throw love::Exception("Cannot allocate descriptor set: currentFrame (%zu) is out of range", currentFrame);
 
+	// Limit the number of pools to prevent unbounded growth
+	const size_t MAX_DESCRIPTOR_POOLS = 10;
+	
 	if (descriptorPools[currentFrame].empty())
 		createDescriptorPool();
 
 	while (true)
 	{
-		// Verify pool exists before using it
-		if (currentDescriptorPool >= descriptorPools[currentFrame].size())
-			throw love::Exception("currentDescriptorPool index out of range");
-		
 		VkDescriptorPool pool = descriptorPools[currentFrame][currentDescriptorPool];
-		if (pool == VK_NULL_HANDLE)
-			throw love::Exception("Descriptor pool is null at index %zu", currentDescriptorPool);
 
 		VkDescriptorSetAllocateInfo allocInfo{};
 		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -1426,12 +1445,13 @@ VkDescriptorSet Shader::allocateDescriptorSet()
 		case VK_SUCCESS:
 			return descriptorSet;
 		case VK_ERROR_OUT_OF_POOL_MEMORY_KHR:
+		case VK_ERROR_FRAGMENTED_POOL:
 			currentDescriptorPool++;
-			if (descriptorPools[currentFrame].size() <= currentDescriptorPool)
+			if (currentDescriptorPool >= descriptorPools[currentFrame].size())
 				createDescriptorPool();
 			continue;
 		default:
-			throw love::Exception("failed to allocate descriptor set");
+			throw love::Exception("failed to allocate descriptor set (VkResult = %d)", result);
 		}
 	}
 }

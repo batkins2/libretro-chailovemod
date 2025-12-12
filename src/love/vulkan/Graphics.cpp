@@ -547,8 +547,11 @@ void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallback
 
         if (submitMode != SUBMIT_RESTART)
         {
-            // vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
-            // vkResetFences(device, 1, &inFlightFences[currentFrame]);
+            if (!inFlightFences.empty())
+            {
+                vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+                vkResetFences(device, 1, &inFlightFences[currentFrame]);
+            }
 
             updatePendingReadbacks();
             updateTemporaryResources();
@@ -636,6 +639,44 @@ void Graphics::present(void *screenshotCallbackdata)
 
     updatePendingReadbacks();
     updateTemporaryResources();
+    
+    // CRITICAL: Destroy render passes and samplers if they grow too large
+    // These are cached indefinitely and can accumulate
+    const size_t MAX_RENDER_PASSES = 20;
+    const size_t MAX_SAMPLERS = 20;
+    
+    if (renderPasses.size() > MAX_RENDER_PASSES)
+    {
+        for (const auto &kvp : renderPasses)
+            vkDestroyRenderPass(device, kvp.second, nullptr);
+        renderPasses.clear();
+    }
+    
+    if (samplers.size() > MAX_SAMPLERS)
+    {
+        for (const auto &kvp : samplers)
+            vkDestroySampler(device, kvp.second, nullptr);
+        samplers.clear();
+    }
+    
+    // Clean up unused framebuffers to prevent memory leak
+    // Destroy framebuffers that weren't used this frame
+    for (auto it = framebuffers.begin(); it != framebuffers.end();)
+    {
+        if (framebufferUsages.find(it->second) == framebufferUsages.end())
+        {
+            // Framebuffer wasn't used this frame, destroy it
+            vkDestroyFramebuffer(device, it->second, nullptr);
+            it = framebuffers.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+    
+    // Clear framebuffer usage tracking for next frame
+    framebufferUsages.clear();
 
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 
@@ -1823,7 +1864,34 @@ void Graphics::initDynamicState()
 
 void Graphics::beginFrame()
 {
-	// vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+	std::printf("[BEGINFRAME] Called\n");
+	fflush(stdout);
+	
+	// Log VMA statistics every 60 frames to track memory usage
+	static int statsFrameCounter = 0;
+	if (++statsFrameCounter >= 60)
+	{
+		statsFrameCounter = 0;
+		VmaTotalStatistics stats;
+		vmaCalculateStatistics(vmaAllocator, &stats);
+		
+		size_t inUseCount = 0;
+		for (const auto& sb : stagingBufferPool)
+			if (sb.inUse) inUseCount++;
+		
+		std::printf("[VMA] Memory: %llu MB, Allocs: %llu | Staging: %zu buffers (%zu in use)\n",
+			stats.total.statistics.allocationBytes / (1024 * 1024),
+			stats.total.statistics.allocationCount,
+			stagingBufferPool.size(),
+			inUseCount);
+		fflush(stdout);
+	}
+
+	if (!libretroMode && !inFlightFences.empty())
+	{
+		vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+		vkResetFences(device, 1, &inFlightFences[currentFrame]);
+	}
 
 	if (swapChain != VK_NULL_HANDLE)
 	{
@@ -1855,9 +1923,6 @@ void Graphics::beginFrame()
 	for (auto &cleanUpFn : cleanUpFunctions.at(currentFrame))
 		cleanUpFn();
 	cleanUpFunctions.at(currentFrame).clear();
-	
-	// Clear deferred buffer uploads from previous frame to prevent memory leak
-	deferredUploads.clear();
 
 	startRecordingGraphicsCommands();
 
@@ -3786,26 +3851,8 @@ void Graphics::startRenderPass()
                 fbConfig.staticData.depthView = depthImageView;
                 // std::printf("[CHAILOVE DEBUG] Using fakeBackbuffer for framebuffer: %p\n", fakeBackbuffer.get());
             } else {
-				// std::printf("[CHAILOVE ERROR] fakeBackbuffer is null! Creating dummy image for libretro compatibility\n");
-					
-					// Create a minimal dummy texture for the framebuffer directly using Texture::Settings
-					Texture::Settings texSettings;
-					texSettings.type = TEXTURE_2D;
-					texSettings.format = love::PixelFormat::PIXELFORMAT_RGBA8_UNORM;
-					texSettings.width = static_cast<int>(renderPassState.width);
-					texSettings.height = static_cast<int>(renderPassState.height);
-					texSettings.layers = 1;
-					texSettings.mipmaps = love::gfx::Texture::MipmapsMode::MIPMAPS_NONE;
-					texSettings.readable = false;
-					texSettings.renderTarget = true;
-					
-					StrongRef<Texture> dummyTexture(new Texture(this, texSettings, nullptr), Acquire::NORETAIN);
-					VkImageView colorView = dummyTexture->getRenderTargetView(0, 0);
-					fbConfig.colorViews.push_back(colorView);
-
-                    fbConfig.staticData.depthView = depthImageView;
-					
-					// std::printf("[CHAILOVE DEBUG] Created dummy texture for libretro framebuffer\n");
+				// ERROR: fakeBackbuffer should always exist in libretro mode
+				throw love::Exception("fakeBackbuffer is null in libretro mode!");
             }
             
             renderPassState.beginInfo.framebuffer = getFramebuffer(fbConfig);
@@ -4500,12 +4547,205 @@ int Graphics::getVsync() const
 	return vsync;
 }
 
+Graphics::StagingBuffer* Graphics::acquireStagingBuffer(size_t size)
+{
+	// Try to find an existing buffer that's large enough and not in use
+	for (auto &sb : stagingBufferPool)
+	{
+		if (!sb.inUse && sb.size >= size)
+		{
+			sb.inUse = true;
+			return &sb;
+		}
+	}
+	
+	// Cap the pool size to prevent unbounded growth
+	const size_t MAX_STAGING_BUFFERS = 50;
+	if (stagingBufferPool.size() >= MAX_STAGING_BUFFERS)
+	{
+		// Pool is full - find the smallest unused buffer and destroy it to make room
+		StagingBuffer* smallestUnused = nullptr;
+		for (auto &sb : stagingBufferPool)
+		{
+			if (!sb.inUse && (smallestUnused == nullptr || sb.size < smallestUnused->size))
+				smallestUnused = &sb;
+		}
+		
+		if (smallestUnused)
+		{
+			// Destroy the smallest unused buffer and reuse its slot
+			vmaDestroyBuffer(vmaAllocator, smallestUnused->buffer, smallestUnused->allocation);
+			
+			// Recreate with new size
+			size_t allocSize = 1024 * 1024; // Start at 1MB minimum
+			while (allocSize < size)
+				allocSize *= 2;
+			
+			VkBufferCreateInfo bufferInfo{};
+			bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+			bufferInfo.size = allocSize;
+			bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+			bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			
+			VmaAllocationCreateInfo allocInfo{};
+			allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+			allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+			
+			if (vmaCreateBuffer(vmaAllocator, &bufferInfo, &allocInfo, &smallestUnused->buffer, &smallestUnused->allocation, &smallestUnused->allocInfo) != VK_SUCCESS)
+				throw love::Exception("Failed to create staging buffer");
+			
+			smallestUnused->size = allocSize;
+			smallestUnused->inUse = true;
+			return smallestUnused;
+		}
+		
+		// All buffers are in use - just create a new one anyway and let it grow
+		// The cap will be enforced next time when there are unused buffers
+	}
+	
+	// No suitable buffer found, create a new one
+	// Round up to nearest power of 2 for better reuse
+	size_t allocSize = 1024 * 1024; // Start at 1MB minimum
+	while (allocSize < size)
+		allocSize *= 2;
+	
+	VkBufferCreateInfo bufferInfo{};
+	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.size = allocSize;
+	bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	
+	VmaAllocationCreateInfo allocInfo{};
+	allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+	allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+	
+	StagingBuffer newBuffer;
+	newBuffer.size = allocSize;
+	newBuffer.inUse = true;
+	
+	if (vmaCreateBuffer(vmaAllocator, &bufferInfo, &allocInfo, &newBuffer.buffer, &newBuffer.allocation, &newBuffer.allocInfo) != VK_SUCCESS)
+		throw love::Exception("Failed to create staging buffer");
+	
+	stagingBufferPool.push_back(newBuffer);
+	return &stagingBufferPool.back();
+}
+
+void Graphics::releaseStagingBuffer(StagingBuffer* buffer)
+{
+	if (buffer)
+		buffer->inUse = false;
+}
+
+void Graphics::releaseStagingBuffer(VkBuffer buffer)
+{
+	for (auto& stagingBuf : stagingBufferPool)
+	{
+		if (stagingBuf.buffer == buffer)
+		{
+			stagingBuf.inUse = false;
+			return;
+		}
+	}
+}
+
+void Graphics::cleanupStagingBufferPool()
+{
+	for (auto &sb : stagingBufferPool)
+	{
+		if (sb.buffer != VK_NULL_HANDLE)
+			vmaDestroyBuffer(vmaAllocator, sb.buffer, sb.allocation);
+	}
+	stagingBufferPool.clear();
+}
+
+void Graphics::processCleanupCallbacks()
+{
+	// Process cleanup functions for current frame
+	for (auto &cleanUpFn : cleanUpFunctions.at(currentFrame))
+		cleanUpFn();
+	cleanUpFunctions.at(currentFrame).clear();
+	
+	// Also process readback callbacks
+	for (auto &readbackCallback : readbackCallbacks.at(currentFrame))
+		readbackCallback();
+	readbackCallbacks.at(currentFrame).clear();
+}
+
+void Graphics::recycleCommandPool()
+{
+	// Must wait for all GPU operations to finish before resetting pool
+	vkDeviceWaitIdle(device);
+	
+	// LEAK FIX: Reset descriptor pool to release driver-side descriptor memory
+	// This is a common source of driver leaks - descriptor sets accumulate
+	if (descriptorPool != VK_NULL_HANDLE) {
+		VkResult descResult = vkResetDescriptorPool(device, descriptorPool, 0);
+		if (descResult != VK_SUCCESS) {
+			std::printf("[WARNING] vkResetDescriptorPool failed with result %d\n", descResult);
+			std::fflush(stdout);
+		}
+	}
+	
+	// LEAK FIX: Destroy and recreate pipeline cache to release accumulated memory
+	// Pipeline caches can grow unbounded as new pipelines are created
+	if (pipelineCache != VK_NULL_HANDLE) {
+		vkDestroyPipelineCache(device, pipelineCache, nullptr);
+		
+		VkPipelineCacheCreateInfo cacheInfo{};
+		cacheInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+		VkResult cacheResult = vkCreatePipelineCache(device, &cacheInfo, nullptr, &pipelineCache);
+		if (cacheResult != VK_SUCCESS) {
+			std::printf("[WARNING] vkCreatePipelineCache failed with result %d\n", cacheResult);
+			std::fflush(stdout);
+			pipelineCache = VK_NULL_HANDLE;
+		}
+	}
+	
+	// Reset the command pool - this frees all command buffers allocated from it
+	// and recycles the driver-side memory back to the pool
+	VkResult result = vkResetCommandPool(device, commandPool, 0);
+	if (result != VK_SUCCESS) {
+		std::printf("[WARNING] vkResetCommandPool failed with result %d\n", result);
+		std::fflush(stdout);
+		return;
+	}
+	
+	// Command buffers need to be re-allocated after pool reset
+	VkCommandBufferAllocateInfo allocInfo{};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.commandPool = commandPool;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
+	
+	if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
+		throw love::Exception("Failed to re-allocate command buffers after pool reset");
+	}
+	
+	// Reset recording state
+	commandBufferRecording = false;
+	
+	std::printf("[RECYCLE] Command pool reset - driver memory recycled\n");
+	std::fflush(stdout);
+}
+
 void Graphics::mapLocalUniformData(void *data, size_t size, VkDescriptorBufferInfo &bufferInfo)
 {
 	size_t alignedSize = alignUp(size, minUniformBufferOffsetAlignment);
 
 	if (localUniformBuffer->getUsableSize() < alignedSize)
-		localUniformBuffer.set(new StreamBuffer(this, BUFFERUSAGE_UNIFORM, localUniformBuffer->getSize() * 2), Acquire::NORETAIN);
+	{
+		// Cap the maximum uniform buffer size to prevent unbounded growth
+		const size_t MAX_UNIFORM_BUFFER_SIZE = 1024 * 1024 * 16; // 16MB max
+		size_t newSize = std::min(localUniformBuffer->getSize() * 2, MAX_UNIFORM_BUFFER_SIZE);
+		
+		if (newSize <= localUniformBuffer->getSize())
+		{
+			// Already at max size - can't grow further
+			throw love::Exception("Uniform buffer size exceeded maximum limit (%zu bytes)", MAX_UNIFORM_BUFFER_SIZE);
+		}
+		
+		localUniformBuffer.set(new StreamBuffer(this, BUFFERUSAGE_UNIFORM, newSize), Acquire::NORETAIN);
+	}
 
 	auto mapInfo = localUniformBuffer->map(size);
 	memcpy(mapInfo.data, data, size);
@@ -4746,6 +4986,9 @@ void Graphics::cleanup()
 	
 	// Clear any remaining deferred uploads
 	deferredUploads.clear();
+	
+	// Cleanup staging buffer pool
+	cleanupStagingBufferPool();
 
 	vmaDestroyAllocator(vmaAllocator);
 

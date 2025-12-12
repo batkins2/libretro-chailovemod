@@ -287,6 +287,29 @@ public:
 
 	void cleanupFramebuffers(VkImageView imageView, PixelFormat format);
 
+	// Staging buffer pool management
+	struct StagingBuffer {
+		VkBuffer buffer = VK_NULL_HANDLE;
+		VmaAllocation allocation = VK_NULL_HANDLE;
+		VmaAllocationInfo allocInfo{};
+		size_t size = 0;
+		bool inUse = false;
+	};
+	StagingBuffer* acquireStagingBuffer(size_t size);
+	void releaseStagingBuffer(StagingBuffer* buffer);
+	void releaseStagingBuffer(VkBuffer buffer); // Overload for releasing by buffer handle
+	void cleanupStagingBufferPool();
+	
+	// Accessors for memory tracking
+	VmaAllocator getAllocator() const { return vmaAllocator; }
+	size_t getStagingBufferPoolSize() const { return stagingBufferPool.size(); }
+	
+	// Process queued cleanup callbacks (needed for libretro mode)
+	void processCleanupCallbacks();
+	
+	// Force recycle command pool to prevent driver memory accumulation
+	void recycleCommandPool();
+
 	VkPipeline createGraphicsPipeline(Shader *shader, const GraphicsPipelineConfigurationCore &configuration, const GraphicsPipelineConfigurationNoDynamicState *noDynamicStateConfiguration);
 
 	uint32 getDeviceApiVersion() const { return deviceApiVersion; }
@@ -447,7 +470,10 @@ private:
 
 	bool libretroMode = false;
 	bool commandBufferRecording = false;  // Track if command buffer is in recording state
-	// Add this member variable in the private section around line 415, after commandBufferRecording
+	
+	// Staging buffer pool to prevent constant allocation/deallocation
+	std::vector<StagingBuffer> stagingBufferPool;
+	
 	uint32_t magicNumber = GRAPHICS_MAGIC;  // Magic number for corruption detection
     VkInstance externalInstance = VK_NULL_HANDLE;
     VkDevice externalDevice = VK_NULL_HANDLE;

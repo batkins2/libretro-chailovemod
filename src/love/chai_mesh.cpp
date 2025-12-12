@@ -12,8 +12,8 @@
 #define TINYGLTF_NO_EXTERNAL_IMAGE
 #include "../../vendor/tinygltf/tiny_gltf.h"
 #endif
-
-#include <memplumber.h>
+// #include "../../vendor/MemPlumber/memplumber.h"
+// #include "../../vendor/MemPlumber/memplumber-internals.h"
 
 namespace love
 {
@@ -145,8 +145,7 @@ void loadTexture(gfx::Mesh *mesh, std::string texture) {
 
     SDL_UnlockSurface(img->surface);
 
-    img->~Image();
-
+    delete img;
     img = NULL;
 
     auto gfx = Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS);
@@ -1121,8 +1120,7 @@ bool LoadImageData(tinygltf::Image *image, const int image_idx, std::string *err
 
     SDL_UnlockSurface(img->surface);
 
-    img->~Image();
-
+    delete img;
     img = NULL;
 
     Rect rect = Rect();
@@ -1297,8 +1295,7 @@ bool chai_mesh::wrap_setTexture(const std::string &texture) {
 
     SDL_UnlockSurface(img->surface);
 
-    img->~Image();
-
+    delete img;
     img = NULL;
 
     // auto cl = ChaiLove::getInstance();
@@ -1869,7 +1866,13 @@ void chai_mesh::update(std::vector<float> position, std::vector<float> rotation,
 // }
 
 void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt, chai_shader *computeShader) {
+    static int frameCount = 0;
+    frameCount++;
+    
     nodeActiveMatrix.clear();
+    
+    // Clear animation cache to prevent unbounded memory growth
+    animationFrameMatrixCache.clear();
 
     if (m_modelMatrixCacheRaw.size() != 16) {
         m_modelMatrixCacheRaw.resize(16, 0.0f);
@@ -1886,11 +1889,6 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
     if (m_jointInfoCache.size() != 4) {
         m_jointInfoCache.resize(4);
     }
-    
-    // size_t leakCountBefore, leakCountAfter;
-    // uint64_t leakSizeBefore, leakSizeAfter;
-    
-    // __mem_leak_check(leakCountBefore, leakSizeBefore, true, "", false);
 
     if (mesh != nullptr) {
         mesh->draw(gfx, m);
@@ -1901,38 +1899,57 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
             auto msh = meshes[j];
 
             if (subVisible[j] == false && msh != nullptr) {
+                i++;  // Increment i even when skipping to keep indices in sync
                 continue;
-            } 
+            }
+
+            // Bounds check to prevent crash
+            if (i >= meshToNode.size()) {
+                i++;
+                continue;
+            }
 
             auto node = meshToNode[i];
             
+            // Always clear and reinitialize jointMatrix every frame to prevent memory leak
+            // The previous condition (currentTime != dt) was preventing clearing at stable 60 FPS
+            if (jointList.size() > i) {                    
+                jointList[i].clear();
+                jointMatrix[i].clear();
+            } else {
+                jointList.push_back(std::vector<int>());
+                jointMatrix.push_back(std::map<int, glm::mat4>());
+            }
+            
+            auto jointIBMatrix = std::map<int, glm::mat4>();
+            
+            // Initialize joint matrices every frame (moved out of time condition)
+            if (jointOrder.find(i) != jointOrder.end()) {
+                for (auto joint : jointOrder[i]) {
+                    auto matrix = skins[i][joint];
+                    jointIBMatrix[joint] = glm::mat4(
+                        matrix[0], matrix[1], matrix[2], matrix[3],
+                        matrix[4], matrix[5], matrix[6], matrix[7],
+                        matrix[8], matrix[9], matrix[10], matrix[11],
+                        matrix[12], matrix[13], matrix[14], matrix[15]
+                    );
+                    jointMatrix[i][joint] = glm::mat4(1.0);
+                    jointList[i].push_back(joint);
 
-            if (currentTime != dt) {
-                if (jointList.size() > i) {                    
-                    jointList[i].clear();
-                    jointMatrix[i].clear();
-                } else {
-                    jointList.push_back(std::vector<int>());
-                    jointMatrix.push_back(std::map<int, glm::mat4>());
+                    nodeActiveMatrix[joint] = glm::inverse(jointIBMatrix[joint]);
                 }
-                auto jointIBMatrix = std::map<int, glm::mat4>();
+            }
 
-                if (jointOrder.find(i) != jointOrder.end()) {
-                    for (auto joint : jointOrder[i]) {
-                        auto matrix = skins[i][joint];
-                        jointIBMatrix[joint] = glm::mat4(
-                            matrix[0], matrix[1], matrix[2], matrix[3],
-                            matrix[4], matrix[5], matrix[6], matrix[7],
-                            matrix[8], matrix[9], matrix[10], matrix[11],
-                            matrix[12], matrix[13], matrix[14], matrix[15]
-                        );
-                        jointMatrix[i][joint] = glm::mat4(1.0);
-                        jointList[i].push_back(joint);
-
-                        nodeActiveMatrix[joint] = glm::inverse(jointIBMatrix[joint]);
-                    }
-                }
-
+            // Process animations every frame (removed currentTime != dt condition)
+            // Since we clear jointMatrix every frame, we must process animations every frame too
+            {
+                size_t animLeakBefore = 0, animLeakAfter = 0;
+                uint64_t animSizeBefore = 0, animSizeAfter = 0;
+                
+                // if (frameCount % 300 == 0) {
+                //     __mem_leak_check(animLeakBefore, animSizeBefore, false, "", false);
+                // }
+                
                 auto animTime = 0.1f;
                 auto loop = false;
                 std::string name = "";
@@ -2164,25 +2181,9 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                                         animPlaying = 0;
                                     }
 
-                                    auto &jointCache = animationFrameMatrixCache[name][animTime];
-                                    auto iter = jointCache.find(nodeIndex);
-                                    if (iter != jointCache.end() && glm::all(glm::isnan(interpolatedValue)) == false) {
-                                        // Use cached matrix
-                                        // std::printf("Using cached matrix for node %d at time %f\n", nodeIndex, animTime);
-                                        // std::printf("Matrix: %f %f %f %f\n", iter->second[0][0], iter->second[0][1], iter->second[0][2], iter->second[0][3]);
-                                        // std::printf("Matrix: %f %f %f %f\n", iter->second[1][0], iter->second[1][1], iter->second[1][2], iter->second[1][3]);
-                                        // std::printf("Matrix: %f %f %f %f\n", iter->second[2][0], iter->second[2][1], iter->second[2][2], iter->second[2][3]);
-                                        // std::printf("Matrix: %f %f %f %f\n", iter->second[3][0], iter->second[3][1], iter->second[3][2], iter->second[3][3]);
-                                        jointMatrix[i][nodeIndex] = iter->second;
-                                        nodeActiveMatrix[nodeIndex] = jointMatrix[i][nodeIndex] * glm::inverse(jointIBMatrix[nodeIndex]);
-                                        
-                                        if (jointCache.size() > 100) {
-                                            // Remove oldest frame
-                                            auto oldest = animationFrameMatrixCache[name].begin();
-                                            animationFrameMatrixCache[name].erase(oldest);
-                                        }
-                                        animPlaying = 1;
-                                    } else if (glm::all(glm::isnan(interpolatedValue)) == false) {
+                                    // Animation caching completely disabled to prevent memory leak
+                                    // The cache was growing unbounded with unique float keys every frame
+                                    if (glm::all(glm::isnan(interpolatedValue)) == false) {
                                         auto nodes = std::vector<int>();
                                         nodes.push_back(nodeIndex);
                                         int parent = -1;
@@ -2317,7 +2318,8 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                                                 }
 
                                                 nodeActiveMatrix[node] = jointMatrix[i][node] * glm::inverse(jointIBMatrix[node]);
-                                                jointCache[node] = jointMatrix[i][node];
+                                                // Disable cache insertion to prevent memory leak
+                                                // jointCache[node] = jointMatrix[i][node];
                                             }
                                         }
                                     } 
@@ -2349,9 +2351,17 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                 for (auto eraseAnimation : eraseAnimations) {
                     activeAnimations.erase(eraseAnimation.first);
                 }
+                
+                // if (frameCount % 300 == 0) {
+                //     __mem_leak_check(animLeakAfter, animSizeAfter, false, "", false);
+                //     if (animLeakAfter > animLeakBefore) {
+                //         printf("  [ANIMATION LOOP] Leaked in mesh %d: %zu objects, %llu bytes\n",
+                //                i, animLeakAfter - animLeakBefore, animSizeAfter - animSizeBefore);
+                //         printf("    activeAnimations size: %zu\n", activeAnimations.size());
+                //     }
+                // }
             }
-
-            
+            // End of animation processing block
 
             auto tempMat = matrices[i] * m;
             // printf("Matrix: %f %f %f %f\n", tempMat.getColumn(0).x, tempMat.getColumn(0).y, tempMat.getColumn(0).z, tempMat.getColumn(0).w);
@@ -2500,16 +2510,46 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
             // std::printf("Drawing mesh %d\n", this->id);
                 
             if (msh != nullptr) {
-                // auto* vkGfx = dynamic_cast<love::gfx::vulkan::Graphics*>(gfx);
-                // vkGfx->flushBatchedDraws();
-                msh->draw(gfx, m);
+                static int meshDrawCount = 0;
+                meshDrawCount++;
                 
+                if (meshDrawCount % 1000 == 0) {
+                    printf("[MESH LEAK] msh->draw() called %d times | mesh has %zu vertices\n", 
+                           meshDrawCount, msh->getVertexCount());
+                    fflush(stdout);
+                }
+                
+                msh->draw(gfx, m);
             }
 
             i++;            
         }
         currentTime = dt;
     }
+    
+    static size_t lastLeakCount = 0;
+    static uint64_t lastLeakSize = 0;
+    size_t leakCountBefore, leakCountAfter;
+    uint64_t leakSizeBefore, leakSizeAfter;
+    
+    // if (frameCount % 300 == 0) {
+    //     __mem_leak_check(leakCountAfter, leakSizeAfter, true, "", false);
+        
+    //     size_t deltaCount = leakCountAfter - leakCountBefore;
+    //     uint64_t deltaSize = leakSizeAfter - leakSizeBefore;
+        
+    //     printf("[MESH DRAW] Frame %d | Delta: %zu objects, %llu bytes | Total Delta since last: %zu objects, %llu bytes\n",
+    //            frameCount, deltaCount, deltaSize,
+    //            leakCountAfter - lastLeakCount, leakSizeAfter - lastLeakSize);
+        
+    //     printf("  nodeActiveMatrix size: %zu\n", nodeActiveMatrix.size());
+    //     printf("  animationFrameMatrixCache size: %zu\n", animationFrameMatrixCache.size());
+    //     printf("  jointMatrix size: %zu\n", jointMatrix.size());
+    //     printf("  jointList size: %zu\n", jointList.size());
+        
+    //     lastLeakCount = leakCountAfter;
+    //     lastLeakSize = leakSizeAfter;
+    // }
 
     // __mem_leak_check(leakCountAfter, leakSizeAfter, true, "", false);
     
@@ -2574,8 +2614,7 @@ void chai_mesh::loadSpecular(std::string texture) {
 
     SDL_UnlockSurface(img->surface);
 
-    img->~Image();
-
+    delete img;
     img = NULL;
 
     specularW = w;

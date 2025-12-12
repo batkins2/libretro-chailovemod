@@ -637,22 +637,12 @@ void Texture::generateMipmapsInternal()
 
 void Texture::uploadByteData(const void *data, size_t size, int level, int slice, const Rect &r)
 {
-	VkBuffer stagingBuffer;
-	VmaAllocation vmaAllocation;
+	// Use staging buffer pool instead of creating temporary buffer
+	auto stagingBuf = vgfx->acquireStagingBuffer(size);
+	if (!stagingBuf)
+		throw love::Exception("failed to acquire staging buffer for texture upload");
 
-	VkBufferCreateInfo bufferCreateInfo{};
-	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferCreateInfo.size = size;
-	bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-
-	VmaAllocationCreateInfo allocCreateInfo = {};
-	allocCreateInfo.usage = VMA_MEMORY_USAGE_AUTO;
-	allocCreateInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-
-	VmaAllocationInfo allocInfo;
-	vmaCreateBuffer(allocator, &bufferCreateInfo, &allocCreateInfo, &stagingBuffer, &vmaAllocation, &allocInfo);
-
-	memcpy(allocInfo.pMappedData, data, size);
+	memcpy(stagingBuf->allocInfo.pMappedData, data, size);
 
 	VkBufferImageCopy region{};
 	region.bufferOffset = 0;
@@ -689,7 +679,7 @@ void Texture::uploadByteData(const void *data, size_t size, int level, int slice
 
 	vkCmdCopyBufferToImage(
 		commandBuffer,
-		stagingBuffer,
+		stagingBuf->buffer,
 		imageData.image,
 		copyDstLayout,
 		1,
@@ -700,8 +690,9 @@ void Texture::uploadByteData(const void *data, size_t size, int level, int slice
 		copyDstLayout, imageData.layout,
 		level, 1, baseLayer, 1);
 
-	vgfx->queueCleanUp([allocator = allocator, stagingBuffer, vmaAllocation]() {
-		vmaDestroyBuffer(allocator, stagingBuffer, vmaAllocation);
+	// Queue cleanup to release staging buffer after GPU is done
+	vgfx->queueCleanUp([vgfx = vgfx, stagingBuf]() mutable {
+		vgfx->releaseStagingBuffer(stagingBuf);
 	});
 }
 

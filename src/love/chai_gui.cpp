@@ -47,7 +47,7 @@ void chai_gui::draw(chai_shader *shader, std::vector<chaiscript::Boxed_Value> vi
         }
         if (element->type == "text")
         {
-            shader->send("scale", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(stof(element->options[6])) }));
+            shader->send("scale", stof(element->options[6]));
             ChaiLove::getInstance()->printNew(element->text, 
                 stoi(element->options[0]), 
                 stoi(element->options[1]),
@@ -57,7 +57,7 @@ void chai_gui::draw(chai_shader *shader, std::vector<chaiscript::Boxed_Value> vi
                 stoi(element->options[5]));          
         } else if (element->type == "image")
         {
-            shader->send("scale", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(1.0f) }));
+            shader->send("scale", 1.0f);
            
             if (element->texture)
             {
@@ -111,8 +111,7 @@ void chai_gui::draw(chai_shader *shader, std::vector<chaiscript::Boxed_Value> vi
 
                 SDL_UnlockSurface(img->surface);
 
-                img->~Image();
-
+                delete img;
                 img = NULL;
 
                 Rect rect = Rect();
@@ -150,7 +149,7 @@ void chai_gui::draw(chai_shader *shader, std::vector<chaiscript::Boxed_Value> vi
         cg.instance->draw(overlayTexture, m);
     }
     initConsole();
-    shader->send("scale", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(2.0f) }));
+    shader->send("scale", 2.0f);
     ChaiLove::getInstance()->printNew(console->text, 
         stoi(console->options[0]), 
         stoi(console->options[1]),

@@ -48,8 +48,7 @@ void chai_particles::setParticleSystem(const std::string &texture, int size) {
 
     SDL_UnlockSurface(img->surface);
 
-    img->~Image();
-
+    delete img;
     img = NULL;
 
     Rect rect = Rect();

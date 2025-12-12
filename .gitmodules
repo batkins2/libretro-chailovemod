@@ -115,3 +115,5 @@
 [submodule "vendor/MemPlumber"]
 	path = vendor/MemPlumber
 	url = https://github.com/seladb/MemPlumber.git
+[submodule "vendor\\chaiscript\\"]
+	url = https://github.com/batkins2/chaiscript.git

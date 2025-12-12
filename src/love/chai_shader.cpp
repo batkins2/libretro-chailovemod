@@ -5,6 +5,10 @@ namespace love
 {
 
 chai_shader::chai_shader() {
+    // Pre-reserve cache vectors to reduce allocations (typical scene uses ~200 entries)
+    m_floatCache.reserve(512);
+    m_intCache.reserve(512);
+    m_mat4Cache.reserve(128);
 }
 
 void chai_shader::destroy() {
@@ -88,18 +92,18 @@ size_t chai_shader::sendMap(const std::string &uniform, const std::map<int, glm:
             startidx = modelJointOffset;
         }
         
-        m_floatCache.clear();
-        m_floatCache.reserve(order.size() * 16);
+        m_floatCache.resize(order.size() * 16);  // Reuse allocated memory
+        size_t idx = 0;
         for (const auto& j : order) {   
             auto m = data.find(j)->second;
             for (int c = 0; c < 4; ++c) {
-                m_floatCache.emplace_back(m[c].x);
+                m_floatCache[idx++] = m[c].x;
                 // printf("%f ", m[c].x);
-                m_floatCache.emplace_back(m[c].y);
+                m_floatCache[idx++] = m[c].y;
                 // printf("%f ", m[c].y);
-                m_floatCache.emplace_back(m[c].z);
+                m_floatCache[idx++] = m[c].z;
                 // printf("%f ", m[c].z);
-                m_floatCache.emplace_back(m[c].w);
+                m_floatCache[idx++] = m[c].w;
                 // printf("%f\n", m[c].w);
                 startidx+=4;
             }          
@@ -135,23 +139,20 @@ void chai_shader::sendConstant(const std::string &uniform, const std::vector<cha
  
     int startidx = 0;
     if (info->baseType == gfx::Shader::UNIFORM_INT) {
-        m_intCache.clear();
-        m_intCache.reserve(data.size());
-        for (const auto& d : data) {
-            m_intCache.emplace_back(chaiscript::boxed_cast<int>(d));
+        m_intCache.resize(data.size());  // Reuse allocated memory
+        for (size_t i = 0; i < data.size(); i++) {
+            m_intCache[i] = chaiscript::boxed_cast<int>(data[i]);
             startidx++;
         }
         shader->setPushConstant(info, m_intCache.data(), m_intCache.size() * sizeof(int));
     } else if (info->baseType == gfx::Shader::UNIFORM_FLOAT) {
-        m_floatCache.clear();
-        m_floatCache.reserve(data.size());
-        for (const auto& d : data) {
-            m_floatCache.emplace_back(chaiscript::boxed_cast<float>(d));
+        m_floatCache.resize(data.size());  // Reuse allocated memory
+        for (size_t i = 0; i < data.size(); i++) {
+            m_floatCache[i] = chaiscript::boxed_cast<float>(data[i]);
             startidx++;
         }
         shader->setPushConstant(info, m_floatCache.data(), m_floatCache.size() * sizeof(float));
     } else if (info->baseType == gfx::Shader::UNIFORM_MATRIX && uniform == "jointMatrix") {
-        m_floatCache.clear();
         size_t totalSize = 0;
         for (const auto& d : data) {
             const auto& outerVec = chaiscript::boxed_cast<const std::vector<chaiscript::Boxed_Value>&>(d);
@@ -160,7 +161,8 @@ void chai_shader::sendConstant(const std::string &uniform, const std::vector<cha
                 totalSize += innerVec.size();
             }
         }
-        m_floatCache.reserve(totalSize);
+        m_floatCache.resize(totalSize);  // Reuse allocated memory
+        size_t idx = 0;
         for (const auto& d : data) {
             // Cache the outer vector once
             const auto& outerVec = chaiscript::boxed_cast<const std::vector<chaiscript::Boxed_Value>&>(d);
@@ -168,17 +170,16 @@ void chai_shader::sendConstant(const std::string &uniform, const std::vector<cha
                 // Cache the inner vector once
                 const auto& innerVec = chaiscript::boxed_cast<const std::vector<chaiscript::Boxed_Value>&>(v);
                 for (const auto& f : innerVec) {
-                    m_floatCache.emplace_back(chaiscript::boxed_cast<float>(f));
+                    m_floatCache[idx++] = chaiscript::boxed_cast<float>(f);
                     startidx++;
                 }
             }
         }
         shader->setPushConstant(info, m_floatCache.data(), m_floatCache.size() * sizeof(float));
     } else if (info->baseType == gfx::Shader::UNIFORM_MATRIX) {
-        m_floatCache.clear();
-        m_floatCache.reserve(data.size());
-        for (const auto& d : data) {
-            m_floatCache.emplace_back(chaiscript::boxed_cast<float>(d));
+        m_floatCache.resize(data.size());  // Reuse allocated memory
+        for (size_t i = 0; i < data.size(); i++) {
+            m_floatCache[i] = chaiscript::boxed_cast<float>(data[i]);
             startidx++;
         }
         int count = startidx / (info->matrix.columns * info->matrix.rows);
@@ -204,13 +205,13 @@ void chai_shader::sendConstant(const std::string &uniform, const std::vector<glm
         return;
  
     int startidx = 0;
-    m_floatCache.clear();
-    m_floatCache.reserve(data.size() * 4);
+    m_floatCache.resize(data.size() * 4);  // Reuse allocated memory
+    size_t idx = 0;
     for (const auto& d : data) {
-        m_floatCache.emplace_back(d.x);
-        m_floatCache.emplace_back(d.y);
-        m_floatCache.emplace_back(d.z);
-        m_floatCache.emplace_back(d.w);
+        m_floatCache[idx++] = d.x;
+        m_floatCache[idx++] = d.y;
+        m_floatCache[idx++] = d.z;
+        m_floatCache[idx++] = d.w;
         startidx += 4;
     }
     shader->setPushConstant(info, m_floatCache.data(), m_floatCache.size() * sizeof(float));
@@ -230,10 +231,18 @@ int chai_shader::send(const std::string &uniform, const std::vector<chaiscript::
             return -1;
         if (info->baseType == gfx::Shader::UNIFORM_INT) {
             int startidx = 0;
-            m_intCache.clear();
-            m_intCache.reserve(data.size());
-            for (const auto& d : data) {
-                m_intCache.emplace_back(chaiscript::boxed_cast<int>(d));  // Direct use, no temporary binding
+            
+            static int intCacheUseCount = 0;
+            static size_t maxIntCacheCapacity = 0;
+            if (++intCacheUseCount % 1000 == 0 && m_intCache.capacity() > maxIntCacheCapacity) {
+                maxIntCacheCapacity = m_intCache.capacity();
+                printf("[SHADER LEAK] m_intCache capacity: %zu (size=%zu)\n", 
+                       m_intCache.capacity(), data.size());
+            }
+            
+            m_intCache.resize(data.size());  // Reuse allocated memory instead of clear+reserve
+            for (size_t i = 0; i < data.size(); i++) {
+                m_intCache[i] = chaiscript::boxed_cast<int>(data[i]);
                 startidx++;
             }
             std::memcpy(info->ints, m_intCache.data(), m_intCache.size()*sizeof(int));
@@ -241,9 +250,10 @@ int chai_shader::send(const std::string &uniform, const std::vector<chaiscript::
         } else if (info->baseType == gfx::Shader::UNIFORM_MATRIX && uniform == "jointMatrix") {
             int startidx = 0;
             
-            std::vector<std::reference_wrapper<const std::vector<chaiscript::Boxed_Value>>> outerVecs;
-            std::vector<std::reference_wrapper<const std::map<chaiscript::Boxed_Value, chaiscript::Boxed_Value>>> maps;
-            std::vector<std::reference_wrapper<const std::vector<chaiscript::Boxed_Value>>> innerVecs;
+            // REMOVED: Unused vectors that were causing allocator churn
+            // std::vector<std::reference_wrapper<const std::vector<chaiscript::Boxed_Value>>> outerVecs;
+            // std::vector<std::reference_wrapper<const std::map<chaiscript::Boxed_Value, chaiscript::Boxed_Value>>> maps;
+            // std::vector<std::reference_wrapper<const std::vector<chaiscript::Boxed_Value>>> innerVecs;
             
             size_t totalSize = 0;
             for (const auto& d : data) {
@@ -257,8 +267,8 @@ int chai_shader::send(const std::string &uniform, const std::vector<chaiscript::
                 }
             }
             
-            m_floatCache.clear();
-            m_floatCache.reserve(totalSize);
+            m_floatCache.resize(totalSize);  // Reuse allocated memory
+            size_t idx = 0;
             
             for (const auto& d : data) {
                 const auto& outerVec = chaiscript::boxed_cast<const std::vector<chaiscript::Boxed_Value>&>(d);
@@ -267,7 +277,7 @@ int chai_shader::send(const std::string &uniform, const std::vector<chaiscript::
                     for (const auto& value : mapRef) {
                         const auto& innerVec = chaiscript::boxed_cast<const std::vector<chaiscript::Boxed_Value>&>(value.second);
                         for (const auto& elem : innerVec) {
-                            m_floatCache.emplace_back(chaiscript::boxed_cast<float>(elem));
+                            m_floatCache[idx++] = chaiscript::boxed_cast<float>(elem);
                             startidx++;
                         }
                     }
@@ -280,10 +290,9 @@ int chai_shader::send(const std::string &uniform, const std::vector<chaiscript::
         
         } else {
             int startidx = 0;
-            m_floatCache.clear();
-            m_floatCache.reserve(data.size());
-            for (const auto& d : data) {
-                m_floatCache.emplace_back(chaiscript::boxed_cast<float>(d));  // Direct use, no temporary binding
+            m_floatCache.resize(data.size());  // Reuse allocated memory
+            for (size_t i = 0; i < data.size(); i++) {
+                m_floatCache[i] = chaiscript::boxed_cast<float>(data[i]);  // Direct use, no temporary binding
                 startidx++;
             }
             if (uniform == "modelMatrix") {
@@ -319,15 +328,32 @@ int chai_shader::send(const std::string &uniform, const std::vector<glm::mat4> &
             || info->baseType == gfx::Shader::UNIFORM_TEXELBUFFER || info->baseType == gfx::Shader::UNIFORM_STORAGEBUFFER)
             return -1;
 
+        static int sendCount = 0;
+        static size_t maxCapacity = 0;
+        sendCount++;
+        
         int startidx = 0;
-        m_floatCache.clear();
-        m_floatCache.reserve(data.size() * 16);
+        size_t requiredSize = data.size() * 16;
+        
+        // Track cache growth
+        if (m_floatCache.capacity() > maxCapacity) {
+            maxCapacity = m_floatCache.capacity();
+            if (sendCount % 100 == 0) {
+                printf("[SHADER LEAK] m_floatCache capacity grew to %zu (size=%zu, required=%zu)\n", 
+                       maxCapacity, m_floatCache.size(), requiredSize);
+            }
+        }
+        
+        // Note: Cannot shrink cache safely - may cause crashes if GPU is still using the data
+        
+        m_floatCache.resize(requiredSize);  // Reuse allocated memory
+        size_t idx = 0;
         for (const auto& d : data) {
             for (int c = 0; c < 4; ++c) {
-                m_floatCache.emplace_back(d[c].x);
-                m_floatCache.emplace_back(d[c].y);
-                m_floatCache.emplace_back(d[c].z);
-                m_floatCache.emplace_back(d[c].w);
+                m_floatCache[idx++] = d[c].x;
+                m_floatCache[idx++] = d[c].y;
+                m_floatCache[idx++] = d[c].z;
+                m_floatCache[idx++] = d[c].w;
                 startidx += 4;
             }          
         }
@@ -425,10 +451,9 @@ int chai_shader::send(const std::string &uniform, const std::vector<int> &data) 
             return -1;
 
         int startidx = 0;
-        m_intCache.clear();
-        m_intCache.reserve(data.size());
-        for (const auto& d : data) {
-            m_intCache.emplace_back(d);
+        m_intCache.resize(data.size());  // Reuse allocated memory
+        for (size_t i = 0; i < data.size(); i++) {
+            m_intCache[i] = data[i];
             startidx++;
         }
         std::memcpy(info->ints, m_intCache.data(), m_intCache.size()*sizeof(int));
@@ -451,16 +476,12 @@ int chai_shader::send(const std::string &uniform, const glm::mat4 &data) {
             || info->baseType == gfx::Shader::UNIFORM_TEXELBUFFER || info->baseType == gfx::Shader::UNIFORM_STORAGEBUFFER)
             return -1;
 
-        m_floatCache.clear();
-        m_floatCache.reserve(16);
-        for (int c = 0; c < 4; ++c) {
-            m_floatCache.emplace_back(data[c].x);
-            m_floatCache.emplace_back(data[c].y);
-            m_floatCache.emplace_back(data[c].z);
-            m_floatCache.emplace_back(data[c].w);
-        }          
-
-        std::memcpy(info->floats, m_floatCache.data(), m_floatCache.size()*sizeof(float));
+        // LEAK FIX: Use matrix pool instead of resizing m_floatCache
+        // Avoid vector resize() operations that cause capacity growth
+        size_t slot = cacheMatrix(data);
+        const float* matrixData = getCachedMatrix(slot);
+        
+        std::memcpy(info->floats, matrixData, 16 * sizeof(float));
         shader->updateUniform(info, 1);
         return 0;      
     }

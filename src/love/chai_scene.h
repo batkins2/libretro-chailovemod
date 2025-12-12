@@ -30,7 +30,7 @@ public:
     void hideMesh(chai_mesh *mesh);
     void showMesh(chai_mesh *mesh);
     void setShader(chai_shader *shader, chai_shader *compute);
-    void setMatrix(const glm::mat4 &matrix, int index);
+    void setMatrix(const std::vector<float> &matrix, int index);
     void finalize();    
     void drawMeshes(bool shadows, int view);
     void draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2, const glm::mat4 &viewMatrix3, const glm::mat4 &viewMatrix4, int viewCount);
@@ -79,8 +79,14 @@ private:
     std::vector<glm::mat4> m_shadowCache;
     std::vector<glm::mat4> m_viewMatrixCache2;
     std::vector<glm::mat4> m_jointInfoCache;
+    std::vector<glm::vec4> m_jointInfoVec4Cache;
     std::vector<glm::mat4> m_projectionMatrixBoxedCache;
     std::vector<glm::mat4> m_viewMatrixBoxedCache;
+    // Deferred rendering indices
+    std::vector<int> m_deferredChildIndices;
+    std::vector<int> m_deferredParentIndices;
+    std::vector<int> m_deferredMeshIndices;
+    std::vector<std::pair<int, int>> m_drawnPairs;
     // Framerate tracking
     float m_frameTime = 0.0f;
     float m_fps = 0.0f;

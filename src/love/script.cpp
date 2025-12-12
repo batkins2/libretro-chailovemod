@@ -122,17 +122,61 @@ void script::debugbreak() {
 
 script::script(const std::string& file) {
 	#ifdef __HAVE_CHAISCRIPT__
+	// LEAK FIX: Initialize Boxed_Value object pools and scalar caches at startup
+	#ifdef CHAISCRIPT_POOLING_ENABLED
+	chaiscript::initializeBoxedValuePools();
+	chaiscript::ScalarCache::initialize();
+	std::printf("[ChaiScript] LEAK FIX: Thread-local pooling ENABLED (64-object per-thread pool)\n");
+	#else
+	#ifdef CHAISCRIPT_NO_THREADS
+	std::printf("[ChaiScript] WARNING: Boxed_Value pooling DISABLED (NO_THREADS build - pooling requires threading)\n");
+	#else
+	std::printf("[ChaiScript] WARNING: Boxed_Value pooling DISABLED (standard allocator active)\n");
+	#endif
+	#endif
+	
 	ChaiLove* app = ChaiLove::getInstance();
+
+	// Debug: Track vector allocations
+	static int vectorAllocCount = 0;
+	auto vectorFloatDebugWrapper = []() -> std::vector<float> {
+		vectorAllocCount++;
+		if (vectorAllocCount % 1000 == 0) {
+			std::printf("[ChaiScript] VectorFloat allocated %d times\n", vectorAllocCount);
+		}
+		return std::vector<float>();
+	};
 
 	// ChaiScript Standard Library Additions
 	// This adds some basic type definitions to ChaiScript.
 	chai.add(bootstrap::standard_library::vector_type<std::vector<int>>("VectorInt"));
 	chai.add(bootstrap::standard_library::vector_type<std::vector<float>>("VectorFloat"));
+	chai.add(fun(vectorFloatDebugWrapper), "VectorFloat"); // Debug wrapper
 	chai.add(bootstrap::standard_library::vector_type<std::vector<std::string>>("StringVector"));
 	chai.add(bootstrap::standard_library::map_type<std::map<std::string, bool>>("StringBoolMap"));
 	chai.add(bootstrap::standard_library::map_type<std::map<std::string, int>>("StringIntMap"));
 	chai.add(bootstrap::standard_library::map_type<std::map<std::string, float>>("StringFloatMap"));
 	chai.add(bootstrap::standard_library::map_type<std::map<std::string, std::vector<float>>>("StringFloatVectorMap"));
+
+	// GLM Types
+	chai.add(user_type<glm::vec3>(), "vec3");
+	chai.add(constructor<glm::vec3()>(), "vec3");
+	chai.add(constructor<glm::vec3(float)>(), "vec3");
+	chai.add(constructor<glm::vec3(float, float, float)>(), "vec3");
+	chai.add(constructor<glm::vec3(const glm::vec3&)>(), "vec3");
+	chai.add(fun(static_cast<glm::vec3& (glm::vec3::*)(const glm::vec3&)>(&glm::vec3::operator=)), "=");
+	chai.add(fun(&glm::vec3::x), "x");
+	chai.add(fun(&glm::vec3::y), "y");
+	chai.add(fun(&glm::vec3::z), "z");
+	
+	chai.add(user_type<glm::mat4>(), "mat4");
+	chai.add(constructor<glm::mat4()>(), "mat4");
+	chai.add(constructor<glm::mat4(float)>(), "mat4");
+	chai.add(constructor<glm::mat4(const glm::mat4&)>(), "mat4");
+	chai.add(fun(static_cast<glm::mat4& (glm::mat4::*)(const glm::mat4&)>(&glm::mat4::operator=)), "=");
+	
+	chai.add(bootstrap::standard_library::vector_type<std::vector<glm::vec3>>("VectorVec3"));
+	chai.add(bootstrap::standard_library::vector_type<std::vector<glm::mat4>>("VectorMat4"));
 
 	// ChaiScript_Extras: String Methods
 	auto stringmethods = chaiscript::extras::string_methods::bootstrap();
@@ -368,6 +412,13 @@ script::script(const std::string& file) {
 	chai.add(constructor<chai_shader(const chai_shader &)>(), "chai_shader");
 	chai.add(fun(&chai_shader::operator=), "=");
 	chai.add(fun(&chai_shader::newShader), "newShader");
+	// Expose all send overloads - prefer direct types over Boxed_Value for performance
+	chai.add(fun(static_cast<void (chai_shader::*)(const std::string&, float)>(&chai_shader::send)), "send");
+	chai.add(fun(static_cast<void (chai_shader::*)(const std::string&, const glm::vec3&)>(&chai_shader::send)), "send");
+	chai.add(fun(static_cast<void (chai_shader::*)(const std::string&, const std::vector<glm::vec3>&)>(&chai_shader::send)), "send");
+	chai.add(fun(static_cast<int (chai_shader::*)(const std::string&, const std::vector<int>&)>(&chai_shader::send)), "send");
+	chai.add(fun(static_cast<int (chai_shader::*)(const std::string&, const glm::mat4&)>(&chai_shader::send)), "send");
+	chai.add(fun(static_cast<int (chai_shader::*)(const std::string&, const std::vector<glm::mat4>&)>(&chai_shader::send)), "send");
 	chai.add(fun(static_cast<int (chai_shader::*)(const std::string&, const std::vector<chaiscript::Boxed_Value>&)>(&chai_shader::send)), "send");
 	chai.add(fun(&chai_shader::sendInt), "sendInt");
 	chai.add(user_type<chai_particles>(), "chai_particles");
@@ -405,27 +456,23 @@ script::script(const std::string& file) {
 	chai.add(user_type<chai_meshData>(), "chai_meshData");
 	chai.add(fun(&chai_meshData::clone), "clone");
 	
-	// Wrapper functions to convert ChaiScript Boxed_Value vectors to glm::mat4
-	auto chai_scene_setMatrix_wrapper = [](chai_scene* scene, const std::vector<Boxed_Value>& matrix, int index) {
-		glm::mat4 mat;
-		float* ptr = glm::value_ptr(mat);
-		for (int i = 0; i < 16 && i < matrix.size(); i++) {
-			ptr[i] = boxed_cast<float>(matrix[i]);
-		}
-		scene->setMatrix(mat, index);
-	};
 	
+	static int drawCallCount = 0;
 	auto chai_scene_draw_wrapper = [](chai_scene* scene, 
-		const std::vector<Boxed_Value>& vm1,
-		const std::vector<Boxed_Value>& vm2,
-		const std::vector<Boxed_Value>& vm3,
-		const std::vector<Boxed_Value>& vm4,
+		const std::vector<float>& vm1,
+		const std::vector<float>& vm2,
+		const std::vector<float>& vm3,
+		const std::vector<float>& vm4,
 		int viewCount) {
-		auto convertToMat4 = [](const std::vector<Boxed_Value>& vec) -> glm::mat4 {
+		drawCallCount++;
+		if (drawCallCount % 60 == 0) {
+			std::printf("[chai_scene] draw called %d times (60 FPS check)\n", drawCallCount);
+		}
+		auto convertToMat4 = [](const std::vector<float>& vec) -> glm::mat4 {
 			glm::mat4 mat;
 			float* ptr = glm::value_ptr(mat);
 			for (int i = 0; i < 16 && i < vec.size(); i++) {
-				ptr[i] = boxed_cast<float>(vec[i]);
+				ptr[i] = vec[i];
 			}
 			return mat;
 		};
@@ -440,7 +487,7 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_scene::hideMesh), "hideMesh");
 	chai.add(fun(&chai_scene::showMesh), "showMesh");
 	chai.add(fun(&chai_scene::setShader), "setShader");
-	chai.add(fun(chai_scene_setMatrix_wrapper), "setMatrix");
+	chai.add(fun(&chai_scene::setMatrix), "setMatrix");	
 	chai.add(fun(chai_scene_draw_wrapper), "draw");
 	chai.add(fun(&chai_scene::newScene), "newScene");
 	chai.add(fun(&chai_scene::destroy), "destroy");
@@ -492,11 +539,28 @@ script::script(const std::string& file) {
 	chai.add(constructor<chai_editor(const chai_editor &)>(), "chai_editor");
 	chai.add(fun(&chai_editor::isEditMode), "isEditMode");
 
-	// Matrices
-	chai.add(fun(&chai_matrices::setTransformationMatrix), "setTransformationMatrix");
-	chai.add(fun(&chai_matrices::setProjectionMatrix), "setProjectionMatrix");
-	chai.add(fun(&chai_matrices::setViewMatrix), "setViewMatrix");
-	chai.add(fun(&chai_matrices::setOrthographicMatrix), "setOrthographicMatrix");
+	// Matrices - OPTIMIZED versions with thread-local storage reuse (ACTIVE - fixes memory leak)
+	// chai.add(fun(&chai_matrices::setProjectionMatrixOptimized), "setProjectionMatrix");
+	// chai.add(fun(&chai_matrices::setViewMatrixOptimized), "setViewMatrix");
+	// chai.add(fun(&chai_matrices::setOrthographicMatrixOptimized), "setOrthographicMatrix");
+	// chai.add(fun(&chai_matrices::setTransformationMatrixOptimized), "setTransformationMatrix");
+	
+	// Matrices - IN-PLACE versions (ChaiScript creates new vector each call, causing leak!)
+	chai.add(fun(&chai_matrices::setProjectionMatrixInPlace), "setProjectionMatrix");
+	chai.add(fun(&chai_matrices::setViewMatrixInPlace), "setViewMatrix");
+	chai.add(fun(&chai_matrices::setOrthographicMatrixInPlace), "setOrthographicMatrix");
+	chai.add(fun(&chai_matrices::setTransformationMatrixInPlace), "setTransformationMatrix");
+	chai.add(fun(&chai_matrices::mat4ToVectorInPlace), "mat4ToVector");
+	
+	// Matrices - OLD return-by-value versions (kept for compatibility but cause memory leaks)
+	// chai.add(fun<std::vector<float>, chai_matrices, const std::vector<float>&, const std::vector<float>&, const std::vector<float>&, const std::vector<float>&>(&chai_matrices::setTransformationMatrix), "setTransformationMatrix");
+	// chai.add(fun(static_cast<std::vector<float> (chai_matrices::*)(const std::vector<float>&)>(&chai_matrices::setProjectionMatrix)), "setProjectionMatrix");
+	// chai.add(fun(static_cast<std::vector<float> (chai_matrices::*)(float, float, float, float)>(&chai_matrices::setProjectionMatrix)), "setProjectionMatrix");
+	// chai.add(fun(static_cast<std::vector<float> (chai_matrices::*)(const std::vector<float>&, const std::vector<float>&, const std::vector<float>&)>(&chai_matrices::setViewMatrix)), "setViewMatrix");
+	// chai.add(fun(static_cast<std::vector<float> (chai_matrices::*)(const std::vector<float>&)>(&chai_matrices::setOrthographicMatrix)), "setOrthographicMatrix");
+	// chai.add(fun(static_cast<std::vector<float> (chai_matrices::*)(float, float, float, float, float, float)>(&chai_matrices::setOrthographicMatrix)), "setOrthographicMatrix");
+	// chai.add(fun(&chai_matrices::mat4ToVector), "mat4ToVector");
+	chai.add(fun(&chai_matrices::vectorToMat4), "vectorToMat4");
 	
 	// Font
 	// chai.add(fun(&font::isOpen), "isOpen");
@@ -795,8 +859,12 @@ void script::reset() {
 void script::update(float delta) {
 	#ifdef __HAVE_CHAISCRIPT__
 	if (hasUpdate) {
-		try {
+		try {			
 			chaiupdate(delta);
+			
+			// Note: ChaiScript internal memory cannot be easily cleaned up
+			// The RAM leak is likely from Boxed_Value wrappers that accumulate
+			// inside ChaiScript's internal state. This is a known limitation.
 		}
 		catch (const std::exception& e) {
 			hasUpdate = false;
@@ -809,7 +877,7 @@ void script::update(float delta) {
 void script::draw() {
 	#ifdef __HAVE_CHAISCRIPT__
 	if (hasDraw) {
-		try {
+		try {			
 			chaidraw();
 		}
 		catch (const std::exception& e) {

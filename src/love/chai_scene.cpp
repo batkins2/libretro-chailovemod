@@ -1,7 +1,7 @@
 #include "chai_scene.h"
 #include "../ChaiLove.h"
-
-#include <memplumber.h>
+// #include "../../vendor/MemPlumber/memplumber.h"
+// #include "../../vendor/MemPlumber/memplumber-internals.h"
 
 namespace love {
 chai_scene::chai_scene() {
@@ -112,12 +112,11 @@ void chai_scene::setShader(chai_shader *shader, chai_shader *compute) {
     sceneShader = shader;   
 }
 
-void chai_scene::setMatrix(const glm::mat4 &matrix, int index) {
-    // Convert glm::mat4 to Matrix4
+void chai_scene::setMatrix(const std::vector<float> &matrix, int index) {
+    // Convert std::vector<float> to Matrix4
     float mat[16];
-    const float *ptr = glm::value_ptr(matrix);
     for (int i = 0; i < 16; i++) {
-        mat[i] = ptr[i];
+        mat[i] = matrix[i];
     }
     matrices[index] = Matrix4(mat);
 }
@@ -178,6 +177,18 @@ bool isMeshInFrustum(chai_mesh *mesh, const glm::mat4 &viewProjectionMatrix) {
 }
 
 void chai_scene::drawMeshes(bool shadows, int view) {
+    static int sceneFrameCount = 0;
+    static size_t lastSceneLeakCount = 0;
+    static uint64_t lastSceneLeakSize = 0;
+    size_t leakCountBefore, leakCountAfter;
+    uint64_t leakSizeBefore, leakSizeAfter;
+    
+    sceneFrameCount++;
+    
+    // if (sceneFrameCount % 300 == 0) {
+    //     __mem_leak_check(leakCountBefore, leakSizeBefore, true, "", false);
+    // }
+    
     // if (shadows) {
     //     printf("Drawing shadows\n");
     // } else {
@@ -266,21 +277,21 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         // }
         // auto modelIdx = sceneShader->send("modelMatrix", v);
 
-        printf("Testing for memory leaks around shader uniform updates\n");
-        size_t leakCountBefore, leakCountAfter;
-        uint64_t leakSizeBefore, leakSizeAfter;
+        // printf("Testing for memory leaks around shader uniform updates\n");
+        // size_t leakCountBefore, leakCountAfter;
+        // uint64_t leakSizeBefore, leakSizeAfter;
         
-        __mem_leak_check(leakCountBefore, leakSizeBefore, false, "", false);
+        // __mem_leak_check(leakCountBefore, leakSizeBefore, false, "", false);
         
         m_lightIntensityCache.clear();
         m_lightIntensityCache.push_back(glm::vec3(1.2f));
         sceneShader->send("lightIntensity", 1.2f);
 
-        __mem_leak_check(leakCountAfter, leakSizeAfter, false, "", false);
+        // __mem_leak_check(leakCountAfter, leakSizeAfter, false, "", false);
     
-        printf("Leak delta: %zu objects, %llu bytes\n", 
-            leakCountAfter - leakCountBefore,
-            leakSizeAfter - leakSizeBefore);
+        // printf("Leak delta: %zu objects, %llu bytes\n", 
+        //     leakCountAfter - leakCountBefore,
+        //     leakSizeAfter - leakSizeBefore);
 
         m_ambientColorCache2.clear();
         m_ambientColorCache2.push_back(glm::vec3(0.9f, 0.9f, 0.9f));
@@ -291,22 +302,22 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         auto t2 = glm::ortho(0.0f, static_cast<float>(mesh->specularW),
             static_cast<float>(mesh->specularH), 0.0f, -1.0f, 1.0f);
         auto pm = glm::value_ptr(t2);
-        printf("Testing for memory leaks around shader uniform updates\n");
+        // printf("Testing for memory leaks around shader uniform updates\n");
         m_projectionMatrixCache2.clear();
-        __mem_leak_check(leakCountBefore, leakSizeBefore, false, "", false);
+        // __mem_leak_check(leakCountBefore, leakSizeBefore, false, "", false);
         m_projectionMatrixCache2.push_back(t2);
         sceneShader->send("projectionMatrix", m_projectionMatrixCache2);
-        __mem_leak_check(leakCountAfter, leakSizeAfter, false, "", false);
+        // __mem_leak_check(leakCountAfter, leakSizeAfter, false, "", false);
     
-        printf("Leak delta: %zu objects, %llu bytes\n", 
-            leakCountAfter - leakCountBefore,
-            leakSizeAfter - leakSizeBefore);
+        // printf("Leak delta: %zu objects, %llu bytes\n", 
+            // leakCountAfter - leakCountBefore,
+            // leakSizeAfter - leakSizeBefore);
 
         // Set the view matrix to identity for fullscreen quad
         auto vMatrix = glm::mat4(1.0f);
-        m_viewMatrixCache.clear();
+        // m_viewMatrixCache.clear();
         // m_viewMatrixCache.push_back(vMatrix);
-        // sceneShader->send("viewMatrix", m_viewMatrixCache[0]);
+        // sceneShader->send("viewMatrix", vMatrix);
 
         // Draw a fullscreen quad (replace with your engine's quad draw if needed)
         // gfx::Texture::Settings settings;
@@ -343,13 +354,24 @@ void chai_scene::drawMeshes(bool shadows, int view) {
 
     glm::mat4 viewProjectionMatrix = t2 * vMatrix;
 
-    std::vector<int> deferredChildIndices;
-    std::vector<int> deferredParentIndices;
-    std::vector<int> deferredMeshIndices;
+    m_deferredChildIndices.clear();
+    m_deferredParentIndices.clear();
+    m_deferredMeshIndices.clear();
 
     for (auto mesh : meshes) {
+        // Check for null mesh first
+        if (!mesh) {
+            i++;
+            continue;
+        }
         
         if (i == 0) {
+            // Bounds check to prevent crash
+            if (view >= mesh->cameraParams.size() || view >= mesh->lightParams.size()) {
+                i++;
+                continue;
+            }
+            
             auto cameraParams = mesh->cameraParams[view];
 
             float fov = cameraParams.at("fov")[0];
@@ -483,19 +505,18 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                     bmat.getColumn(2).x, bmat.getColumn(2).y, bmat.getColumn(2).z, bmat.getColumn(2).w,
                     bmat.getColumn(3).x, bmat.getColumn(3).y, bmat.getColumn(3).z, bmat.getColumn(3).w
                 );
-                m_modelMatrixCache.clear();
-                m_modelMatrixCache.push_back(modelMat);
+                // m_modelMatrixCache.clear();
+                // m_modelMatrixCache.push_back(modelMat);
                 
 
-                auto modelIdx = sceneShader->send("modelMatrix", m_modelMatrixCache[0]);
+                auto modelIdx = sceneShader->send("modelMatrix", modelMat);
                 // size_t leakCountBefore, leakCountAfter;
                 // uint64_t leakSizeBefore, leakSizeAfter;
                 
                 // __mem_leak_check(leakCountBefore, leakSizeBefore, false, "", false);
-                std::vector<glm::vec4> jointInfoVec = {
-                    glm::vec4(0.0f, 0.0f, (float)modelIdx, 0.0f)
-                };
-                sceneShader->sendConstant("jointInfo", jointInfoVec);
+                m_jointInfoVec4Cache.resize(1);
+                m_jointInfoVec4Cache[0] = glm::vec4(0.0f, 0.0f, (float)modelIdx, 0.0f);
+                sceneShader->sendConstant("jointInfo", m_jointInfoVec4Cache);
                 // __mem_leak_check(leakCountAfter, leakSizeAfter, false, "", false);
     
                 // printf("Leak delta: %zu objects, %llu bytes\n", 
@@ -571,8 +592,8 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                     continue;
                 }
                 if (meshGroups[child->getId()] > 1) {
-                    deferredChildIndices.push_back(j);
-                    deferredParentIndices.push_back(i);
+                    m_deferredChildIndices.push_back(j);
+                    m_deferredParentIndices.push_back(i);
                     defer = true;
                 }
                 j++;
@@ -584,10 +605,17 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         }
 
         if (meshGroups[mesh->getId()] > 1) {
-            deferredMeshIndices.push_back(i);
+            m_deferredMeshIndices.push_back(i);
             i++;
             continue;
         }
+        
+        // Bounds check for matrices array
+        if (i >= matrices.size()) {
+            i++;
+            continue;
+        }
+        
         // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
 
         // gfx::Graphics::flushBatchedDrawsGlobal();
@@ -622,28 +650,45 @@ void chai_scene::drawMeshes(bool shadows, int view) {
     }
     // Draw deferred child meshes in order of same index
     i = 0;
-    std::vector<std::pair<int, int>> drawnPairs;
-    for (auto childIndex : deferredChildIndices) {
-        // printf("Drawing deferred child mesh index %d of parent mesh index %d\n", childIndex, deferredParentIndices[i]);
-        // auto vbo = meshChildren[deferredParentIndices[i]][childIndex]->cachedVBOs.begin()->second;
+    m_drawnPairs.clear();
+    for (auto childIndex : m_deferredChildIndices) {
+        // Bounds check for deferred parent indices
+        if (i >= m_deferredParentIndices.size()) {
+            i++;
+            continue;
+        }
+        
+        // printf("Drawing deferred child mesh index %d of parent mesh index %d\n", childIndex, m_deferredParentIndices[i]);
+        // auto vbo = meshChildren[m_deferredParentIndices[i]][childIndex]->cachedVBOs.begin()->second;
         // printf("Using VBO %d\n", vbo);
         // glBindBuffer(GL_ARRAY_BUFFER, vbo);
         // printf("Buffer bound\n");
-        for (auto parentId : deferredParentIndices) {
+        for (auto parentId : m_deferredParentIndices) {
+            // Bounds check for meshChildren and arrays
+            if (meshChildren.find(parentId) == meshChildren.end() || 
+                meshChildren.find(m_deferredParentIndices[i]) == meshChildren.end() ||
+                childIndex >= meshChildren[m_deferredParentIndices[i]].size()) {
+                continue;
+            }
+            
             int j = 0;
             for (auto child : meshChildren[parentId]) {
-                if (child->getId() == meshChildren[deferredParentIndices[i]][childIndex]->getId()) {
-                    if (child->visible == false || drawnPairs.end() != std::find(drawnPairs.begin(), drawnPairs.end(), std::make_pair(parentId, j))) {
+                if (!child || child->getId() == meshChildren[m_deferredParentIndices[i]][childIndex]->getId()) {
+                    if (child->visible == false || m_drawnPairs.end() != std::find(m_drawnPairs.begin(), m_drawnPairs.end(), std::make_pair(parentId, j))) {
                         j++;
                         continue;
                     }
                     auto drawnPair = std::make_pair(parentId, j);
                     // printf("Drawing child mesh %d of parent mesh %d\n", j, parentId);
-                    drawnPairs.push_back(drawnPair);
+                    m_drawnPairs.push_back(drawnPair);
                     // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
                     // gfx::Graphics::flushBatchedDrawsGlobal();
                    
                     // Draw the parent mesh first
+                    // Bounds check for meshes and matrices arrays
+                    if (parentId >= meshes.size() || parentId >= matrices.size() || !meshes[parentId]) {
+                        continue;
+                    }
                     meshes[parentId]->draw(cg.instance, matrices[parentId], sceneShader, deltaTime, computeShader);
                     float identityData[16] = {
                         1.0f, 0.0f, 0.0f, 0.0f,
@@ -654,7 +699,7 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                     Matrix4 m = Matrix4(identityData);
                     // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
 
-                    if (computeShader == nullptr) {
+                    if (computeShader == nullptr && j < child->meshes.size() && child->meshes[j]) {
                         child->meshes[j]->draw(cg.instance, m);
                     }
                     // cg.instance->present(nullptr);
@@ -667,7 +712,12 @@ void chai_scene::drawMeshes(bool shadows, int view) {
 
     // printf("Drawing deferred parent meshes\n");
 
-    for (auto meshIndex : deferredMeshIndices) {
+    for (auto meshIndex : m_deferredMeshIndices) {
+        // Bounds check for deferred mesh indices
+        if (meshIndex >= meshes.size() || meshIndex >= matrices.size() || !meshes[meshIndex]) {
+            continue;
+        }
+        
         auto mesh = meshes[meshIndex];
         auto matrix = matrices[meshIndex];
         // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
@@ -676,10 +726,13 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         mesh->draw(cg.instance, matrix, sceneShader, deltaTime, computeShader);
         if (meshChildren.find(meshIndex) != meshChildren.end()) {
             for (auto child : meshChildren[meshIndex]) {
-                if (child->visible == false) {
+                if (!child || child->visible == false) {
                     continue;
                 }
                 for (int j = 0; j < child->meshes.size(); ++j) {
+                    if (!child->meshes[j]) {
+                        continue;
+                    }
                     float identityData[16] = {
                         1.0f, 0.0f, 0.0f, 0.0f,
                         0.0f, 1.0f, 0.0f, 0.0f,
@@ -696,6 +749,27 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         }
         // cg.instance->present(nullptr);
     }
+    
+    // if (sceneFrameCount % 300 == 0) {
+    //     __mem_leak_check(leakCountAfter, leakSizeAfter, true, "", false);
+        
+    //     size_t deltaCount = leakCountAfter - leakCountBefore;
+    //     uint64_t deltaSize = leakSizeAfter - leakSizeBefore;
+        
+    //     printf("[SCENE DRAW] Frame %d | Delta: %zu objects, %llu bytes | Total Delta since last: %zu objects, %llu bytes\n",
+    //            sceneFrameCount, deltaCount, deltaSize,
+    //            leakCountAfter - lastSceneLeakCount, leakSizeAfter - lastSceneLeakSize);
+        
+    //     printf("  m_lightDirectionCache size: %zu\n", m_lightDirectionCache.size());
+    //     printf("  m_lightColorCache size: %zu\n", m_lightColorCache.size());
+    //     printf("  m_deferredChildIndices size: %zu\n", m_deferredChildIndices.size());
+    //     printf("  m_deferredParentIndices size: %zu\n", m_deferredParentIndices.size());
+    //     printf("  m_deferredMeshIndices size: %zu\n", m_deferredMeshIndices.size());
+        
+    //     lastSceneLeakCount = leakCountAfter;
+    //     lastSceneLeakSize = leakSizeAfter;
+    // }
+    
     if (shadows == false && computeShader == nullptr) {
         for (auto ps : particleSystems) {
             // if (ps->visible == false) {
@@ -709,6 +783,7 @@ void chai_scene::drawMeshes(bool shadows, int view) {
 }
 
 void chai_scene::draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2, const glm::mat4 &viewMatrix3, const glm::mat4 &viewMatrix4, int viewCount) {
+    // MemPlumber::start();
     auto& cg = ChaiLove::getInstance()->chai_gfx;
     // ChaiLove::getInstance()->chai_collisions.processDebug(1.0f / 60.0f, viewMatrix1);
     
@@ -748,20 +823,20 @@ void chai_scene::draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2
         // auto cs = computeShader;
         computeShader = nullptr;
         if (viewCount == 1) {
-            size_t leakCountBefore, leakCountAfter;
-            uint64_t leakSizeBefore, leakSizeAfter;
+            // size_t leakCountBefore, leakCountAfter;
+            // uint64_t leakSizeBefore, leakSizeAfter;
             
-            __mem_leak_check(leakCountBefore, leakSizeBefore, false, "", false);
+            // __mem_leak_check(leakCountBefore, leakSizeBefore, false, "", false);
             cg.instance->setShader(sceneShader->shader);
             cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
             sceneShader->newFrame();
             sceneShader->send("viewMatrix", viewMatrix1);
             drawMeshes(false, 0);
-            __mem_leak_check(leakCountAfter, leakSizeAfter, false, "", false);
+            // __mem_leak_check(leakCountAfter, leakSizeAfter, false, "", false);
     
-            printf("Leak delta: %zu objects, %llu bytes\n", 
-                leakCountAfter - leakCountBefore,
-                leakSizeAfter - leakSizeBefore);
+            // printf("Leak delta: %zu objects, %llu bytes\n", 
+            //     leakCountAfter - leakCountBefore,
+            //     leakSizeAfter - leakSizeBefore);
         }
         if (viewCount == 2) {
             

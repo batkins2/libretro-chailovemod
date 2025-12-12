@@ -3,7 +3,6 @@
 // #include "filesystem/Filesystem.h"
 #include "../ChaiLove.h"
 #include "filesystem.h"
-#include <memplumber.h>
 namespace love
 {
 
@@ -20,16 +19,9 @@ chai_gfx::~chai_gfx() {
     // delete shader;
     // delete instance;
     // delete win;
-    __mem_leak_check(leakCountAfter, leakSizeAfter, false, "", false);
-    
-    printf("Leak delta: %zu objects, %llu bytes\n", 
-        leakCountAfter - leakCountBefore,
-        leakSizeAfter - leakSizeBefore);
 }
 
 bool chai_gfx::init() {
-        
-    __mem_leak_check(leakCountBefore, leakSizeBefore, false, "", false); 
         
     auto init = false;
     if (instance != nullptr) {

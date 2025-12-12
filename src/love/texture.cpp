@@ -561,52 +561,34 @@ void Texture::draw3D(Graphics *gfx, const Matrix4 &m, const Colorf &c)
         quadVerts[i][19] = 0.0f; // Joint[3]
     }
 
-	// Create vertex buffer
-	std::vector<Buffer::DataDeclaration> vertexFormat = std::vector<gfx::Buffer::DataDeclaration>();
+	// Create vertex buffer with proper format
+	std::vector<Buffer::DataDeclaration> vertexFormat;
+	vertexFormat.push_back(Buffer::DataDeclaration("VertexPosition", DATAFORMAT_FLOAT_VEC3, sizeof(float) * 3));
+    vertexFormat.push_back(Buffer::DataDeclaration("VertexTexCoord", DATAFORMAT_FLOAT_VEC2, sizeof(float) * 2));
+    vertexFormat.push_back(Buffer::DataDeclaration("VertexColor", DATAFORMAT_FLOAT_VEC4, sizeof(float) * 4));
+    vertexFormat.push_back(Buffer::DataDeclaration("VertexWeight", DATAFORMAT_FLOAT_VEC4, sizeof(float) * 4));
+    vertexFormat.push_back(Buffer::DataDeclaration("VertexNormal", DATAFORMAT_FLOAT_VEC3, sizeof(float) * 3));
+    vertexFormat.push_back(Buffer::DataDeclaration("VertexJoint", DATAFORMAT_FLOAT_VEC4, sizeof(float) * 4));
 
-	Buffer::Settings vbSettings(BUFFERUSAGEFLAG_VERTEX, BUFFERDATAUSAGE_STATIC);
-
-	vertexFormat.push_back(gfx::Buffer::DataDeclaration("VertexPosition", gfx::DATAFORMAT_FLOAT_VEC3, sizeof(float) * 3)); // XYZ
-    vertexFormat.push_back(gfx::Buffer::DataDeclaration("VertexTexCoord", gfx::DATAFORMAT_FLOAT_VEC2, sizeof(float) * 2)); // UV
-    vertexFormat.push_back(gfx::Buffer::DataDeclaration("VertexColor", gfx::DATAFORMAT_FLOAT_VEC4, sizeof(float) * 4));    // RGBA
-    vertexFormat.push_back(gfx::Buffer::DataDeclaration("VertexWeight", gfx::DATAFORMAT_FLOAT_VEC4, sizeof(float) * 4));   // Weight
-    vertexFormat.push_back(gfx::Buffer::DataDeclaration("VertexNormal", gfx::DATAFORMAT_FLOAT_VEC3, sizeof(float) * 3));   // Normal
-    vertexFormat.push_back(gfx::Buffer::DataDeclaration("VertexJoint", gfx::DATAFORMAT_FLOAT_VEC4, sizeof(float) * 4));    // Joint
+	Buffer::Settings vbSettings(BUFFERUSAGEFLAG_VERTEX, BUFFERDATAUSAGE_STREAM);
+	Buffer *vertexBuffer = gfx->newBuffer(vbSettings, vertexFormat, quadVerts, sizeof(quadVerts), 4);
 	
-	StrongRef<Buffer> vertexBuffer(gfx->newBuffer(
-		vbSettings,
-		vertexFormat,
-		quadVerts,
-		sizeof(quadVerts),
-		4
-	), Acquire::NORETAIN);
-
-    // Create index buffer
-    Buffer::Settings ibSettings(BUFFERUSAGEFLAG_INDEX, BUFFERDATAUSAGE_STATIC);
-    StrongRef<Buffer> indexBuffer(gfx->newBuffer(
-        ibSettings,
-        gfx::DATAFORMAT_UINT16,
-        quadIndices,
-        sizeof(quadIndices),
-        6
-    ), Acquire::NORETAIN);
+	// Use the shared quad index buffer
+	Buffer *indexBuffer = gfx->getQuadIndexBuffer();
 
     // Set up attributes and bindings
     VertexAttributes attributes;
     BufferBindings buffers;
 
-    attributes.set(0, gfx::DATAFORMAT_FLOAT_VEC3, 0, 0); // VertexPosition
-    attributes.set(1, gfx::DATAFORMAT_FLOAT_VEC2, sizeof(float) * 3, 0); // VertexTexCoord
-    attributes.set(2, gfx::DATAFORMAT_FLOAT_VEC4, sizeof(float) * 5, 0); // VertexColor
-    attributes.set(3, gfx::DATAFORMAT_FLOAT_VEC4, sizeof(float) * 9, 0); // VertexWeight
-    attributes.set(4, gfx::DATAFORMAT_FLOAT_VEC3, sizeof(float) * 13, 0); // VertexNormal
-    attributes.set(5, gfx::DATAFORMAT_FLOAT_VEC4, sizeof(float) * 16, 0); // VertexJoint
+    attributes.set(0, DATAFORMAT_FLOAT_VEC3, 0, 0);
+    attributes.set(1, DATAFORMAT_FLOAT_VEC2, sizeof(float) * 3, 0);
+    attributes.set(2, DATAFORMAT_FLOAT_VEC4, sizeof(float) * 5, 0);
+    attributes.set(3, DATAFORMAT_FLOAT_VEC4, sizeof(float) * 9, 0);
+    attributes.set(4, DATAFORMAT_FLOAT_VEC3, sizeof(float) * 13, 0);
+    attributes.set(5, DATAFORMAT_FLOAT_VEC4, sizeof(float) * 16, 0);
     attributes.setBufferLayout(0, sizeof(float) * 20, STEP_PER_VERTEX);
 
     buffers.set(0, vertexBuffer, 0);
-
-    // Apply transformation
-    Graphics::TempTransform transform(gfx, m);
 
     // Draw command
     Graphics::DrawIndexedCommand cmd(&attributes, &buffers, indexBuffer);
@@ -619,6 +601,9 @@ void Texture::draw3D(Graphics *gfx, const Matrix4 &m, const Colorf &c)
     cmd.indexCount = 6;
 	
     gfx->draw(cmd);
+    
+    // Immediately release the vertex buffer
+    vertexBuffer->release();
 }
 
 void Texture::draw(Graphics *gfx, Quad *q, const Matrix4 &localTransform)
