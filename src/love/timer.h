@@ -30,6 +30,8 @@ class timer {
 	 */
 	int getFPS();
 
+	float getTime();
+	
 	float m_delta = 0.0f;
 	float m_deltaCounter = 0.0f;
 	int m_frameCounter = 0;

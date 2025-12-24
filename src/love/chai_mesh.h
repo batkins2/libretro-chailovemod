@@ -171,6 +171,7 @@ class chai_mesh {
     std::map<int, size_t> vboSizes;
     protected:
     int id;
+    int frameCount = 0;
     // float jointMinValue;
 };
 }

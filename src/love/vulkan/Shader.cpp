@@ -190,6 +190,7 @@ bool Shader::loadVolatile()
 	createPipelineLayout();
 	createDescriptorPoolSizes();
 	descriptorPools.resize(MAX_FRAMES_IN_FLIGHT);
+	allocatedDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
 	currentFrame = 0;
 	newFrame();
 
@@ -224,6 +225,7 @@ void Shader::unloadVolatile()
 	shaderModules.clear();
 	shaderStages.clear();
 	descriptorPools.clear();
+	allocatedDescriptorSets.clear();
 	attributes.clear();
 	uniformBufferBlocks.clear();
 	graphicsPipelinesDynamicState.clear();
@@ -269,6 +271,20 @@ void Shader::newFrame()
 	currentDescriptorSet = VK_NULL_HANDLE;
 	resourceDescriptorsDirty = true;
 	
+	// CRITICAL FIX: Reset descriptor pools to actually free AMD driver memory
+	// Explicit freeing alone doesn't release driver memory - must reset pool
+	if (!allocatedDescriptorSets[currentFrame].empty())
+	{
+		allocatedDescriptorSets[currentFrame].clear();
+	}
+	
+	// Reset all descriptor pools for this frame to free AMD driver memory
+	for (auto pool : descriptorPools[currentFrame])
+	{
+		if (pool != VK_NULL_HANDLE)
+			vkResetDescriptorPool(device, pool, 0);
+	}
+	
 	// Don't destroy pools every frame - let them accumulate to a reasonable cap
 	// Destroying and recreating constantly causes VMA fragmentation
 	const size_t MAX_POOLS_PER_FRAME = 10;
@@ -280,10 +296,11 @@ void Shader::newFrame()
 		descriptorPools[currentFrame].resize(MAX_POOLS_PER_FRAME);
 	}
 	
-	// Destroy pipelines every 120 frames to prevent accumulation
+	// CRITICAL FIX: Destroy pipelines every 60 frames to match recycleCommandPool frequency
+	// Pipelines accumulate in AMD driver memory - must be destroyed in sync with recycling
 	static int frameCounter = 0;
 	frameCounter++;
-	if (frameCounter >= 120)
+	if (frameCounter >= 60)  // Changed from 120 to 60 to match recycling
 	{
 		frameCounter = 0;
 		
@@ -893,31 +910,33 @@ void Shader::compileShaders()
             u.location = bindingMapper(comp, spirv, name, u.count, r.id);
         }
 
-        if (shaderStage == SHADERSTAGE_VERTEX)
-        {
-            auto pushConstants = comp.get_shader_resources().push_constant_buffers;
-            for (const auto& pc : pushConstants) {
-                const auto& type = comp.get_type(pc.base_type_id);
-                size_t size = comp.get_declared_struct_size(type);
-                uint32_t offset = 0; // Usually 0
+        // Check for push constants in all shader stages (not just vertex)
+        auto pushConstants = comp.get_shader_resources().push_constant_buffers;
+        for (const auto& pc : pushConstants) {
+            const auto& type = comp.get_type(pc.base_type_id);
+            size_t size = comp.get_declared_struct_size(type);
+            uint32_t offset = 0; // Usually 0
 
-                // Accumulate stage flags if the same block is used in multiple stages
-                bool found = false;
-                for (auto& range : pushConstantRanges) {
-                    if (range.offset == offset && range.size == size) {
-                        range.stageFlags |= getStageBit(shaderStage);
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    VkPushConstantRange range = {};
-                    range.stageFlags = getStageBit(shaderStage);
-                    range.offset = offset;
-                    range.size = (uint32_t)size;
-                    pushConstantRanges.push_back(range);
+            // Accumulate stage flags if the same block is used in multiple stages
+            bool found = false;
+            for (auto& range : pushConstantRanges) {
+                if (range.offset == offset && range.size == size) {
+                    range.stageFlags |= getStageBit(shaderStage);
+                    found = true;
+                    break;
                 }
             }
+            if (!found) {
+                VkPushConstantRange range = {};
+                range.stageFlags = getStageBit(shaderStage);
+                range.offset = offset;
+                range.size = (uint32_t)size;
+                pushConstantRanges.push_back(range);
+            }
+        }
+
+        if (shaderStage == SHADERSTAGE_VERTEX)
+        {
             std::map<std::string, int> vertexInputs;
             
             for (const auto& attr : attributes)
@@ -1360,6 +1379,11 @@ void Shader::setTextureDescriptor(const UniformInfo *info, love::gfx::Texture *t
 	VkImageView view = vkTexture != nullptr ? (VkImageView)vkTexture->getHandle() : VK_NULL_HANDLE;
 	if (view != imageInfo.imageView)
 	{
+		// Transition render targets from COLOR_ATTACHMENT_OPTIMAL to SHADER_READ_ONLY_OPTIMAL if needed
+		if (vkTexture != nullptr)
+			vkTexture->transitionForSampling();
+		
+		// Now use the actual layout from the texture (which should be SHADER_READ_ONLY_OPTIMAL after transition)
 		imageInfo.imageLayout = vkTexture != nullptr ? vkTexture->getImageLayout() : VK_IMAGE_LAYOUT_UNDEFINED;
 		imageInfo.imageView = view;
 		allTextureInfo[info->bindingStartIndex + index].texture = texture;
@@ -1398,6 +1422,8 @@ void Shader::createDescriptorPool()
 {
 	VkDescriptorPoolCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	// WORKAROUND #3: Enable explicit freeing for AMD GPU driver
+	createInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 	createInfo.maxSets = DESCRIPTOR_POOL_SIZE;
 	createInfo.poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size());
 	createInfo.pPoolSizes = descriptorPoolSizes.data();
@@ -1443,6 +1469,8 @@ VkDescriptorSet Shader::allocateDescriptorSet()
 		switch (result)
 		{
 		case VK_SUCCESS:
+			// WORKAROUND #3: Track allocated descriptor sets for explicit freeing (AMD GPU)
+			allocatedDescriptorSets[currentFrame].push_back({pool, descriptorSet});
 			return descriptorSet;
 		case VK_ERROR_OUT_OF_POOL_MEMORY_KHR:
 		case VK_ERROR_FRAGMENTED_POOL:

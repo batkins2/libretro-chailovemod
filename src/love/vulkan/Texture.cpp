@@ -385,6 +385,37 @@ VkImageLayout Texture::getMSAAImageLayout() const
 	return msaaImageData.layout;
 }
 
+void Texture::transitionForSampling()
+{
+	// If this is a render target currently in COLOR_ATTACHMENT_OPTIMAL, transition to SHADER_READ_ONLY_OPTIMAL
+	if (renderTarget && imageData.layout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+	{
+		auto commandBuffer = vgfx->getCommandBufferForDataTransfer();
+		
+		Vulkan::cmdTransitionImageLayout(commandBuffer, imageData.image, format, renderTarget,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			0, VK_REMAINING_MIP_LEVELS,
+			0, VK_REMAINING_ARRAY_LAYERS);
+		
+		imageData.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	}
+	
+	// Handle MSAA image if present
+	if (renderTarget && msaaImageData.image != VK_NULL_HANDLE && msaaImageData.layout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+	{
+		auto commandBuffer = vgfx->getCommandBufferForDataTransfer();
+		
+		Vulkan::cmdTransitionImageLayout(commandBuffer, msaaImageData.image, format, renderTarget,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			0, VK_REMAINING_MIP_LEVELS,
+			0, VK_REMAINING_ARRAY_LAYERS);
+		
+		msaaImageData.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	}
+}
+
 void Texture::createTextureImageView()
 {
 	auto vulkanFormat = Vulkan::getTextureFormat(format);

@@ -33,10 +33,7 @@ class chai_shader {
     void send(const std::string &uniform, float data);
     void send(const std::string &uniform, const glm::vec3 &data);
     void send(const std::string &uniform, const std::vector<glm::vec3> &data);
-    void newFrame() {
-        modelCount = 0;
-        modelJointOffset = 0;
-    };
+    void newFrame();
     love::gfx::Graphics *instance;
     gfx::Shader *shader = nullptr;
     gfx::Shader *fragmentShader;

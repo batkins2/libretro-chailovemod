@@ -221,6 +221,8 @@ private:
 	std::vector<VkDescriptorPoolSize> descriptorPoolSizes;
 
 	std::vector<std::vector<VkDescriptorPool>> descriptorPools;
+	// Track allocated descriptor sets per frame for explicit freeing (AMD GPU workaround)
+	std::vector<std::vector<std::pair<VkDescriptorPool, VkDescriptorSet>>> allocatedDescriptorSets;
 
 	std::vector<VkDescriptorBufferInfo> descriptorBuffers;
 	std::vector<VkDescriptorImageInfo> descriptorImages;

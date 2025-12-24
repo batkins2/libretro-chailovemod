@@ -52,6 +52,9 @@ public:
 	VkImageLayout getImageLayout() const;
 	VkImageLayout getMSAAImageLayout() const;
 
+	// Transition render target from COLOR_ATTACHMENT_OPTIMAL to SHADER_READ_ONLY_OPTIMAL if needed
+	void transitionForSampling();
+
 	void copyFromBuffer(gfx::Buffer *source, size_t sourceoffset, int sourcewidth, size_t size, int slice, int mipmap, const Rect &rect) override;
 	void copyToBuffer(gfx::Buffer *dest, int slice, int mipmap, const Rect &rect, size_t destoffset, int destwidth, size_t size) override;
 

@@ -177,6 +177,9 @@ struct OptionalDeviceExtensions
 
 	// VK_KHR_spirv_1_4
 	bool spirv14 = false;
+
+	// VK_AMD_memory_overallocation_behavior
+	bool amdMemoryOverallocationBehavior = false;
 };
 
 struct QueueFamilyIndices
@@ -299,6 +302,7 @@ public:
 	void releaseStagingBuffer(StagingBuffer* buffer);
 	void releaseStagingBuffer(VkBuffer buffer); // Overload for releasing by buffer handle
 	void cleanupStagingBufferPool();
+	void cleanupUnusedStagingBuffers(); // Cleanup only unused buffers, not entire pool
 	
 	// Accessors for memory tracking
 	VmaAllocator getAllocator() const { return vmaAllocator; }
@@ -307,8 +311,11 @@ public:
 	// Process queued cleanup callbacks (needed for libretro mode)
 	void processCleanupCallbacks();
 	
+	// Call newFrame() on all used shaders (for libretro mode where beginFrame isn't called)
+	void callShaderNewFrame();
+	
 	// Force recycle command pool to prevent driver memory accumulation
-	void recycleCommandPool();
+	void recycleCommandPool(bool recreatePipelineCache = true);
 
 	VkPipeline createGraphicsPipeline(Shader *shader, const GraphicsPipelineConfigurationCore &configuration, const GraphicsPipelineConfigurationNoDynamicState *noDynamicStateConfiguration);
 

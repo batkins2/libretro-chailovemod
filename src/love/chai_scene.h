@@ -56,6 +56,7 @@ private:
     // GLuint shadowMapFBO = 0;
     // GLuint shadowMap = 0;
     love::gfx::Texture *background_tex = nullptr;
+    love::gfx::Mesh *background_mesh = nullptr;
     bool frameOddEven = false;
     int skip = 0;
     // GLuint sceneFramebuffer = 0;

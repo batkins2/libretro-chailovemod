@@ -102,17 +102,17 @@ class chai_matrices
     
     // In-place versions that modify output parameter (NO allocations, NO returns)
     inline void mat4ToVectorInPlace(const glm::mat4& mat, std::vector<float>& out) const {
-        static std::atomic<int> callCount{0};
-        static std::atomic<size_t> maxCapacity{0};
-        
-        if (++callCount % 100 == 0) {
-            std::cout << "[TRACE] mat4ToVectorInPlace called " << callCount << " times (IN-PLACE)" << std::endl;
-            
-            if (out.capacity() > maxCapacity) {
-                maxCapacity = out.capacity();
-                std::cout << "[LEAK WARNING] Vector capacity grew to " << out.capacity() << std::endl;
-            }
-        }
+        // static std::atomic<int> callCount{0};
+        // static std::atomic<size_t> maxCapacity{0};
+        // 
+        // if (++callCount % 100 == 0) {
+        //     std::cout << "[TRACE] mat4ToVectorInPlace called " << callCount << " times (IN-PLACE)" << std::endl;
+        //     
+        //     if (out.capacity() > maxCapacity) {
+        //         maxCapacity = out.capacity();
+        //         std::cout << "[LEAK WARNING] Vector capacity grew to " << out.capacity() << std::endl;
+        //     }
+        // }
         
         // Don't shrink - ChaiScript may hold references that would become invalid
         out.resize(16);
@@ -123,18 +123,18 @@ class chai_matrices
     }
     
     inline void setProjectionMatrixInPlace(float fov, float aspect, float nearPlane, float farPlane, std::vector<float>& out) const {
-        static std::atomic<int> callCount{0};
-        if (++callCount % 100 == 0) {
-            std::cout << "[TRACE] setProjectionMatrixInPlace called " << callCount << " times (IN-PLACE)" << std::endl;
-        }
+        // static std::atomic<int> callCount{0};
+        // if (++callCount % 100 == 0) {
+        //     std::cout << "[TRACE] setProjectionMatrixInPlace called " << callCount << " times (IN-PLACE)" << std::endl;
+        // }
         mat4ToVectorInPlace(setProjectionMatrixCore(fov, aspect, nearPlane, farPlane), out);
     }
     
     inline void setViewMatrixInPlace(const std::vector<float>& eye, const std::vector<float>& target, const std::vector<float>& up, std::vector<float>& out) const {
-        static std::atomic<int> callCount{0};
-        if (++callCount % 100 == 0) {
-            std::cout << "[TRACE] setViewMatrixInPlace called " << callCount << " times (IN-PLACE)" << std::endl;
-        }
+        // static std::atomic<int> callCount{0};
+        // if (++callCount % 100 == 0) {
+        //     std::cout << "[TRACE] setViewMatrixInPlace called " << callCount << " times (IN-PLACE)" << std::endl;
+        // }
         glm::vec3 eyeVec(0.0f), targetVec(0.0f), upVec(0.0f);
         if (eye.size() >= 3) eyeVec = glm::vec3(eye[0], eye[1], eye[2]);
         if (target.size() >= 3) targetVec = glm::vec3(target[0], target[1], target[2]);
@@ -151,10 +151,10 @@ class chai_matrices
     }
     
     inline void setTransformationMatrixInPlace(const std::vector<float>& translation, const std::vector<float>& rotation, const std::vector<float>& scale, const std::vector<float>& inputMatrix, std::vector<float>& out) {
-        static std::atomic<int> callCount{0};
-        if (++callCount % 100 == 0) {
-            std::cout << "[TRACE] setTransformationMatrixInPlace called " << callCount << " times (IN-PLACE)" << std::endl;
-        }
+        // static std::atomic<int> callCount{0};
+        // if (++callCount % 100 == 0) {
+        //     std::cout << "[TRACE] setTransformationMatrixInPlace called " << callCount << " times (IN-PLACE)" << std::endl;
+        // }
         glm::vec3 t(0.0f), r(0.0f), s(1.0f);
         glm::mat4 mat(1.0f);
         if (translation.size() >= 3) t = glm::vec3(translation[0], translation[1], translation[2]);

@@ -715,12 +715,12 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
             JPH::PhysicsMaterialList materialList;
             materialList.push_back(JPH::PhysicsMaterial::sDefault);
             JPH::MeshShapeSettings meshSettings(triangleList, materialList);
-            printf("Creating mesh with %zu triangles\n", triangleList.size());
+            // printf("Creating mesh with %zu triangles\n", triangleList.size());
             auto s = meshSettings.Create();
-            printf("ERROR: MeshShape creation failed: %s\n", s.GetError().c_str());
-            printf("Created mesh shape\n");  
+            // printf("ERROR: MeshShape creation failed: %s\n", s.GetError().c_str());
+            // printf("Created mesh shape\n");  
             shape = s.Get();
-            printf("Got mesh shape\n");  
+            // printf("Got mesh shape\n");  
 
             // Set up body creation settings
             JPH::BodyCreationSettings bodySettings(
@@ -856,7 +856,7 @@ int chai_collisions::addCharacterController(int index, int meshRef, std::string 
         for (int i = 0; i < characterControllers.size(); i++) {
             if (characterControllers[i]->charId == charId) {
                 characterControllers[i]->addMesh(meshRef);
-                printf("Character controller with charId %s already exists, added meshRef %d\n", charId.c_str(), meshRef);
+                // printf("Character controller with charId %s already exists, added meshRef %d\n", charId.c_str(), meshRef);
                 return -1;
             }
         }
@@ -907,7 +907,7 @@ int chai_collisions::addCharacterController(int index, int meshRef, std::string 
     // Store character reference in your CharacterController
     characterControllers.emplace_back(new CharacterController(bodyID, meshRef, charId, character, index));
     
-    printf("Created character controller with charId %s at position (0, 5.0f, 0)\n", charId.c_str());
+    // printf("Created character controller with charId %s at position (0, 5.0f, 0)\n", charId.c_str());
     return characterControllers.size() - 1;
 }
 void chai_collisions::setCharacterControllerPosition(int characterIndex, float x, float y, float z, std::vector<int> group = {0})
@@ -2064,8 +2064,8 @@ void chai_collisions::process(float deltaTime)
                         JPH::Vec3 newPosition = cc->character->GetPosition() + correctionVector;
 
                         cc->character->SetPosition(newPosition, JPH::EActivation::Activate);
-                        printf("Character %s: Corrected penetration by %.3f units\n",
-                            cc->charId.c_str(), cc->perimeterPenetration);
+                        // printf("Character %s: Corrected penetration by %.3f units\n",
+                            // cc->charId.c_str(), cc->perimeterPenetration);
                     }
 
                     if (abs(cc->collisionNormal.GetZ()) > 0.3f) {
@@ -2073,8 +2073,8 @@ void chai_collisions::process(float deltaTime)
                         if ((cc->collisionNormal.GetZ() < 0 && cc->velocityZ < 0) || (cc->collisionNormal.GetZ() > 0 && cc->velocityZ > 0)) {
                             cc->velocityZ = 0.0f;
                             cc->velocityY += 0.1f; // Small upward nudge to prevent sticking
-                            printf("Character %s: Z movement blocked (normal: %.2f, vel: %.2f)\n",
-                                cc->charId.c_str(), cc->collisionNormal.GetZ(), cc->velocityZ);
+                            // printf("Character %s: Z movement blocked (normal: %.2f, vel: %.2f)\n",
+                                // cc->charId.c_str(), cc->collisionNormal.GetZ(), cc->velocityZ);
                         }
                     }
 

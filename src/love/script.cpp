@@ -149,14 +149,16 @@ script::script(const std::string& file) {
 
 	// ChaiScript Standard Library Additions
 	// This adds some basic type definitions to ChaiScript.
-	chai.add(bootstrap::standard_library::vector_type<std::vector<int>>("VectorInt"));
-	chai.add(bootstrap::standard_library::vector_type<std::vector<float>>("VectorFloat"));
+	auto stl_module = std::make_shared<chaiscript::Module>();
+	bootstrap::standard_library::vector_type<std::vector<int>>("VectorInt", *stl_module);
+	bootstrap::standard_library::vector_type<std::vector<float>>("VectorFloat", *stl_module);
+	bootstrap::standard_library::vector_type<std::vector<std::string>>("StringVector", *stl_module);
+	bootstrap::standard_library::map_type<std::map<std::string, bool>>("StringBoolMap", *stl_module);
+	bootstrap::standard_library::map_type<std::map<std::string, int>>("StringIntMap", *stl_module);
+	bootstrap::standard_library::map_type<std::map<std::string, float>>("StringFloatMap", *stl_module);
+	bootstrap::standard_library::map_type<std::map<std::string, std::vector<float>>>("StringFloatVectorMap", *stl_module);
+	chai.add(stl_module);
 	chai.add(fun(vectorFloatDebugWrapper), "VectorFloat"); // Debug wrapper
-	chai.add(bootstrap::standard_library::vector_type<std::vector<std::string>>("StringVector"));
-	chai.add(bootstrap::standard_library::map_type<std::map<std::string, bool>>("StringBoolMap"));
-	chai.add(bootstrap::standard_library::map_type<std::map<std::string, int>>("StringIntMap"));
-	chai.add(bootstrap::standard_library::map_type<std::map<std::string, float>>("StringFloatMap"));
-	chai.add(bootstrap::standard_library::map_type<std::map<std::string, std::vector<float>>>("StringFloatVectorMap"));
 
 	// GLM Types
 	chai.add(user_type<glm::vec3>(), "vec3");
@@ -175,8 +177,8 @@ script::script(const std::string& file) {
 	chai.add(constructor<glm::mat4(const glm::mat4&)>(), "mat4");
 	chai.add(fun(static_cast<glm::mat4& (glm::mat4::*)(const glm::mat4&)>(&glm::mat4::operator=)), "=");
 	
-	chai.add(bootstrap::standard_library::vector_type<std::vector<glm::vec3>>("VectorVec3"));
-	chai.add(bootstrap::standard_library::vector_type<std::vector<glm::mat4>>("VectorMat4"));
+	bootstrap::standard_library::vector_type<std::vector<glm::vec3>>("VectorVec3", *stl_module);
+	bootstrap::standard_library::vector_type<std::vector<glm::mat4>>("VectorMat4", *stl_module);
 
 	// ChaiScript_Extras: String Methods
 	auto stringmethods = chaiscript::extras::string_methods::bootstrap();
@@ -341,8 +343,8 @@ script::script(const std::string& file) {
 
 	// Joystick
 	chai.add(user_type<Joystick>(), "Joystick");
-	chai.add(fun<bool, Joystick, const std::string&>(&Joystick::isDown), "isDown");
-	chai.add(fun<bool, Joystick, int>(&Joystick::isDown), "isDown");
+	chai.add(fun(static_cast<bool (Joystick::*)(const std::string&)>(&Joystick::isDown)), "isDown");
+	chai.add(fun(static_cast<bool (Joystick::*)(int)>(&Joystick::isDown)), "isDown");
 	chai.add(fun(&Joystick::getName), "getName");
 	chai.add(fun(&Joystick::isConnected), "isConnected");
 	chai.add(fun(&Joystick::getID), "getID");
@@ -350,10 +352,10 @@ script::script(const std::string& file) {
 	// Graphics
 	chai.add(fun(&graphics::rectangle), "rectangle");
 	chai.add(fun(&graphics::newImage), "newImage");
-	chai.add(fun<love::graphics&, graphics, const std::string&, int, int>(&graphics::print), "print");
-	chai.add(fun<love::graphics&, graphics, const std::string&>(&graphics::print), "print");
-	chai.add(fun<love::graphics&, graphics, int, int>(&graphics::point), "point");
-	chai.add(fun<love::graphics&, graphics, Point*>(&graphics::point), "point");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)(const std::string&, int, int)>(&graphics::print)), "print");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)(const std::string&)>(&graphics::print)), "print");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)(int, int)>(&graphics::point)), "point");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)(Point*)>(&graphics::point)), "point");
 	// chai.add(bootstrap::standard_library::vector_type<std::vector<Point*>>("VectorPointPointer"));
 	// chai.add(bootstrap::standard_library::vector_type<std::vector<Point>>("VectorPoint"));
 	// chai.add(fun<void, graphics, std::vector<Point*>>(&graphics::points), "points");
@@ -375,25 +377,24 @@ script::script(const std::string& file) {
 	// chai.add(fun<love::graphics&, graphics, Font*>(&graphics::setFont), "setFont");
 	// chai.add(fun<love::graphics&, graphics>(&graphics::setFont), "setFont");
 	// chai.add(fun<Font*, graphics>(&graphics::getFont), "getFont");
-	chai.add(fun<love::graphics&, graphics, int, int, int, int>(&graphics::setColor), "setColor");
-	chai.add(fun<love::graphics&, graphics, int, int, int>(&graphics::setColor), "setColor");
-	chai.add(fun<love::graphics&, graphics, int, int, int, int>(&graphics::setBackgroundColor), "setBackgroundColor");
-	chai.add(fun<love::graphics&, graphics, int, int, int>(&graphics::setBackgroundColor), "setBackgroundColor");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)(int, int, int, int)>(&graphics::setColor)), "setColor");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)(int, int, int)>(&graphics::setColor)), "setColor");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)(int, int, int, int)>(&graphics::setBackgroundColor)), "setBackgroundColor");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)(int, int, int)>(&graphics::setBackgroundColor)), "setBackgroundColor");
 
-	chai.add(fun<love::graphics&, graphics, Image*, int, int>(&graphics::draw), "draw");
-	chai.add(fun<love::graphics&, graphics, Image*>(&graphics::draw), "draw");
-	chai.add(fun<love::graphics&, graphics, Image*, int, int, float, float, float, float, float>(&graphics::draw), "draw");
-	chai.add(fun<love::graphics&, graphics, Image*, int, int, float, float, float, float>(&graphics::draw), "draw");
-	chai.add(fun<love::graphics&, graphics, Image*, int, int, float, float, float>(&graphics::draw), "draw");
-	chai.add(fun<love::graphics&, graphics, Image*, int, int, float, float>(&graphics::draw), "draw");
-	chai.add(fun<love::graphics&, graphics, Image*, int, int, float>(&graphics::draw), "draw");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)(Image*, int, int)>(&graphics::draw)), "draw");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)(Image*)>(&graphics::draw)), "draw");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)(Image*, int, int, float, float, float, float, float)>(&graphics::draw)), "draw");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)(Image*, int, int, float, float, float, float)>(&graphics::draw)), "draw");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)(Image*, int, int, float, float, float)>(&graphics::draw)), "draw");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)(Image*, int, int, float, float)>(&graphics::draw)), "draw");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)(Image*, int, int, float)>(&graphics::draw)), "draw");
 
-	chai.add(fun<love::graphics&, graphics, Image*, Quad, int, int>(&graphics::draw), "draw");
-	chai.add(fun<love::graphics&, graphics, Image*, Quad>(&graphics::draw), "draw");
-
-	chai.add(fun<love::graphics&, graphics, int, int, int, int>(&graphics::clear), "clear");
-	chai.add(fun<love::graphics&, graphics, int, int, int>(&graphics::clear), "clear");
-	chai.add(fun<love::graphics&, graphics>(&graphics::clear), "clear");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)(Image*, Quad, int, int)>(&graphics::draw)), "draw");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)(Image*, Quad)>(&graphics::draw)), "draw");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)(int, int, int, int)>(&graphics::clear)), "clear");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)(int, int, int)>(&graphics::clear)), "clear");
+	chai.add(fun(static_cast<love::graphics& (graphics::*)()>(&graphics::clear)), "clear");
 
 	// Gfx
 	chai.add(fun(&chai_gfx::wrap_newShader), "newShader");
@@ -465,9 +466,9 @@ script::script(const std::string& file) {
 		const std::vector<float>& vm4,
 		int viewCount) {
 		drawCallCount++;
-		if (drawCallCount % 60 == 0) {
-			std::printf("[chai_scene] draw called %d times (60 FPS check)\n", drawCallCount);
-		}
+		// if (drawCallCount % 60 == 0) {
+		// 	std::printf("[chai_scene] draw called %d times (60 FPS check)\n", drawCallCount);
+		// }
 		auto convertToMat4 = [](const std::vector<float>& vec) -> glm::mat4 {
 			glm::mat4 mat;
 			float* ptr = glm::value_ptr(mat);
@@ -566,8 +567,8 @@ script::script(const std::string& file) {
 	// chai.add(fun(&font::isOpen), "isOpen");
 
 	// Keyboard
-	chai.add(fun<bool, keyboard, const std::string&>(&keyboard::isDown), "isDown");
-	chai.add(fun<bool, keyboard, int>(&keyboard::isDown), "isDown");
+	chai.add(fun(static_cast<bool (keyboard::*)(const std::string&)>(&keyboard::isDown)), "isDown");
+	chai.add(fun(static_cast<bool (keyboard::*)(int)>(&keyboard::isDown)), "isDown");
 	chai.add(fun(&keyboard::isScancodeDown), "isScancodeDown");
 	chai.add(fun(&keyboard::getKeyFromScancode), "getKeyFromScancode");
 	chai.add(fun(&keyboard::getScancodeFromKey), "getScancodeFromKey");
@@ -592,14 +593,14 @@ script::script(const std::string& file) {
 	chai.add(fun(&filesystem::getExecutablePath), "getExecutablePath");
 	chai.add(fun(&filesystem::getSaveDirectory), "getSaveDirectory");
 	chai.add(fun(&filesystem::getInfo), "getInfo");
-	chai.add(fun<FileData, filesystem, const std::string&>(&filesystem::newFileData), "newFileData");
-	chai.add(fun<FileData, filesystem, const std::string&, const std::string&>(&filesystem::newFileData), "newFileData");
+	chai.add(fun(static_cast<FileData (filesystem::*)(const std::string&)>(&filesystem::newFileData)), "newFileData");
+	chai.add(fun(static_cast<FileData (filesystem::*)(const std::string&, const std::string&)>(&filesystem::newFileData)), "newFileData");
 	chai.add(fun(&filesystem::getDirectoryItems), "getDirectoryItems");
-	chai.add(fun<bool, filesystem, const std::string&, const std::string&, bool>(&filesystem::mount), "mount");
-	chai.add(fun<bool, filesystem, const std::string&, const std::string&>(&filesystem::mount), "mount");
-	chai.add(fun<int, filesystem, const std::string&>(&filesystem::getSize), "getSize");
-	chai.add(fun<std::vector<std::string>, filesystem, const std::string&>(&filesystem::lines), "lines");
-	chai.add(fun<std::vector<std::string>, filesystem, const std::string&, const std::string&>(&filesystem::lines), "lines");
+	chai.add(fun(static_cast<bool (filesystem::*)(const std::string&, const std::string&, bool)>(&filesystem::mount)), "mount");
+	chai.add(fun(static_cast<bool (filesystem::*)(const std::string&, const std::string&)>(&filesystem::mount)), "mount");
+	chai.add(fun(static_cast<int (filesystem::*)(const std::string&)>(&filesystem::getSize)), "getSize");
+	chai.add(fun(static_cast<std::vector<std::string> (filesystem::*)(const std::string&)>(&filesystem::lines)), "lines");
+	chai.add(fun(static_cast<std::vector<std::string> (filesystem::*)(const std::string&, const std::string&)>(&filesystem::lines)), "lines");
 	chai.add(fun(&filesystem::load), "load");
 	chai.add(fun(&script::require, this), "require");
 	chai.add(fun(&filesystem::getFileExtension), "getFileExtension");
@@ -619,35 +620,35 @@ script::script(const std::string& file) {
 	chai.add(fun(&mouse::getX), "getX");
 	chai.add(fun(&mouse::getY), "getY");
 	chai.add(fun(&mouse::getPosition), "getPosition");
-	chai.add(fun<bool, mouse, const std::string&>(&mouse::isDown), "isDown");
-	chai.add(fun<bool, mouse, int>(&mouse::isDown), "isDown");
+	chai.add(fun(static_cast<bool (mouse::*)(const std::string&)>(&mouse::isDown)), "isDown");
+	chai.add(fun(static_cast<bool (mouse::*)(int)>(&mouse::isDown)), "isDown");
 
 	// Sound
-	chai.add(fun<SoundData*, sound, const std::string&>(&sound::newSoundData), "newSoundData");
-
+	chai.add(fun(static_cast<SoundData* (sound::*)(const std::string&)>(&sound::newSoundData)), "newSoundData");
 	// Audio
 	chai.add(fun(&audio::play), "play");
-	chai.add(fun<SoundData*, audio, const std::string&, const std::string&>(&audio::newSource), "newSource");
-	chai.add(fun<SoundData*, audio, const std::string&>(&audio::newSource), "newSource");
+	chai.add(fun(static_cast<SoundData* (audio::*)(const std::string&, const std::string&)>(&audio::newSource)), "newSource");
+	chai.add(fun(static_cast<SoundData* (audio::*)(const std::string&)>(&audio::newSource)), "newSource");
 	chai.add(fun(&audio::getVolume), "getVolume");
 	chai.add(fun(&audio::setVolume), "setVolume");
 
 	// Window
 	chai.add(fun(&window::setTitle), "setTitle");
 	chai.add(fun(&window::getTitle), "getTitle");
-	chai.add(fun<love::window&, window, const std::string&, int>(&window::showMessageBox), "showMessageBox");
-	chai.add(fun<love::window&, window, const std::string&>(&window::showMessageBox), "showMessageBox");
+	chai.add(fun(static_cast<love::window& (window::*)(const std::string&, int)>(&window::showMessageBox)), "showMessageBox");
+	chai.add(fun(static_cast<love::window& (window::*)(const std::string&)>(&window::showMessageBox)), "showMessageBox");
 
 	// Timer
 	chai.add(fun(&timer::getDelta), "getDelta");
 	chai.add(fun(&timer::getFPS), "getFPS");
 	chai.add(fun(&timer::step), "step");
+	chai.add(fun(&timer::getTime), "getTime");
 
 	// Joystick
 	chai.add(fun(&joystick::getJoysticks), "getJoysticks");
 	chai.add(fun(&joystick::getJoystickCount), "getJoystickCount");
-	chai.add(fun<bool, joystick, int, const std::string&>(&joystick::isDown), "isDown");
-	chai.add(fun<bool, joystick, int, int>(&joystick::isDown), "isDown");
+	chai.add(fun(static_cast<bool (joystick::*)(int, const std::string&)>(&joystick::isDown)), "isDown");
+	chai.add(fun(static_cast<bool (joystick::*)(int, int)>(&joystick::isDown)), "isDown");
 	chai.add(fun(&joystick::operator[]), "[]");
 
 	// Math
@@ -657,20 +658,20 @@ script::script(const std::string& file) {
 	chai.add(fun(&math::e), "e");
 	chai.add(fun(&math::rad), "rad");
 	chai.add(fun(&math::degrees), "degrees");
-	chai.add(fun<float, math>(&math::random), "random");
-	chai.add(fun<float, math, float>(&math::random), "random");
-	chai.add(fun<float, math, float, float>(&math::random), "random");
-	chai.add(fun<int, math, int>(&math::random), "random");
-	chai.add(fun<int, math, int, int>(&math::random), "random");
-	chai.add(fun<double, math, double>(&math::random), "random");
-	chai.add(fun<double, math, double, double>(&math::random), "random");
-	chai.add(fun<love::math&, math, int, int>(&math::setRandomSeed), "setRandomSeed");
-	chai.add(fun<love::math&, math, int>(&math::setRandomSeed), "setRandomSeed");
+	chai.add(fun(static_cast<float (math::*)()>(&math::random)), "random");
+	chai.add(fun(static_cast<float (math::*)(float)>(&math::random)), "random");
+	chai.add(fun(static_cast<float (math::*)(float, float)>(&math::random)), "random");
+	chai.add(fun(static_cast<int (math::*)(int)>(&math::random)), "random");
+	chai.add(fun(static_cast<int (math::*)(int, int)>(&math::random)), "random");
+	chai.add(fun(static_cast<double (math::*)(double)>(&math::random)), "random");
+	chai.add(fun(static_cast<double (math::*)(double, double)>(&math::random)), "random");
+	chai.add(fun(static_cast<math& (math::*)(int, int)>(&math::setRandomSeed)), "setRandomSeed");
+	chai.add(fun(static_cast<math& (math::*)(int)>(&math::setRandomSeed)), "setRandomSeed");
 	chai.add(fun(&math::getRandomSeed), "getRandomSeed");
 
 	// Data
-	chai.add(fun<std::string, data, const std::string&>(&data::compress), "compress");
-	chai.add(fun<std::string, data, const std::string&, int>(&data::compress), "compress");
+	chai.add(fun(static_cast<std::string (data::*)(const std::string&)>(&data::compress)), "compress");
+	chai.add(fun(static_cast<std::string (data::*)(const std::string&, int)>(&data::compress)), "compress");
 	chai.add(fun(&data::decompress), "decompress");
 	chai.add(fun(&data::hash), "hash");
 	chai.add(fun(&data::encode), "encode");

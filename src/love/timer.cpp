@@ -1,4 +1,6 @@
 #include "timer.h"
+#include <chrono>
+#include <SDL.h>
 
 namespace love {
 
@@ -22,6 +24,11 @@ float timer::step(float delta) {
 	}
 
 	return m_delta;
+}
+
+float timer::getTime() {
+	// Run epoch time in microseconds
+	return SDL_GetTicks() / 1000.0f;
 }
 
 int timer::getFPS() {

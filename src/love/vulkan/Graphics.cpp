@@ -298,14 +298,15 @@ void Graphics::clear(const std::vector<OptionalColorD> &colors, OptionalInt sten
 		for (size_t i = 0; i < ncolors; i++)
 		{
 			const OptionalColorD &color = colors[i];
-			VkClearAttachment attachment{};
 			if (color.hasValue)
 			{
+				VkClearAttachment attachment{};
 				auto texture = i < rts.colors.size() ? rts.colors[i].texture.get() : nullptr;
 				attachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				attachment.colorAttachment = static_cast<uint32_t>(i);
 				attachment.clearValue.color = Texture::getClearColor(texture, color.value);
+				attachments.push_back(attachment);
 			}
-			attachments.push_back(attachment);
 		}
 
 		VkClearAttachment depthStencilAttachment{};
@@ -405,6 +406,11 @@ void Graphics::discard(const std::vector<bool> &colorbuffers, bool depthstencil)
 
 void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallbackData)
 {
+    // static int submitCount = 0;
+    // if (++submitCount % 60 == 1) {
+    //     std::printf("[GPU SUBMIT] submitGpuCommands() called #%d (mode: %d) (last 60 frames had 60 calls)\n", 
+    //            submitCount, (int)submitMode);
+    // }
     // std::printf("[CHAILOVE DEBUG] submitGpuCommands called:\n");
     // std::printf("[CHAILOVE DEBUG] - libretroMode: %s\n", libretroMode ? "true" : "false");
     // std::printf("[CHAILOVE DEBUG] - submitMode: %d (SUBMIT_NOPRESENT=%d, SUBMIT_PRESENT=%d)\n", 
@@ -793,7 +799,7 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
         
         // Create our internal resources that don't conflict with RetroArch
         if (localUniformBuffer == nullptr)
-            localUniformBuffer.set(new StreamBuffer(this, BUFFERUSAGE_UNIFORM, 1024 * 512 * 1), Acquire::NORETAIN);
+            localUniformBuffer.set(new StreamBuffer(this, BUFFERUSAGE_UNIFORM, 1024 * 1024 * 2), Acquire::NORETAIN);
             
         // Create defaultVertexBuffer
         if (defaultVertexBuffer == nullptr) {
@@ -992,7 +998,7 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
     }
 
     if (localUniformBuffer == nullptr)
-        localUniformBuffer.set(new StreamBuffer(this, BUFFERUSAGE_UNIFORM, 1024 * 512 * 1), Acquire::NORETAIN);
+        localUniformBuffer.set(new StreamBuffer(this, BUFFERUSAGE_UNIFORM, 1024 * 1024 * 2), Acquire::NORETAIN);
 
     // Create our render target texture for libretro
     auto settings = love::gfx::Texture::Settings{
@@ -1550,6 +1556,13 @@ void Graphics::setStencilState(const StencilState &s)
 
 	flushBatchedDraws();
 
+	// Only set stencil state if command buffer is recording
+	if (!commandBufferRecording)
+	{
+		states.back().stencil = s;
+		return;
+	}
+
 	vkCmdSetStencilWriteMask(commandBuffers.at(currentFrame), VK_STENCIL_FRONT_AND_BACK, s.writeMask);
 	
 	vkCmdSetStencilCompareMask(commandBuffers.at(currentFrame), VK_STENCIL_FRONT_AND_BACK, s.readMask);
@@ -1839,6 +1852,10 @@ void Graphics::setRenderTargetsInternal(const RenderTargets &rts, int pixelw, in
 
 void Graphics::initDynamicState()
 {
+	// Only set dynamic state if command buffer is recording
+	if (!commandBufferRecording)
+		return;
+	
 	vkCmdSetStencilWriteMask(commandBuffers.at(currentFrame), VK_STENCIL_FRONT_AND_BACK, states.back().stencil.writeMask);
 	vkCmdSetStencilCompareMask(commandBuffers.at(currentFrame), VK_STENCIL_FRONT_AND_BACK, states.back().stencil.readMask);
 	vkCmdSetStencilReference(commandBuffers.at(currentFrame), VK_STENCIL_FRONT_AND_BACK, states.back().stencil.value);
@@ -1887,7 +1904,8 @@ void Graphics::beginFrame()
 		fflush(stdout);
 	}
 
-	if (!libretroMode && !inFlightFences.empty())
+	// CRITICAL FIX: Wait for fences even in libretro mode to prevent command buffer reuse errors
+	if (!inFlightFences.empty())
 	{
 		vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 		vkResetFences(device, 1, &inFlightFences[currentFrame]);
@@ -2104,6 +2122,11 @@ void Graphics::setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFl
 
     if (!commandBufferRecording)
         startRecordingGraphicsCommands();
+
+    // CRITICAL: Push constants must be set INSIDE a render pass, not before
+    // If render pass is not active, start it now
+    if (!renderPassState.active)
+        startRenderPass();
 
     vkCmdPushConstants(
         commandBuffers.at(currentFrame),
@@ -2383,6 +2406,8 @@ static void findOptionalDeviceExtensions(VkPhysicalDevice physicalDevice, Option
 			optionalDeviceExtensions.shaderFloatControls = true;
 		if (strcmp(extension.extensionName, VK_KHR_SPIRV_1_4_EXTENSION_NAME) == 0)
 			optionalDeviceExtensions.spirv14 = true;
+		if (strcmp(extension.extensionName, VK_AMD_MEMORY_OVERALLOCATION_BEHAVIOR_EXTENSION_NAME) == 0)
+			optionalDeviceExtensions.amdMemoryOverallocationBehavior = true;
 	}
 }
 
@@ -2445,6 +2470,8 @@ void Graphics::createLogicalDevice()
 		enabledExtensions.push_back(VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
 	if (optionalDeviceExtensions.spirv14)
 		enabledExtensions.push_back(VK_KHR_SPIRV_1_4_EXTENSION_NAME);
+	if (optionalDeviceExtensions.amdMemoryOverallocationBehavior)
+		enabledExtensions.push_back(VK_AMD_MEMORY_OVERALLOCATION_BEHAVIOR_EXTENSION_NAME);
 	if (deviceApiVersion >= VK_API_VERSION_1_1)
 		enabledExtensions.push_back(VK_KHR_BIND_MEMORY_2_EXTENSION_NAME);
 
@@ -2462,8 +2489,24 @@ void Graphics::createLogicalDevice()
 	extendedDynamicStateFeatures.extendedDynamicState = VK_TRUE;
 	extendedDynamicStateFeatures.pNext = nullptr;
 
+	// AMD memory overallocation behavior - WORKAROUND for AMD integrated GPU driver leak
+	VkDeviceMemoryOverallocationCreateInfoAMD amdMemoryOverallocationInfo{};
+	amdMemoryOverallocationInfo.sType = VK_STRUCTURE_TYPE_DEVICE_MEMORY_OVERALLOCATION_CREATE_INFO_AMD;
+	amdMemoryOverallocationInfo.overallocationBehavior = VK_MEMORY_OVERALLOCATION_BEHAVIOR_DISALLOWED_AMD;
+	amdMemoryOverallocationInfo.pNext = nullptr;
+
 	if (optionalDeviceExtensions.extendedDynamicState)
+	{
 		createInfo.pNext = &extendedDynamicStateFeatures;
+		if (optionalDeviceExtensions.amdMemoryOverallocationBehavior)
+		{
+			extendedDynamicStateFeatures.pNext = &amdMemoryOverallocationInfo;
+		}
+	}
+	else if (optionalDeviceExtensions.amdMemoryOverallocationBehavior)
+	{
+		createInfo.pNext = &amdMemoryOverallocationInfo;
+	}
 
 	if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS)
 		throw love::Exception("failed to create logical device");
@@ -3744,18 +3787,23 @@ void Graphics::setRenderPass(const RenderTargets &rts, int pixelw, int pixelh)
 
 void Graphics::setSplitScreenViewport(int playerIndex, int totalPlayers)
 {
+	if (!commandBufferRecording) {
+		startRecordingGraphicsCommands();
+		startRenderPass();
+	}
+
     VkViewport viewport;
     VkRect2D scissor;
     
     if (totalPlayers == 2) {
-        // Horizontal split
-        viewport.x = (playerIndex * renderPassState.width) * 0.5f;
-        viewport.y = 0.0f;
-        viewport.width = renderPassState.width * 0.5f;
-        viewport.height = renderPassState.height;
+        // Vertical split
+        viewport.x = 0.0f;
+        viewport.y = (playerIndex == 0) ? 0.0f : renderPassState.height * 0.5f;
+        viewport.width = renderPassState.width;
+        viewport.height = renderPassState.height * 0.5f;
         
-        scissor.offset.x = viewport.x;
-        scissor.offset.y = 0;
+        scissor.offset.x = 0;
+        scissor.offset.y = viewport.y;
         scissor.extent.width = viewport.width;
         scissor.extent.height = viewport.height;
     }
@@ -3769,6 +3817,11 @@ void Graphics::setSplitScreenViewport(int playerIndex, int totalPlayers)
 
 void Graphics::startRenderPass()
 {
+    // static int renderPassCount = 0;
+    // if (++renderPassCount % 60 == 1) {
+    //     std::printf("[RENDER PASS] startRenderPass() called #%d (last 60 frames had 60 calls)\n", renderPassCount);
+    // }
+    
     if (renderPassState.active)
         return;
 
@@ -3790,9 +3843,15 @@ void Graphics::startRenderPass()
             
             RenderPassConfiguration minimalConfig{};
             
-            // Use RetroArch's expected format
+            // CRITICAL FIX: Use actual colorFormat and depthStencilFormat, not hardcoded values
+            // The render pass format MUST match the actual image formats
+            // Use swapChainImageFormat if available, otherwise reasonable default
+            VkFormat actualColorFormat = (swapChainImageFormat != VK_FORMAT_UNDEFINED) 
+                ? swapChainImageFormat 
+                : VK_FORMAT_R8G8B8A8_UNORM;  // Default fallback
+            
             VkAttachmentDescription colorAttachment = {};
-            colorAttachment.format = VK_FORMAT_B8G8R8A8_UNORM;
+            colorAttachment.format = actualColorFormat;  // Use actual image format
             colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
             colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
             colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -3801,8 +3860,13 @@ void Graphics::startRenderPass()
             colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             colorAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+            // Validate that depth format is actually supported
+            VkFormatProperties depthProps;
+            vkGetPhysicalDeviceFormatProperties(physicalDevice, depthStencilFormat, &depthProps);
+            bool depthFormatSupported = (depthProps.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0;
+            
             VkAttachmentDescription depthAttachment = {};
-            depthAttachment.format = VK_FORMAT_D24_UNORM_S8_UINT;
+            depthAttachment.format = depthStencilFormat;  // Use actual depthStencilFormat
             depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
             depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
             depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -3817,13 +3881,25 @@ void Graphics::startRenderPass()
                 colorAttachment.loadOp,
                 VK_SAMPLE_COUNT_1_BIT
             });
-            minimalConfig.staticData.depthStencilAttachment = {
-                depthAttachment.format,
-                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                depthAttachment.loadOp,
-                depthAttachment.stencilLoadOp,
-                VK_SAMPLE_COUNT_1_BIT
-            };
+            // Only add depth attachment if format is actually supported
+            if (depthFormatSupported) {
+                minimalConfig.staticData.depthStencilAttachment = {
+                    depthAttachment.format,
+                    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                    depthAttachment.loadOp,
+                    depthAttachment.stencilLoadOp,
+                    VK_SAMPLE_COUNT_1_BIT
+                };
+            } else {
+                // If depth format not supported, use VK_FORMAT_UNDEFINED (no depth)
+                minimalConfig.staticData.depthStencilAttachment = {
+                    VK_FORMAT_UNDEFINED,
+                    VK_IMAGE_LAYOUT_UNDEFINED,
+                    VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                    VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                    VK_SAMPLE_COUNT_1_BIT
+                };
+            }
 
             VkRenderPass minimalRenderPass = getRenderPass(minimalConfig);
             renderPassState.beginInfo.renderPass = minimalRenderPass;
@@ -4118,6 +4194,11 @@ void Graphics::startRenderPass()
 
 void Graphics::endRenderPass()
 {
+    // static int endRenderPassCount = 0;
+    // if (++endRenderPassCount % 60 == 1) {
+    //     std::printf("[RENDER PASS] endRenderPass() called #%d (last 60 frames had 60 calls)\n", endRenderPassCount);
+    // }
+
     renderPassState.active = false;
 
     vkCmdEndRenderPass(commandBuffers.at(currentFrame));
@@ -4261,8 +4342,10 @@ VkSampler Graphics::createSampler(const SamplerState &samplerState)
 	samplerInfo.addressModeU = Vulkan::getWrapMode(samplerState.wrapU);
 	samplerInfo.addressModeV = Vulkan::getWrapMode(samplerState.wrapV);
 	samplerInfo.addressModeW = Vulkan::getWrapMode(samplerState.wrapW);
-	samplerInfo.anisotropyEnable = VK_TRUE;
-	samplerInfo.maxAnisotropy = static_cast<float>(samplerState.maxAnisotropy);
+	// Only enable anisotropy if actually supported (check capabilities, not features, since in libretro mode device is managed externally)
+	bool anisotropySupported = (capabilities.limits[LIMIT_ANISOTROPY] > 1.0);
+	samplerInfo.anisotropyEnable = anisotropySupported ? VK_TRUE : VK_FALSE;
+	samplerInfo.maxAnisotropy = anisotropySupported ? static_cast<float>(samplerState.maxAnisotropy) : 1.0f;
 
 	// TODO: This probably needs to branch on a pixel format to determine whether
 	// it should be float vs int, and opaque vs transparent.
@@ -4658,6 +4741,25 @@ void Graphics::cleanupStagingBufferPool()
 	stagingBufferPool.clear();
 }
 
+void Graphics::cleanupUnusedStagingBuffers()
+{
+	// WORKAROUND #7: Remove unused staging buffers to prevent AMD driver memory leak
+	// Keep only buffers that are actively in use, destroy the rest
+	auto it = stagingBufferPool.begin();
+	while (it != stagingBufferPool.end())
+	{
+		if (!it->inUse && it->buffer != VK_NULL_HANDLE)
+		{
+			vmaDestroyBuffer(vmaAllocator, it->buffer, it->allocation);
+			it = stagingBufferPool.erase(it);
+		}
+		else
+		{
+			++it;
+		}
+	}
+}
+
 void Graphics::processCleanupCallbacks()
 {
 	// Process cleanup functions for current frame
@@ -4671,14 +4773,52 @@ void Graphics::processCleanupCallbacks()
 	readbackCallbacks.at(currentFrame).clear();
 }
 
-void Graphics::recycleCommandPool()
+void Graphics::callShaderNewFrame()
 {
+	// CRITICAL FIX: In libretro mode, beginFrame() is never called, so shader->newFrame()
+	// is never called. This causes descriptor pools to never reset and pipelines to never
+	// be destroyed, leading to massive AMD driver memory leaks (120+ MB/min).
+	for (const auto &shader : usedShadersInFrame)
+		shader->newFrame();
+	usedShadersInFrame.clear();
+	
+	// Also advance the stream buffer frame
+	if (localUniformBuffer)
+		localUniformBuffer->nextFrame();
+}
+
+void Graphics::recycleCommandPool(bool recreatePipelineCache)
+{
+	// CRITICAL FIX: Process ALL pending cleanup callbacks before recycling
+	// StreamBuffers and other resources queue cleanup via queueCleanUp()
+	// If we recycle before processing these, the AMD driver leaks the memory
+	for (size_t frame = 0; frame < MAX_FRAMES_IN_FLIGHT; frame++)
+	{
+		for (auto &cleanUpFn : cleanUpFunctions.at(frame))
+			cleanUpFn();
+		cleanUpFunctions.at(frame).clear();
+		
+		for (auto &readbackCallback : readbackCallbacks.at(frame))
+			readbackCallback();
+		readbackCallbacks.at(frame).clear();
+	}
+	
+	// WORKAROUND #2: Better queue synchronization for AMD integrated GPU driver
+	// Wait for queues to finish before waiting for device - improves synchronization
+	if (graphicsQueue != VK_NULL_HANDLE)
+		vkQueueWaitIdle(graphicsQueue);
+	if (presentQueue != VK_NULL_HANDLE && presentQueue != graphicsQueue)
+		vkQueueWaitIdle(presentQueue);
+	
 	// Must wait for all GPU operations to finish before resetting pool
 	vkDeviceWaitIdle(device);
 	
-	// LEAK FIX: Reset descriptor pool to release driver-side descriptor memory
-	// This is a common source of driver leaks - descriptor sets accumulate
+	// WORKAROUND #3: Explicit descriptor set cleanup for AMD integrated GPU driver
+	// AMD drivers may leak memory when using implicit freeing via vkResetDescriptorPool
+	// Note: This only handles the Graphics descriptor pool, not Shader descriptor pools
 	if (descriptorPool != VK_NULL_HANDLE) {
+		// Reset the pool - this implicitly frees all descriptor sets
+		// For Shader descriptor pools, explicit freeing would need to be added there
 		VkResult descResult = vkResetDescriptorPool(device, descriptorPool, 0);
 		if (descResult != VK_SUCCESS) {
 			std::printf("[WARNING] vkResetDescriptorPool failed with result %d\n", descResult);
@@ -4686,9 +4826,10 @@ void Graphics::recycleCommandPool()
 		}
 	}
 	
-	// LEAK FIX: Destroy and recreate pipeline cache to release accumulated memory
-	// Pipeline caches can grow unbounded as new pipelines are created
-	if (pipelineCache != VK_NULL_HANDLE) {
+	// WORKAROUND #4: Conditionally destroy/recreate pipeline cache to reduce overhead
+	// Pipeline caches can grow unbounded, but recreating too frequently causes performance issues
+	// Only recreate when explicitly requested (every 60 seconds instead of every 10 seconds)
+	if (recreatePipelineCache && pipelineCache != VK_NULL_HANDLE) {
 		vkDestroyPipelineCache(device, pipelineCache, nullptr);
 		
 		VkPipelineCacheCreateInfo cacheInfo{};
@@ -4724,8 +4865,8 @@ void Graphics::recycleCommandPool()
 	// Reset recording state
 	commandBufferRecording = false;
 	
-	std::printf("[RECYCLE] Command pool reset - driver memory recycled\n");
-	std::fflush(stdout);
+	// std::printf("[RECYCLE] Command pool reset - driver memory recycled\n");
+	// std::fflush(stdout);
 }
 
 void Graphics::mapLocalUniformData(void *data, size_t size, VkDescriptorBufferInfo &bufferInfo)
@@ -4909,7 +5050,8 @@ void Graphics::createDepthResources()
     imageViewInfo.subresourceRange.aspectMask = 0;
     if (backbufferHasDepth)
         imageViewInfo.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT;
-    if (backbufferHasStencil)
+    // Only add stencil aspect if format actually has stencil component
+    if (backbufferHasStencil && (depthStencilFormat == VK_FORMAT_D32_SFLOAT_S8_UINT || depthStencilFormat == VK_FORMAT_D24_UNORM_S8_UINT))
         imageViewInfo.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
     
     imageViewInfo.subresourceRange.baseMipLevel = 0;
