@@ -81,7 +81,7 @@
 #include "love/chai_editor.h"
 #endif
 // #ifndef __HAVE_CHAI_ASYNC__
-// #include "love/chai_async.h"
+#include "love/chai_async.h"
 // #endif
 #include "love/keyboard.h"
 #include "love/config.h"
@@ -153,7 +153,7 @@ class ChaiLove {
 	love::chai_gui chai_gui;
 	love::chai_debug chai_debug;
 	love::chai_editor chai_editor;
-	// love::chai_async chai_async;
+	love::chai_async* chai_async = nullptr;
 	
 	ChaiLove();
 	~ChaiLove();

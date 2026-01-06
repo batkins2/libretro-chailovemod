@@ -520,7 +520,9 @@ public:
 
 	virtual VkImageView getCurrentSwapchainImageView() = 0;
 	virtual VkImageViewCreateInfo getCurrentSwapchainImageViewCreateInfo() = 0;
+	virtual std::vector<VkCommandBuffer> getCommandBuffersForDataTransfer() = 0;
 	virtual VkCommandBuffer getCommandBufferForDataTransfer() = 0;
+	virtual VkCommandBuffer getCommandBufferForDataTransfer(int frameIndex) = 0;
 	
 	virtual void setSplitScreenViewport(int playerIndex, int totalPlayers) = 0;
 

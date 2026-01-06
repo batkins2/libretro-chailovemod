@@ -227,15 +227,27 @@ void chai_shader::sendConstant(const std::string &uniform, const std::vector<glm
         return;
     }
  
-    int startidx = 0;
-    m_floatCache.resize(data.size() * 4);  // Reuse allocated memory
+    
     size_t idx = 0;
+    size_t count = 4;
+    if (uniform == "miscInfo") {
+        count = 8;
+    }
+    
+    m_floatCache.resize(data.size() * count);  // Reuse allocated memory
+    
+    if (uniform == "miscInfo") {
+        m_floatCache[idx++] = 0.0f;
+        m_floatCache[idx++] = 0.0f;
+        m_floatCache[idx++] = 0.0f;
+        m_floatCache[idx++] = 0.0f;
+    }
+
     for (const auto& d : data) {
         m_floatCache[idx++] = d.x;
         m_floatCache[idx++] = d.y;
         m_floatCache[idx++] = d.z;
         m_floatCache[idx++] = d.w;
-        startidx += 4;
     }
     // printf("[SENDCONSTANT] Sending %zu vec4 to uniform '%s'\n", data.size(), uniform.c_str());
     // printf("[SENDCONSTANT] Data: ");
@@ -243,7 +255,7 @@ void chai_shader::sendConstant(const std::string &uniform, const std::vector<glm
     //     printf("%f ", m_floatCache[i]);
     // }
     // printf("\n");
-    shader->setPushConstant(info, m_floatCache.data(), 4 * sizeof(float));
+    shader->setPushConstant(info, m_floatCache.data(), count * sizeof(float));
 }
 
 int chai_shader::send(const std::string &uniform, const std::vector<chaiscript::Boxed_Value> &data) {

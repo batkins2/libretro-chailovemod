@@ -10,23 +10,27 @@ retro_input_poll_t ChaiLove::input_poll_cb = NULL;
 retro_environment_t ChaiLove::environ_cb = NULL;
 
 ChaiLove::ChaiLove() {
-
+	chai_async = nullptr;
 }
 
 void ChaiLove::destroy() {
-	LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] Attempting to destroy ChaiLove" << std::endl;
+	if (log_cb) log_cb(RETRO_LOG_INFO, "[ChaiLove] Attempting to destroy ChaiLove\n");
 	if (hasInstance()) {
-		LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] Destroying ChaiLove" << std::endl;
+			   if (log_cb) log_cb(RETRO_LOG_INFO, "[ChaiLove] Destroying ChaiLove\n");
 		m_instance->quit();
+		if (m_instance->chai_async) {
+			delete m_instance->chai_async;
+			m_instance->chai_async = nullptr;
+		}
 		delete m_instance;
 		m_instance = NULL;
 	}
-	LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] Destroyed ChaiLove" << std::endl;
+	if (log_cb) log_cb(RETRO_LOG_INFO, "[ChaiLove] Destroyed ChaiLove\n");
 }
 
 ChaiLove* ChaiLove::getInstance() {
 	if (!hasInstance()) {
-		LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] Initializing ChaiLove" << std::endl;
+		// if (log_cb) log_cb(RETRO_LOG_INFO, "[ChaiLove] Initializing ChaiLove\n");
 		m_instance = new ChaiLove;
 	}
 	return m_instance;
@@ -38,6 +42,10 @@ bool ChaiLove::hasInstance() {
 
 ChaiLove::~ChaiLove() {
 	quit();
+	if (chai_async) {
+		delete chai_async;
+		chai_async = nullptr;
+	}
 }
 
 void ChaiLove::quit(void) {
@@ -68,7 +76,7 @@ bool ChaiLove::load(const std::string& file, const void* data) {
 #define GIT_VERSION ""
 #endif
 	std::string version = CHAILOVE_VERSION_STRING GIT_VERSION;
-	LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] ChaiLove " << version.c_str() << std::endl;
+	// if (log_cb) log_cb(RETRO_LOG_INFO, "[ChaiLove] ChaiLove %s\n", version.c_str());
 
 	// Iniitalize some of the initial subsystems.
 	sound.load();
@@ -76,7 +84,7 @@ bool ChaiLove::load(const std::string& file, const void* data) {
 	// Initalize the file system.
 	bool loaded = filesystem.init(file, data);
 	if (!loaded) {
-		LibretroLog::log(RETRO_LOG_ERROR) << "[ChaiLove] [filesystem] Error loading " << file << std::endl;
+		if (log_cb) log_cb(RETRO_LOG_ERROR, "[ChaiLove] [filesystem] Error loading %s\n", file.c_str());
 		return false;
 	}
 
@@ -85,7 +93,7 @@ bool ChaiLove::load(const std::string& file, const void* data) {
 	// Initialize the scripting system.
 	script = new love::script(file);
 	if (!script->mainLoaded) {
-		LibretroLog::log(RETRO_LOG_ERROR) << "[ChaiLove] [script] Error loading " << file << std::endl;
+		if (log_cb) log_cb(RETRO_LOG_ERROR, "[ChaiLove] [script] Error loading %s\n", file.c_str());
 		return false;
 	}
 	script->conf(config);
@@ -102,6 +110,11 @@ bool ChaiLove::load(const std::string& file, const void* data) {
 	math.load();
 	mouse.load();
 	// font.load();
+
+	// Now that all subsystems are loaded, create chai_async
+	if (!chai_async) {
+		chai_async = new love::chai_async();
+	}
 
 	// Now that all subsystems are loaded, start the script.
 	script->load();
@@ -129,7 +142,7 @@ void ChaiLove::update() {
  */
 void ChaiLove::reset() {
 	// Tell the script that we are to reset the game.
-	LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] Reset" << std::endl;
+	if (log_cb) log_cb(RETRO_LOG_INFO, "[ChaiLove] Reset\n");
 	if (script != NULL) {
 		script->reset();
 	}

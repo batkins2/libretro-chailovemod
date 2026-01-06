@@ -59,6 +59,7 @@ static const std::vector<const char*> validationLayers = {
 
 static const std::vector<const char*> deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+	VK_KHR_MULTIVIEW_EXTENSION_NAME,
 };
 
 constexpr int DEFAULT_VERTEX_BUFFER_BINDING = 0;
@@ -378,7 +379,7 @@ void Graphics::clear(const std::vector<OptionalColorD> &colors, OptionalInt sten
 			renderPassState.mainWindowClearStencilValue = stencil;
 		}
 		// else
-		// 	startRenderPass();
+		// 	startRenderPass(currentFrame);
 	}
 }
 
@@ -401,7 +402,7 @@ void Graphics::discard(const std::vector<bool> &colorbuffers, bool depthstencil)
 		renderPassConfiguration.staticData.depthStencilAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	}
 
-	startRenderPass();
+	startRenderPass(currentFrame);
 }
 
 void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallbackData)
@@ -442,7 +443,7 @@ void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallback
             // std::printf("[CHAILOVE DEBUG] Set default clear color to bright GREEN\n");
         }
         
-        // startRenderPass();
+        // startRenderPass(currentFrame);
         // std::printf("[CHAILOVE DEBUG] startRenderPass() called successfully before submit\n");
     } else {
         // std::printf("[CHAILOVE DEBUG] NOT triggering libretro fix because:\n");
@@ -481,13 +482,13 @@ void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallback
         uint32_t sync_index = vulkan->get_sync_index(vulkan->handle);
         // std::printf("[CHAILOVE DEBUG] Got sync index: %u\n", sync_index);
         
-        // Create array of command buffers for this frame
+        // Submit only the primary command buffer (contains all viewports in one buffer)
         std::array<VkCommandBuffer, 1> libretroCommandBuffers = { commandBuffers.at(currentFrame) };
         
         // Set the command buffers for RetroArch
         vulkan->set_command_buffers(vulkan->handle, static_cast<unsigned>(libretroCommandBuffers.size()), libretroCommandBuffers.data());
         
-        // std::printf("[CHAILOVE DEBUG] Set command buffers for RetroArch\n");
+        // std::printf("[CHAILOVE DEBUG] Set command buffer for RetroArch\n");
         
         // Note: We don't submit here - RetroArch will handle the submission
         // This is different from the normal present() flow
@@ -501,7 +502,7 @@ void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallback
         return;
     }
 
-    // Instead of managing our own semaphores, work with RetroArch's system
+    // Submit only the primary command buffer
     std::array<VkCommandBuffer, 1> submitCommandbuffers = { commandBuffers.at(currentFrame) };
 
     VkSubmitInfo submitInfo{};
@@ -592,11 +593,11 @@ void Graphics::present(void *screenshotCallbackdata)
         //     // std::printf("[CHAILOVE DEBUG] Set default clear color to bright magenta\n");
         // }
         
-        startRenderPass();
+        startRenderPass(currentFrame);
         // std::printf("[CHAILOVE DEBUG] startRenderPass() called successfully\n");
     } else if (!renderPassState.active && renderPassState.windowClearRequested) {
         // Original logic for non-libretro mode
-        startRenderPass();
+        startRenderPass(currentFrame);
     }
 
     deprecations.draw(this);
@@ -685,6 +686,9 @@ void Graphics::present(void *screenshotCallbackdata)
     framebufferUsages.clear();
 
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+    
+    // std::printf("[FRAMEADVANCE] Incremented to Frame %zu (buffer %u)\n", currentFrame, currentFrame % MAX_FRAMES_IN_FLIGHT);
+    // fflush(stdout);
 
     beginFrame();
 }
@@ -787,12 +791,16 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
         readbackCallbacks.resize(MAX_FRAMES_IN_FLIGHT);
         
         // Create command buffers from RetroArch's command pool
-        commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+        // Allocate 4 command buffers per frame for split-screen support
+        const uint32_t COMMAND_BUFFERS_PER_FRAME = 4;
+        uint32_t totalCommandBuffers = MAX_FRAMES_IN_FLIGHT * COMMAND_BUFFERS_PER_FRAME;
+        
+        commandBuffers.resize(totalCommandBuffers);
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.commandPool = commandPool;  // Use RetroArch's command pool
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandBufferCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        allocInfo.commandBufferCount = totalCommandBuffers;
 
         if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS)
             throw love::Exception("Failed to allocate command buffers in libretro mode");
@@ -1183,12 +1191,16 @@ bool Graphics::setLibretroVulkanContext(VkInstance instance, VkDevice device, Vk
         readbackCallbacks.resize(MAX_FRAMES_IN_FLIGHT);
         
         // Create command buffers from our command pool
-        commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+        // Allocate 4 command buffers per frame for split-screen support
+        const uint32_t COMMAND_BUFFERS_PER_FRAME = 4;
+        uint32_t totalCommandBuffers = MAX_FRAMES_IN_FLIGHT * COMMAND_BUFFERS_PER_FRAME;
+        
+        commandBuffers.resize(totalCommandBuffers);
         VkCommandBufferAllocateInfo allocInfo{};
         allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         allocInfo.commandPool = this->commandPool;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandBufferCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+        allocInfo.commandBufferCount = totalCommandBuffers;
 
         if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS)
             throw love::Exception("Failed to allocate command buffers in libretro mode");
@@ -1387,7 +1399,7 @@ void Graphics::draw(const DrawCommand &cmd)
     {
         // Debug output for direct draws  
         // std::printf("[CHAILOVE DEBUG] Issuing vkCmdDraw: vertexCount=%d, instanceCount=%d\n", cmd.vertexCount, cmd.instanceCount);
-        vkCmdDraw(commandBuffers.at(currentFrame), cmd.vertexCount, cmd.instanceCount, cmd.vertexStart, 0);
+		vkCmdDraw(commandBuffers.at(currentFrame), cmd.vertexCount, cmd.instanceCount, cmd.vertexStart, 0);
     }
 
 	drawCalls++;
@@ -1881,8 +1893,14 @@ void Graphics::initDynamicState()
 
 void Graphics::beginFrame()
 {
-	std::printf("[BEGINFRAME] Called\n");
-	fflush(stdout);
+	// std::printf("[BEGINFRAME] Called, Frame %zu\n", currentFrame);
+	// fflush(stdout);
+	
+	// CRITICAL: Reset all per-frame state flags at start of frame
+	// This prevents state from persisting between frames
+	renderPassState.active = false;
+	commandBufferRecording = false;
+	renderPassState.windowClearRequested = false;  // Reset clear flag after each frame
 	
 	// Log VMA statistics every 60 frames to track memory usage
 	static int statsFrameCounter = 0;
@@ -1896,19 +1914,38 @@ void Graphics::beginFrame()
 		for (const auto& sb : stagingBufferPool)
 			if (sb.inUse) inUseCount++;
 		
-		std::printf("[VMA] Memory: %llu MB, Allocs: %llu | Staging: %zu buffers (%zu in use)\n",
-			stats.total.statistics.allocationBytes / (1024 * 1024),
-			stats.total.statistics.allocationCount,
-			stagingBufferPool.size(),
-			inUseCount);
-		fflush(stdout);
+		// std::printf("[VMA] Memory: %llu MB, Allocs: %llu | Staging: %zu buffers (%zu in use)\n",
+		// 	stats.total.statistics.allocationBytes / (1024 * 1024),
+		// 	stats.total.statistics.allocationCount,
+		// 	stagingBufferPool.size(),
+		// 	inUseCount);
+		// fflush(stdout);
 	}
 
-	// CRITICAL FIX: Wait for fences even in libretro mode to prevent command buffer reuse errors
+	// In libretro mode, wait for RetroArch's sync
+	if (libretroMode) {
+		auto vulkan = ChaiLove::getInstance()->chai_gfx.vulkan;
+		if (vulkan && vulkan->wait_sync_index) {
+			vulkan->wait_sync_index(vulkan->handle);
+		}
+	}
+
+	// CRITICAL FIX: Wait for fence FIRST before resetting command buffer
+	// This ensures the GPU is done using the buffer before we reset it
 	if (!inFlightFences.empty())
 	{
 		vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 		vkResetFences(device, 1, &inFlightFences[currentFrame]);
+	}
+	
+	// CRITICAL: Reset current frame's command buffer AFTER fence wait
+	// This prevents resetting a buffer the GPU is still using
+	if (currentFrame < commandBuffers.size() && commandBuffers[currentFrame] != VK_NULL_HANDLE) {
+		VkResult resetResult = vkResetCommandBuffer(commandBuffers[currentFrame], 0);
+		if (resetResult != VK_SUCCESS) {
+			std::printf("[ERROR] Failed to reset command buffer %zu at beginFrame: %d\n", currentFrame, resetResult);
+			fflush(stdout);
+		}
 	}
 
 	if (swapChain != VK_NULL_HANDLE)
@@ -1942,7 +1979,7 @@ void Graphics::beginFrame()
 		cleanUpFn();
 	cleanUpFunctions.at(currentFrame).clear();
 
-	startRecordingGraphicsCommands();
+	startRecordingGraphicsCommands(currentFrame);
 
 	if (!swapChainImages.empty())
 	{
@@ -1984,16 +2021,16 @@ void Graphics::beginFrame()
 	localUniformBuffer->nextFrame();
 }
 
-void Graphics::startRecordingGraphicsCommands()
+void Graphics::startRecordingGraphicsCommands(int commandBufferIndex)
 {
     // Safety check for command buffers
-    if (commandBuffers.empty() || currentFrame >= commandBuffers.size()) {
-        throw love::Exception("Command buffers not properly initialized - size: %zu, currentFrame: %zu", 
-                             commandBuffers.size(), currentFrame);
+    if (commandBuffers.empty() || commandBufferIndex >= commandBuffers.size()) {
+        throw love::Exception("Command buffers not properly initialized - size: %zu, commandBufferIndex: %zu", 
+                             commandBuffers.size(), commandBufferIndex);
     }
     
     // Add debug information about the command buffer state
-    VkCommandBuffer currentCommandBuffer = commandBuffers.at(currentFrame);
+    VkCommandBuffer currentCommandBuffer = commandBuffers.at(commandBufferIndex);
     // std::printf("[CHAILOVE DEBUG] startRecordingGraphicsCommands:\n");
     // std::printf("[CHAILOVE DEBUG] - currentFrame: %zu\n", currentFrame);
     // std::printf("[CHAILOVE DEBUG] - commandBuffers.size(): %zu\n", commandBuffers.size());
@@ -2005,27 +2042,6 @@ void Graphics::startRecordingGraphicsCommands()
     // Check if command buffer is valid
     if (currentCommandBuffer == VK_NULL_HANDLE) {
         throw love::Exception("Command buffer at frame %zu is VK_NULL_HANDLE", currentFrame);
-    }
-    
-    // IMPORTANT FIX: Reset the command buffer if it's already recording
-    if (commandBufferRecording) {
-        // std::printf("[CHAILOVE DEBUG] Command buffer already recording, resetting it first\n");
-        
-        // End the current recording if it's active
-        VkResult endResult = vkEndCommandBuffer(currentCommandBuffer);
-        if (endResult != VK_SUCCESS) {
-            // std::printf("[CHAILOVE DEBUG] Warning: vkEndCommandBuffer failed with result: %d\n", endResult);
-        }
-        
-        // Reset the command buffer to initial state
-        VkResult resetResult = vkResetCommandBuffer(currentCommandBuffer, 0);
-        if (resetResult != VK_SUCCESS) {
-            // std::printf("[CHAILOVE DEBUG] vkResetCommandBuffer failed with result: %d\n", resetResult);
-            throw love::Exception("Failed to reset command buffer (VkResult: %d)", resetResult);
-        }
-        
-        commandBufferRecording = false;
-        // std::printf("[CHAILOVE DEBUG] Command buffer reset successfully\n");
     }
     
     VkCommandBufferBeginInfo beginInfo{};
@@ -2048,6 +2064,30 @@ void Graphics::startRecordingGraphicsCommands()
 
     // std::printf("[CHAILOVE DEBUG] vkBeginCommandBuffer succeeded\n");
     commandBufferRecording = true;
+
+    // CRITICAL: Set default fullscreen viewport and scissor immediately after beginning command buffer
+    // This ensures we start with clean state and prevents split-screen persistence across frames
+    VkViewport defaultViewport{};
+    defaultViewport.x = 0.0f;
+    defaultViewport.y = 0.0f;
+    defaultViewport.width = static_cast<float>(pixelWidth);
+    defaultViewport.height = static_cast<float>(pixelHeight);
+    defaultViewport.minDepth = 0.0f;
+    defaultViewport.maxDepth = 1.0f;
+    vkCmdSetViewport(currentCommandBuffer, 0, 1, &defaultViewport);
+    
+    VkRect2D defaultScissor{};
+    defaultScissor.offset = {0, 0};
+    defaultScissor.extent.width = static_cast<uint32_t>(pixelWidth);
+    defaultScissor.extent.height = static_cast<uint32_t>(pixelHeight);
+    vkCmdSetScissor(currentCommandBuffer, 0, 1, &defaultScissor);
+    
+    // std::printf("[STARTRECORDING] Frame %zu, Buffer %u: Set DEFAULT VP(x=0, y=0, w=%d, h=%d), Scissor(x=0, y=0, w=%u, h=%u)\n",
+    //     currentFrame,
+    //     currentFrame % 2,
+    //     pixelWidth, pixelHeight,
+    //     static_cast<uint32_t>(pixelWidth), static_cast<uint32_t>(pixelHeight));
+    // fflush(stdout);
 
     initDynamicState();
 
@@ -2120,13 +2160,10 @@ void Graphics::setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFl
     //     VK_PIPELINE_BIND_POINT_GRAPHICS,
     //     renderPassState.pipeline);
 
-    if (!commandBufferRecording)
-        startRecordingGraphicsCommands();
-
-    // CRITICAL: Push constants must be set INSIDE a render pass, not before
-    // If render pass is not active, start it now
-    if (!renderPassState.active)
-        startRenderPass();
+    if (!commandBufferRecording) {
+        startRecordingGraphicsCommands(currentFrame);
+		startRenderPass(currentFrame);
+	}
 
     vkCmdPushConstants(
         commandBuffers.at(currentFrame),
@@ -2137,7 +2174,17 @@ void Graphics::setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFl
         data);
 }
 
+std::vector<VkCommandBuffer> Graphics::getCommandBuffersForDataTransfer() 
+{
+	return commandBuffers;
+}
+
 VkCommandBuffer Graphics::getCommandBufferForDataTransfer()
+{
+	return getCommandBufferForDataTransfer(currentFrame);
+}
+
+VkCommandBuffer Graphics::getCommandBufferForDataTransfer(int frameIndex)
 {
 	if (renderPassState.active)
 		endRenderPass();
@@ -2148,14 +2195,23 @@ VkCommandBuffer Graphics::getCommandBufferForDataTransfer()
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         beginInfo.pInheritanceInfo = nullptr;
 
-        if (vkBeginCommandBuffer(commandBuffers.at(currentFrame), &beginInfo) != VK_SUCCESS)
+        if (vkBeginCommandBuffer(commandBuffers.at(frameIndex), &beginInfo) != VK_SUCCESS)
             throw love::Exception("failed to begin recording command buffer for data transfer");
         
         commandBufferRecording = true;
         initDynamicState();  // Initialize dynamic state when starting recording
     }
 
-	return commandBuffers.at(currentFrame);
+	return commandBuffers.at(frameIndex);
+}
+
+void Graphics::setMultiviewViewCount(uint32_t views)
+{
+	uint32_t clamped = views == 0 ? 1u : (views > 4u ? 4u : views);
+	requestedMultiviewViewCount = clamped;
+	multiviewFeatureEnabled = multiviewFeatureSupported && clamped > 1;
+	std::printf("[MULTIVIEW] setMultiviewViewCount(%u) -> clamped=%u, enabled=%d (supported=%d)\n", 
+		views, clamped, multiviewFeatureEnabled, multiviewFeatureSupported);
 }
 
 void Graphics::queueCleanUp(std::function<void()> cleanUp)
@@ -2392,10 +2448,13 @@ static void findOptionalDeviceExtensions(VkPhysicalDevice physicalDevice, Option
 	std::vector<VkExtensionProperties> availableExtensions(extensionCount);
 	vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, availableExtensions.data());
 
+	std::printf("[EXTENSIONS] Found %u device extensions:\n", extensionCount);
 	for (const auto &extension : availableExtensions)
 	{
-		if (strcmp(extension.extensionName, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME) == 0)
+		if (strcmp(extension.extensionName, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME) == 0) {
 			optionalDeviceExtensions.extendedDynamicState = true;
+			std::printf("[EXTENSIONS]   - %s (found)\n", VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+		}
 		if (strcmp(extension.extensionName, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME) == 0)
 			optionalDeviceExtensions.memoryRequirements2 = true;
 		if (strcmp(extension.extensionName, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME) == 0)
@@ -2406,6 +2465,10 @@ static void findOptionalDeviceExtensions(VkPhysicalDevice physicalDevice, Option
 			optionalDeviceExtensions.shaderFloatControls = true;
 		if (strcmp(extension.extensionName, VK_KHR_SPIRV_1_4_EXTENSION_NAME) == 0)
 			optionalDeviceExtensions.spirv14 = true;
+		if (strcmp(extension.extensionName, VK_KHR_MULTIVIEW_EXTENSION_NAME) == 0) {
+			optionalDeviceExtensions.multiview = true;
+			std::printf("[EXTENSIONS]   - %s (MULTIVIEW FOUND!)\n", VK_KHR_MULTIVIEW_EXTENSION_NAME);
+		}
 		if (strcmp(extension.extensionName, VK_AMD_MEMORY_OVERALLOCATION_BEHAVIOR_EXTENSION_NAME) == 0)
 			optionalDeviceExtensions.amdMemoryOverallocationBehavior = true;
 	}
@@ -2447,6 +2510,24 @@ void Graphics::createLogicalDevice()
 	if (optionalDeviceExtensions.spirv14 && deviceApiVersion < VK_API_VERSION_1_1)
 		optionalDeviceExtensions.spirv14 = false;
 
+	multiviewFeatureSupported = false;
+	VkPhysicalDeviceMultiviewFeatures multiviewFeaturesQuery{};
+	multiviewFeaturesQuery.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES;
+
+	std::printf("[MULTIVIEW] Feature detection: apiVersion=%u (1.1=%u), extension.multiview=%d, physDevProps2=%d\n",
+		deviceApiVersion, VK_API_VERSION_1_1, optionalDeviceExtensions.multiview, optionalInstanceExtensions.physicalDeviceProperties2);
+
+	if ((deviceApiVersion >= VK_API_VERSION_1_1 || optionalDeviceExtensions.multiview) &&
+		(deviceApiVersion >= VK_API_VERSION_1_1 || optionalInstanceExtensions.physicalDeviceProperties2))
+	{
+		VkPhysicalDeviceFeatures2 features2{};
+		features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+		features2.pNext = &multiviewFeaturesQuery;
+		vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
+		multiviewFeatureSupported = multiviewFeaturesQuery.multiview == VK_TRUE;
+		std::printf("[MULTIVIEW] Feature query result: multiview=%d\n", multiviewFeaturesQuery.multiview);
+	}
+
 	VkPhysicalDeviceFeatures deviceFeatures{};
 	deviceFeatures.samplerAnisotropy = VK_TRUE;
 	deviceFeatures.fillModeNonSolid = VK_TRUE;
@@ -2470,6 +2551,8 @@ void Graphics::createLogicalDevice()
 		enabledExtensions.push_back(VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
 	if (optionalDeviceExtensions.spirv14)
 		enabledExtensions.push_back(VK_KHR_SPIRV_1_4_EXTENSION_NAME);
+	if (optionalDeviceExtensions.multiview)
+		enabledExtensions.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
 	if (optionalDeviceExtensions.amdMemoryOverallocationBehavior)
 		enabledExtensions.push_back(VK_AMD_MEMORY_OVERALLOCATION_BEHAVIOR_EXTENSION_NAME);
 	if (deviceApiVersion >= VK_API_VERSION_1_1)
@@ -2489,24 +2572,39 @@ void Graphics::createLogicalDevice()
 	extendedDynamicStateFeatures.extendedDynamicState = VK_TRUE;
 	extendedDynamicStateFeatures.pNext = nullptr;
 
+	VkPhysicalDeviceMultiviewFeatures multiviewFeatures{};
+	multiviewFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES;
+	multiviewFeatures.multiview = multiviewFeatureSupported ? VK_TRUE : VK_FALSE;
+	multiviewFeatures.pNext = nullptr;
+
 	// AMD memory overallocation behavior - WORKAROUND for AMD integrated GPU driver leak
 	VkDeviceMemoryOverallocationCreateInfoAMD amdMemoryOverallocationInfo{};
 	amdMemoryOverallocationInfo.sType = VK_STRUCTURE_TYPE_DEVICE_MEMORY_OVERALLOCATION_CREATE_INFO_AMD;
 	amdMemoryOverallocationInfo.overallocationBehavior = VK_MEMORY_OVERALLOCATION_BEHAVIOR_DISALLOWED_AMD;
 	amdMemoryOverallocationInfo.pNext = nullptr;
 
+	void *pNextChain = nullptr;
+
+	if (optionalDeviceExtensions.amdMemoryOverallocationBehavior)
+	{
+		amdMemoryOverallocationInfo.pNext = pNextChain;
+		pNextChain = &amdMemoryOverallocationInfo;
+	}
+
 	if (optionalDeviceExtensions.extendedDynamicState)
 	{
-		createInfo.pNext = &extendedDynamicStateFeatures;
-		if (optionalDeviceExtensions.amdMemoryOverallocationBehavior)
-		{
-			extendedDynamicStateFeatures.pNext = &amdMemoryOverallocationInfo;
-		}
+		extendedDynamicStateFeatures.pNext = pNextChain;
+		pNextChain = &extendedDynamicStateFeatures;
 	}
-	else if (optionalDeviceExtensions.amdMemoryOverallocationBehavior)
+
+	if (multiviewFeatureSupported)
 	{
-		createInfo.pNext = &amdMemoryOverallocationInfo;
+		multiviewFeatures.pNext = pNextChain;
+		pNextChain = &multiviewFeatures;
+		multiviewFeatureEnabled = true;
 	}
+
+	createInfo.pNext = pNextChain;
 
 	if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS)
 		throw love::Exception("failed to create logical device");
@@ -2859,7 +2957,7 @@ VkFramebuffer Graphics::createFramebuffer(FramebufferConfiguration &configuratio
 	createInfo.pAttachments = attachments.data();
 	createInfo.width = configuration.staticData.width;
 	createInfo.height = configuration.staticData.height;
-	createInfo.layers = 1;
+	createInfo.layers = configuration.staticData.layers == 0 ? 1 : configuration.staticData.layers;
 
 	VkFramebuffer frameBuffer;
 	if (vkCreateFramebuffer(device, &createInfo, nullptr, &frameBuffer) != VK_SUCCESS)
@@ -3088,6 +3186,20 @@ VkRenderPass Graphics::createRenderPass(RenderPassConfiguration &configuration)
 	createInfo.pSubpasses = &subPass;
 	createInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
 	createInfo.pDependencies = dependencies.data();
+	createInfo.pNext = nullptr;
+
+	VkRenderPassMultiviewCreateInfo multiviewInfo{};
+	if (configuration.staticData.viewCount > 1 && configuration.staticData.viewMask != 0)
+	{
+		multiviewInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_MULTIVIEW_CREATE_INFO;
+		multiviewInfo.subpassCount = 1;
+		multiviewInfo.pViewMasks = &configuration.staticData.viewMask;
+		multiviewInfo.correlationMaskCount = 1;
+		multiviewInfo.pCorrelationMasks = &configuration.staticData.correlationMask;
+		createInfo.pNext = &multiviewInfo;
+		std::printf("[MULTIVIEW] createRenderPass: Creating %u-view render pass (mask=0x%x, correlationMask=0x%x)\n", 
+			configuration.staticData.viewCount, configuration.staticData.viewMask, configuration.staticData.correlationMask);
+	}
 
 	VkRenderPass renderPass;
 	if (vkCreateRenderPass(device, &createInfo, nullptr, &renderPass) != VK_SUCCESS)
@@ -3245,7 +3357,7 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
 	if (!renderPassState.active) {
 		if (!commandBufferRecording) {
 			// std::printf("[CHAILOVE DEBUG] prepareDraw: Starting command buffer recording\n");
-			startRecordingGraphicsCommands();
+			startRecordingGraphicsCommands(currentFrame);
 		}else {
 			// Command buffer is already recording, but we still need to set up render pass configuration
 			// std::printf("[CHAILOVE DEBUG] prepareDraw: Command buffer already recording, setting up render pass configuration\n");
@@ -3253,7 +3365,7 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
 		}
 
 		// std::printf("[CHAILOVE DEBUG] prepareDraw: No active render pass, starting one automatically\n");
-		startRenderPass();
+		startRenderPass(currentFrame);
 		
 		// Verify that render pass was successfully started
 		if (!renderPassState.active) {
@@ -3312,7 +3424,7 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
         if (!renderPassState.active) {
             // std::printf("[CHAILOVE DEBUG] prepareDraw: Attempting to start render pass\n");
             try {
-                startRenderPass();
+                startRenderPass(currentFrame);
                 pipelineRenderPass = renderPassState.beginInfo.renderPass;
                 // std::printf("[CHAILOVE DEBUG] prepareDraw: Render pass started, new renderPass: %p\n", (void*)pipelineRenderPass);
             } catch (const std::exception& e) {
@@ -3464,6 +3576,9 @@ void Graphics::setDefaultRenderPass()
     renderPassState.beginInfo.renderArea.extent.height = renderHeight;
     renderPassState.width = static_cast<float>(renderWidth);
     renderPassState.height = static_cast<float>(renderHeight);
+	// Support multiview for split screen on window render pass
+	uint32_t windowViewCount = (multiviewFeatureEnabled && requestedMultiviewViewCount > 1) ? std::min(requestedMultiviewViewCount, 4u) : 1;
+	renderPassState.viewCount = windowViewCount;
     
     // std::printf("[CHAILOVE DEBUG] Final render area extent: %ux%u\n", renderWidth, renderHeight);
 
@@ -3509,6 +3624,16 @@ void Graphics::setDefaultRenderPass()
 
     // Create render pass configuration
     RenderPassConfiguration renderPassConfiguration{};
+	// Support multiview for split screen on window render pass
+	uint32_t windowViewCount2 = (multiviewFeatureEnabled && requestedMultiviewViewCount > 1) ? std::min(requestedMultiviewViewCount, 4u) : 1;
+	uint32_t windowViewMask = windowViewCount2 > 1 ? ((1u << windowViewCount2) - 1u) : 0;
+	renderPassConfiguration.staticData.viewCount = windowViewCount2;
+	renderPassConfiguration.staticData.viewMask = windowViewMask;
+	renderPassConfiguration.staticData.correlationMask = windowViewMask;
+	if (windowViewCount2 > 1) {
+		std::printf("[MULTIVIEW] setDefaultRenderPass: Enabled %u-view rendering (mask=0x%x, multiviewFeatureEnabled=%d, requestedCount=%u)\n", 
+			windowViewCount2, windowViewMask, multiviewFeatureEnabled, requestedMultiviewViewCount);
+	}
 
     // CRITICAL FIX: Determine if we need depth/stencil and set appropriate load operations
     VkFormat dsformat = (backbufferHasDepth || backbufferHasStencil) ? depthStencilFormat : VK_FORMAT_UNDEFINED;
@@ -3605,6 +3730,9 @@ void Graphics::setDefaultRenderPass()
     
     framebufferConfiguration.staticData.width = renderWidth;
     framebufferConfiguration.staticData.height = renderHeight;
+	// Support multiview for split screen on window render pass
+	uint32_t windowViewCount3 = (multiviewFeatureEnabled && requestedMultiviewViewCount > 1) ? std::min(requestedMultiviewViewCount, 4u) : 1;
+	framebufferConfiguration.staticData.layers = windowViewCount3;
 
 	if (msaaSamples & VK_SAMPLE_COUNT_1_BIT)
     {
@@ -3703,6 +3831,8 @@ void Graphics::setRenderPass(const RenderTargets &rts, int pixelw, int pixelh)
 {
 	RenderPassConfiguration renderPassConfiguration{};
 	VkSampleCountFlagBits msaa = VK_SAMPLE_COUNT_1_BIT;
+	uint32_t viewCount = (multiviewFeatureEnabled && requestedMultiviewViewCount > 1) ? std::min(requestedMultiviewViewCount, 4u) : 1;
+	uint32_t viewMask = viewCount > 1 ? ((1u << viewCount) - 1u) : 0;
 
 	for (const auto &color : rts.colors)
 	{
@@ -3733,6 +3863,10 @@ void Graphics::setRenderPass(const RenderTargets &rts, int pixelw, int pixelh)
 		msaa = tex->getMsaaSamples();
 	}
 
+		renderPassConfiguration.staticData.viewCount = viewCount;
+		renderPassConfiguration.staticData.viewMask = viewMask;
+		renderPassConfiguration.staticData.correlationMask = viewMask;
+
 	FramebufferConfiguration configuration{};
 
 	for (const auto &color : rts.colors)
@@ -3759,6 +3893,7 @@ void Graphics::setRenderPass(const RenderTargets &rts, int pixelw, int pixelh)
 
 	configuration.staticData.width = static_cast<uint32_t>(pixelw);
 	configuration.staticData.height = static_cast<uint32_t>(pixelh);
+	configuration.staticData.layers = viewCount;
 
 	uint32_t numClearValues = static_cast<uint32_t>(rts.colors.size() + 1);
 	renderPassState.clearColors.resize(numClearValues);
@@ -3778,6 +3913,7 @@ void Graphics::setRenderPass(const RenderTargets &rts, int pixelw, int pixelh)
 	renderPassState.pipeline = VK_NULL_HANDLE;
 	renderPassState.width = static_cast<float>(pixelw);
 	renderPassState.height = static_cast<float>(pixelh);
+	renderPassState.viewCount = viewCount;
 	renderPassState.msaa = msaa;
 	renderPassState.numColorAttachments = static_cast<uint32_t>(rts.colors.size());
 	renderPassState.packedColorAttachmentFormats = 0;
@@ -3788,39 +3924,122 @@ void Graphics::setRenderPass(const RenderTargets &rts, int pixelw, int pixelh)
 void Graphics::setSplitScreenViewport(int playerIndex, int totalPlayers)
 {
 	if (!commandBufferRecording) {
-		startRecordingGraphicsCommands();
-		startRenderPass();
+		startRecordingGraphicsCommands(currentFrame);
 	}
 
-    VkViewport viewport;
-    VkRect2D scissor;
-    
-    if (totalPlayers == 2) {
-        // Vertical split
-        viewport.x = 0.0f;
-        viewport.y = (playerIndex == 0) ? 0.0f : renderPassState.height * 0.5f;
-        viewport.width = renderPassState.width;
-        viewport.height = renderPassState.height * 0.5f;
-        
-        scissor.offset.x = 0;
-        scissor.offset.y = viewport.y;
-        scissor.extent.width = viewport.width;
-        scissor.extent.height = viewport.height;
-    }
-    
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    
-    vkCmdSetViewport(commandBuffers.at(currentFrame), 0, 1, &viewport);
-    vkCmdSetScissor(commandBuffers.at(currentFrame), 0, 1, &scissor);
+	if (!renderPassState.active) {
+		startRenderPass(currentFrame);
+	}
+
+	// Initialize viewport array if needed
+	// if (viewports.empty() || totalViewportCount != totalPlayers) {
+	// 	viewports.clear();
+	// 	viewports.resize(totalPlayers);
+	// 	totalViewportCount = totalPlayers;
+	// }
+
+	// // Track current viewport
+	// currentViewportIndex = playerIndex;
+
+	// Set up viewport and scissor for this player
+	VkViewport viewport{};
+	VkRect2D scissor{};
+
+	if (totalPlayers == 2) {
+		// Vertical split
+		viewport.x = 0.0f;
+		viewport.y = (playerIndex == 0) ? 0.0f : renderPassState.height * 0.5f;
+		viewport.width = static_cast<float>(renderPassState.width);
+		viewport.height = renderPassState.height * 0.5f;
+
+		scissor.offset.x = 0;
+		scissor.offset.y = static_cast<int32_t>(viewport.y);
+		scissor.extent.width = static_cast<uint32_t>(renderPassState.width);
+		scissor.extent.height = static_cast<uint32_t>(viewport.height);
+	} else if (totalPlayers == 4) {
+		// 2x2 split
+		int col = playerIndex % 2;
+		int row = playerIndex / 2;
+
+		viewport.x = static_cast<float>(col * renderPassState.width * 0.5f);
+		viewport.y = static_cast<float>(row * renderPassState.height * 0.5f);
+		viewport.width = renderPassState.width * 0.5f;
+		viewport.height = renderPassState.height * 0.5f;
+
+		scissor.offset.x = static_cast<int32_t>(viewport.x);
+		scissor.offset.y = static_cast<int32_t>(viewport.y);
+		scissor.extent.width = static_cast<uint32_t>(viewport.width);
+		scissor.extent.height = static_cast<uint32_t>(viewport.height);
+	} else {
+		// Default to fullscreen for totalPlayers == 1
+		viewport.x = 0.0f;
+		viewport.y = 0.0f;
+		viewport.width = static_cast<float>(renderPassState.width);
+		viewport.height = static_cast<float>(renderPassState.height);
+
+		scissor.offset.x = 0;
+		scissor.offset.y = 0;
+		scissor.extent.width = static_cast<uint32_t>(renderPassState.width);
+		scissor.extent.height = static_cast<uint32_t>(renderPassState.height);
+	}
+
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+
+	// Store viewport state for this player
+	// viewports[playerIndex].viewport = viewport;
+	// viewports[playerIndex].scissor = scissor;
+	// viewports[playerIndex].needsDepthClear = (playerIndex > 0);  // Clear depth for all but first viewport
+
+	// Ensure render pass is active
+	// commandBufferRecording = false;
+	// startRecordingGraphicsCommands(currentFrame+(2*playerIndex));
+	
+	// renderPassState.active = false;
+	// startRenderPass(currentFrame+(2*playerIndex));
+	
+	// std::printf("[SPLITSCREEN VP] Frame %zu, Buffer %u: Player %d of %d -> VP(x=%.1f, y=%.1f, w=%.1f, h=%.1f), Scissor(x=%d, y=%d, w=%u, h=%u)\n",
+	// 	currentFrame,
+	// 	currentFrame % 2,
+	// 	playerIndex, 
+	// 	totalPlayers,
+	// 	viewport.x, viewport.y, viewport.width, viewport.height,
+	// 	scissor.offset.x, scissor.offset.y, scissor.extent.width, scissor.extent.height);
+	// fflush(stdout);
+
+	// Apply viewport and scissor for current player
+	vkCmdSetViewport(commandBuffers.at(currentFrame), 0, 1, &viewport);
+	vkCmdSetScissor(commandBuffers.at(currentFrame), 0, 1, &scissor);
+
+	// CRITICAL FIX: Clear depth buffer for each viewport after the first
+	// This prevents depth contamination between viewports
+	if (playerIndex > 0 && totalPlayers > 1) {
+		gfx::OptionalColorD noColor;  // Don't clear color
+		OptionalInt noStencil;         // Don't clear stencil
+		OptionalDouble clearDepth(1.0);  // Clear depth to 1.0
+
+		// This clears in-place using vkCmdClearAttachments
+		// std::printf("[SPLITSCREEN VP] Frame %zu, Buffer %u: Clearing depth for Player %d\n",
+		// 	currentFrame,
+		// 	currentFrame % 2,
+		// 	playerIndex);
+		// fflush(stdout);
+		clear(noColor, noStencil, clearDepth);
+	}
 }
 
-void Graphics::startRenderPass()
+void Graphics::startRenderPass(int bufferIndex)
 {
     // static int renderPassCount = 0;
     // if (++renderPassCount % 60 == 1) {
     //     std::printf("[RENDER PASS] startRenderPass() called #%d (last 60 frames had 60 calls)\n", renderPassCount);
     // }
+    
+    // std::printf("[STARTRRP] Frame %zu, Buffer %u: Checking if active=%d\n", 
+    //     currentFrame,
+    //     currentFrame % 2,
+    //     renderPassState.active);
+    // fflush(stdout);
     
     if (renderPassState.active)
         return;
@@ -3829,13 +4048,16 @@ void Graphics::startRenderPass()
     if (libretroMode) {
         // std::printf("[CHAILOVE DEBUG] Using libretro-compatible rendering with minimal render pass\n");
         
-        // CRITICAL FIX: Initialize render pass dimensions for libretro
-        if (renderPassState.width <= 0 || renderPassState.height <= 0) {
-            renderPassState.width = 1440.0f;  // Default RetroArch resolution
-            renderPassState.height = 1080.0f;
-            // std::printf("[CHAILOVE DEBUG] Initialized libretro render pass dimensions: %fx%f\n", 
-                // renderPassState.width, renderPassState.height);
-        }
+        // CRITICAL FIX: Always use actual pixelWidth and pixelHeight for render pass dimensions
+        // This ensures split-screen viewports are calculated correctly
+        renderPassState.width = static_cast<float>(pixelWidth);
+        renderPassState.height = static_cast<float>(pixelHeight);
+        
+        // std::printf("[STARTRRP] Frame %zu, Buffer %u: Set renderPassState dimensions to actual: w=%d, h=%d\n",
+        //     currentFrame,
+        //     currentFrame % 2,
+        //     pixelWidth, pixelHeight);
+        // fflush(stdout);
         
         // CRITICAL: Create minimal render pass for pipeline compatibility
         if (renderPassState.beginInfo.renderPass == VK_NULL_HANDLE) {
@@ -3908,7 +4130,7 @@ void Graphics::startRenderPass()
         }
         
         // CRITICAL: Actually start the render pass for draw commands
-        VkCommandBuffer currentCommandBuffer = commandBuffers.at(currentFrame);
+        VkCommandBuffer currentCommandBuffer = commandBuffers.at(bufferIndex);
         
         
                 // Set up a dummy framebuffer for the render pass
@@ -4067,19 +4289,10 @@ void Graphics::startRenderPass()
     // LIBRETRO-COMPATIBLE SOLUTION: Use simplified rendering approach
     // std::printf("[CHAILOVE DEBUG] Using libretro-compatible rendering approach\n");
     
-    // Set viewport
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = renderPassState.width;
-    viewport.height = renderPassState.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-
-    vkCmdSetViewport(currentCommandBuffer, 0, 1, &viewport);
-    
-    // FALLBACK: Direct rendering with manual clearing for libretro
-    // std::printf("[CHAILOVE DEBUG] Using direct rendering with manual clearing for libretro compatibility\n");
+    // NOTE: Do NOT set viewport/scissor here in startRenderPass!
+    // They are already set by startRecordingGraphicsCommands() and will be
+    // modified by setSplitScreenViewport() as needed for split-screen rendering.
+    // Setting them here would overwrite the correct viewport state.
     
     // Mark as active
     renderPassState.active = true;
@@ -5086,13 +5299,18 @@ void Graphics::createCommandBuffers()
         throw love::Exception("Command pool is null in libretro mode - cannot create command buffers");
     }
     
-    commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+    // Allocate command buffers: MAX_FRAMES_IN_FLIGHT * 4 viewports for split-screen support
+    // Each frame can have up to 4 command buffers (for 4-way split screen)
+    const uint32_t COMMAND_BUFFERS_PER_FRAME = 4;
+    uint32_t totalCommandBuffers = MAX_FRAMES_IN_FLIGHT * COMMAND_BUFFERS_PER_FRAME;
+    
+    commandBuffers.resize(totalCommandBuffers);
 
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandPool = commandPool;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    allocInfo.commandBufferCount = totalCommandBuffers;
 
     if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS)
         throw love::Exception("failed to allocate command buffers");

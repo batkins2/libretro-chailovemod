@@ -92,6 +92,9 @@ struct RenderPassConfiguration
 	{
 		DepthStencilAttachment depthStencilAttachment;
 		bool resolve = false;
+		uint32_t viewMask = 0;
+		uint32_t correlationMask = 0;
+		uint32_t viewCount = 1;
 	} staticData;
 
 	bool operator==(const RenderPassConfiguration &conf) const
@@ -124,6 +127,7 @@ struct FramebufferConfiguration
 
 		uint32_t width = 0;
 		uint32_t height = 0;
+		uint32_t layers = 1;
 
 		VkRenderPass renderPass = VK_NULL_HANDLE;
 	} staticData;
@@ -178,6 +182,9 @@ struct OptionalDeviceExtensions
 	// VK_KHR_spirv_1_4
 	bool spirv14 = false;
 
+	// VK_KHR_multiview
+	bool multiview = false;
+
 	// VK_AMD_memory_overallocation_behavior
 	bool amdMemoryOverallocationBehavior = false;
 };
@@ -209,6 +216,7 @@ struct RenderpassState
 	FramebufferConfiguration framebufferConfiguration{};
 	VkPipeline pipeline = VK_NULL_HANDLE;
 	uint32_t numColorAttachments = 0;
+	uint32_t viewCount = 1;
 	uint64 packedColorAttachmentFormats = 0;
 	float width = 0.0f;
 	float height = 0.0f;
@@ -275,7 +283,12 @@ public:
 
 	VkDevice getDevice() const;
 	VmaAllocator getVmaAllocator() const;
+	std::vector<VkCommandBuffer> getCommandBuffersForDataTransfer();
 	VkCommandBuffer getCommandBufferForDataTransfer();
+	VkCommandBuffer getCommandBufferForDataTransfer(int frameIndex);
+	void setMultiviewViewCount(uint32_t views);
+	uint32_t getMultiviewViewCount() const { return requestedMultiviewViewCount; }
+	bool isMultiviewEnabled() const { return multiviewFeatureSupported && requestedMultiviewViewCount > 1; }
 	void queueCleanUp(std::function<void()> cleanUp);
 	void addReadbackCallback(std::function<void()> callback);
 	void submitGpuCommands(SubmitMode, void *screenshotCallbackData = nullptr);
@@ -355,6 +368,16 @@ public:
 	}
 
 	void setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void *data);
+	
+	// Frame management for libretro mode
+	void advanceFrame() {
+		currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+		beginFrame();
+	}
+	
+	size_t getCurrentFrame() const {
+		return currentFrame;
+	}
 
 protected:
 	gfx::ShaderStage *newShaderStageInternal(ShaderStageType stage, const std::string &cachekey, const std::string &source, bool gles) override;
@@ -400,7 +423,7 @@ private:
 	void recreateSwapChain();
 	void initDynamicState();
 	void beginFrame();
-	void startRecordingGraphicsCommands();
+	void startRecordingGraphicsCommands(int commandBufferIndex);
 	void endRecordingGraphicsCommands();
 	void createVulkanVertexFormat(
 		Shader *shader,
@@ -414,7 +437,7 @@ private:
 	void setRenderPass(const RenderTargets &rts, int pixelw, int pixelh);
 	void setDefaultRenderPass();
 	void setSplitScreenViewport(int playerIndex, int totalPlayers);
-	void startRenderPass();
+	void startRenderPass(int bufferIndex);
 	void endRenderPass();
 	void applyScissor();
 	VkSampler createSampler(const SamplerState &sampler);
@@ -508,6 +531,20 @@ private:
 
 	// Add this member variable after renderPassState:
 	std::vector<DeferredBufferUpload> deferredUploads;
+
+	bool multiviewFeatureSupported = false;
+	bool multiviewFeatureEnabled = false;
+	uint32_t requestedMultiviewViewCount = 1;
+	
+	// Multi-viewport tracking for split-screen rendering
+	int currentViewportIndex = 0;
+	int totalViewportCount = 1;
+	struct ViewportState {
+		VkViewport viewport;
+		VkRect2D scissor;
+		bool needsDepthClear = false;
+	};
+	std::vector<ViewportState> viewports;
 };
 
 } // vulkan

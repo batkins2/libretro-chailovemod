@@ -1867,7 +1867,8 @@ void chai_mesh::update(std::vector<float> position, std::vector<float> rotation,
 
 void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt, chai_shader *computeShader) {
     
-    frameCount++;
+    if (dt > 0.0f)
+        frameCount++;
     
     int animRate = 6; // Adjust this value to change animation update frequency
 

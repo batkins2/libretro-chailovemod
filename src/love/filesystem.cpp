@@ -277,7 +277,7 @@ bool filesystem::mount(const std::string& archive, const std::string& mountpoint
 	}
 
 	// Display a message.
-	LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] [filesystem] Mounting " << archive << " as " << mountpoint << std::endl;
+	// LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] [filesystem] Mounting " << archive << " as " << mountpoint << std::endl;
 
 	// Use the simple mount method if we're mounting the root directory.
 	if (mountpoint == "/") {

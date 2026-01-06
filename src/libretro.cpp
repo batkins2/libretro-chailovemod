@@ -38,7 +38,7 @@ static void fallback_log(enum retro_log_level level,
 static retro_video_refresh_t video_cb;
 static struct retro_hw_render_callback hw_render;
 static const struct retro_hw_render_interface_vulkan *vulkan;
-retro_log_printf_t log_cb = fallback_log;
+extern retro_log_printf_t log_cb;
 
 static struct {
     uint32_t index;
@@ -250,7 +250,7 @@ void retro_get_system_info(struct retro_system_info *info) {
  * libretro callback; Set the audio/video settings.
  */
 void retro_get_system_av_info(struct retro_system_av_info *info) {
-	LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] retro_get_system_av_info" << std::endl;
+	// LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] retro_get_system_av_info" << std::endl;
 	if (!ChaiLove::hasInstance()) {
 		return;
 	}
@@ -389,7 +389,7 @@ void retro_audio_cb() {
  */
 void audio_set_state(bool enabled) {
 	// TODO(RobLoach): Act on whether or not audio is enabled/disabled?
-	LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] audio_set_state(" << (enabled ? "true" : "false") << ")" << std::endl;
+	// LibretroLog::log(RETRO_LOG_INFO) << "[ChaiLove] audio_set_state(" << (enabled ? "true" : "false") << ")" << std::endl;
 }
 
 /**
@@ -588,27 +588,7 @@ void retro_reset(void) {
 	}
 }
 
-int LibretroLog::LoggerBuf::sync() {
-	const std::string &s = str();
-	if (!s.empty()) {
-		if (s[s.length() - 1] == '\n')
-			log_cb(level, "%s", s.c_str());
-		else
-			log_cb(level, "%s\n", s.c_str());
-	}
-	str() = "";
-	return 0;
-}
 
-std::ostream &LibretroLog::log(enum retro_log_level level) {
-	static LibretroLog::LoggerBuf *bufs[RETRO_LOG_ERROR + 1] = {0};
-	static std::ostream *streams[RETRO_LOG_ERROR + 1] = {0};
-	if (!bufs[level]) {
-		bufs[level] = new LibretroLog::LoggerBuf(level);
-		streams[level] = new std::ostream(bufs[level]);
-	}
-	return *streams[level];
-}
 
 
 int runCount = 0;
@@ -799,12 +779,19 @@ void retro_run(void) {
 		vulkan->wait_sync_index(vulkan->handle);
 
 		vk.index = vulkan->get_sync_index(vulkan->handle);
-
-		VkCommandBuffer cmd[] = { cg.instance->getCommandBufferForDataTransfer() };
-		
-		
+		VkCommandBuffer cmd[] = {cg.instance->getCommandBufferForDataTransfer()}; 
+		// VkCommandBuffer cmd[buffers.size()];
+		// for (size_t i = 0; i < buffers.size(); i++) {
+		// 	cmd[i] = buffers[i];
+		// }		
 
 		vulkanGraphics->submitGpuCommands(love::gfx::vulkan::SUBMIT_NOPRESENT, nullptr);
+		
+		// CRITICAL FIX: Advance frame after submitting GPU commands in libretro mode
+		// This ensures each frame uses a different command buffer and prevents "every other frame" persistence
+		// std::printf("[FRAMEADVANCE] Advancing to next frame\n");
+		// fflush(stdout);
+		vulkanGraphics->advanceFrame();
 
 		retro_vulkan_image image;
 		image.image_view = cg.instance->getCurrentSwapchainImageView();

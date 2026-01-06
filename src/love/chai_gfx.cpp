@@ -265,7 +265,36 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, const std::st
             lines.push_back(line);
         }
 
-        std::string a;
+        // Add multiview support to vertex shader
+        std::string multiviewHeader = "#extension GL_EXT_multiview : enable\n";
+        
+        // Check if the shader already has a position() function or needs multiview wrapper
+        bool hasPositionFunc = false;
+        bool hasViewMatrixUsage = false;
+        for (const auto &piece : lines) {
+            if (strstr(piece.c_str(), "vec4 position(") != NULL ||
+                strstr(piece.c_str(), "void vertexmain(") != NULL) {
+                hasPositionFunc = true;
+            }
+            if (strstr(piece.c_str(), "viewMatrix") != NULL) {
+                hasViewMatrixUsage = true;
+            }
+        }
+        
+        // If the shader uses viewMatrix, inject multiview selection code
+        std::string a = multiviewHeader;
+        
+        // Add helper function to select view matrix based on gl_ViewIndex
+        if (hasViewMatrixUsage) {
+            a += "// Multiview helper - select view matrix based on gl_ViewIndex\n";
+            a += "mat4 getViewMatrix(mat4 view1, mat4 view2, int splitMode) {\n";
+            a += "    if (splitMode == 1 && gl_ViewIndex == 1) {\n";
+            a += "        return view2;\n";
+            a += "    }\n";
+            a += "    return view1;\n";
+            a += "}\n\n";
+        }
+        
         for (const auto &piece : lines) a += piece+'\n';
        
         std::vector<std::string> code;

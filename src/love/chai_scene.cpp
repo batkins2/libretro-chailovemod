@@ -185,6 +185,9 @@ void chai_scene::drawMeshes(bool shadows, int view) {
     
     sceneFrameCount++;
     
+    // Track which meshes have been drawn to prevent duplicates
+    std::set<int> drawnMeshIndices;
+    
     // if (sceneFrameCount % 60 == 1) {
     //     printf("[DRAW MESHES] Frame %d | shadows=%s | view=%d\n", 
     //            sceneFrameCount, shadows ? "TRUE" : "FALSE", view);
@@ -312,6 +315,7 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         // __mem_leak_check(leakCountBefore, leakSizeBefore, false, "", false);
         m_projectionMatrixCache2.push_back(t2);
         sceneShader->send("projectionMatrix", m_projectionMatrixCache2);
+        sceneShader->send("projectionMatrix2", m_projectionMatrixCache2);
         // __mem_leak_check(leakCountAfter, leakSizeAfter, false, "", false);
     
         // printf("Leak delta: %zu objects, %llu bytes\n", 
@@ -447,6 +451,7 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                 m_projectionMatrixCache.push_back(t2);
             }
             sceneShader->send("projectionMatrix", m_projectionMatrixCache);
+            sceneShader->send("projectionMatrix2", m_projectionMatrixCache);
 
             if (shadows == true) {
                 if (sceneFrameCount % 60 == 1) {
@@ -473,10 +478,10 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                 m_vmCache.push_back(lightView);
                 sceneShader->send("viewMatrix", m_vmCache[0]);
                 viewProjectionMatrix = lightSpaceMatrix;
-            } else {
-                sceneShader->send("viewMatrix", viewMatrix);
+            } else {                
+                sceneShader->send("viewMatrix"+(view > 0 ? std::to_string(view+1) : ""), viewMatrix);
                 viewMatrix.clear();
-                auto mat = sceneShader->shader->getUniformInfo("viewMatrix");
+                auto mat = sceneShader->shader->getUniformInfo("viewMatrix"+(view > 0 ? std::to_string(view+1) : ""));
                 auto data = mat->floats;
                 if (data == nullptr) {
                     vMatrix = glm::mat4(1.0f);
@@ -578,35 +583,35 @@ void chai_scene::drawMeshes(bool shadows, int view) {
             continue; // Skip meshes outside the frustum
         }
 
-        bool defer = false;
+        // bool defer = false;
 
-        if (meshChildren.find(i) != meshChildren.end()) {
-            if (sceneFrameCount % 60 == 0 && isMultiGroup) {
-                printf("[CHECK CHILDREN] Mesh %d (multi-group) has %zu children\n", 
-                       i, meshChildren[i].size());
-            }
-            int j = 0;
-            for (auto child : meshChildren[i]) {
-                if (child->visible == false) {
-                    j++;
-                    continue;
-                }
-                if (meshGroups[child->getId()] > 1) {
-                    // m_deferredChildIndices.push_back(j);
-                    // m_deferredParentIndices.push_back(i);
-                    // defer = true;
-                }
-                j++;
-            }
-            if (defer) {
-                if (sceneFrameCount % 60 == 0 && isMultiGroup) {
-                    printf("[SKIP CHILD DEFER] Mesh %d (multi-group) deferred due to child\n", 
-                           i);
-                }
-                i++;
-                continue;
-            }
-        }
+        // if (meshChildren.find(i) != meshChildren.end()) {
+        //     if (sceneFrameCount % 60 == 0 && isMultiGroup) {
+        //         printf("[CHECK CHILDREN] Mesh %d (multi-group) has %zu children\n", 
+        //                i, meshChildren[i].size());
+        //     }
+        //     int j = 0;
+        //     for (auto child : meshChildren[i]) {
+        //         if (child->visible == false) {
+        //             j++;
+        //             continue;
+        //         }
+        //         if (meshGroups[child->getId()] > 1) {
+        //             // m_deferredChildIndices.push_back(j);
+        //             // m_deferredParentIndices.push_back(i);
+        //             // defer = true;
+        //         }
+        //         j++;
+        //     }
+        //     if (defer) {
+        //         if (sceneFrameCount % 60 == 0 && isMultiGroup) {
+        //             printf("[SKIP CHILD DEFER] Mesh %d (multi-group) deferred due to child\n", 
+        //                    i);
+        //         }
+        //         i++;
+        //         continue;
+        //     }
+        // }
 
         // if (meshGroups[mesh->getId()] > 1) {
         //     if (sceneFrameCount % 60 == 0) {
@@ -632,20 +637,13 @@ void chai_scene::drawMeshes(bool shadows, int view) {
 
         // gfx::Graphics::flushBatchedDrawsGlobal();
         auto matrix = matrices[i];
-        mesh->draw(cg.instance, matrix, sceneShader, deltaTime, computeShader);
+        mesh->draw(cg.instance, matrix, sceneShader, view == 0 ? deltaTime : 0, computeShader);
+        drawnMeshIndices.insert(i);  // Mark as drawn
         if (meshChildren.find(i) != meshChildren.end() && computeShader == nullptr) {
-            // if (i == 4) {
-            //     printf("Mesh %p breakpoint\n", mesh);
-            //     isMeshInFrustum(mesh, viewProjectionMatrix);
-            // }
             auto c = 0;
             auto zOffset = 0.0001f;
             for (auto child : meshChildren[i]) {
-                // printf("Drawing child mesh %p of parent mesh %p\n", child, mesh);
-                if (child->visible == false) {
-                    c++;
-                    continue;
-                }
+                if (child->visible == false) { c++; continue; }
                 for (int j = 0; j < child->meshes.size(); ++j) {
                     float mArr[16] = {
                         1.0f, 0.0f, 0.0f, 0.0f,
@@ -654,11 +652,8 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                         0.0f, 0.0f, 0.0f, 1.0f
                     };
                     Matrix4 m = Matrix4(mArr);
-                    // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
-                    
                     if (true || c > 0) {
                         auto mm = mesh->m_matrixCache[0];
-                        // Offset the translation.z component (3rd row, 4th column) of the matrix
                         mm[3][2] += zOffset;
                         zOffset += 0.0001f;
                         auto mc = sceneShader->send("modelMatrix", std::vector<glm::mat4>({mm}));
@@ -666,129 +661,142 @@ void chai_scene::drawMeshes(bool shadows, int view) {
                         jic.z = (float)mc;
                         sceneShader->sendConstant("jointInfo", std::vector<glm::vec4>({ jic }));
                     }
-                    
                     child->meshes[j]->draw(cg.instance, m);
                 }
                 c++;
             }
         }
-        // cg.instance->present(nullptr);
         i++;
     }
     // Draw deferred child meshes in order of same index
-    i = 0;
-    m_drawnPairs.clear();
-    for (auto childIndex : m_deferredChildIndices) {
-        // Bounds check for deferred parent indices
-        // if (i >= m_deferredParentIndices.size()) {
-        //     i++;
-        //     continue;
-        // }
+    // i = 0;
+    // m_drawnPairs.clear();
+    // for (auto childIndex : m_deferredChildIndices) {
+    //     // Bounds check for deferred parent indices
+    //     // if (i >= m_deferredParentIndices.size()) {
+    //     //     i++;
+    //     //     continue;
+    //     // }
         
-        // printf("Drawing deferred child mesh index %d of parent mesh index %d\n", childIndex, m_deferredParentIndices[i]);
-        // auto vbo = meshChildren[m_deferredParentIndices[i]][childIndex]->cachedVBOs.begin()->second;
-        // printf("Using VBO %d\n", vbo);
-        // glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        // printf("Buffer bound\n");
-        for (auto parentId : m_deferredParentIndices) {
-            // Bounds check for meshChildren and arrays
-            // if (meshChildren.find(parentId) == meshChildren.end() || 
-            //     meshChildren.find(m_deferredParentIndices[i]) == meshChildren.end() ||
-            //     childIndex >= meshChildren[m_deferredParentIndices[i]].size()) {
-            //     continue;
-            // }
+    //     // printf("Drawing deferred child mesh index %d of parent mesh index %d\n", childIndex, m_deferredParentIndices[i]);
+    //     // auto vbo = meshChildren[m_deferredParentIndices[i]][childIndex]->cachedVBOs.begin()->second;
+    //     // printf("Using VBO %d\n", vbo);
+    //     // glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    //     // printf("Buffer bound\n");
+    //     for (auto parentId : m_deferredParentIndices) {
+    //         // Bounds check for meshChildren and arrays
+    //         // if (meshChildren.find(parentId) == meshChildren.end() || 
+    //         //     meshChildren.find(m_deferredParentIndices[i]) == meshChildren.end() ||
+    //         //     childIndex >= meshChildren[m_deferredParentIndices[i]].size()) {
+    //         //     continue;
+    //         // }
             
-            int j = 0;
-            for (auto child : meshChildren[parentId]) {
-                if (!child || child->getId() == meshChildren[m_deferredParentIndices[i]][childIndex]->getId()) {
-                    if (child->visible == false || m_drawnPairs.end() != std::find(m_drawnPairs.begin(), m_drawnPairs.end(), std::make_pair(parentId, j))) {
-                        j++;
-                        continue;
-                    }
-                    auto drawnPair = std::make_pair(parentId, j);
-                    // printf("Drawing child mesh %d of parent mesh %d\n", j, parentId);
-                    m_drawnPairs.push_back(drawnPair);
-                    // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
-                    // gfx::Graphics::flushBatchedDrawsGlobal();
+    //         int j = 0;
+    //         for (auto child : meshChildren[parentId]) {
+    //             if (!child || child->getId() == meshChildren[m_deferredParentIndices[i]][childIndex]->getId()) {
+    //                 if (child->visible == false || m_drawnPairs.end() != std::find(m_drawnPairs.begin(), m_drawnPairs.end(), std::make_pair(parentId, j))) {
+    //                     j++;
+    //                     continue;
+    //                 }
+    //                 auto drawnPair = std::make_pair(parentId, j);
+    //                 // printf("Drawing child mesh %d of parent mesh %d\n", j, parentId);
+    //                 m_drawnPairs.push_back(drawnPair);
+    //                 // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+    //                 // gfx::Graphics::flushBatchedDrawsGlobal();
                    
-                    // Draw the parent mesh first
-                    // Bounds check for meshes and matrices arrays
-                    if (parentId >= meshes.size() || parentId >= matrices.size() || !meshes[parentId]) {
-                        continue;
-                    }
-                    meshes[parentId]->draw(cg.instance, matrices[parentId], sceneShader, deltaTime, computeShader);
-                    float identityData[16] = {
-                        1.0f, 0.0f, 0.0f, 0.0f,
-                        0.0f, 1.0f, 0.0f, 0.0f,
-                        0.0f, 0.0f, 1.0f, 0.0f,
-                        0.0f, 0.0f, 0.0f, 1.0f
-                    };
-                    Matrix4 m = Matrix4(identityData);
-                    // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+    //                 // Draw the parent mesh first
+    //                 // Bounds check for meshes and matrices arrays
+    //                 if (parentId >= meshes.size() || parentId >= matrices.size() || !meshes[parentId]) {
+    //                     continue;
+    //                 }
+                    
+    //                 // Skip if already drawn in main loop
+    //                 if (drawnMeshIndices.find(parentId) == drawnMeshIndices.end()) {
+    //                     meshes[parentId]->draw(cg.instance, matrices[parentId], sceneShader, deltaTime, computeShader);
+    //                     drawnMeshIndices.insert(parentId);
+    //                 }
+                    
+    //                 float identityData[16] = {
+    //                     1.0f, 0.0f, 0.0f, 0.0f,
+    //                     0.0f, 1.0f, 0.0f, 0.0f,
+    //                     0.0f, 0.0f, 1.0f, 0.0f,
+    //                     0.0f, 0.0f, 0.0f, 1.0f
+    //                 };
+    //                 Matrix4 m = Matrix4(identityData);
+    //                 // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
 
-                    if (computeShader == nullptr && j < child->meshes.size() && child->meshes[j]) {
-                        child->meshes[j]->draw(cg.instance, m);
-                    }
-                    // cg.instance->present(nullptr);
-                }
-                j++;
-            }
-        }
-        i++;
-    }
-
-    // printf("Drawing deferred parent meshes\n");
-
-    // if (sceneFrameCount % 60 == 0) {
-    //     printf("[DEFERRED CHECK] m_deferredMeshIndices has %zu meshes\n", m_deferredMeshIndices.size());
-    //     if (m_deferredMeshIndices.size() > 0) {
-    //         printf("[DEFERRED LOOP] Processing %zu deferred meshes\n", m_deferredMeshIndices.size());
+    //                 if (computeShader == nullptr && j < child->meshes.size() && child->meshes[j]) {
+    //                     child->meshes[j]->draw(cg.instance, m);
+    //                 }
+    //                 // cg.instance->present(nullptr);
+    //             }
+    //             j++;
+    //         }
     //     }
+    //     i++;
     // }
 
-    for (auto meshIndex : m_deferredMeshIndices) {
-        // Bounds check for deferred mesh indices
-        if (meshIndex >= meshes.size() || meshIndex >= matrices.size() || !meshes[meshIndex]) {
-            if (sceneFrameCount % 60 == 0) {
-                printf("[DEFERRED SKIP] Mesh %d failed bounds check\n", meshIndex);
-            }
-            continue;
-        }
+    // // printf("Drawing deferred parent meshes\n");
+
+    // // if (sceneFrameCount % 60 == 0) {
+    // //     printf("[DEFERRED CHECK] m_deferredMeshIndices has %zu meshes\n", m_deferredMeshIndices.size());
+    // //     if (m_deferredMeshIndices.size() > 0) {
+    // //         printf("[DEFERRED LOOP] Processing %zu deferred meshes\n", m_deferredMeshIndices.size());
+    // //     }
+    // // }
+
+    // for (auto meshIndex : m_deferredMeshIndices) {
+    //     // Bounds check for deferred mesh indices
+    //     if (meshIndex >= meshes.size() || meshIndex >= matrices.size() || !meshes[meshIndex]) {
+    //         if (sceneFrameCount % 60 == 0) {
+    //             printf("[DEFERRED SKIP] Mesh %d failed bounds check\n", meshIndex);
+    //         }
+    //         continue;
+    //     }
         
-        auto mesh = meshes[meshIndex];
-        auto matrix = matrices[meshIndex];
+    //     // Skip if already drawn
+    //     if (drawnMeshIndices.find(meshIndex) != drawnMeshIndices.end()) {
+    //         if (sceneFrameCount % 60 == 0) {
+    //             printf("[DEFERRED SKIP] Mesh %d already drawn\n", meshIndex);
+    //         }
+    //         continue;
+    //     }
         
-        if (sceneFrameCount % 60 == 0) {
-            printf("[DEFERRED DRAW] Drawing mesh %d\n", meshIndex);
-        }
+    //     auto mesh = meshes[meshIndex];
+    //     auto matrix = matrices[meshIndex];
         
-        // Draw with same method as main loop - mesh->draw handles shader setup
-        mesh->draw(cg.instance, matrix, sceneShader, deltaTime, computeShader);
-        if (meshChildren.find(meshIndex) != meshChildren.end()) {
-            for (auto child : meshChildren[meshIndex]) {
-                if (!child || child->visible == false) {
-                    continue;
-                }
-                for (int j = 0; j < child->meshes.size(); ++j) {
-                    if (!child->meshes[j]) {
-                        continue;
-                    }
-                    float identityData[16] = {
-                        1.0f, 0.0f, 0.0f, 0.0f,
-                        0.0f, 1.0f, 0.0f, 0.0f,
-                        0.0f, 0.0f, 1.0f, 0.0f,
-                        0.0f, 0.0f, 0.0f, 1.0f
-                    };
-                    Matrix4 m = Matrix4(identityData);
-                    // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
-                    if (computeShader == nullptr) {
-                        child->meshes[j]->draw(cg.instance, m);
-                    }
-                }
-            }
-        }
-        // cg.instance->present(nullptr);
-    }
+    //     if (sceneFrameCount % 60 == 0) {
+    //         printf("[DEFERRED DRAW] Drawing mesh %d\n", meshIndex);
+    //     }
+        
+    //     // Draw with same method as main loop - mesh->draw handles shader setup
+    //     mesh->draw(cg.instance, matrix, sceneShader, deltaTime, computeShader);
+    //     drawnMeshIndices.insert(meshIndex);  // Mark as drawn
+    //     if (meshChildren.find(meshIndex) != meshChildren.end()) {
+    //         for (auto child : meshChildren[meshIndex]) {
+    //             if (!child || child->visible == false) {
+    //                 continue;
+    //             }
+    //             for (int j = 0; j < child->meshes.size(); ++j) {
+    //                 if (!child->meshes[j]) {
+    //                     continue;
+    //                 }
+    //                 float identityData[16] = {
+    //                     1.0f, 0.0f, 0.0f, 0.0f,
+    //                     0.0f, 1.0f, 0.0f, 0.0f,
+    //                     0.0f, 0.0f, 1.0f, 0.0f,
+    //                     0.0f, 0.0f, 0.0f, 1.0f
+    //                 };
+    //                 Matrix4 m = Matrix4(identityData);
+    //                 // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
+    //                 if (computeShader == nullptr) {
+    //                     child->meshes[j]->draw(cg.instance, m);
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     // cg.instance->present(nullptr);
+    // }
     
     // if (sceneFrameCount % 300 == 0) {
     //     __mem_leak_check(leakCountAfter, leakSizeAfter, true, "", false);
@@ -994,6 +1002,7 @@ void chai_scene::draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2
             // uint64_t leakSizeBefore, leakSizeAfter;
             
             // __mem_leak_check(leakCountBefore, leakSizeBefore, false, "", false);
+            
             cg.instance->setShader(sceneShader->shader);
             cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
             sceneShader->newFrame();
@@ -1044,6 +1053,10 @@ void chai_scene::draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2
             }
             
             drawMeshes(false, 0);
+            cg.instance->setShader(); 
+
+            // drawMeshes(false, 0);
+            // cg.instance->setShader();  
             // __mem_leak_check(leakCountAfter, leakSizeAfter, false, "", false);
     
             // printf("Leak delta: %zu objects, %llu bytes\n", 
@@ -1051,16 +1064,59 @@ void chai_scene::draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2
             //     leakSizeAfter - leakSizeBefore);
         }
         if (viewCount == 2) {
+            // Track render calls per frame to detect duplicate rendering
+            // static size_t lastRenderFrame = SIZE_MAX;
+            // static int renderCallsThisFrame = 0;
+            // auto* vulkanGraphics = static_cast<love::gfx::vulkan::Graphics*>(cg.instance);
+            // size_t currentVulkanFrame = vulkanGraphics->getCurrentFrame();
+            // 
+            // if (currentVulkanFrame != lastRenderFrame) {
+            //     if (renderCallsThisFrame > 1) {
+            //         printf("[SPLIT SCREEN WARNING] Frame %zu had %d render calls (should be 1)\n", 
+            //             lastRenderFrame, renderCallsThisFrame);
+            //     }
+            //     renderCallsThisFrame = 0;
+            //     lastRenderFrame = currentVulkanFrame;
+            // }
+            // renderCallsThisFrame++;
+            // 
+            // printf("[SPLIT SCREEN] Frame %zu, Render call #%d: Starting 2-view split-screen\n",
+            //     currentVulkanFrame, renderCallsThisFrame);
+            // 
+            // // Log stack trace to identify where duplicate calls originate from
+            // if (renderCallsThisFrame > 1) {
+            //     printf("[SPLIT SCREEN CALL STACK] Duplicate call detected - checking if from script re-invocation\n");
+            //     // The fact we're here means chai_scene::draw() was called again in the same frame
+            //     // This must be from the ChaiScript draw() callback being invoked twice
+            // }
             
             cg.instance->setShader(sceneShader->shader);
             cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
             sceneShader->newFrame();
+            
+            // Since multiview is not supported on this hardware,
+            // render both views as separate draws with different view matrices
+            
+            // Render view 1 (left side)
+            // printf("[SPLIT SCREEN] Rendering view 1 (left)\n");
             sceneShader->send("viewMatrix", viewMatrix1);
-            cg.instance->setSplitScreenViewport(0, 2);
+            sceneShader->send("splitScreenMode", 3.0f);  // Disable multiview, use standard rendering
+            cg.instance->setSplitScreenViewport(0, 2);  // Left half
             drawMeshes(false, 0);
-            sceneShader->send("viewMatrix", viewMatrix2);            
-            cg.instance->setSplitScreenViewport(1, 2);
+            
+            // Render view 2 (right side) - accumulate on same target
+            // printf("[SPLIT SCREEN] Rendering view 2 (right)\n");
+            sceneShader->send("viewMatrix2", viewMatrix2);
+            
+            
+            cg.instance->setSplitScreenViewport(1, 2);  // Right half
+            sceneShader->sendConstant("miscInfo", {glm::vec4(1.0f, 0.0f, 0.0f, 0.0f)});  // Disable multiview, use standard rendering
             drawMeshes(false, 1);
+            
+            // Reset viewport to fullscreen for next frame
+            cg.instance->setSplitScreenViewport(0, 1);  // Reset to single viewport (fullscreen)
+            
+            cg.instance->setShader();  
         }
         if (viewCount == 3) {
             sceneShader->send("viewMatrix", viewMatrix1);
@@ -1069,6 +1125,7 @@ void chai_scene::draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2
             drawMeshes(false, 1);
             sceneShader->send("viewMatrix", viewMatrix3);
             drawMeshes(false, 2);
+            cg.instance->setShader();  
         }
         if (viewCount == 4) {
             sceneShader->send("viewMatrix", viewMatrix1);
@@ -1079,6 +1136,7 @@ void chai_scene::draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2
             drawMeshes(false, 2);
             sceneShader->send("viewMatrix", viewMatrix4);
             drawMeshes(false, 3);
+            cg.instance->setShader();
         }        
         // computeShader = cs;
 
@@ -1226,7 +1284,7 @@ void chai_scene::draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2
         
     
     
-        cg.instance->setShader();       
+             
         
         // cg.instance->setActive(true);
         // cg.instance->setShader();
@@ -1673,6 +1731,7 @@ void chai_scene::prepareScreen() {
     m_projectionMatrixBoxedCache.clear();
     m_projectionMatrixBoxedCache.push_back(projectionMatrix);
     sceneShader->send("projectionMatrix", m_projectionMatrixBoxedCache);
+    sceneShader->send("projectionMatrix2", m_projectionMatrixBoxedCache);
     // Set the view matrix for the loading screen
     glm::mat4 viewMatrix = glm::mat4(1.0f); // Identity matrix for the loading screen
     
