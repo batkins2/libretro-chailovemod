@@ -27,6 +27,10 @@
 #include "../libraries/glslang/glslang/Public/ResourceLimits.h"
 #include "../libraries/glslang/SPIRV/GlslangToSpv.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #include <array>
 
 namespace love
@@ -271,6 +275,15 @@ void Shader::newFrame()
 	currentDescriptorSet = VK_NULL_HANDLE;
 	resourceDescriptorsDirty = true;
 	
+	// DISABLED: Don't clear descriptor vectors to test if clearing causes corruption
+	// These will grow without bound, but this is just for testing
+	/* descriptorWrites.clear();
+	descriptorBuffers.clear();
+	descriptorImages.clear();
+	descriptorBufferViews.clear();
+	allTextureInfo.clear();
+	storageBufferInfo.clear(); */
+	
 	// CRITICAL FIX: Reset descriptor pools to actually free AMD driver memory
 	// Explicit freeing alone doesn't release driver memory - must reset pool
 	if (!allocatedDescriptorSets[currentFrame].empty())
@@ -353,7 +366,11 @@ void Shader::cmdPushDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBind
 
 		for (int i = 0; i < info.count; i++)
 		{
-			auto vkTexture = dynamic_cast<Texture*>(activeTextures[info.resourceIndex + i]);
+			// Bounds check to avoid out-of-range access on activeTextures
+			int idx = info.resourceIndex + i;
+			if (idx < 0 || idx >= (int)activeTextures.size())
+				throw love::Exception("uniform variable %s index %d out of bounds (activeTextures size: %zu)", info.name.c_str(), idx, activeTextures.size());
+			auto vkTexture = dynamic_cast<Texture*>(activeTextures[idx]);
 
 			if (vkTexture == nullptr)
 				throw love::Exception("uniform variable %s is not set.", info.name.c_str());
@@ -375,7 +392,6 @@ void Shader::cmdPushDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBind
 
 		for (auto &write : descriptorWrites)
 			write.dstSet = currentDescriptorSet;
-
 		vkUpdateDescriptorSets(device, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
 		resourceDescriptorsDirty = false;
 	}
@@ -394,9 +410,40 @@ void Shader::attach()
 	{
 		if (Shader::current != this)
 		{
+			// printf("[SHADER] Attaching shader %p (previous was %p)\n", this, Shader::current);
+			// fflush(stdout);
 			Graphics::flushBatchedDrawsGlobal();
 			Shader::current = this;
 			Vulkan::shaderSwitch();
+		}
+		else
+		{
+			// printf("[SHADER] Shader %p already attached\n", this);
+			// fflush(stdout);
+		}
+	}
+}
+
+void Shader::clearAllDescriptors()
+{
+	// Clear descriptor vectors for all standard shaders
+	// This is called after graphics initialization to ensure no stale pointers remain
+	int cleared = 0;
+	for (int i = 0; i < Shader::STANDARD_MAX_ENUM; ++i)
+	{
+		if (Shader::standardShaders[i])
+		{
+			Shader *shader = dynamic_cast<Shader*>(Shader::standardShaders[i]);
+			if (shader)
+			{
+				shader->descriptorWrites.clear();
+				shader->descriptorBuffers.clear();
+				shader->descriptorImages.clear();
+				shader->descriptorBufferViews.clear();
+				shader->allTextureInfo.clear();
+				shader->storageBufferInfo.clear();
+				cleared++;
+			}
 		}
 	}
 }
@@ -1032,8 +1079,14 @@ void Shader::compileShaders()
 
     std::printf("[UBO DEBUG] Shader compilation completed successfully\n");
 
-    // Continue with the rest of the function (descriptor setup, etc.)
-    // ... (same as original implementation)
+#ifdef _WIN32
+	BOOL heapOk = HeapValidate(GetProcessHeap(), 0, nullptr);
+	if (!heapOk) {
+		printf("[SHADER HEAP] HeapValidate FAILED after shader compilation!\n");
+		fflush(stdout);
+	}
+#endif
+
     
     int numBuffers = 0;
     int numTextures = 0;
@@ -1064,41 +1117,48 @@ void Shader::compileShaders()
         }
     }
 
+    // Clear vectors at START of descriptor building, then pre-reserve
+    // to ensure no reallocation happens during push_back operations
     descriptorWrites.clear();
-
     descriptorBuffers.clear();
-    descriptorBuffers.reserve(numBuffers);
-
     descriptorImages.clear();
-    descriptorImages.reserve(numTextures);
-
     descriptorBufferViews.clear();
-    descriptorBufferViews.reserve(numBufferViews);
-
     allTextureInfo.clear();
-    allTextureInfo.reserve(numTextures);
     storageBufferInfo.clear();
-    storageBufferInfo.reserve(numBuffers);
+    
+    // Now pre-reserve capacity to prevent reallocation
+	descriptorBuffers.reserve(numBuffers + 16);  // +16 safety margin
 
-    if (localUniformData.size() > 0)
-    {
-        VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.range = localUniformData.size();
+	descriptorImages.reserve(numTextures + 16);  // +16 safety margin
 
-        descriptorBuffers.push_back(bufferInfo);
-        storageBufferInfo.push_back({ nullptr, ACCESS_READ });
+	// Pre-reserve capacity after clearing
+	descriptorBufferViews.reserve(numBufferViews + 16);  // +16 safety margin
+	allTextureInfo.reserve(numTextures + 16);  // +16 safety margin
+	storageBufferInfo.reserve(numBuffers + 16);  // +16 safety margin
 
-        VkWriteDescriptorSet write{};
-        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstBinding = localUniformLocation;
-        write.dstArrayElement = 0;
-        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-        write.descriptorCount = 1;
-        write.pBufferInfo = &descriptorBuffers.back();
-        descriptorWrites.push_back(write);
-    }
+	// Pre-reserve descriptorWrites to prevent reallocation invalidating pointers in VkWriteDescriptorSet
+	size_t maxDescriptorWrites = numBuffers + numTextures + numBufferViews + 16;
+	descriptorWrites.reserve(maxDescriptorWrites);
 
-    for (auto &u : reflection.sampledTextures)
+	if (localUniformData.size() > 0)
+	{
+		VkDescriptorBufferInfo bufferInfo{};
+		bufferInfo.range = localUniformData.size();
+
+		descriptorBuffers.push_back(bufferInfo);
+		storageBufferInfo.push_back({ nullptr, ACCESS_READ });
+
+		VkWriteDescriptorSet write{};
+		write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		write.dstBinding = localUniformLocation;
+		write.dstArrayElement = 0;
+		write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+		write.descriptorCount = 1;
+		write.pBufferInfo = &descriptorBuffers.back();
+		descriptorWrites.push_back(write);
+	}
+
+	for (auto &u : reflection.sampledTextures)
     {
         UniformInfo &info = u.second;
         if (!info.active)
@@ -1106,17 +1166,21 @@ void Shader::compileShaders()
 
         info.bindingStartIndex = (int)descriptorImages.size();
 
-        for (int i = 0; i < info.count; i++)
-        {
-            VkDescriptorImageInfo imageInfo{};
-            descriptorImages.push_back(imageInfo);
+		for (int i = 0; i < info.count; i++)
+		{
+			VkDescriptorImageInfo imageInfo{};
+			descriptorImages.push_back(imageInfo);
 
-            allTextureInfo.push_back({ nullptr, info.access });
+			allTextureInfo.push_back({ nullptr, info.access });
 
-            auto texture = activeTextures[info.resourceIndex + i];
-            if (texture != nullptr)
-                setTextureDescriptor(&info, texture, i);
-        }
+			int idx = info.resourceIndex + i;
+			if (idx >= 0 && idx < (int)activeTextures.size())
+			{
+				auto texture = activeTextures[idx];
+				if (texture != nullptr)
+					setTextureDescriptor(&info, texture, i);
+			}
+		}
 
         VkWriteDescriptorSet write{};
         write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1137,17 +1201,21 @@ void Shader::compileShaders()
 
         info.bindingStartIndex = (int)descriptorImages.size();
 
-        for (int i = 0; i < info.count; i++)
-        {
-            VkDescriptorImageInfo imageInfo{};
-            descriptorImages.push_back(imageInfo);
+		for (int i = 0; i < info.count; i++)
+		{
+			VkDescriptorImageInfo imageInfo{};
+			descriptorImages.push_back(imageInfo);
 
-            allTextureInfo.push_back({ nullptr, info.access });
+			allTextureInfo.push_back({ nullptr, info.access });
 
-            auto texture = activeTextures[info.resourceIndex + i];
-            if (texture != nullptr)
-                setTextureDescriptor(&info, texture, i);
-        }
+			int idx = info.resourceIndex + i;
+			if (idx >= 0 && idx < (int)activeTextures.size())
+			{
+				auto texture = activeTextures[idx];
+				if (texture != nullptr)
+					setTextureDescriptor(&info, texture, i);
+			}
+		}
 
         VkWriteDescriptorSet write{};
         write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1168,14 +1236,18 @@ void Shader::compileShaders()
 
         info.bindingStartIndex = (int)descriptorBufferViews.size();
 
-        for (int i = 0; i < info.count; i++)
-        {
-            descriptorBufferViews.push_back(VK_NULL_HANDLE);
+		for (int i = 0; i < info.count; i++)
+		{
+			descriptorBufferViews.push_back(VK_NULL_HANDLE);
 
-            auto buffer = activeBuffers[info.resourceIndex + i];
-            if (buffer != nullptr)
-                setBufferDescriptor(&info, buffer, i);
-        }
+			int idx = info.resourceIndex + i;
+			if (idx >= 0 && idx < (int)activeBuffers.size())
+			{
+				auto buffer = activeBuffers[idx];
+				if (buffer != nullptr)
+					setBufferDescriptor(&info, buffer, i);
+			}
+		}
 
         VkWriteDescriptorSet write{};
         write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1196,17 +1268,21 @@ void Shader::compileShaders()
 
         info.bindingStartIndex = (int)descriptorBuffers.size();
 
-        for (int i = 0; i < info.count; i++)
-        {
-            VkDescriptorBufferInfo bufferInfo{};
-            descriptorBuffers.push_back(bufferInfo);
+		for (int i = 0; i < info.count; i++)
+		{
+			VkDescriptorBufferInfo bufferInfo{};
+			descriptorBuffers.push_back(bufferInfo);
 
-            storageBufferInfo.push_back({ nullptr, info.access });
+			storageBufferInfo.push_back({ nullptr, info.access });
 
-            auto buffer = activeBuffers[info.resourceIndex + i];
-            if (buffer != nullptr)
-                setBufferDescriptor(&info, buffer, i);
-        }
+			int idx = info.resourceIndex + i;
+			if (idx >= 0 && idx < (int)activeBuffers.size())
+			{
+				auto buffer = activeBuffers[idx];
+				if (buffer != nullptr)
+					setBufferDescriptor(&info, buffer, i);
+			}
+		}
 
         VkWriteDescriptorSet write{};
         write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1351,51 +1427,103 @@ void Shader::createDescriptorPoolSizes()
 	}
 }
 
-void Shader::setMainTex(gfx::Texture *texture)
-{
-	const UniformInfo *u = builtinUniformInfo[BUILTIN_TEXTURE_MAIN];
-	if (u != nullptr)
-	{
-		auto prevtexture = activeTextures[u->resourceIndex];
-		if (texture != nullptr)
-			texture->retain();
-		if (prevtexture)
-			prevtexture->release();
-		activeTextures[u->resourceIndex] = texture;
-
-		if (texture != prevtexture)
-			setTextureDescriptor(u, texture, 0);
-	}
-}
-
 void Shader::setTextureDescriptor(const UniformInfo *info, love::gfx::Texture *texture, int index)
 {
-	auto vkTexture = dynamic_cast<Texture*>(texture);
+	static int callCounter = 0;
+	callCounter++;
+	
+	// Safety checks
+	if (!info)
+		throw love::Exception("setTextureDescriptor: info is null");
+	if (index < 0 || index >= info->count)
+		throw love::Exception("setTextureDescriptor: index %d out of bounds for count %d", index, info->count);
+	
+	if (info->bindingStartIndex < 0)
+		throw love::Exception("setTextureDescriptor: invalid bindingStartIndex %d", info->bindingStartIndex);
+	
+	size_t descriptorIndex = info->bindingStartIndex + index;
 
-	VkDescriptorImageInfo &imageInfo = descriptorImages[info->bindingStartIndex + index];
+	if (descriptorIndex >= descriptorImages.size())
+		throw love::Exception("setTextureDescriptor: descriptor index %zu out of bounds (size: %zu)", descriptorIndex, descriptorImages.size());
+	
+	if (descriptorIndex >= allTextureInfo.size())
+		throw love::Exception("setTextureDescriptor: texture info index %zu out of bounds (size: %zu)", descriptorIndex, allTextureInfo.size());
+	
+	// Read current state by value, then write back by index at the end.
+	VkImageView currentView = descriptorImages[descriptorIndex].imageView;
+	VkImageLayout currentLayout = descriptorImages[descriptorIndex].imageLayout;
+
+    // Only proceed when the incoming texture is a Vulkan texture instance. In rare
+    // cases a stale or backend-mismatched pointer could arrive here (e.g. a
+    // destroyed mesh still being referenced). If the dynamic cast fails, skip
+    // binding to avoid crashing and leave the descriptor unbound.
+    Texture* vkTexture = nullptr;
+    if (texture)
+    {
+        vkTexture = dynamic_cast<Texture*>(texture);
+        if (!vkTexture)
+        {
+            // Write directly by index, not via reference
+            descriptorImages[descriptorIndex].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            descriptorImages[descriptorIndex].imageView = VK_NULL_HANDLE;
+            allTextureInfo[descriptorIndex].texture = nullptr;
+            resourceDescriptorsDirty = true;
+            return;
+        }
+    }
 
 	// Samplers may change after this call, so they're set just before the
 	// descriptor set is used instead of here.
 	VkImageView view = vkTexture != nullptr ? (VkImageView)vkTexture->getHandle() : VK_NULL_HANDLE;
-	if (view != imageInfo.imageView)
+	if (view != currentView)
 	{
 		// Transition render targets from COLOR_ATTACHMENT_OPTIMAL to SHADER_READ_ONLY_OPTIMAL if needed
 		if (vkTexture != nullptr)
+		{
 			vkTexture->transitionForSampling();
-		
+		}
 		// Now use the actual layout from the texture (which should be SHADER_READ_ONLY_OPTIMAL after transition)
-		imageInfo.imageLayout = vkTexture != nullptr ? vkTexture->getImageLayout() : VK_IMAGE_LAYOUT_UNDEFINED;
-		imageInfo.imageView = view;
-		allTextureInfo[info->bindingStartIndex + index].texture = texture;
+		VkImageLayout newLayout = vkTexture != nullptr ? vkTexture->getImageLayout() : VK_IMAGE_LAYOUT_UNDEFINED;
+		// Write directly by index after all potentially-reallocating calls
+		descriptorImages[descriptorIndex].imageLayout = newLayout;
+		descriptorImages[descriptorIndex].imageView = view;
+		allTextureInfo[descriptorIndex].texture = texture;
 		resourceDescriptorsDirty = true;
 	}
+	else
+	{
+	}
+}
+
+void Shader::setMainTex(gfx::Texture *texture)
+{
+	const UniformInfo *info = getUniformInfo(BUILTIN_TEXTURE_MAIN);
+	if (info != nullptr)
+		setTextureDescriptor(info, texture, 0);
 }
 
 void Shader::setBufferDescriptor(const UniformInfo *info, love::gfx::Buffer *buffer, int index)
 {
+	// Safety checks
+	if (!info)
+		throw love::Exception("setBufferDescriptor: info is null");
+	if (index < 0 || index >= info->count)
+		throw love::Exception("setBufferDescriptor: index %d out of bounds for count %d", index, info->count);
+	
+	if (info->bindingStartIndex < 0)
+		throw love::Exception("setBufferDescriptor: invalid bindingStartIndex %d", info->bindingStartIndex);
+	
+	size_t bufferIndex = info->bindingStartIndex + index;
+	
 	if (info->baseType == UNIFORM_STORAGEBUFFER)
 	{
-		VkDescriptorBufferInfo &bufferInfo = descriptorBuffers[info->bindingStartIndex + index];
+		if (bufferIndex >= descriptorBuffers.size())
+			throw love::Exception("setBufferDescriptor: storage buffer index %zu out of bounds (size: %zu)", bufferIndex, descriptorBuffers.size());
+		
+		if (bufferIndex >= storageBufferInfo.size())
+			throw love::Exception("setBufferDescriptor: storage buffer info index %zu out of bounds (size: %zu)", bufferIndex, storageBufferInfo.size());
+		
+		VkDescriptorBufferInfo &bufferInfo = descriptorBuffers[bufferIndex];
 		VkBuffer vkbuffer = buffer != nullptr ? (VkBuffer)buffer->getHandle() : VK_NULL_HANDLE;
 		VkDeviceSize range = buffer != nullptr ? buffer->getSize() : 0;
 		if (vkbuffer != bufferInfo.buffer || bufferInfo.offset != 0 || range != bufferInfo.range)
@@ -1403,16 +1531,19 @@ void Shader::setBufferDescriptor(const UniformInfo *info, love::gfx::Buffer *buf
 			bufferInfo.buffer = vkbuffer;
 			bufferInfo.offset = 0;
 			bufferInfo.range = range;
-			storageBufferInfo[info->bindingStartIndex + index].buffer = buffer;
+			storageBufferInfo[bufferIndex].buffer = buffer;
 			resourceDescriptorsDirty = true;
 		}
 	}
 	else if (info->baseType == UNIFORM_TEXELBUFFER)
 	{
+		if (bufferIndex >= descriptorBufferViews.size())
+			throw love::Exception("setBufferDescriptor: texel buffer index %zu out of bounds (size: %zu)", bufferIndex, descriptorBufferViews.size());
+		
 		VkBufferView view = buffer != nullptr ? (VkBufferView)buffer->getTexelBufferHandle() : VK_NULL_HANDLE;
-		if (view != descriptorBufferViews[info->bindingStartIndex + index])
+		if (view != descriptorBufferViews[bufferIndex])
 		{
-			descriptorBufferViews[info->bindingStartIndex + index] = view;
+			descriptorBufferViews[bufferIndex] = view;
 			resourceDescriptorsDirty = true;
 		}
 	}

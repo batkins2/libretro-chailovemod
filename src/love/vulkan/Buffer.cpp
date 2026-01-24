@@ -21,6 +21,10 @@
 #include "Buffer.h"
 #include "Graphics.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 namespace love
 {
 namespace gfx
@@ -258,6 +262,10 @@ bool Buffer::fillImmediate(size_t offset, size_t size, const void *data)
     auto stagingBuf = vgfx->acquireStagingBuffer(size);
     if (!stagingBuf)
         throw love::Exception("failed to acquire staging buffer");
+    // Bounds check to catch buffer overruns
+    if (stagingBuf->allocInfo.size < size)
+        throw love::Exception("Buffer upload: staging buffer too small (has %zu, needs %zu)",
+                              stagingBuf->allocInfo.size, size);
 
     memcpy(stagingBuf->allocInfo.pMappedData, data, size);
 
@@ -276,9 +284,12 @@ bool Buffer::fillImmediate(size_t offset, size_t size, const void *data)
 
     postGPUWriteBarrier(cmd);
 
+
     // Queue cleanup to release staging buffer after GPU is done
-    vgfx->queueCleanUp([vgfx = vgfx, stagingBuf]() mutable {
-        vgfx->releaseStagingBuffer(stagingBuf);
+    // CRITICAL: Capture VkBuffer by value, NOT pointer - stagingBufferPool can reallocate
+    VkBuffer stagingBufferHandle = stagingBuf->buffer;
+    vgfx->queueCleanUp([vgfx = vgfx, stagingBufferHandle]() mutable {
+        vgfx->releaseStagingBuffer(stagingBufferHandle);
     });
 
     return true;

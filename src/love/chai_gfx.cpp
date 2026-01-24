@@ -212,7 +212,10 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, const std::st
     // delete instance;
     // init();
 
-   
+    printf("[SHADER LOAD] wrap_newShader called with vertex='%s', fragment='%s'\n", 
+        FileName ? FileName->c_str() : "null", 
+        PixFileName ? PixFileName->c_str() : "null");
+    fflush(stdout);
 
     if (isGraphicsAvailable()) {
         
@@ -220,6 +223,9 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, const std::st
         auto file = new filesystem();
         std::string data = file->read(FileName->c_str());
         delete file;
+        
+        printf("[SHADER LOAD] Read %zu bytes from vertex shader file\n", data.size());
+        fflush(stdout);
         // auto file = Module::getInstance<filesystemmod::Filesystem>(Module::M_FILESYSTEM);
         // auto fn = FileName->c_str();
         // auto fd = file->read(fn);
@@ -402,6 +408,9 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, const std::st
         }
         // shader = new chai_shader();
         
+        printf("[SHADER LOAD] Built shader code with %zu stages (vertex + fragment)\n", code.size());
+        fflush(stdout);
+        
         cshader->newVertexShader(instance, code, options);
 
         // if (!shader->fragmentShader) {
@@ -413,9 +422,17 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, const std::st
         //         "GL_FRAGMENT_SHADER"
         //     );
         // }
+        printf("[SHADER LOAD] Shader creation %s (cshader=%p, shader=%p)\n", 
+            cshader->shader ? "SUCCEEDED" : "FAILED",
+            cshader, 
+            cshader->shader);
+        fflush(stdout);
+        
         return cshader;
         // return instance->newShader(lines, options);
     }
+    printf("[SHADER LOAD] Graphics not available, returning nullptr\n");
+    fflush(stdout);
     return nullptr;
 }
 

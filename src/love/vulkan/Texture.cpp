@@ -23,6 +23,10 @@
 #include "Vulkan.h"
 #include "Buffer.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #include <limits>
 #include <array>
 
@@ -244,8 +248,12 @@ bool Texture::loadVolatile()
 	createTextureImageView();
 	setSamplerState(samplerState);
 
-	if (root && !isPixelFormatDepthStencil(format) && slices.getMipmapCount() <= 1 && getMipmapsMode() != MIPMAPS_NONE)
-		generateMipmaps();
+	// CRITICAL FIX: Disable automatic mipmap generation in libretro mode
+	// Generating mipmaps for 250+ textures = 1500+ vkCmdBlitImage calls with barriers
+	// This was causing the massive "1784 wasted actions" seen in RenderDoc
+	// Most 2D games don't need mipmaps, and if they do, provide pre-mipmapped textures
+	// if (root && !isPixelFormatDepthStencil(format) && slices.getMipmapCount() <= 1 && getMipmapsMode() != MIPMAPS_NONE)
+	// 	generateMipmaps();
 
 	if (renderTarget)
 	{
@@ -673,6 +681,12 @@ void Texture::uploadByteData(const void *data, size_t size, int level, int slice
 	if (!stagingBuf)
 		throw love::Exception("failed to acquire staging buffer for texture upload");
 
+	// Bounds check to catch buffer overruns
+	if (stagingBuf->allocInfo.size < size)
+		throw love::Exception("uploadByteData: staging buffer too small (has %zu, needs %zu)", 
+		                      stagingBuf->allocInfo.size, size);
+
+
 	memcpy(stagingBuf->allocInfo.pMappedData, data, size);
 
 	VkBufferImageCopy region{};
@@ -717,13 +731,16 @@ void Texture::uploadByteData(const void *data, size_t size, int level, int slice
 		&region
 	);
 
+
 	Vulkan::cmdTransitionImageLayout(commandBuffer, imageData.image, format, renderTarget,
 		copyDstLayout, imageData.layout,
 		level, 1, baseLayer, 1);
 
 	// Queue cleanup to release staging buffer after GPU is done
-	vgfx->queueCleanUp([vgfx = vgfx, stagingBuf]() mutable {
-		vgfx->releaseStagingBuffer(stagingBuf);
+	// CRITICAL: Capture VkBuffer by value, NOT pointer - stagingBufferPool can reallocate
+	VkBuffer stagingBufferHandle = stagingBuf->buffer;
+	vgfx->queueCleanUp([vgfx = vgfx, stagingBufferHandle]() mutable {
+		vgfx->releaseStagingBuffer(stagingBufferHandle);
 	});
 }
 

@@ -105,7 +105,19 @@ graphics& graphics::rectangle(const std::string& drawmode, int x, int y, int wid
 }
 
 graphics& graphics::line(int x1, int y1, int x2, int y2) {
-	lineRGBA(getRenderer(), x1, y1, x2, y2, r, g, b, a);
+	// Use Vulkan polyline rendering if in render pass, otherwise fall back to SDL
+	auto app = ChaiLove::getInstance();
+	auto vulkanGraphics = dynamic_cast<love::gfx::vulkan::Graphics*>(app->chai_gfx.instance);
+	if (vulkanGraphics && vulkanGraphics->isInRenderPass()) {
+		// Use polyline for Vulkan rendering
+		love::Vector2 vertices[2] = {
+			love::Vector2((float)x1, (float)y1),
+			love::Vector2((float)x2, (float)y2)
+		};
+		vulkanGraphics->polyline(vertices, 2);
+	} else {
+		lineRGBA(getRenderer(), x1, y1, x2, y2, r, g, b, a);
+	}
 	return *this;
 }
 

@@ -179,6 +179,9 @@ public:
 
 	void attach() override;
 
+	// Static method to clear all descriptor vectors for initialization safety
+	static void clearAllDescriptors();
+
 	ptrdiff_t getHandle() const override { return 0; }
 
 	std::string getWarnings() const override { return ""; }

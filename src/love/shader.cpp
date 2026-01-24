@@ -1017,8 +1017,11 @@ void Shader::validateDrawState(PrimitiveType primtype, Texture *maintex) const
 	{
 		const char *textypestr = "unknown";
 		const char *shadertextypestr = "unknown";
-		Texture::getConstant(textype, textypestr);
-		Texture::getConstant(info->textureType, shadertextypestr);
+		// Try to get the texture type string, but don't fail if not found
+		if (!Texture::getConstant(textype, textypestr))
+			textypestr = "unknown (invalid type)";
+		if (!Texture::getConstant(info->textureType, shadertextypestr))
+			shadertextypestr = "unknown (invalid type)";
 		throw love::Exception("Texture's type (%s) must match the type of the shader's main texture type (%s).", textypestr, shadertextypestr);
 	}
 
@@ -1612,8 +1615,11 @@ bool Shader::validateTexture(const UniformInfo *info, Texture *tex, bool interna
 		{
 			const char *textypestr = "unknown";
 			const char *shadertextypestr = "unknown";
-			Texture::getConstant(tex->getTextureType(), textypestr);
-			Texture::getConstant(info->textureType, shadertextypestr);
+			// Try to get the texture type string, but don't fail if not found
+			if (!Texture::getConstant(tex->getTextureType(), textypestr))
+				textypestr = "unknown (invalid type)";
+			if (!Texture::getConstant(info->textureType, shadertextypestr))
+				shadertextypestr = "unknown (invalid type)";
 			throw love::Exception("Texture's type (%s) must match the type of %s (%s).", textypestr, info->name.c_str(), shadertextypestr);
 		}
 	}
@@ -1818,6 +1824,13 @@ vec4 effect(vec4 vcolor, Image tex, vec2 texcoord, vec2 pixcoord)
 }
 )";
 
+static const std::string defaultPointsPixel = R"(
+vec4 effect(vec4 vcolor, Image tex, vec2 texcoord, vec2 pixcoord)
+{
+	return vcolor;
+}
+)";
+
 static const std::string defaultVideoPixel = R"(
 void effect()
 {
@@ -1850,7 +1863,7 @@ const std::string &Shader::getDefaultCode(StandardShader shader, ShaderStageType
 		case STANDARD_DEFAULT: return defaultStandardPixel;
 		case STANDARD_VIDEO: return defaultVideoPixel;
 		case STANDARD_ARRAY: return defaultArrayPixel;
-		case STANDARD_POINTS: return defaultStandardPixel;
+		case STANDARD_POINTS: return defaultPointsPixel;
 		case STANDARD_MAX_ENUM: return nocode;
 	}
 

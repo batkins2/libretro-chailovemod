@@ -514,6 +514,7 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_collisions::addCharacterController), "addCharacterController");
 	chai.add(fun(&chai_collisions::applyForceToCharacter), "applyForceToCharacter");
 	chai.add(fun(&chai_collisions::applyForceToRigidMesh), "applyForceToRigidMesh");
+	chai.add(fun(static_cast<void (chai_collisions::*)(int, int, int, int, int, float, float, float, float, float, float, float, float, float, float)>(&chai_collisions::createVehicle)), "createVehicle");
 	chai.add(fun(&chai_collisions::setCharacterControllerPosition), "setCharacterControllerPosition");
 	chai.add(fun(&chai_collisions::setRigidMeshPosition), "setRigidMeshPosition");
 	chai.add(fun(&chai_collisions::getCharacterController), "getCharacterController");
@@ -884,26 +885,7 @@ void script::update(float delta) {
 void script::draw() {
 	#ifdef __HAVE_CHAISCRIPT__
 	if (hasDraw) {
-		try {
-			// Track draw() invocations per frame
-			// static size_t lastDrawFrame = SIZE_MAX;
-			// static int drawCallsThisFrame = 0;
-			// auto* vulkanGraphics = static_cast<love::gfx::vulkan::Graphics*>(
-			// 	ChaiLove::getInstance()->chai_gfx.instance);
-			// size_t currentVulkanFrame = vulkanGraphics->getCurrentFrame();
-			// 
-			// if (currentVulkanFrame != lastDrawFrame) {
-			// 	if (drawCallsThisFrame > 1) {
-			// 		printf("[SCRIPT DRAW WARNING] Frame %zu: script::draw() called %d times (should be 1)\n",
-			// 			lastDrawFrame, drawCallsThisFrame);
-			// 	}
-			// 	drawCallsThisFrame = 0;
-			// 	lastDrawFrame = currentVulkanFrame;
-			// }
-			// drawCallsThisFrame++;
-			// printf("[SCRIPT DRAW] Frame %zu, Call #%d: Invoking ChaiScript draw() callback\n",
-			// 	currentVulkanFrame, drawCallsThisFrame);
-			
+		try {			
 			chaidraw();
 		}
 		catch (const std::exception& e) {
@@ -913,6 +895,57 @@ void script::draw() {
 	} else {
 		ChaiLove::getInstance()->graphics.print("ChaiLove: def draw() not found.", 100, 100);
 	}
+	
+	// Draw physics debug geometry AFTER user draw code but BEFORE render pass ends
+	#ifdef JPH_DEBUG_RENDERER
+	#if ENABLE_DEBUG_GEOMETRY_RENDERING
+	auto app = ChaiLove::getInstance();
+	try {
+		// Get line vertices from the default world group (0)
+		auto lineVertices = app->chai_collisions.getDebugRendererLineVertices(0);
+		size_t lineCount = app->chai_collisions.getDebugRendererLineCount(0);
+		
+		// Draw line endpoints as points (stays in same render pass)
+		if (lineCount > 0 && lineVertices.size() >= lineCount * 14) {
+			auto vulkanGraphics = dynamic_cast<love::gfx::vulkan::Graphics*>(app->chai_gfx.instance);
+			if (vulkanGraphics) {
+				// Set larger point size so they're visible
+				vulkanGraphics->setPointSize(3.0f);
+				
+				// Collect all point positions and colors
+				std::vector<love::Vector2> positions;
+				std::vector<love::Colorf> colors;
+				positions.reserve(lineCount * 2);
+				colors.reserve(lineCount * 2);
+				
+				for (size_t i = 0; i < lineCount; i++) {
+					size_t idx = i * 14;
+					
+					// First vertex
+					positions.push_back(love::Vector2(lineVertices[idx + 0], lineVertices[idx + 1]));
+					colors.push_back(love::Colorf(lineVertices[idx + 3], lineVertices[idx + 4], 
+					                               lineVertices[idx + 5], lineVertices[idx + 6]));
+					
+					// Second vertex
+					positions.push_back(love::Vector2(lineVertices[idx + 7], lineVertices[idx + 8]));
+					colors.push_back(love::Colorf(lineVertices[idx + 10], lineVertices[idx + 11], 
+					                               lineVertices[idx + 12], lineVertices[idx + 13]));
+				}
+				
+				// Draw all points in one call
+				if (!positions.empty()) {
+					vulkanGraphics->points(positions.data(), colors.data(), positions.size());
+				}
+			}
+		}
+		
+		// Clear debug geometry for next frame
+		app->chai_collisions.clearDebugRendererGeometry(0);
+	} catch (const std::exception& e) {
+		// Silently ignore errors to avoid spamming logs
+	}
+	#endif // ENABLE_DEBUG_GEOMETRY_RENDERING
+	#endif // JPH_DEBUG_RENDERER
 	#endif
 }
 

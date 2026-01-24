@@ -1,6 +1,11 @@
 #include "../ChaiLove.h"
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include <cmath> // For M_PI
 #include <GL/gl.h> // For OpenGL functions like glOrtho
+#include <Jolt/Physics/Constraints/DistanceConstraint.h>
+#include <Jolt/Physics/Constraints/FixedConstraint.h>
 #ifndef TINY_GLTF_H_
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -18,7 +23,7 @@ namespace love
 {
 chai_collisions::chai_collisions()
 {
-    setProcessFrequency(30); // Default to 30 FPS
+    setProcessFrequency(360); // Default to 60 FPS
 }
 chai_collisions::~chai_collisions()
 {
@@ -34,8 +39,10 @@ namespace Layers
 	static constexpr JPH::ObjectLayer MOVING = 1;
 	static constexpr JPH::ObjectLayer AI = 2;
     static constexpr JPH::ObjectLayer BOUNDARY = 3;
-	static constexpr JPH::ObjectLayer NUM_LAYERS = 4;
+    static constexpr JPH::ObjectLayer WHEEL = 4;  // Non-colliding wheel layer
+	static constexpr JPH::ObjectLayer NUM_LAYERS = 5;
 };
+
 
 namespace Groups
 {
@@ -70,16 +77,26 @@ public:
 
     virtual void OnContactAdded(const JPH::Body &inBody1, const JPH::Body &inBody2, const JPH::ContactManifold &inManifold, JPH::ContactSettings &ioSettings) override
     {
-        if (inBody1.GetObjectLayer() == Layers::NON_MOVING || inBody2.GetObjectLayer() == Layers::NON_MOVING) {
-            // If one of the bodies is a non-moving object, ignore the contact
-            return;
-        }
         JPH::BodyID body1ID = inBody1.GetID();
         JPH::BodyID body2ID = inBody2.GetID();
         // printf("Contact added between bodies %d and %d\n", body1ID, body2ID);
         // printf("Body 1 Layer: %d, Body 2 Layer: %d\n", inBody1.GetObjectLayer(), inBody2.GetObjectLayer());
         if (body1ID == body2ID)
             return;
+
+        // Suppress collisions between a wheel and its own chassis (same vehicle tag)
+        bool body1Wheel = inBody1.GetObjectLayer() == Layers::WHEEL;
+        bool body2Wheel = inBody2.GetObjectLayer() == Layers::WHEEL;
+        bool body1Chassis = inBody1.GetObjectLayer() == Layers::MOVING;
+        bool body2Chassis = inBody2.GetObjectLayer() == Layers::MOVING;
+        if ((body1Wheel && body2Chassis) || (body2Wheel && body1Chassis)) {
+            uint64 tag1 = inBody1.GetUserData();
+            uint64 tag2 = inBody2.GetUserData();
+            if (tag1 != 0 && tag1 == tag2) {
+                ioSettings.mIsSensor = true; // Disable collision response for wheel vs own chassis
+                return;
+            }
+        }
 
         if (inBody1.GetObjectLayer() == 2 && inBody2.GetObjectLayer() == 2 &&
             inBody1.GetUserData() == 1 && inBody2.GetUserData() == 1) {
@@ -461,7 +478,7 @@ private:
     }
 };
 
-std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef, bool makeConvex, bool ragdoll) 
+std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef, bool makeConvex, bool makeShape) 
 {
     auto cl = ChaiLove::getInstance();
     auto f = cl->getFSModule();
@@ -477,6 +494,29 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
     std::string err;
     std::string warn;
     loader.LoadBinaryFromMemory(&model, &err, &warn, data, s, "", false);
+    
+    // DEBUG: Print GLTF structure immediately after loading
+    printf("\n========== GLTF FILE LOADED (meshRef %d) ==========\n", meshRef);
+    printf("Path: %s\n", meshPath.c_str());
+    printf("Nodes: %zu, Meshes: %zu\n", model.nodes.size(), model.meshes.size());
+    for (size_t ni = 0; ni < model.nodes.size(); ni++) {
+        auto& node = model.nodes[ni];
+        printf("  Node[%zu]: name='%s', mesh=%d\n", ni, node.name.c_str(), node.mesh);
+        if (!node.translation.empty()) {
+            printf("    Translation: (%.3f, %.3f, %.3f)\n", 
+                   node.translation[0], node.translation[1], node.translation[2]);
+        } else {
+            printf("    Translation: EMPTY (defaults to 0,0,0)\n");
+        }
+        if (!node.rotation.empty()) {
+            printf("    Rotation: (%.3f, %.3f, %.3f, %.3f)\n", 
+                   node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]);
+        } else {
+            printf("    Rotation: EMPTY (defaults to identity)\n");
+        }
+    }
+    printf("===================================================\n\n");
+    
     std::vector<int> refs;
     auto count = rigidMeshes.size();  
     
@@ -535,26 +575,85 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
     JPH::Ref<JPH::Shape> ragdollShape;
     std::vector<float> vertices;
     std::vector<uint32_t> indices;
-    for (size_t i = 0; i < model.meshes.size(); i++) {
+    // DEBUG: Print GLTF structure
+    printf("\n[addRigidMesh] === GLTF STRUCTURE DEBUG ===\n");
+    printf("Nodes: %zu, Meshes: %zu, Scenes: %zu\n", model.nodes.size(), model.meshes.size(), model.scenes.size());
+    
+    // Print all nodes with their properties
+    for (size_t ni = 0; ni < model.nodes.size(); ni++) {
+        auto& node = model.nodes[ni];
+        printf("Node[%zu]: name='%s', mesh=%d, children=%zu\n", ni, node.name.c_str(), node.mesh, node.children.size());
         
-        // Retrieve the transformation matrix for the model
+        if (!node.matrix.empty()) {
+            printf("  Has matrix (16 values)\n");
+        }
+        if (!node.translation.empty()) {
+            printf("  Translation: (%.3f, %.3f, %.3f)\n", node.translation[0], node.translation[1], node.translation[2]);
+        }
+        if (!node.rotation.empty()) {
+            printf("  Rotation: (%.3f, %.3f, %.3f, %.3f)\n", node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]);
+        }
+        if (!node.scale.empty()) {
+            printf("  Scale: (%.3f, %.3f, %.3f)\n", node.scale[0], node.scale[1], node.scale[2]);
+        }
+        if (!node.children.empty()) {
+            printf("  Children nodes: ");
+            for (auto childIdx : node.children) {
+                printf("%d ", childIdx);
+            }
+            printf("\n");
+        }
+    }
+    
+    // Print scene hierarchy
+    if (!model.scenes.empty()) {
+        auto& scene = model.scenes[model.defaultScene >= 0 ? model.defaultScene : 0];
+        printf("\nScene '%s' root nodes: ", scene.name.c_str());
+        for (auto nodeIdx : scene.nodes) {
+            printf("%d ", nodeIdx);
+        }
+        printf("\n");
+    }
+    printf("=================================\n\n");
+
+    for (size_t i = 0; i < model.meshes.size(); i++) {
+        vertices.clear();
+        indices.clear();
+        
+        // Gather node transform so physics aligns with rendered mesh
+        glm::vec3 nodeTranslation(0.0f);
+        glm::quat nodeRotation(1.0f, 0.0f, 0.0f, 0.0f);
+        glm::vec3 nodeScale(1.0f);
         glm::mat4 modelMatrix = glm::mat4(1.0f);
+        bool applyTransformToVertices = false; // Only apply to vertices if we're using zero body position (old behavior)
+        
+        printf("[addRigidMesh] Looking for node with mesh index %zu\n", i);
         for (auto node : model.nodes) {
-            if (node.mesh == i) {
+            if (node.mesh == (int)i) {
+                printf("  FOUND matching node: mesh=%d, name='%s'\n", node.mesh, node.name.c_str());
                 if (!node.matrix.empty()) {
-                    // modelMatrix = glm::make_mat4(node.matrix.data());
+                    glm::dmat4 nodeMatD = glm::make_mat4(node.matrix.data());
+                    glm::mat4 nodeMat = glm::mat4(nodeMatD);
+                    nodeTranslation = glm::vec3(nodeMat[3]);
+                    nodeRotation = glm::quat_cast(nodeMat);
+                    nodeScale = glm::vec3(
+                        glm::length(glm::vec3(nodeMat[0])),
+                        glm::length(glm::vec3(nodeMat[1])),
+                        glm::length(glm::vec3(nodeMat[2]))
+                    );
                 } else {
-                    // if (!node.translation.empty()) {
-                    //     modelMatrix = glm::translate(modelMatrix, glm::vec3(node.translation[0], node.translation[1], node.translation[2]));
-                    // }
-                    // if (!node.rotation.empty()) {
-                    //     glm::quat rotation = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
-                    //     modelMatrix *= glm::mat4_cast(rotation);
-                    // }
+                    if (!node.translation.empty()) {
+                        nodeTranslation = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
+                    }
+                    if (!node.rotation.empty()) {
+                        nodeRotation = glm::quat(node.rotation[3], node.rotation[0], node.rotation[1], node.rotation[2]);
+                    }
                     if (!node.scale.empty()) {
-                        modelMatrix = glm::scale(modelMatrix, glm::vec3(node.scale[0], node.scale[1], node.scale[2]));
+                        nodeScale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
                     }
                 }
+                // Only apply scale to vertices (rotation and translation handled by body transform)
+                modelMatrix = glm::scale(glm::mat4(1.0f), nodeScale);
                 break;
             }
         }
@@ -671,39 +770,64 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
 
         // Create Jolt mesh shape
         JPH::Ref<JPH::Shape> shape;
-        if (makeConvex) {
-            if (ragdoll) {                
-                // ragdollShape->addChildShape(btTransform::getIdentity(), convexShape);
-                // refs = std::vector<int>(); // Clear refs since we're making a ragdoll
-                // count = rigidMeshes.size();
+        
+        // Calculate mesh centroid for proper body positioning
+        JPH::Vec3 meshMin(FLT_MAX, FLT_MAX, FLT_MAX);
+        JPH::Vec3 meshMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+        for (size_t vi = 0; vi + 2 < vertices.size(); vi += 3) {
+            float vx = vertices[vi];
+            float vy = vertices[vi + 1];
+            float vz = vertices[vi + 2];
+            
+            // Validate vertex coordinates
+            if (!isfinite(vx) || !isfinite(vy) || !isfinite(vz)) {
+                printf("[addRigidMesh] WARNING: Non-finite vertex at index %zu: (%.2e, %.2e, %.2e), skipping bounds update\n", 
+                       vi, vx, vy, vz);
+                continue;
             }
-            if (!ragdoll) {
-                // btDefaultMotionState *motionState = new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, 0, 0)));
-                if (ragdoll) {
-                    // btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(0, motionState, ragdollShape, btVector3(0, 0, 0));
-                    // btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
-                    // rigidBody->setWorldTransform(btTransform(btQuaternion(modelMatrix[0][0], modelMatrix[1][1], modelMatrix[2][2], 1), btVector3(modelMatrix[3][0], modelMatrix[3][1], modelMatrix[3][2])));
-                    // rigidBody->setUserIndex(-1);
-                    // rigidMeshes.emplace_back(new RigidMesh(mesh, rigidBody, meshRef));  
-                } else {
-                    // Convert flat float vector to std::vector<JPH::Vec3>
-                    // std::vector<JPH::Vec3> jphVertices;
-                    // for (size_t vi = 0; vi + 2 < vertices.size(); vi += 3) {
-                    //     jphVertices.emplace_back(vertices[vi], vertices[vi + 1], vertices[vi + 2]);
-                    // }
-                    // if (!jphVertices.empty()) {
-                    //     auto inNumPoints = static_cast<int>(jphVertices.size());
-                    //     JPH::ConvexShapeSettings convexSettings(jphVertices, inNumPoints);
-                    //     shape = convexSettings.Create().Get();
-                    // }
-                    // btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(0, motionState, convexShape, btVector3(0, 0, 0));
-                    // btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
-                    // rigidBody->setWorldTransform(btTransform(btQuaternion(modelMatrix[0][0], modelMatrix[1][1], modelMatrix[2][2], 1), btVector3(modelMatrix[3][0], modelMatrix[3][1], modelMatrix[3][2])));
-                    // rigidBody->setUserIndex(-1);
-                    // rigidMeshes.emplace_back(new RigidMesh(mesh, rigidBody, meshRef));  
+            
+            meshMin.SetX(std::min(meshMin.GetX(), vx));
+            meshMax.SetX(std::max(meshMax.GetX(), vx));
+            meshMin.SetY(std::min(meshMin.GetY(), vy));
+            meshMax.SetY(std::max(meshMax.GetY(), vy));
+            meshMin.SetZ(std::min(meshMin.GetZ(), vz));
+            meshMax.SetZ(std::max(meshMax.GetZ(), vz));
+        }
+        
+        // Validate bounds are finite before computing centroid
+        if (!isfinite(meshMin.GetX()) || !isfinite(meshMin.GetY()) || !isfinite(meshMin.GetZ()) ||
+            !isfinite(meshMax.GetX()) || !isfinite(meshMax.GetY()) || !isfinite(meshMax.GetZ())) {
+            printf("[addRigidMesh] WARNING: Mesh %zu has invalid bounds, using zero position\n", i);
+            meshMin = JPH::Vec3::sZero();
+            meshMax = JPH::Vec3::sZero();
+        }
+        
+        // Don't offset vertices - keep mesh at original position
+        printf("[addRigidMesh] Mesh %zu bounds: (%.2f, %.2f, %.2f) to (%.2f, %.2f, %.2f)\n",
+               i, meshMin.GetX(), meshMin.GetY(), meshMin.GetZ(),
+               meshMax.GetX(), meshMax.GetY(), meshMax.GetZ());
+        
+        if (makeConvex) {
+            // Create a convex hull shape that can be dynamic
+            std::vector<JPH::Vec3> jphVertices;
+            for (size_t vi = 0; vi + 2 < vertices.size(); vi += 3) {
+                jphVertices.emplace_back(vertices[vi], vertices[vi + 1], vertices[vi + 2]);
+            }
+            
+            if (!jphVertices.empty()) {
+                JPH::ConvexHullShapeSettings convexSettings(jphVertices.data(), (int)jphVertices.size());
+                convexSettings.mMaxConvexRadius = 0.0f;
+                auto result = convexSettings.Create();
+                if (result.HasError()) {
+                    printf("ConvexHull creation failed: %s\n", result.GetError().c_str());
+                    continue; // Skip this mesh
                 }
+                shape = result.Get();
+            } else {
+                continue; // No vertices, skip
             }
         } else {
+            // Create a non-convex mesh shape (must be static)
             std::vector<JPH::Vec3> jphVertices;
             for (size_t vi = 0; vi + 2 < vertices.size(); vi += 3) {
                 jphVertices.emplace_back(vertices[vi], vertices[vi + 1], vertices[vi + 2]);
@@ -715,44 +839,85 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
             JPH::PhysicsMaterialList materialList;
             materialList.push_back(JPH::PhysicsMaterial::sDefault);
             JPH::MeshShapeSettings meshSettings(triangleList, materialList);
-            // printf("Creating mesh with %zu triangles\n", triangleList.size());
             auto s = meshSettings.Create();
-            // printf("ERROR: MeshShape creation failed: %s\n", s.GetError().c_str());
-            // printf("Created mesh shape\n");  
+            if (s.HasError()) {
+                printf("MeshShape creation failed: %s\n", s.GetError().c_str());
+                continue;
+            }
             shape = s.Get();
-            // printf("Got mesh shape\n");  
-
-            // Set up body creation settings
-            JPH::BodyCreationSettings bodySettings(
-                shape,
-                JPH::RVec3(0, 0, 0), // Position (set as needed)
-                JPH::Quat::sIdentity(), // Rotation (set as needed)
-                JPH::EMotionType::Static, // Motion type
-                Layers::NON_MOVING    
-            );
-
-            // Create the body
-            auto ps = worlds->worlds[0]->physics_system;
-            JPH::BodyInterface& bodyInterface = ps->GetBodyInterface();
-            JPH::Body *body = bodyInterface.CreateBody(bodySettings);
-            bodyInterface.SetFriction(body->GetID(), 1.0f);
-            bodyInterface.AddBody(body->GetID(), JPH::EActivation::DontActivate);
-            auto bodyID = body->GetID();
-
-
-        auto rm = new RigidMesh(bodyID, meshRef);
-        rigidMeshes.push_back(rm);
-                    
-            // btBvhTriangleMeshShape *shape = new btBvhTriangleMeshShape(mesh, true);
-            // btDefaultMotionState *motionState = new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, 0, 0)));
-            // btRigidBody::btRigidBodyConstructionInfo rigidBodyCI(0, motionState, shape, btVector3(0, 0, 0));    
-            // btRigidBody *rigidBody = new btRigidBody(rigidBodyCI);
-            // rigidBody->setWorldTransform(btTransform(btQuaternion(modelMatrix[0][0], modelMatrix[1][1], modelMatrix[2][2], 1), btVector3(modelMatrix[3][0], modelMatrix[3][1], modelMatrix[3][2])));
-            // rigidBody->setUserIndex(-1);
-            // rigidMeshes.emplace_back(new RigidMesh(mesh, rigidBody, meshRef));   
         }
         
+        if (!shape) {
+            continue; // Shape creation failed, skip
+        }  
+
+        // Set up body creation settings
+        // If makeShape is true, create as kinematic for vehicle use
+        JPH::EMotionType motionType;
+        JPH::ObjectLayer objectLayer;
         
+        if (makeShape) {
+            // Kinematic bodies for vehicle parts (will be positioned manually)
+            motionType = JPH::EMotionType::Kinematic;
+            objectLayer = Layers::MOVING;
+        } else if (makeConvex) {
+            // Dynamic convex bodies
+            motionType = JPH::EMotionType::Dynamic;
+            objectLayer = Layers::MOVING;
+        } else {
+            // Static mesh floors
+            motionType = JPH::EMotionType::Static;
+            objectLayer = Layers::NON_MOVING;
+        }
+        
+        // Use node translation directly for body position (no centroid offset)
+        JPH::RVec3 bodyPosition(nodeTranslation.x, nodeTranslation.y, nodeTranslation.z);
+        JPH::Quat bodyRotation(nodeRotation.x, nodeRotation.y, nodeRotation.z, nodeRotation.w);
+        
+        // DEBUG: Print what we're reading from GLTF
+        printf("[addRigidMesh] Mesh %zu, meshRef %d: BodyPosition=(%.3f, %.3f, %.3f), Rotation=(%.3f, %.3f, %.3f, %.3f), Scale=(%.3f, %.3f, %.3f)\n",
+               i, meshRef,
+               bodyPosition.GetX(), bodyPosition.GetY(), bodyPosition.GetZ(),
+               bodyRotation.GetX(), bodyRotation.GetY(), bodyRotation.GetZ(), bodyRotation.GetW(),
+               nodeScale.x, nodeScale.y, nodeScale.z);
+        
+        JPH::BodyCreationSettings bodySettings(
+            shape,
+            bodyPosition, // Use actual GLTF node translation
+            bodyRotation, // Use actual GLTF node rotation
+            motionType,
+            objectLayer
+        );
+        
+        // Set mass properties only for dynamic bodies (convex and not makeShape)
+        // Kinematic and static bodies don't need mass
+        if (makeConvex && !makeShape) {
+            bodySettings.mOverrideMassProperties = JPH::EOverrideMassProperties::MassAndInertiaProvided;
+            bodySettings.mMassPropertiesOverride.SetMassAndInertiaOfSolidBox(JPH::Vec3(1.0f, 1.0f, 1.0f), 1.0f); // 1kg mass, not 100kg
+            bodySettings.mGravityFactor = 1.0f; // Enable gravity for dynamic convex bodies
+        }
+
+        // Create the body
+        auto ps = worlds->worlds[0]->physics_system;
+        JPH::BodyInterface& bodyInterface = ps->GetBodyInterface();
+        JPH::Body *body = bodyInterface.CreateBody(bodySettings);
+        
+        // Add and activate based on type
+        if (makeShape || motionType == JPH::EMotionType::Static) {
+            // Kinematic bodies and static meshes - don't activate
+            bodyInterface.AddBody(body->GetID(), JPH::EActivation::DontActivate);
+        } else {
+            // Dynamic convex bodies - activate them so they fall
+            bodyInterface.AddBody(body->GetID(), JPH::EActivation::Activate);
+        }
+        bodyInterface.SetFriction(body->GetID(), 1.0f);
+        auto bodyID = body->GetID();
+
+        // Store shape if makeShape is true (for vehicle creation)
+        JPH::Ref<JPH::Shape> storedShape = makeShape ? shape : nullptr;
+        // Store node transforms as-is for reference
+        auto rm = new RigidMesh(bodyID, meshRef, storedShape, JPH::Vec3::sZero(), nodeTranslation, nodeRotation);
+        rigidMeshes.push_back(rm);
 
         refs.push_back(count);
         count++;
@@ -782,7 +947,7 @@ void chai_collisions::setRigidMeshPosition(std::vector<int> rigidMeshIndex, floa
         JPH::Quat rotation = bodyInterface.GetRotation(rigidMeshes[i]->bodyID);
 
         // Set the new position (and keep current rotation)
-        bodyInterface.SetPositionAndRotation(rigidMeshes[i]->bodyID, JPH::RVec3(x, y, z), JPH::Quat::sIdentity(), JPH::EActivation::DontActivate);
+        bodyInterface.SetPositionAndRotation(rigidMeshes[i]->bodyID, JPH::RVec3(x, y, z), JPH::Quat::sIdentity(), JPH::EActivation::Activate);
 
         // auto r = rigidMeshes[i]->rigidBody;
         // for (auto g : group) {
@@ -816,40 +981,388 @@ void chai_collisions::teleportRigidMesh(std::vector<int> rigidMeshIndex, float x
 
 void chai_collisions::togglePhysics(std::vector<int> rigidMeshIndex, bool enable)
 {
-    // for (auto i : rigidMeshIndex) {
-    //     auto r = rigidMeshes[i]->rigidBody;
-    //     if (enable) {
-    //         worlds->worlds[0]->dynamicsWorld->removeRigidBody(r);
-            
-    //         r->setCollisionFlags(btCollisionObject::CF_DYNAMIC_OBJECT);
-    //         r->setActivationState(DISABLE_DEACTIVATION); // Disable deactivation to keep the rigid body active
-    //         btVector3 inertia;
-    //         btScalar mass = 1000.0f; // Set mass to 1.0f for the rigid body
-    //         r->getCollisionShape()->calculateLocalInertia(mass, inertia); 
-    //         r->setMassProps(mass, inertia);
-    //         // r->setCollisionFlags(r->getCollisionFlags() & ~btCollisionObject::CF_STATIC_OBJECT);
-    //         // r->setLinearFactor(btVector3(0.1, 0.1, 0.1)); // Enable movement in all directions
-    //         r->setGravity(btVector3(0, -9.81f, 0));
-    //         r->setLinearVelocity(btVector3(0, 0, 0)); // Reset linear velocity
-    //         r->setAngularVelocity(btVector3(0, 0, 0)); // Reset angular velocity
-    //         r->setFriction(0.1f); // Set friction to a reasonable value
-    //         r->setRestitution(0.0f); // Set restitution to a reasonable value
-    //         r->setRollingFriction(0.1f); // Set rolling friction to a
-    //         r->setSpinningFriction(0.1f); // Set spinning friction to a reasonable value
-    //         r->setDamping(0.1f, 0.1f);       
+    for (auto i : rigidMeshIndex) {
+        auto r = rigidMeshes[i]->bodyID;
+        auto ps = worlds->worlds[0]->physics_system;
+        JPH::BodyInterface& bodyInterface = ps->GetBodyInterface();
+        
+        // Don't toggle Kinematic bodies (sensors, boundaries, etc.)
+        JPH::EMotionType currentMotionType = bodyInterface.GetMotionType(r);
+        if (currentMotionType == JPH::EMotionType::Kinematic) {
+            continue;
+        }
+        
+        const JPH::Shape* shape = bodyInterface.GetShape(r);
+        if (shape && shape->GetSubType() == JPH::EShapeSubType::Mesh) {
+            // Mesh shapes should remain static; dynamic mesh shapes can produce NaN/Inf states
+            bodyInterface.SetMotionType(r, JPH::EMotionType::Static, JPH::EActivation::DontActivate);
+            bodyInterface.SetObjectLayer(r, Layers::NON_MOVING);
+            bodyInterface.SetLinearVelocity(r, JPH::Vec3::sZero());
+            bodyInterface.SetAngularVelocity(r, JPH::Vec3::sZero());
+            continue;
+        }
+        auto comTransform = bodyInterface.GetCenterOfMassTransform(r);
+        auto pos = comTransform.GetTranslation();
+        bool posFinite = std::isfinite((float)pos.GetX()) && std::isfinite((float)pos.GetY()) && std::isfinite((float)pos.GetZ());
 
-    //         // applyForceToRigidMesh(i, 0, 5, 0); // Reset any previous forces applied to the rigid body
-           
-    //         worlds->worlds[0]->dynamicsWorld->addRigidBody(r); 
-    //         // Set the collision flags to dynamic
+        if (!posFinite) {
+            // Bail out if position is non-finite; keep static to avoid NaN propagation
+            bodyInterface.SetMotionType(r, JPH::EMotionType::Static, JPH::EActivation::DontActivate);
+            bodyInterface.SetObjectLayer(r, Layers::NON_MOVING);
+            bodyInterface.SetLinearVelocity(r, JPH::Vec3::sZero());
+            bodyInterface.SetAngularVelocity(r, JPH::Vec3::sZero());
+            continue;
+        }
 
-    //     } else {
-    //         // Turn off gravity and set the rigid body to static
-    //         r->setCollisionFlags(r->getCollisionFlags() | btCollisionObject::CF_STATIC_OBJECT);
-    //         r->setGravity(btVector3(0, 0, 0));
-    //     }
-    // }
+        // Clear velocities before switching motion type to avoid NaN/Inf state
+        bodyInterface.SetLinearVelocity(r, JPH::Vec3::sZero());
+        bodyInterface.SetAngularVelocity(r, JPH::Vec3::sZero());
+
+        if (enable) {
+            // Enable physics - change to dynamic motion type so it can fall
+            bodyInterface.SetMotionType(r, JPH::EMotionType::Dynamic, JPH::EActivation::Activate);
+            bodyInterface.SetObjectLayer(r, Layers::MOVING);
+        } else {
+            // Disable physics - change back to static
+            bodyInterface.SetMotionType(r, JPH::EMotionType::Static, JPH::EActivation::DontActivate);
+            bodyInterface.SetObjectLayer(r, Layers::NON_MOVING);
+        }
+    }
+    
 }
+
+void chai_collisions::createVehicle(int frontLeftWheelMeshRef, int frontRightWheelMeshRef, int rearLeftWheelMeshRef, int rearRightWheelMeshRef, int chassisMeshRef, float mass, float wheelRadius, float wheelWidth, float suspensionRestLength, float suspensionStiffness, float suspensionDamping, float suspensionCompression, float frictionSlip, float maxSuspensionTravelCm, float maxSuspensionForce)
+{
+    // Sanity check: ensure mass is reasonable (1kg to 10000kg)
+    if (mass < 1.0f || mass > 10000.0f) {
+        printf("[Vehicle] ERROR: Unrealistic mass %.2f (must be 1-10000 kg), using 1500 kg as default\n", mass);
+        mass = 1500.0f;
+    }
+    
+    // Clamp suspension parameters to reasonable ranges to prevent instability
+    // Suspension frequency should be 1-3 Hz for most vehicles
+    // For a vehicle with mass M, spring constant k gives frequency f = sqrt(k/M)/(2*pi)
+    // So k = (2*pi*f)^2 * M. For f=2Hz and M=1000kg, k ≈ 79000 N/m
+    suspensionStiffness = std::max(1000.0f, std::min(suspensionStiffness, 200000.0f)); // Clamp to 1000-200000
+    suspensionDamping = std::max(100.0f, std::min(suspensionDamping, 50000.0f));     // Clamp to 100-50000
+    suspensionCompression = std::max(0.1f, std::min(suspensionCompression, 1.0f));   // Clamp to 0.1-1.0
+    // Clamp rest length to a sane range (meters)
+    suspensionRestLength = std::max(0.1f, std::min(suspensionRestLength, 1.0f));     // Clamp to 0.1-1.0 m
+    
+    printf("[Vehicle] Initialization: mass=%.2f, suspensionStiffness=%.2f, suspensionDamping=%.2f, compression=%.2f\n",
+           mass, suspensionStiffness, suspensionDamping, suspensionCompression);
+    
+    // Ensure world 0 is initialized before using it
+    if (!worlds || worlds->worlds.find(0) == worlds->worlds.end()) {
+        printf("[Vehicle] World 0 not initialized, calling init(0) before vehicle creation\n");
+        init(0);
+    }
+    if (!worlds || worlds->worlds.find(0) == worlds->worlds.end() || !worlds->worlds[0]->physics_system) {
+        printf("[Vehicle] ERROR: Physics world unavailable, aborting vehicle creation\n");
+        return;
+    }
+
+    auto ps = worlds->worlds[0]->physics_system;
+    JPH::BodyInterface& bodyInterface = ps->GetBodyInterface();
+    
+    // DEBUG: Print all rigid bodies and their meshRefs
+    printf("\n=== ALL RIGID BODIES IN SCENE ===\n");
+    for (auto* rm : rigidMeshes) {
+        JPH::RVec3 pos = bodyInterface.GetPosition(rm->bodyID);
+        printf("Body meshRef: %d, Position: (%.2f, %.2f, %.2f)\n", rm->meshRef, pos.GetX(), pos.GetY(), pos.GetZ());
+    }
+    printf("Chassis meshRef to find: %d\n", chassisMeshRef);
+    printf("Wheel meshRefs to find: %d, %d, %d, %d\n", frontLeftWheelMeshRef, frontRightWheelMeshRef, rearLeftWheelMeshRef, rearRightWheelMeshRef);
+    printf("================================\n\n");
+    
+    // Find existing chassis shape and position by meshRef
+    RigidMesh* chassisRM = nullptr;
+    JPH::Ref<JPH::Shape> chassisShape = nullptr;
+    JPH::RVec3 chassisPos;
+    JPH::Quat chassisRot;
+    
+    for (auto* rm : rigidMeshes) {
+        if (rm->meshRef == chassisMeshRef) {
+            chassisRM = rm;
+            chassisShape = rm->shape;  // Retrieve stored shape
+            
+            // Get old body's transform before removing it
+            chassisPos = bodyInterface.GetPosition(rm->bodyID);
+            chassisRot = bodyInterface.GetRotation(rm->bodyID);
+            
+            if (!chassisShape) {
+                printf("ERROR: Chassis meshRef %d has no stored shape (makeShape was false)\n", chassisMeshRef);
+                return;
+            }
+            
+            printf("Found chassis shape for meshRef %d at position (%.2f, %.2f, %.2f)\n", 
+                   chassisMeshRef, chassisPos.GetX(), chassisPos.GetY(), chassisPos.GetZ());
+            
+            // Remove old body from physics system
+            bodyInterface.RemoveBody(rm->bodyID);
+            bodyInterface.DestroyBody(rm->bodyID);
+            
+            break;
+        }
+    }
+    
+    if (!chassisShape) {
+        printf("ERROR: Chassis body with meshRef %d not found or has no shape\n", chassisMeshRef);
+        return;
+    }
+    
+    // Create new chassis body from shape with proper vehicle settings
+    JPH::BodyCreationSettings chassisSettings(
+        chassisShape,
+        chassisPos,
+        chassisRot,
+        JPH::EMotionType::Dynamic,
+        Layers::MOVING
+    );
+    
+    // Set mass properties for the chassis
+    chassisSettings.mOverrideMassProperties = JPH::EOverrideMassProperties::MassAndInertiaProvided;
+    chassisSettings.mMassPropertiesOverride.mMass = mass;
+    
+    // Calculate inertia based on a box approximation (more stable than scaling)
+    // For a rectangular box: I = (1/12) * m * (L^2 + W^2) for each axis
+    // Use a conservative box estimate to avoid degenerate inertias
+    float chassis_half_width = 1.0f;
+    float chassis_half_depth = 1.5f;
+    float chassis_half_height = 0.5f;
+    float Ixx = (mass / 12.0f) * (4 * chassis_half_depth * chassis_half_depth + 4 * chassis_half_height * chassis_half_height);
+    float Iyy = (mass / 12.0f) * (4 * chassis_half_width * chassis_half_width + 4 * chassis_half_height * chassis_half_height);
+    float Izz = (mass / 12.0f) * (4 * chassis_half_width * chassis_half_width + 4 * chassis_half_depth * chassis_half_depth);
+    chassisSettings.mMassPropertiesOverride.mInertia = JPH::Mat44::sScale(JPH::Vec3(Ixx, Iyy, Izz));
+    
+    chassisSettings.mGravityFactor = 1.0f;
+    chassisSettings.mFriction = 0.5f;
+    
+    // Add damping to prevent tumbling during free fall
+    // Angular damping is critical for stable falling
+    chassisSettings.mAngularDamping = 0.9f;  // High angular damping to suppress rotation
+    chassisSettings.mLinearDamping = 0.1f;   // Small linear damping to reduce air resistance
+    
+    printf("[Vehicle] Chassis mass: %.2f, Inertia: (%.2f, %.2f, %.2f)\n", mass, Ixx, Iyy, Izz);
+    
+    JPH::Body* chassisBody = bodyInterface.CreateBody(chassisSettings);
+    // Prevent sleeping to ensure the chassis remains visible and updated
+    chassisBody->SetAllowSleeping(false);
+    bodyInterface.AddBody(chassisBody->GetID(), JPH::EActivation::Activate);
+    JPH::BodyID chassisBodyID = chassisBody->GetID();
+    
+    // Ensure chassis starts with zero angular velocity
+    bodyInterface.SetAngularVelocity(chassisBodyID, JPH::Vec3::sZero());
+
+    // Tag bodies with vehicle ID for contact filtering (avoid chassis-wheel collisions per vehicle)
+    uint64 vehicleTag = (uint64)(vehicles.size() + 1);
+    bodyInterface.SetUserData(chassisBodyID, vehicleTag);
+    
+    // Place chassis on MOVING layer
+    bodyInterface.SetObjectLayer(chassisBodyID, Layers::MOVING);
+    
+    // Update RigidMesh to point to new body
+    chassisRM->bodyID = chassisBodyID;
+    
+    printf("Created new chassis body from shape, BodyID: %u\n", (uint32)chassisBodyID.GetIndex());
+    JPH::Mat44 chassisTransform = JPH::Mat44::sRotationTranslation(chassisRot, chassisPos);
+    
+    // Extract wheel shapes and create new wheel bodies
+    JPH::Vec3 wheelPositions[4];
+    JPH::BodyID wheelBodyIDs[4];
+    JPH::RVec3 wheelWorldPositions[4];
+    RigidMesh* wheelRMs[4] = { nullptr, nullptr, nullptr, nullptr };
+    JPH::Ref<JPH::Shape> wheelShapes[4];
+    int wheelMeshRefs[4] = { frontLeftWheelMeshRef, frontRightWheelMeshRef, rearLeftWheelMeshRef, rearRightWheelMeshRef };
+    
+    printf("\n=== VEHICLE WHEEL SETUP ===\n");
+    printf("Chassis shape available: %s\n", chassisShape ? "YES" : "NO");
+    
+    for (int i = 0; i < 4; i++) {
+        bool found = false;
+        for (auto* rm : rigidMeshes) {
+            if (rm->meshRef == wheelMeshRefs[i]) {
+                wheelRMs[i] = rm;
+                wheelShapes[i] = rm->shape;  // Retrieve stored shape
+
+                if (!wheelShapes[i]) {
+                    printf("ERROR: Wheel %d (meshRef %d) has no stored shape (makeShape was false)\n", i, wheelMeshRefs[i]);
+                    // Clean up already created bodies and abort
+                    bodyInterface.RemoveBody(chassisBodyID);
+                    bodyInterface.DestroyBody(chassisBodyID);
+                    for (int j = 0; j < i; j++) {
+                        bodyInterface.RemoveBody(wheelBodyIDs[j]);
+                        bodyInterface.DestroyBody(wheelBodyIDs[j]);
+                    }
+                    return;
+                }
+
+                // Get wheel position from the old kinematic body - this was set correctly during addRigidMesh
+                JPH::RVec3 wheelWorldPos = bodyInterface.GetPosition(rm->bodyID);
+                JPH::Quat wheelRot = bodyInterface.GetRotation(rm->bodyID);
+                
+                printf("Wheel %d: old kinematic body position: (%.2f, %.2f, %.2f)\n",
+                       i, wheelWorldPos.GetX(), wheelWorldPos.GetY(), wheelWorldPos.GetZ());
+                
+                wheelWorldPositions[i] = wheelWorldPos;
+                
+                printf("Wheel %d shape found, GLTF node position: (%.2f, %.2f, %.2f), world position: (%.2f, %.2f, %.2f)\n", 
+                       i, rm->nodePosition.x, rm->nodePosition.y, rm->nodePosition.z,
+                       wheelWorldPos.GetX(), wheelWorldPos.GetY(), wheelWorldPos.GetZ());
+                
+                // Remove old wheel body
+                bodyInterface.RemoveBody(rm->bodyID);
+                bodyInterface.DestroyBody(rm->bodyID);
+                
+                // Create new kinematic wheel body (VehicleConstraint handles physics, but wheels must collide with world)
+                JPH::BodyCreationSettings wheelSettings(
+                    wheelShapes[i],
+                    wheelWorldPos,
+                    wheelRot,
+                    JPH::EMotionType::Dynamic,
+                    Layers::WHEEL
+                );
+                
+                JPH::Body* wheelBody = bodyInterface.CreateBody(wheelSettings);
+                // Wheels are dynamic bodies attached to chassis via suspension constraint
+                // Don't make them sensors; let collision layer filtering prevent chassis collisions
+                wheelBody->SetIsSensor(false);
+                
+                // Prevent sleeping to ensure wheels remain visible and updated
+                wheelBody->SetAllowSleeping(false);
+                // Always keep wheels in the physics system; don't let them deactivate
+                // This ensures they continue to be synced and rendered each frame
+                bodyInterface.AddBody(wheelBody->GetID(), JPH::EActivation::Activate);
+                wheelBodyIDs[i] = wheelBody->GetID();
+
+                // Update the corresponding RigidMesh to reference the new wheel body
+                if (wheelRMs[i]) {
+                    wheelRMs[i]->bodyID = wheelBodyIDs[i];
+                }
+
+                // Tag wheel with same vehicle ID for contact filtering
+                bodyInterface.SetUserData(wheelBody->GetID(), vehicleTag);
+                
+                // Place wheel on WHEEL layer (separate from MOVING so they don't collide)
+                bodyInterface.SetObjectLayer(wheelBody->GetID(), Layers::WHEEL);
+                
+                // Ensure wheel stays active
+                bodyInterface.ActivateBody(wheelBody->GetID());
+                
+                // Calculate relative position for vehicle
+                JPH::Vec3 wheelRelative = JPH::Vec3(
+                    (float)(wheelWorldPos.GetX() - chassisPos.GetX()),
+                    (float)(wheelWorldPos.GetY() - chassisPos.GetY()),
+                    (float)(wheelWorldPos.GetZ() - chassisPos.GetZ())
+                );
+                
+                printf("Wheel %d: world=(%.2f, %.2f, %.2f), chassis=(%.2f, %.2f, %.2f), relative=(%.2f, %.2f, %.2f)\n",
+                       i, wheelWorldPos.GetX(), wheelWorldPos.GetY(), wheelWorldPos.GetZ(),
+                       chassisPos.GetX(), chassisPos.GetY(), chassisPos.GetZ(),
+                       wheelRelative.GetX(), wheelRelative.GetY(), wheelRelative.GetZ());
+                
+                // Use relative world position directly 
+                wheelPositions[i] = wheelRelative;
+                
+                printf("Wheel %d new BodyID: %u, local position: (%.2f, %.2f, %.2f)\n", 
+                       i, (uint32)wheelBodyIDs[i].GetIndex(),
+                       wheelPositions[i].GetX(), wheelPositions[i].GetY(), wheelPositions[i].GetZ());
+                
+                found = true;
+                break;
+            }
+        }
+        
+        if (!found) {
+            printf("ERROR: Wheel %d with meshRef %d not found in rigidMeshes\n", i, wheelMeshRefs[i]);
+            // Clean up already created bodies
+            bodyInterface.RemoveBody(chassisBodyID);
+            bodyInterface.DestroyBody(chassisBodyID);
+            for (int j = 0; j < i; j++) {
+                bodyInterface.RemoveBody(wheelBodyIDs[j]);
+                bodyInterface.DestroyBody(wheelBodyIDs[j]);
+            }
+            return;
+        }
+    }
+    
+    // Use only FixedConstraints to lock wheels to chassis
+    // No VehicleConstraint - wheels collide with ground via layer filtering
+    const JPH::BodyLockInterface& lockInterface = ps->GetBodyLockInterface();
+    printf("[Vehicle] Setting up wheel constraints with anchor positions:\n");
+    
+    // Lock chassis to get its transform
+    JPH::BodyLockWrite chassisLock(lockInterface, chassisBodyID);
+    if (!chassisLock.Succeeded()) {
+        printf("ERROR: Failed to lock chassis body\n");
+        return;
+    }
+    JPH::Body& chassisBodyRef = chassisLock.GetBody();
+    
+    for (int i = 0; i < 4; i++) {
+        // Validate wheel positions before constraining
+        bool wheelPosValid = std::isfinite(wheelWorldPositions[i].GetX()) &&
+                            std::isfinite(wheelWorldPositions[i].GetY()) &&
+                            std::isfinite(wheelWorldPositions[i].GetZ());
+        
+        printf("  Wheel %d world position: (%.3f, %.3f, %.3f) valid=%d\n", i,
+               wheelWorldPositions[i].GetX(), wheelWorldPositions[i].GetY(), wheelWorldPositions[i].GetZ(), wheelPosValid);
+        
+        if (!wheelPosValid) {
+            printf("[Vehicle] WARNING: Wheel %d has invalid position, skipping constraint\n", i);
+            continue;
+        }
+        
+        // Use world positions directly for constraint points
+        JPH::Vec3 constraintPoint(wheelWorldPositions[i].GetX(), wheelWorldPositions[i].GetY(), wheelWorldPositions[i].GetZ());
+        
+        JPH::FixedConstraintSettings fixedSettings;
+        fixedSettings.mSpace = JPH::EConstraintSpace::WorldSpace;
+        fixedSettings.mPoint1 = fixedSettings.mPoint2 = constraintPoint;
+        fixedSettings.mAxisX1 = fixedSettings.mAxisX2 = JPH::Vec3::sAxisX();
+        fixedSettings.mAxisY1 = fixedSettings.mAxisY2 = JPH::Vec3::sAxisY();
+        
+        // Lock wheel body to get reference
+        JPH::BodyLockWrite wheelLock(lockInterface, wheelBodyIDs[i]);
+        if (wheelLock.Succeeded()) {
+            JPH::Body& wheelBody = wheelLock.GetBody();
+            JPH::TwoBodyConstraint* fixedConstraint = fixedSettings.Create(chassisBodyRef, wheelBody);
+            ps->AddConstraint(fixedConstraint);
+        }
+    }
+    
+    printf("=== VEHICLE SETUP COMPLETE (CONSTRAINT ACTIVE) ===\n");
+    printf("Chassis BodyID: %u\n", (uint32)chassisBodyID.GetIndex());
+    for (int i = 0; i < 4; i++) {
+        printf("Wheel %d BodyID: %u, Position: (%.2f, %.2f, %.2f)\n", i, (uint32)wheelBodyIDs[i].GetIndex(), 
+            wheelPositions[i].GetX(), wheelPositions[i].GetY(), wheelPositions[i].GetZ());
+    }
+    printf("=== VEHICLE SETUP COMPLETE (FIXED CONSTRAINTS ONLY) ===\n");
+    printf("Chassis BodyID: %u\n", (uint32)chassisBodyID.GetIndex());
+    for (int i = 0; i < 4; i++) {
+        printf("Wheel %d BodyID: %u, Position: (%.2f, %.2f, %.2f)\n", i, (uint32)wheelBodyIDs[i].GetIndex(), 
+            wheelPositions[i].GetX(), wheelPositions[i].GetY(), wheelPositions[i].GetZ());
+    }
+    printf("Wheels locked via FixedConstraints\n");
+    printf("=========================================================\n\n");
+    
+    // Store vehicle data - note: no VehicleConstraint, using FixedConstraints only
+    Vehicle* vehicle = new Vehicle(nullptr, chassisBodyID, wheelBodyIDs, wheelPositions,
+                                   suspensionRestLength, suspensionStiffness, suspensionDamping, wheelRadius);
+    vehicle->frameCounter = 0;
+    vehicle->constraintActive = true;
+    vehicles.push_back(vehicle);
+    
+        printf("[Vehicle] Created vehicle: chassis meshRef=%d, BodyID=%u, wheels=%u/%u/%u/%u\n",
+            chassisMeshRef,
+            (uint32)chassisBodyID.GetIndex(),
+            (uint32)wheelBodyIDs[0].GetIndex(),
+            (uint32)wheelBodyIDs[1].GetIndex(),
+            (uint32)wheelBodyIDs[2].GetIndex(),
+            (uint32)wheelBodyIDs[3].GetIndex());
+        printf("[Vehicle] Suspension: Rest=%.2f, Stiffness=%.1f, Damping=%.1f\n", suspensionRestLength, suspensionStiffness, suspensionDamping);
+}
+
 int chai_collisions::addCharacterController(int index, int meshRef, std::string charId)
 {
     if (characterControllers.size() > 0) {
@@ -1013,6 +1526,80 @@ std::vector<float> chai_collisions::getRigidMesh(int ref)
     return std::vector<float>{ (float)pos.GetX(), (float)pos.GetY(), (float)pos.GetZ() };
 }
 
+#ifdef JPH_DEBUG_RENDERER
+// Libretro integration functions for debug renderer
+std::vector<float> chai_collisions::getDebugRendererLineVertices(int worldGroup)
+{
+    std::vector<float> buffer;
+    if (worlds && worlds->worlds.find(worldGroup) != worlds->worlds.end()) {
+        auto world = worlds->worlds[worldGroup];
+        if (world && world->debug_renderer) {
+            auto debugRenderer = static_cast<DebugRendererImpl*>(world->debug_renderer);
+            if (debugRenderer) {
+                debugRenderer->GetLineVertexBuffer(buffer);
+            }
+        }
+    }
+    return buffer;
+}
+
+std::vector<float> chai_collisions::getDebugRendererTriangleVertices(int worldGroup)
+{
+    std::vector<float> buffer;
+    if (worlds && worlds->worlds.find(worldGroup) != worlds->worlds.end()) {
+        auto world = worlds->worlds[worldGroup];
+        if (world && world->debug_renderer) {
+            auto debugRenderer = static_cast<DebugRendererImpl*>(world->debug_renderer);
+            if (debugRenderer) {
+                debugRenderer->GetTriangleVertexBuffer(buffer);
+            }
+        }
+    }
+    return buffer;
+}
+
+size_t chai_collisions::getDebugRendererLineCount(int worldGroup)
+{
+    if (worlds && worlds->worlds.find(worldGroup) != worlds->worlds.end()) {
+        auto world = worlds->worlds[worldGroup];
+        if (world && world->debug_renderer) {
+            auto debugRenderer = static_cast<DebugRendererImpl*>(world->debug_renderer);
+            if (debugRenderer) {
+                return debugRenderer->GetLines().size();
+            }
+        }
+    }
+    return 0;
+}
+
+size_t chai_collisions::getDebugRendererTriangleCount(int worldGroup)
+{
+    if (worlds && worlds->worlds.find(worldGroup) != worlds->worlds.end()) {
+        auto world = worlds->worlds[worldGroup];
+        if (world && world->debug_renderer) {
+            auto debugRenderer = static_cast<DebugRendererImpl*>(world->debug_renderer);
+            if (debugRenderer) {
+                return debugRenderer->GetTriangles().size();
+            }
+        }
+    }
+    return 0;
+}
+
+void chai_collisions::clearDebugRendererGeometry(int worldGroup)
+{
+    if (worlds && worlds->worlds.find(worldGroup) != worlds->worlds.end()) {
+        auto world = worlds->worlds[worldGroup];
+        if (world && world->debug_renderer) {
+            auto debugRenderer = static_cast<DebugRendererImpl*>(world->debug_renderer);
+            if (debugRenderer) {
+                debugRenderer->Clear();
+            }
+        }
+    }
+}
+#endif // JPH_DEBUG_RENDERER
+
 int chai_collisions::addBox(float x, float y, float z, float width, float height, float depth, std::vector<int> group = {0}, int index = 0)
 {
     // Create a triangle mesh to represent the box in jolt physics
@@ -1084,6 +1671,11 @@ int chai_collisions::addBox(float x, float y, float z, float width, float height
     bodySettings.mIsSensor = true; // Make it a sensor
     // Set gravity to zero
     bodySettings.mGravityFactor = 0.0f;
+    
+    // Kinematic bodies with MeshShape also need mass properties
+    bodySettings.mOverrideMassProperties = JPH::EOverrideMassProperties::MassAndInertiaProvided;
+    bodySettings.mMassPropertiesOverride.SetMassAndInertiaOfSolidBox(JPH::Vec3(width, height, depth), 1.0f);
+    
     // JPH::CollisionGroup groupSettings;
     // if (index == 0) groupSettings.SetGroupID(Groups::CHARACTER_0);
     // if (index == 1) groupSettings.SetGroupID(Groups::CHARACTER_1);
@@ -1188,19 +1780,40 @@ int chai_collisions::addBox(float x, float y, float z, float width, float height
 std::vector<std::pair<glm::vec3, glm::vec3>> chai_collisions::getBoundingBox(int mesh)
 {
     std::vector<std::pair<glm::vec3, glm::vec3>> bb;
+    
+    // Guard against null or invalid worlds
+    if (!worlds || worlds->worlds.empty() || worlds->worlds.find(0) == worlds->worlds.end()) {
+        return bb;
+    }
+    
     for (auto &m : rigidMeshes) {
         if (m->meshRef == mesh) {
             // Get world space bounds
-
             auto ps = worlds->worlds[0]->physics_system;
+            if (!ps) continue;  // Skip if physics system is null
             JPH::BodyInterface& bodyInterface = ps->GetBodyInterface();
+            
+            // Guard against invalid body ID
+            if (m->bodyID.IsInvalid()) continue;
+            if (!bodyInterface.IsAdded(m->bodyID)) continue;
+            
             auto bodyTransform = bodyInterface.GetCenterOfMassTransform(m->bodyID);
             JPH::Vec3 inScale(1.0f, 1.0f, 1.0f);
-            auto shapeBounds = bodyInterface.GetShape(m->bodyID)->GetWorldSpaceBounds(bodyTransform, inScale);
+            
+            // Guard against null shape
+            auto shape = bodyInterface.GetShape(m->bodyID);
+            if (!shape) continue;
+            
+            auto shapeBounds = shape->GetWorldSpaceBounds(bodyTransform, inScale);
             bb.push_back(std::make_pair(
                 glm::vec3(shapeBounds.mMin.GetX(), shapeBounds.mMin.GetY(), shapeBounds.mMin.GetZ()),
                 glm::vec3(shapeBounds.mMax.GetX(), shapeBounds.mMax.GetY(), shapeBounds.mMax.GetZ())
             ));
+
+            // printf("RigidMesh meshRef %d bounding box min(%f, %f, %f) max(%f, %f, %f)\n", mesh,
+            //     shapeBounds.mMin.GetX(), shapeBounds.mMin.GetY(), shapeBounds.mMin.GetZ(),
+            //     shapeBounds.mMax.GetX(), shapeBounds.mMax.GetY(), shapeBounds.mMax.GetZ()
+            // );
 
             // btCollisionShape* shape = m->rigidBody->getCollisionShape();
             // btTransform world = m->rigidBody->getWorldTransform();
@@ -1257,27 +1870,30 @@ std::vector<std::pair<glm::vec3, glm::vec3>> chai_collisions::getBoundingBox(int
 std::vector<Matrix4> chai_collisions::getPhysicsObjects(int mesh)
 {
     std::vector<Matrix4> objects;
+    // printf("[DEBUG getPhysicsObjects] Looking for mesh ID: %d, total rigidMeshes: %zu\n", mesh, rigidMeshes.size());
     for (auto &m : rigidMeshes) {
+        // printf("[DEBUG getPhysicsObjects] Checking rigidMesh with meshRef: %d\n", m->meshRef);
         if (m->meshRef == mesh) {
+            // printf("[DEBUG getPhysicsObjects] Found matching mesh! Fetching physics transform...\n");
             // Get world space bounds
 
-            auto ps = worlds->worlds[0]->physics_system;
-            JPH::BodyInterface& bodyInterface = ps->GetBodyInterface();
-            auto bodyTransform = bodyInterface.GetCenterOfMassTransform(m->bodyID);
-            glm::mat4 modelMat(1.0f);
-            glm::vec3 translation((float)bodyTransform.GetTranslation().GetX(), (float)bodyTransform.GetTranslation().GetY(), (float)bodyTransform.GetTranslation().GetZ());
-            JPH::Quat bodyRot = bodyInterface.GetRotation(m->bodyID);
-            glm::quat rotation(bodyRot.GetW(), bodyRot.GetX(), bodyRot.GetY(), bodyRot.GetZ()); // glm::quat(w, x, y, z)
-            // If JPH::Quat stores (x, y, z, w), reorder as follows:
-            // glm::quat rotation(bodyRot.GetW(), bodyRot.GetX(), bodyRot.GetY(), bodyRot.GetZ());
-            // But if you get a runtime error, try:
-            // glm::quat rotation(bodyRot.GetW(), bodyRot.GetX(), bodyRot.GetY(), bodyRot.GetZ());
-            glm::mat4 rotationMatrix = glm::mat4_cast(rotation);
-            glm::vec3 scale(1.0f, 1.0f, 1.0f); // scale vector
-            glm::mat4 trs = glm::translate(glm::mat4(1.0f), translation)
+                auto ps = worlds->worlds[0]->physics_system;
+                JPH::BodyInterface& bodyInterface = ps->GetBodyInterface();
+
+                // Use world-space position/rotation directly (avoid COM offsets)
+                glm::vec3 translation(
+                (float)bodyInterface.GetPosition(m->bodyID).GetX(),
+                (float)bodyInterface.GetPosition(m->bodyID).GetY(),
+                (float)bodyInterface.GetPosition(m->bodyID).GetZ());
+                JPH::Quat bodyRot = bodyInterface.GetRotation(m->bodyID);
+                glm::quat rotation(bodyRot.GetW(), bodyRot.GetX(), bodyRot.GetY(), bodyRot.GetZ());
+
+                glm::mat4 rotationMatrix = glm::mat4_cast(rotation);
+                glm::vec3 scale(1.0f, 1.0f, 1.0f); // scale vector
+                glm::mat4 trs = glm::translate(glm::mat4(1.0f), translation)
                     * rotationMatrix
                     * glm::scale(glm::mat4(1.0f), scale);
-            modelMat = modelMat * trs;
+                glm::mat4 modelMat = trs;
             Matrix4 mat = Matrix4(new float[16] {
                 modelMat[0][0], modelMat[0][1], modelMat[0][2], modelMat[0][3],
                 modelMat[1][0], modelMat[1][1], modelMat[1][2], modelMat[1][3],
@@ -1339,6 +1955,8 @@ std::vector<Matrix4> chai_collisions::getPhysicsObjects(int mesh)
     //         }
         }
     }
+    // printf("[DEBUG getPhysicsObjects] Returning %zu physics objects for mesh %d\n", objects.size(), mesh);
+    // fflush(stdout);
     return objects;
     // return std::vector<Matrix4>{};
 }
@@ -1368,104 +1986,6 @@ static void TraceImpl(const char *inFMT, ...)
 	std::cout << buffer << std::endl;
 }
 
-#ifdef JPH_DEBUG_RENDERER
-class DebugRendererImpl : public JPH::DebugRendererSimple
-{
-public:
-    DebugRendererImpl() {}
-    ~DebugRendererImpl() {}
-    
-    virtual void DrawLine(JPH::RVec3Arg inFrom, JPH::RVec3Arg inTo, JPH::ColorArg inColor) override
-    {
-        // glBegin(GL_LINES);
-        // glColor3f(inColor.r, inColor.g, inColor.b);
-        // glVertex3f((float)inFrom.GetX(), (float)inFrom.GetY(), (float)inFrom.GetZ());
-        // glVertex3f((float)inTo.GetX(), (float)inTo.GetY(), (float)inTo.GetZ());
-        // glEnd();
-    }
-
-    virtual void DrawTriangle(JPH::RVec3Arg inV1, JPH::RVec3Arg inV2, JPH::RVec3Arg inV3, JPH::ColorArg inColor, ECastShadow inCastShadow) override
-    {
-        // glBegin(GL_TRIANGLES);
-        // glColor3f(inColor.r, inColor.g, inColor.b);
-        // glVertex3f((float)inV1.GetX(), (float)inV1.GetY(), (float)inV1.GetZ());
-        // glVertex3f((float)inV2.GetX(), (float)inV2.GetY(), (float)inV2.GetZ());
-        // glVertex3f((float)inV3.GetX(), (float)inV3.GetY(), (float)inV3.GetZ());
-        // glEnd();
-    }
-
-    // Add missing pure virtual functions
-    virtual void DrawText3D(JPH::RVec3Arg inPosition, const std::string_view& inString, JPH::ColorArg inColor, float inHeight = 0.5f) override
-    {
-        // Simple implementation - draw a point instead of text
-        // glPointSize(5.0f);
-        // glBegin(GL_POINTS);
-        // glColor3f(inColor.r, inColor.g, inColor.b);
-        // glVertex3f((float)inPosition.GetX(), (float)inPosition.GetY(), (float)inPosition.GetZ());
-        // glEnd();
-        // glPointSize(1.0f);
-    }
-
-    // virtual JPH::DebugRenderer::Batch CreateTriangleBatch(const JPH::DebugRenderer::Triangle *inTriangles, int inTriangleCount) override
-    // {
-    //     // Simple implementation - return empty batch
-    //     return JPH::DebugRenderer::Batch();
-    // }
-
-   
-
-    // virtual JPH::DebugRenderer::Batch CreateTriangleBatch(const JPH::DebugRenderer::Vertex *inVertices, int inVertexCount, const JPH::uint32 *inIndices, int inIndexCount) override
-    // {
-    //     // Simple implementation - return empty batch
-    //     return JPH::DebugRenderer::Batch();
-    // }
-
-    // virtual void DrawGeometry(JPH::RMat44Arg inModelMatrix, const JPH::AABox &inWorldSpaceBounds, float inLODScaleSq, JPH::ColorArg inModelColor, const JPH::DebugRenderer::GeometryRef &inGeometry) override
-    // {
-    //     // Simple implementation - draw the bounding box as wireframe
-    //     JPH::Vec3 min = inWorldSpaceBounds.mMin;
-    //     JPH::Vec3 max = inWorldSpaceBounds.mMax;
-        
-    //     glColor3f(inModelColor.r, inModelColor.g, inModelColor.b);
-        
-    //     // Draw wireframe box
-    //     glBegin(GL_LINES);
-    //     // Bottom face
-    //     glVertex3f(min.GetX(), min.GetY(), min.GetZ());
-    //     glVertex3f(max.GetX(), min.GetY(), min.GetZ());
-    //     glVertex3f(max.GetX(), min.GetY(), min.GetZ());
-    //     glVertex3f(max.GetX(), min.GetY(), max.GetZ());
-    //     glVertex3f(max.GetX(), min.GetY(), max.GetZ());
-    //     glVertex3f(min.GetX(), min.GetY(), max.GetZ());
-    //     glVertex3f(min.GetX(), min.GetY(), max.GetZ());
-    //     glVertex3f(min.GetX(), min.GetY(), min.GetZ());
-        
-    //     // Top face
-    //     glVertex3f(min.GetX(), max.GetY(), min.GetZ());
-    //     glVertex3f(max.GetX(), max.GetY(), min.GetZ());
-    //     glVertex3f(max.GetX(), max.GetY(), min.GetZ());
-    //     glVertex3f(max.GetX(), max.GetY(), max.GetZ());
-    //     glVertex3f(max.GetX(), max.GetY(), max.GetZ());
-    //     glVertex3f(min.GetX(), max.GetY(), max.GetZ());
-    //     glVertex3f(min.GetX(), max.GetY(), max.GetZ());
-    //     glVertex3f(min.GetX(), max.GetY(), min.GetZ());
-        
-    //     // Vertical edges
-    //     glVertex3f(min.GetX(), min.GetY(), min.GetZ());
-    //     glVertex3f(min.GetX(), max.GetY(), min.GetZ());
-    //     glVertex3f(max.GetX(), min.GetY(), min.GetZ());
-    //     glVertex3f(max.GetX(), max.GetY(), min.GetZ());
-    //     glVertex3f(max.GetX(), min.GetY(), max.GetZ());
-    //     glVertex3f(max.GetX(), max.GetY(), max.GetZ());
-    //     glVertex3f(min.GetX(), min.GetY(), max.GetZ());
-    //     glVertex3f(min.GetX(), max.GetY(), max.GetZ());
-    //     glEnd();
-    // }
-
-    // Remove the old DrawGeometry function that takes a JPH::Shape pointer
-    // This function signature doesn't exist in the current Jolt API
-};
-#endif // JPH_DEBUG_RENDERER
 
 #ifdef JPH_ENABLE_ASSERTS
 
@@ -1490,13 +2010,15 @@ public:
         switch (inObject1)
         {
         case Layers::NON_MOVING:
-            return inObject2 == Layers::MOVING || inObject2 == Layers::AI; // Non moving only collides with moving
+            return inObject2 == Layers::MOVING || inObject2 == Layers::AI || inObject2 == Layers::WHEEL;
         case Layers::MOVING:
-            return true; // Moving collides with everything
+            return inObject2 == Layers::NON_MOVING || inObject2 == Layers::AI; // MOVING doesn't collide with WHEEL
         case Layers::AI:
-            return true; // AI only collides with other AI
+            return true;
         case Layers::BOUNDARY:
-            return inObject2 == Layers::AI; // Boundary collides with AI
+            return inObject2 == Layers::AI;
+        case Layers::WHEEL:
+            return inObject2 == Layers::NON_MOVING || inObject2 == Layers::AI; // WHEEL only collides with ground and AI, not MOVING
         default:
             JPH_ASSERT(false);
             return false;
@@ -1516,7 +2038,8 @@ namespace BroadPhaseLayers
 	static constexpr JPH::BroadPhaseLayer MOVING(1);
 	static constexpr JPH::BroadPhaseLayer AI(2);
     static constexpr JPH::BroadPhaseLayer BOUNDARY(3);
-	static constexpr JPH::uint NUM_LAYERS(4);
+    static constexpr JPH::BroadPhaseLayer WHEEL(4);
+	static constexpr JPH::uint NUM_LAYERS(5);
 };
 
 // BroadPhaseLayerInterface implementation
@@ -1531,6 +2054,7 @@ public:
         mObjectToBroadPhase[Layers::MOVING] = BroadPhaseLayers::MOVING;
         mObjectToBroadPhase[Layers::AI] = BroadPhaseLayers::AI;
         mObjectToBroadPhase[Layers::BOUNDARY] = BroadPhaseLayers::BOUNDARY;
+        mObjectToBroadPhase[Layers::WHEEL] = BroadPhaseLayers::WHEEL;
     }
 
     virtual JPH::uint GetNumBroadPhaseLayers() const override
@@ -1553,6 +2077,7 @@ public:
         case 1:	return "MOVING";
         case 2:	return "AI";
         case 3:	return "BOUNDARY";
+        case 4:	return "WHEEL";
         default:	JPH_ASSERT(false); return "INVALID";
         }
     }
@@ -1573,11 +2098,13 @@ public:
 		case Layers::NON_MOVING:
 			return inLayer2 == BroadPhaseLayers::MOVING || inLayer2 == BroadPhaseLayers::AI;
 		case Layers::MOVING:
-			return true;
+			return true; // Allow wheels in broadphase
 		 case Layers::AI:
-            return true; // AI only collides with non-moving and other AI
+            return true; // Allow wheels in broadphase
         case Layers::BOUNDARY:
             return inLayer2 == BroadPhaseLayers::AI; // Boundary collides with moving
+        case Layers::WHEEL:
+            return true; // Wheels participate in broadphase
 		default:
 			JPH_ASSERT(false);
 			return false;
@@ -1602,31 +2129,30 @@ public:
 
 void chai_collisions::init(int group = 0)
 {    
+    
     // Initialize Jolt Physics system for this group
     if (worlds == nullptr) {
         worlds = new WorldMap();
     }
 
+    // One-time Jolt global initialization (allocator, factory, type registration)
+    static bool sJoltInitialized = false;
+    if (!sJoltInitialized) {
+        using namespace JPH;
+        RegisterDefaultAllocator();
+        Trace = TraceImpl;
+        JPH_IF_ENABLE_ASSERTS(AssertFailed = AssertFailedImpl;)
+        if (Factory::sInstance == nullptr) {
+            Factory::sInstance = new Factory();
+        }
+        RegisterTypes();
+        sJoltInitialized = true;
+    }
+
     // Create a new Jolt JPH::PhysicsSystem for this group if it doesn't exist
     if (worlds->worlds.find(group) == worlds->worlds.end()) {
         using namespace JPH;
-        // Register allocation hook. In this example we'll just let Jolt use malloc / free but you can override these if you want (see Memory.h).
-        // This needs to be done before any other Jolt function is called.
-        RegisterDefaultAllocator();
-
-        // Install trace and assert callbacks
-        Trace = TraceImpl;
-        JPH_IF_ENABLE_ASSERTS(AssertFailed = AssertFailedImpl;)
-
-        // Create a factory, this class is responsible for creating instances of classes based on their name or hash and is mainly used for deserialization of saved data.
-        // It is not directly used in this example but still required.
-        Factory::sInstance = new Factory();
-
-        // Register all physics types with the factory and install their collision handlers with the CollisionDispatch class.
-        // If you have your own custom shape types you probably need to register their handlers with the CollisionDispatch before calling this function.
-        // If you implement your own default material (PhysicsMaterial::sDefault) make sure to initialize it before this function or else this function will create one for you.
-        RegisterTypes();
-
+        
         // We need a temp allocator for temporary allocations during the physics update. We're
         // pre-allocating 10 MB to avoid having to do allocations during the physics update.
         // B.t.w. 10 MB is way too much for this example but it is a typical value you can use.
@@ -1634,6 +2160,35 @@ void chai_collisions::init(int group = 0)
         // malloc / free.
         // Store in your world map (wrap in your World struct if needed)
         auto worldJolt = new WorldJolt();
+        // Initialize job system AFTER allocator is registered
+
+        const int hwThreads = static_cast<int>(JPH::thread::hardware_concurrency());
+        int jobThreads = hwThreads > 1 ? hwThreads - 1 : 1;  // Keep at least one worker
+
+        // Optional override via environment variable for diagnostics
+        // CHAI_JOLT_THREADS: set number of worker threads (0 disables threads)
+        // Example: CHAI_JOLT_THREADS=1 to minimize concurrency
+    #ifdef _WIN32
+        const char *envThreads = getenv("CHAI_JOLT_THREADS");
+    #else
+        const char *envThreads = std::getenv("CHAI_JOLT_THREADS");
+    #endif
+        if (envThreads && *envThreads)
+        {
+            int v = atoi(envThreads);
+            if (v >= 0)
+            {
+            jobThreads = v;
+            }
+        }
+        worldJolt->job_system = new JPH::JobSystemThreadPool(
+            JPH::cMaxPhysicsJobs,
+            JPH::cMaxPhysicsBarriers,
+            jobThreads
+        );
+
+        // Allocate TempAllocatorImpl separately to avoid constructor heap issues
+        worldJolt->temp_allocator = new JPH::TempAllocatorImpl(10 * 1024 * 1024);
         
         // This is the max amount of rigid bodies that you can add to the physics system. If you try to add more you'll get an error.
         // Note: This value is low because this is a simple test. For a real project use something in the order of 65536.
@@ -1666,7 +2221,7 @@ void chai_collisions::init(int group = 0)
         physics_system->Init(cMaxBodies, cNumBodyMutexes, cMaxBodyPairs, cMaxContactConstraints, *broad_phase_layer_interface, *object_vs_broadphase_layer_filter, *object_vs_object_layer_filter);
         
         // Set gravity
-        // physics_system->SetGravity(JPH::Vec3(0.0f, -9.81f, 0.0f)); // Gravity pointing down the y-axis
+        physics_system->SetGravity(JPH::Vec3(0.0f, -9.981f, 0.0f)); // Gravity pointing down the y-axis
 
         auto contactListener = new MyContactListener(this);
         // auto characterContactListener = new CharacterContactListener(this);
@@ -1682,6 +2237,8 @@ void chai_collisions::init(int group = 0)
         #ifdef JPH_DEBUG_RENDERER
 
         worldJolt->debug_renderer = new DebugRendererImpl();
+        worldJolt->debug_renderer_frame_count = 0;
+        worldJolt->debug_renderer_ready = false; // Will be set to true after frame delay
 
         #endif // JPH_DEBUG_RENDERER
 
@@ -1786,6 +2343,11 @@ void chai_collisions::init(int group = 0)
 }
 void chai_collisions::destroy()
 {
+    
+    if (!worlds) {
+        return;
+    }
+    
      // Remove and delete all rigid meshes (Jolt bodies)
     for (auto &rm : rigidMeshes) {
         for (int i = 0; i < rm->group.size(); i++) {
@@ -2043,6 +2605,11 @@ void chai_collisions::process(float deltaTime)
     
     // For each Jolt world/group
     for (auto &dw : worlds->worlds) {
+        // Defensive: skip null or uninitialized worlds to avoid crashes
+        if (!dw.second || !dw.second->physics_system) {
+            printf("[Physics] Skipping null/invalid world entry in process()\n");
+            continue;
+        }
         
         // Update characters BEFORE physics step (reduced frequency)
         static int characterUpdateCounter = 0;
@@ -2102,9 +2669,231 @@ void chai_collisions::process(float deltaTime)
         // }
         characterUpdateCounter++;
 
+        // Pre-step: Sync wheel transforms to avoid broadphase bounds mismatch
+        // TEMPORARILY DISABLED: This was causing segfaults due to complex vehicle pointer access
+        // Will re-enable after refactoring with proper synchronization
+        /*
+        {
+            JPH::BodyInterface &preBodyInterface = dw.second->physics_system->GetBodyInterface();
+            
+            // Safety check: ensure vehicles vector isn't empty to avoid iterator issues
+            if (!vehicles.empty()) {
+                // Create a copy of the vehicle pointers to avoid iterator invalidation during modification
+                std::vector<Vehicle*> vehicleCopy = vehicles;
+                
+                for (auto *vehicle : vehicleCopy) {
+                    // Verify vehicle still exists in the original list
+                    bool stillExists = false;
+                    for (auto *v : vehicles) {
+                        if (v == vehicle) {
+                            stillExists = true;
+                            break;
+                        }
+                    }
+                    if (!stillExists) continue;
+                    
+                    if (!vehicle) {
+                        printf("[Vehicle] WARNING: Null vehicle pointer in pre-step sync\n");
+                        continue;
+                    }
+                    
+                    if (vehicle->chassisBodyID.IsInvalid()) {
+                        printf("[Vehicle] WARNING: Chassis body ID invalid in pre-step sync\n");
+                        continue;
+                    }
+
+                    // Read chassis transform
+                    JPH::RVec3 chassisPosPre = preBodyInterface.GetPosition(vehicle->chassisBodyID);
+                    JPH::Quat chassisRotPre = preBodyInterface.GetRotation(vehicle->chassisBodyID);
+
+                    if (!vehicle->constraintActive) {
+                        // Free-fall phase: wheels follow chassis transform
+                        for (int i = 0; i < 4; ++i) {
+                            JPH::BodyID wid = vehicle->wheelBodyIDs[i];
+                            if (wid.IsInvalid()) continue;
+                            
+                            // Check if body still exists in physics system
+                            if (!preBodyInterface.IsAdded(wid)) continue;
+                            
+                            try {
+                                JPH::Vec3 wheelRelative = chassisRotPre * vehicle->wheelLocalPos[i];
+                                JPH::RVec3 wheelWorldPos = chassisPosPre + JPH::RVec3(wheelRelative.GetX(), wheelRelative.GetY(), wheelRelative.GetZ());
+                                if (std::isfinite((float)wheelWorldPos.GetX()) &&
+                                    std::isfinite((float)wheelWorldPos.GetY()) &&
+                                    std::isfinite((float)wheelWorldPos.GetZ()) &&
+                                    std::isfinite(chassisRotPre.GetX()) &&
+                                    std::isfinite(chassisRotPre.GetY()) &&
+                                    std::isfinite(chassisRotPre.GetZ()) &&
+                                    std::isfinite(chassisRotPre.GetW())) {
+                                    preBodyInterface.SetPositionAndRotation(wid, wheelWorldPos, chassisRotPre, JPH::EActivation::Activate);
+                                    preBodyInterface.ActivateBody(wid);
+                                }
+                            } catch (...) {
+                                printf("[Vehicle] WARNING: Exception in free-fall wheel sync for wheel %d\n", i);
+                            }
+                        }
+                    } else {
+                        // Active phase: use constraint-provided wheel transforms (last step state)
+                        if (vehicle->vehicleConstraint == nullptr) {
+                            printf("[Vehicle] WARNING: vehicleConstraint is null but constraintActive is true\n");
+                            continue;
+                        }
+                        
+                        const JPH::VehicleConstraint *constraint = vehicle->vehicleConstraint;
+                        
+                        for (int i = 0; i < 4; ++i) {
+                            JPH::BodyID wid = vehicle->wheelBodyIDs[i];
+                            if (wid.IsInvalid()) continue;
+                            
+                            // Check if body still exists in physics system
+                            if (!preBodyInterface.IsAdded(wid)) continue;
+                            
+                            try {
+                                JPH::RMat44 wt = constraint->GetWheelWorldTransform(i, JPH::Vec3::sAxisY(), JPH::Vec3::sAxisX());
+                                JPH::RVec3 wheelPos = wt.GetTranslation();
+                                JPH::Quat wheelRot = wt.GetQuaternion();
+                                if (std::isfinite((float)wheelPos.GetX()) &&
+                                    std::isfinite((float)wheelPos.GetY()) &&
+                                    std::isfinite((float)wheelPos.GetZ()) &&
+                                    std::isfinite(wheelRot.GetX()) &&
+                                    std::isfinite(wheelRot.GetY()) &&
+                                    std::isfinite(wheelRot.GetZ()) &&
+                                    std::isfinite(wheelRot.GetW())) {
+                                    preBodyInterface.SetPositionAndRotation(wid, wheelPos, wheelRot, JPH::EActivation::Activate);
+                                    preBodyInterface.ActivateBody(wid);
+                                }
+                            } catch (...) {
+                                printf("[Vehicle] WARNING: Exception updating wheel %d from constraint\n", i);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        */
+
         // Step the Jolt simulation with fixed timestep
         const int maxSubSteps = 20;
-        dw.second->physics_system->Update(deltaTime, maxSubSteps, &dw.second->temp_allocator, &dw.second->job_system);
+        dw.second->physics_system->Update(actualDeltaTime, maxSubSteps, dw.second->temp_allocator, dw.second->job_system);
+
+        // Update vehicle wheel transforms and suspension after physics step
+        JPH::BodyInterface& bodyInterface = dw.second->physics_system->GetBodyInterface();
+        std::vector<Vehicle*> brokenVehicles;  // Track vehicles to remove
+
+        // Debug: report when no vehicles are present
+        static int vehicleReportCounter = 0;
+        if (vehicles.empty() && (vehicleReportCounter++ % 120 == 0)) {
+            printf("[Vehicle Debug] No vehicles registered in update loop\n");
+        }
+        
+        for (auto* vehicle : vehicles) {
+            if (!vehicle) continue;  // Guard against null vehicle
+            
+            vehicle->frameCounter++;
+
+            // Skip if chassis body is invalid
+            if (vehicle->chassisBodyID.IsInvalid()) {
+                brokenVehicles.push_back(vehicle);
+                continue;
+            }
+            
+            try {
+                // Get chassis physics state
+                auto isFiniteVec3 = [](const JPH::RVec3& v) {
+                    return std::isfinite((float)v.GetX()) && std::isfinite((float)v.GetY()) && std::isfinite((float)v.GetZ());
+                };
+                auto isFiniteQuat = [](const JPH::Quat& q) {
+                    return std::isfinite(q.GetX()) && std::isfinite(q.GetY()) && std::isfinite(q.GetZ()) && std::isfinite(q.GetW());
+                };
+
+                JPH::RVec3 chassisPos = bodyInterface.GetPosition(vehicle->chassisBodyID);
+                JPH::Quat chassisRotChecked = bodyInterface.GetRotation(vehicle->chassisBodyID);
+                JPH::Vec3 chassisVel = bodyInterface.GetLinearVelocity(vehicle->chassisBodyID);
+
+                if (!isFiniteVec3(chassisPos) || !isFiniteQuat(chassisRotChecked)) {
+                    printf("[Vehicle] ERROR: Chassis transform non-finite; removing vehicle. pos=(%f,%f,%f) rot=(%f,%f,%f,%f)\n",
+                           (float)chassisPos.GetX(), (float)chassisPos.GetY(), (float)chassisPos.GetZ(),
+                           chassisRotChecked.GetX(), chassisRotChecked.GetY(), chassisRotChecked.GetZ(), chassisRotChecked.GetW());
+                    if (vehicle->vehicleConstraint && worlds->worlds.find(0) != worlds->worlds.end()) {
+                        JPH::PhysicsSystem* physics_sys = worlds->worlds[0]->physics_system;
+                        if (physics_sys) {
+                            physics_sys->RemoveConstraint(vehicle->vehicleConstraint);
+                            physics_sys->RemoveStepListener(vehicle->vehicleConstraint);
+                        }
+                    }
+                    brokenVehicles.push_back(vehicle);
+                    continue;
+                }
+                
+                // Constraint is added immediately; ensure flag stays true
+                vehicle->constraintActive = true;
+                vehicle->activationWarmupFrames = std::max(0, vehicle->activationWarmupFrames);
+                
+                // === ACTIVE VEHICLE UPDATES ===
+                // Constraint is active, update wheel positions and check for issues
+                
+                // Ensure chassis body is active (not sleeping)
+                bodyInterface.ActivateBody(vehicle->chassisBodyID);
+                
+                // Debug output every 60 frames after activation
+                if (vehicle->frameCounter % 60 == 0) {
+                    JPH::Vec3 angVel = bodyInterface.GetAngularVelocity(vehicle->chassisBodyID);
+                    float mass = bodyInterface.GetShape(vehicle->chassisBodyID)->GetMassProperties().mMass;
+                    printf("[Vehicle] Frame %d: pos=(%.2f, %.2f, %.2f) vel=(%.2f, %.2f, %.2f) angVel=(%.2f, %.2f, %.2f) mass=%.2f\n",
+                           vehicle->frameCounter, 
+                           chassisPos.GetX(), chassisPos.GetY(), chassisPos.GetZ(),
+                           chassisVel.GetX(), chassisVel.GetY(), chassisVel.GetZ(),
+                           angVel.GetX(), angVel.GetY(), angVel.GetZ(), mass);
+                }
+                
+                // SAFETY: If vehicle ascends too high, disable constraint
+                if (chassisPos.GetY() > 50.0f) {
+                    printf("[Vehicle] ERROR: Chassis at Y=%.2f (too high)! Disabling vehicle constraint.\n", chassisPos.GetY());
+                    // Remove constraint to prevent further damage
+                    if (vehicle->vehicleConstraint && worlds->worlds.find(0) != worlds->worlds.end()) {
+                        JPH::PhysicsSystem* physics_sys = worlds->worlds[0]->physics_system;
+                        if (physics_sys) {
+                            physics_sys->RemoveConstraint(vehicle->vehicleConstraint);
+                            physics_sys->RemoveStepListener(vehicle->vehicleConstraint);
+                        }
+                        vehicle->constraintActive = false;
+                        vehicle->settledFrames = 0;
+                    }
+                    continue;
+                }
+                
+                // Simple post-step wheel sync from constraint (safe, after physics step complete)
+                // With fixed constraints attached, let Jolt manage wheel motion
+                if (vehicle->vehicleConstraint != nullptr) {
+                    try {
+                        // The FixedConstraints and VehicleConstraint handle all wheel physics
+                        // Just keep wheels active for rendering
+                        for (int i = 0; i < 4; ++i) {
+                            JPH::BodyID wid = vehicle->wheelBodyIDs[i];
+                            if (wid.IsInvalid()) continue;
+                            if (!bodyInterface.IsAdded(wid)) continue;
+                            
+                            // Keep wheels active
+                            bodyInterface.ActivateBody(wid);
+                        }
+                        if (vehicle->activationWarmupFrames > 0) vehicle->activationWarmupFrames--;
+                    } catch (...) {
+                        // Silently ignore errors
+                    }
+                }
+            } catch (...) {
+                // Silently ignore vehicle update errors
+            }
+        }
+        
+        // Remove broken vehicles
+        for (auto* broken : brokenVehicles) {
+            auto it = std::find(vehicles.begin(), vehicles.end(), broken);
+            if (it != vehicles.end()) {
+                delete broken;
+                vehicles.erase(it);
+            }
+        }
 
         // Process contact events less frequently
         static int contactCounter = 0;
@@ -2131,53 +2920,94 @@ void chai_collisions::process(float deltaTime)
 
 void chai_collisions::processDebugRendering(WorldJolt* world)
 {
-    m_lastDebugTime += m_processInterval;
-    
-    // Only render debug info at reduced frequency
-    if (m_lastDebugTime < m_debugInterval) {
+    // If debug renderer is compiled out, do nothing
+#ifndef JPH_DEBUG_RENDERER
+    (void)world;
+    return;
+#else
+    // Early exit if world is invalid
+    if (!world) {
         return;
     }
     
-    m_lastDebugTime = 0.0f;
+    // Early exit if physics system is invalid
+    if (!world->physics_system) {
+        return;
+    }
     
-    #ifdef JPH_DEBUG_RENDERER
-    if (world->debug_renderer) {
-        // Clear the screen
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        // Set up OpenGL state for debug rendering
-        glEnable(GL_DEPTH_TEST);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-        // Calculate world bounds only when needed (cache this)
-        static JPH::AABox cachedWorldBounds;
-        static int boundsUpdateCounter = 0;
-        static bool hasCachedBounds = false;
+    // Early exit if debug renderer is not set
+    if (!world->debug_renderer) {
+        return;
+    }
+    
+    // Increment frame counter for initialization tracking
+    world->debug_renderer_frame_count++;
+    
+    // CRITICAL FIX: Wait 5 frames before first DrawBodies call to ensure proper initialization
+    // This prevents crashes that occur when DrawBodies is called before the renderer is ready
+    const uint32_t INITIALIZATION_FRAME_DELAY = 5;
+    if (world->debug_renderer_frame_count < INITIALIZATION_FRAME_DELAY) {
+        world->debug_renderer_ready = false;
+        return;
+    }
+    
+    // Mark debug renderer as ready after initialization frames
+    if (world->debug_renderer_frame_count == INITIALIZATION_FRAME_DELAY) {
+        world->debug_renderer_ready = true;
+        printf("[COLLISION DEBUG] Debug renderer initialized and ready after %u frames\n", 
+               INITIALIZATION_FRAME_DELAY);
+        fflush(stdout);
+    }
+    
+    // Only proceed if renderer is fully initialized
+    if (!world->debug_renderer_ready) {
+        return;
+    }
+#endif // JPH_DEBUG_RENDERER
+    
+    // Verify debug renderer cast and render (only when enabled)
+#ifdef JPH_DEBUG_RENDERER
+    auto debugRenderer = static_cast<DebugRendererImpl*>(world->debug_renderer);
+    if (!debugRenderer) {
+        printf("[COLLISION DEBUG] Failed to cast debug renderer to DebugRendererImpl\n");
+        fflush(stdout);
+        return;
+    }
+    
+    try {
+        // Clear previous frame's geometry
+        debugRenderer->Clear();
         
-        // Update bounds every 60 frames (1 second at 60fps)
-        if (boundsUpdateCounter++ % 60 == 0) {
-            hasCachedBounds = calculateWorldBounds(cachedWorldBounds, world);
-        }
-        
-        // Set up camera based on cached bounds
-        if (hasCachedBounds) {
-            setupDebugCamera(cachedWorldBounds);
-        } else {
-            setupFallbackCamera();
-        }
-        
-        // Draw physics bodies at reduced detail
+        // Configure draw settings to reduce complexity
         JPH::BodyManager::DrawSettings settings;
         settings.mDrawGetSupportFunction = false;      // Disabled for performance
         settings.mDrawSupportDirection = false;        // Disabled for performance
         settings.mDrawGetSupportingFace = false;       // Disabled for performance
-        settings.mDrawShape = true;
-        settings.mDrawShapeWireframe = true;
-    
+        settings.mDrawShape = true;                    // Draw collision shapes
+        settings.mDrawShapeWireframe = true;           // Draw wireframe
+        
+        // Call DrawBodies to collect geometry into our renderer
+        // This is the critical call that was crashing - it should be safe now with proper initialization
         world->physics_system->DrawBodies(settings, world->debug_renderer);
+        
+        // Log statistics occasionally for debugging
+        static int debugPrintCounter = 0;
+        if (++debugPrintCounter % 180 == 0) { // Every 3 seconds at 60fps
+            size_t lineCount = debugRenderer->GetLines().size();
+            size_t triCount = debugRenderer->GetTriangles().size();
+
+            printf("[COLLISION DEBUG] Geometry: %zu lines, %zu triangles\n", lineCount, triCount);
+            fflush(stdout);
+        }
+        
+    } catch (const std::exception& ex) {
+        printf("[COLLISION DEBUG] Exception in DrawBodies: %s\n", ex.what());
+        fflush(stdout);
+    } catch (...) {
+        printf("[COLLISION DEBUG] Unknown exception in DrawBodies\n");
+        fflush(stdout);
     }
-    #endif // JPH_DEBUG_RENDERER
+#endif // JPH_DEBUG_RENDERER
 }
 
 void chai_collisions::test() {

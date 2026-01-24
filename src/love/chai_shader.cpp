@@ -54,8 +54,16 @@ chai_shader *chai_shader::clone() const
 
 void chai_shader::newVertexShader(love::gfx::Graphics *inst, std::vector<std::string> lines, love::gfx::Shader::CompileOptions options) {
     instance = inst;
+    printf("[CHAI_SHADER] newVertexShader called with %zu code stages\n", lines.size());
+    fflush(stdout);
+    
     if (instance->isCreated()) {
         shader = instance->newShader(lines, options);
+        printf("[CHAI_SHADER] newShader result: %p\n", shader);
+        fflush(stdout);
+    } else {
+        printf("[CHAI_SHADER] Graphics instance not created!\n");
+        fflush(stdout);
     }
 }
 

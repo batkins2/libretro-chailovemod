@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <sstream>
+#include <optional>
 #ifdef _WIN32
 #include <windows.h>
 #include <psapi.h>
@@ -45,6 +46,767 @@ static struct {
     VkImage images[8];  // Adjust size as needed
     VkCommandBuffer cmd[8];
 } vk;
+
+#ifdef JPH_DEBUG_RENDERER
+
+// Simple vertex shader for debug rendering (SPIR-V bytecode)
+// Input: layout(location = 0) in vec3 position; layout(location = 1) in vec4 color;
+// Output: layout(location = 0) out vec4 fragColor;
+// Vertex shader transforms position and passes color to fragment shader
+// Simple vertex shader for debug rendering (SPIR-V bytecode)
+// Simpler version: just passes through position and color
+static const uint32_t debugVertexShaderSPIRV[] = {
+	0x07230203, 0x00010000, 0x0008000a, 0x0000002d, 0x00000000, 0x00020011, 0x00000001, 0x0006000b,
+	0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e, 0x00000000, 0x0003000e, 0x00000000, 0x00000001,
+	0x0009000f, 0x00000000, 0x00000004, 0x6e69616d, 0x00000000, 0x00000009, 0x0000000d, 0x00000015,
+	0x00000028, 0x00030003, 0x00000002, 0x000001c2, 0x00040005, 0x00000004, 0x6e69616d, 0x00000000,
+	0x00060005, 0x00000009, 0x505f6c67, 0x65567265, 0x78657472, 0x00000000, 0x00060006, 0x00000009,
+	0x00000000, 0x505f6c67, 0x7469736f, 0x006e6f69, 0x00030005, 0x0000000b, 0x00000000, 0x00040005,
+	0x0000000d, 0x736f7061, 0x00000000, 0x00050005, 0x00000015, 0x67617266, 0x6f6c6f43, 0x00000072,
+	0x00050005, 0x00000028, 0x6f6c6f63, 0x6e495f72, 0x00000000, 0x00050048, 0x00000009, 0x00000000,
+	0x0000000b, 0x00000000, 0x00030047, 0x00000009, 0x00000002, 0x00040047, 0x0000000d, 0x0000001e,
+	0x00000000, 0x00040047, 0x00000015, 0x0000001e, 0x00000000, 0x00040047, 0x00000028, 0x0000001e,
+	0x00000001, 0x00020013, 0x00000002, 0x00030021, 0x00000003, 0x00000002, 0x00030016, 0x00000006,
+	0x00000020, 0x00040017, 0x00000007, 0x00000006, 0x00000004, 0x0004001e, 0x00000009, 0x00000007,
+	0x00040020, 0x0000000a, 0x00000003, 0x00000009, 0x0004003b, 0x0000000a, 0x0000000b, 0x00000003,
+	0x00040015, 0x0000000c, 0x00000020, 0x00000001, 0x0004002b, 0x0000000c, 0x0000000e, 0x00000000,
+	0x00040017, 0x0000000f, 0x00000006, 0x00000003, 0x00040020, 0x00000010, 0x00000001, 0x0000000f,
+	0x0004003b, 0x00000010, 0x0000000d, 0x00000001, 0x0004002b, 0x00000006, 0x00000012, 0x3f800000,
+	0x00040020, 0x00000014, 0x00000003, 0x00000007, 0x0004003b, 0x00000014, 0x00000015, 0x00000003,
+	0x00040020, 0x00000027, 0x00000001, 0x00000007, 0x0004003b, 0x00000027, 0x00000028, 0x00000001,
+	0x00040020, 0x0000002b, 0x00000003, 0x00000007, 0x00050036, 0x00000002, 0x00000004, 0x00000000,
+	0x00000003, 0x000200f8, 0x00000005, 0x0004003d, 0x0000000f, 0x00000011, 0x0000000d, 0x00050051,
+	0x00000006, 0x00000016, 0x00000011, 0x00000000, 0x00050051, 0x00000006, 0x00000017, 0x00000011,
+	0x00000001, 0x00050051, 0x00000006, 0x00000018, 0x00000011, 0x00000002, 0x00070050, 0x00000007,
+	0x00000019, 0x00000016, 0x00000017, 0x00000018, 0x00000012, 0x00050041, 0x0000002b, 0x0000001a,
+	0x0000000b, 0x0000000e, 0x0003003e, 0x0000001a, 0x00000019, 0x0004003d, 0x00000007, 0x00000029,
+	0x00000028, 0x0003003e, 0x00000015, 0x00000029, 0x000100fd, 0x00010038
+};
+
+// Simple fragment shader for debug rendering (SPIR-V bytecode)
+static const uint32_t debugFragmentShaderSPIRV[] = {
+	0x07230203, 0x00010000, 0x0008000a, 0x0000000d, 0x00000000, 0x00020011, 0x00000001, 0x0006000b,
+	0x00000001, 0x4c534c47, 0x6474732e, 0x3035342e, 0x00000000, 0x0003000e, 0x00000000, 0x00000001,
+	0x0007000f, 0x00000004, 0x00000004, 0x6e69616d, 0x00000000, 0x00000009, 0x0000000b, 0x00030010,
+	0x00000004, 0x00000007, 0x00030003, 0x00000002, 0x000001c2, 0x00040005, 0x00000004, 0x6e69616d,
+	0x00000000, 0x00050005, 0x00000009, 0x4374756f, 0x726f6c6f, 0x00000000, 0x00050005, 0x0000000b,
+	0x67617266, 0x6f6c6f43, 0x00000072, 0x00040047, 0x00000009, 0x0000001e, 0x00000000, 0x00040047,
+	0x0000000b, 0x0000001e, 0x00000000, 0x00020013, 0x00000002, 0x00030021, 0x00000003, 0x00000002,
+	0x00030016, 0x00000006, 0x00000020, 0x00040017, 0x00000007, 0x00000006, 0x00000004, 0x00040020,
+	0x00000008, 0x00000003, 0x00000007, 0x0004003b, 0x00000008, 0x00000009, 0x00000003, 0x00040020,
+	0x0000000a, 0x00000001, 0x00000007, 0x0004003b, 0x0000000a, 0x0000000b, 0x00000001, 0x00050036,
+	0x00000002, 0x00000004, 0x00000000, 0x00000003, 0x000200f8, 0x00000005, 0x0004003d, 0x00000007,
+	0x0000000c, 0x0000000b, 0x0003003e, 0x00000009, 0x0000000c, 0x000100fd, 0x00010038
+};
+
+// Debug renderer state
+struct DebugRendererState {
+	VkPipeline linePipeline = VK_NULL_HANDLE;
+	VkPipeline trianglePipeline = VK_NULL_HANDLE;
+	VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+	VkShaderModule vertexShader = VK_NULL_HANDLE;
+	VkShaderModule fragmentShader = VK_NULL_HANDLE;
+	VkRenderPass debugRenderPass = VK_NULL_HANDLE;
+	VkBuffer lineVertexBuffer = VK_NULL_HANDLE;
+	VmaAllocation lineVertexAllocation = VK_NULL_HANDLE;
+	size_t lineVertexBufferSize = 0;
+	VkBuffer triVertexBuffer = VK_NULL_HANDLE;
+	VmaAllocation triVertexAllocation = VK_NULL_HANDLE;
+	size_t triVertexBufferSize = 0;
+	bool initialized = false;
+	bool failed = false;  // Set to true if initialization fails to prevent repeated attempts
+	bool pipelinesCreated = false;  // Set to true once pipelines are created
+};
+
+static DebugRendererState g_debugRenderer;
+
+// Enable debug rendering with proper initialization guards in place
+#define ENABLE_DEBUG_GEOMETRY_RENDERING 1
+
+static void cleanupDebugRenderer(VmaAllocator allocator, VkDevice device) {
+	if (allocator == VK_NULL_HANDLE || device == VK_NULL_HANDLE) {
+		return;
+	}
+	
+	if (g_debugRenderer.lineVertexBuffer != VK_NULL_HANDLE) {
+		vmaDestroyBuffer(allocator, g_debugRenderer.lineVertexBuffer, g_debugRenderer.lineVertexAllocation);
+		g_debugRenderer.lineVertexBuffer = VK_NULL_HANDLE;
+	}
+	if (g_debugRenderer.triVertexBuffer != VK_NULL_HANDLE) {
+		vmaDestroyBuffer(allocator, g_debugRenderer.triVertexBuffer, g_debugRenderer.triVertexAllocation);
+		g_debugRenderer.triVertexBuffer = VK_NULL_HANDLE;
+	}
+	if (g_debugRenderer.linePipeline != VK_NULL_HANDLE) {
+		vkDestroyPipeline(device, g_debugRenderer.linePipeline, nullptr);
+		g_debugRenderer.linePipeline = VK_NULL_HANDLE;
+	}
+	if (g_debugRenderer.trianglePipeline != VK_NULL_HANDLE) {
+		vkDestroyPipeline(device, g_debugRenderer.trianglePipeline, nullptr);
+		g_debugRenderer.trianglePipeline = VK_NULL_HANDLE;
+	}
+	if (g_debugRenderer.debugRenderPass != VK_NULL_HANDLE) {
+		vkDestroyRenderPass(device, g_debugRenderer.debugRenderPass, nullptr);
+		g_debugRenderer.debugRenderPass = VK_NULL_HANDLE;
+	}
+	if (g_debugRenderer.pipelineLayout != VK_NULL_HANDLE) {
+		vkDestroyPipelineLayout(device, g_debugRenderer.pipelineLayout, nullptr);
+		g_debugRenderer.pipelineLayout = VK_NULL_HANDLE;
+	}
+	if (g_debugRenderer.vertexShader != VK_NULL_HANDLE) {
+		vkDestroyShaderModule(device, g_debugRenderer.vertexShader, nullptr);
+		g_debugRenderer.vertexShader = VK_NULL_HANDLE;
+	}
+	if (g_debugRenderer.fragmentShader != VK_NULL_HANDLE) {
+		vkDestroyShaderModule(device, g_debugRenderer.fragmentShader, nullptr);
+		g_debugRenderer.fragmentShader = VK_NULL_HANDLE;
+	}
+	g_debugRenderer.initialized = false;
+}
+
+/**
+ * Helper function to render debug geometry (lines and triangles) from Jolt physics.
+ * Vertex format: 7 floats per vertex (x, y, z, r, g, b, a)
+ * 
+ * IMPLEMENTATION GUIDE:
+ * ====================
+ * 
+ * Phase 1: Buffer Creation (per-frame or cached)
+ * -------
+ * 1. Create vertex buffer for lines:
+ *    - Size: lineVertices.size() * sizeof(float)
+ *    - Usage: VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+ *    - Memory: Device local memory
+ *    
+ * 2. Create vertex buffer for triangles:
+ *    - Size: triVertices.size() * sizeof(float)
+ *    - Usage: VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+ *    - Memory: Device local memory
+ * 
+ * Phase 2: Data Transfer
+ * -------
+ * 1. Allocate staging buffer for lineVertices
+ * 2. Allocate staging buffer for triVertices
+ * 3. Record copy commands: vkCmdCopyBuffer to transfer staging -> device local
+ * 4. Note: Can use getCommandBufferForDataTransfer() to batch transfers
+ * 
+ * Phase 3: Pipeline Creation
+ * -------
+ * 1. Create line pipeline:
+ *    - VkPrimitiveTopology: VK_PRIMITIVE_TOPOLOGY_LINE_LIST
+ *    - lineWidth: 1.0f (or use VK_EXT_line_rasterization for thicker lines)
+ *    - Depth test: disabled
+ *    - Blend: enabled (for transparency)
+ * 
+ * 2. Create triangle pipeline:
+ *    - VkPrimitiveTopology: VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+ *    - rasterizationState.polygonMode: VK_POLYGON_MODE_FILL (solid) or VK_POLYGON_MODE_LINE (wireframe)
+ *    - Depth test: disabled or enabled based on preference
+ *    - Blend: enabled (for transparency)
+ * 
+ * Phase 4: Drawing
+ * -------
+ * 1. Get command buffer: vkGetCommandBuffer()
+ * 2. Bind line pipeline and vertex buffer:
+ *    - vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline)
+ *    - vkCmdBindVertexBuffers(cmd, 0, 1, &lineBuffer, &offset)
+ *    - vkCmdDraw(cmd, lineVertices.size(), 1, 0, 0)
+ * 
+ * 3. Bind triangle pipeline and vertex buffer:
+ *    - vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, triPipeline)
+ *    - vkCmdBindVertexBuffers(cmd, 0, 1, &triBuffer, &offset)
+ *    - vkCmdDraw(cmd, triVertices.size(), 1, 0, 0)
+ * 
+ * Vertex Input Description:
+ * --------
+ * VkVertexInputBindingDescription binding{
+ *     .binding = 0,
+ *     .stride = 28,  // 7 floats * 4 bytes
+ *     .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+ * };
+ * 
+ * VkVertexInputAttributeDescription attributes[2]{
+ *     // Position (x, y, z)
+ *     {
+ *         .location = 0,
+ *         .binding = 0,
+ *         .format = VK_FORMAT_R32G32B32_SFLOAT,
+ *         .offset = 0
+ *     },
+ *     // Color (r, g, b, a)
+ *     {
+ *         .location = 1,
+ *         .binding = 0,
+ *         .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+ *         .offset = 12
+ *     }
+ * };
+ */
+
+// Initialize debug rendering pipelines during context setup (outside render pass)
+static void initializeDebugRendererPipelines(love::gfx::vulkan::Graphics* vulkanGraphics)
+{
+	printf("[DEBUG RENDERER] initializeDebugRendererPipelines called (initialized=%d, linePipeline=%p, triPipeline=%p)\n",
+		g_debugRenderer.initialized, g_debugRenderer.linePipeline, g_debugRenderer.trianglePipeline);
+	fflush(stdout);
+
+	// Skip if already initialized or if pipelines already exist
+	if (g_debugRenderer.initialized || 
+		g_debugRenderer.linePipeline != VK_NULL_HANDLE ||
+		g_debugRenderer.trianglePipeline != VK_NULL_HANDLE ||
+		g_debugRenderer.debugRenderPass != VK_NULL_HANDLE) {
+		printf("[DEBUG RENDERER] Pipelines already exist, skipping initialization\n");
+		fflush(stdout);
+		return;
+	}
+	
+	if (!vulkanGraphics) {
+		printf("[DEBUG RENDERER] Invalid graphics context for pipeline initialization\n");
+		fflush(stdout);
+		return;
+	}
+
+	printf("[DEBUG RENDERER] Graphics context valid, getting allocator and device\n");
+	fflush(stdout);
+
+	VmaAllocator allocator = vulkanGraphics->getAllocator();
+	VkDevice device = vulkanGraphics->getDevice();
+	
+	printf("[DEBUG RENDERER] Allocator=%p, Device=%p\n", allocator, device);
+	fflush(stdout);
+
+	if (allocator == VK_NULL_HANDLE || device == VK_NULL_HANDLE) {
+		printf("[DEBUG RENDERER] Invalid allocator or device for pipeline initialization\n");
+		fflush(stdout);
+		return;
+	}
+
+	printf("[DEBUG RENDERER] About to start shader creation\n");
+	fflush(stdout);
+	
+	try {
+		// Validate shader SPIR-V data
+		if (sizeof(debugVertexShaderSPIRV) == 0 || sizeof(debugFragmentShaderSPIRV) == 0) {
+			printf("[DEBUG RENDERER] Invalid shader SPIR-V data size\n");
+			fflush(stdout);
+			return;
+		}
+		
+		printf("[DEBUG RENDERER] Shader SPIR-V sizes: vertex=%zu, fragment=%zu\n", 
+			sizeof(debugVertexShaderSPIRV), sizeof(debugFragmentShaderSPIRV));
+		fflush(stdout);
+		
+		// Create shader modules
+		VkShaderModuleCreateInfo vertShaderInfo = {};
+		vertShaderInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		vertShaderInfo.codeSize = sizeof(debugVertexShaderSPIRV);
+		vertShaderInfo.pCode = debugVertexShaderSPIRV;
+		
+		// Verify SPIR-V magic number
+		printf("[DEBUG RENDERER] Vertex shader magic: 0x%08X (expected 0x07230203)\n", debugVertexShaderSPIRV[0]);
+		fflush(stdout);
+		
+		VkShaderModuleCreateInfo fragShaderInfo = {};
+		fragShaderInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+		fragShaderInfo.codeSize = sizeof(debugFragmentShaderSPIRV);
+		fragShaderInfo.pCode = debugFragmentShaderSPIRV;
+		
+		printf("[DEBUG RENDERER] Fragment shader magic: 0x%08X (expected 0x07230203)\n", debugFragmentShaderSPIRV[0]);
+		fflush(stdout);
+		
+		printf("[DEBUG RENDERER] Creating shader modules\n");
+		fflush(stdout);
+		VkResult vertResult = vkCreateShaderModule(device, &vertShaderInfo, nullptr, &g_debugRenderer.vertexShader);
+		printf("[DEBUG RENDERER] Vertex shader module result: %d\n", vertResult);
+		fflush(stdout);
+		
+		VkResult fragResult = vkCreateShaderModule(device, &fragShaderInfo, nullptr, &g_debugRenderer.fragmentShader);
+		printf("[DEBUG RENDERER] Fragment shader module result: %d\n", fragResult);
+		fflush(stdout);
+		
+		if (vertResult != VK_SUCCESS || fragResult != VK_SUCCESS) {
+			printf("[DEBUG RENDERER] Failed to create shader modules: vert=%d frag=%d\n", vertResult, fragResult);
+			fflush(stdout);
+			g_debugRenderer.failed = true;
+			return;
+		}
+		
+		// Create pipeline layout (no descriptors needed for debug rendering)
+		VkPipelineLayoutCreateInfo layoutInfo = {};
+		layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		
+		if (vkCreatePipelineLayout(device, &layoutInfo, nullptr, &g_debugRenderer.pipelineLayout) != VK_SUCCESS) {
+			printf("[DEBUG RENDERER] Failed to create pipeline layout\n");
+			fflush(stdout);
+			g_debugRenderer.failed = true;
+			return;
+		}
+		
+		// Obtain a compatible render pass from Graphics using the current configuration
+		auto conf = vulkanGraphics->getCurrentRenderPassConfiguration();
+		VkRenderPass compatibleRenderPass = vulkanGraphics->getCompatibleRenderPass(conf);
+		if (compatibleRenderPass == VK_NULL_HANDLE) {
+			printf("[DEBUG RENDERER] Failed to get compatible render pass from Graphics\n");
+			fflush(stdout);
+			g_debugRenderer.failed = true;
+			return;
+		}
+		g_debugRenderer.debugRenderPass = compatibleRenderPass;
+		
+		g_debugRenderer.initialized = true;
+		printf("[DEBUG RENDERER] Debug renderer initialized (shaders + layout ready, pipelines cannot be created during context_reset)\n");
+		fflush(stdout);
+		
+	} catch (const std::exception& e) {
+		printf("[DEBUG RENDERER] Exception during pipeline initialization: %s\n", e.what());
+		fflush(stdout);
+		g_debugRenderer.failed = true;
+	}
+}
+
+// Create pipelines at a safe time (outside render pass, after full Vulkan initialization)
+static void createDebugRendererPipelines(love::gfx::vulkan::Graphics* vulkanGraphics)
+{
+	// Skip if already created, failed, or not initialized
+	if (g_debugRenderer.pipelinesCreated || g_debugRenderer.failed || !g_debugRenderer.initialized) {
+		return;
+	}
+	
+	// Skip if essential components not ready
+	if (g_debugRenderer.vertexShader == VK_NULL_HANDLE || 
+		g_debugRenderer.fragmentShader == VK_NULL_HANDLE ||
+		g_debugRenderer.pipelineLayout == VK_NULL_HANDLE ||
+		g_debugRenderer.debugRenderPass == VK_NULL_HANDLE) {
+		return;
+	}
+	
+	if (!vulkanGraphics) {
+		return;
+	}
+	
+	VkDevice device = vulkanGraphics->getDevice();
+	if (device == VK_NULL_HANDLE) {
+		return;
+	}
+	
+	printf("[DEBUG RENDERER] Creating pipelines at safe time (outside render pass)\n");
+	fflush(stdout);
+	
+	try {
+		// Setup vertex input
+		VkVertexInputBindingDescription bindingDesc = {};
+		bindingDesc.binding = 0;
+		bindingDesc.stride = 28;
+		bindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		
+		VkVertexInputAttributeDescription attribs[2] = {};
+		attribs[0].location = 0;
+		attribs[0].binding = 0;
+		attribs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attribs[0].offset = 0;
+		attribs[1].location = 1;
+		attribs[1].binding = 0;
+		attribs[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		attribs[1].offset = 12;
+		
+		VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
+		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		vertexInputInfo.vertexBindingDescriptionCount = 1;
+		vertexInputInfo.pVertexBindingDescriptions = &bindingDesc;
+		vertexInputInfo.vertexAttributeDescriptionCount = 2;
+		vertexInputInfo.pVertexAttributeDescriptions = attribs;
+		
+		VkPipelineShaderStageCreateInfo shaderStages[2] = {};
+		shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+		shaderStages[0].module = g_debugRenderer.vertexShader;
+		shaderStages[0].pName = "main";
+		shaderStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+		shaderStages[1].module = g_debugRenderer.fragmentShader;
+		shaderStages[1].pName = "main";
+		
+		VkViewport dummyViewport = {0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f};
+		VkRect2D dummyScissor = {{0, 0}, {1, 1}};
+		VkPipelineViewportStateCreateInfo viewportState = {};
+		viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+		viewportState.viewportCount = 1;
+		viewportState.pViewports = &dummyViewport;
+		viewportState.scissorCount = 1;
+		viewportState.pScissors = &dummyScissor;
+		
+		VkPipelineRasterizationStateCreateInfo rasterizer = {};
+		rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+		rasterizer.depthClampEnable = VK_FALSE;
+		rasterizer.rasterizerDiscardEnable = VK_FALSE;
+		rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+		rasterizer.cullMode = VK_CULL_MODE_NONE;
+		rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+		rasterizer.lineWidth = 1.0f;
+		rasterizer.depthBiasEnable = VK_FALSE;
+		
+		VkSampleCountFlagBits samples = vulkanGraphics->getCurrentMsaa();
+		VkPipelineMultisampleStateCreateInfo multisampling = {};
+		multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+		multisampling.sampleShadingEnable = VK_FALSE;
+		multisampling.rasterizationSamples = samples;
+		
+		VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
+		colorBlendAttachment.blendEnable = VK_TRUE;
+		colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+		colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+		colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+		colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+		colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+		colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+		colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+		
+		VkPipelineColorBlendStateCreateInfo colorBlending = {};
+		colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+		colorBlending.logicOpEnable = VK_FALSE;
+		colorBlending.attachmentCount = 1;
+		colorBlending.pAttachments = &colorBlendAttachment;
+		
+		VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+		depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+		depthStencil.depthTestEnable = VK_FALSE;
+		depthStencil.depthWriteEnable = VK_FALSE;
+		depthStencil.stencilTestEnable = VK_FALSE;
+		
+		VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+		VkPipelineDynamicStateCreateInfo dynamicState = {};
+		dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+		dynamicState.dynamicStateCount = 2;
+		dynamicState.pDynamicStates = dynamicStates;
+		
+		// Create line pipeline
+		VkPipelineInputAssemblyStateCreateInfo lineInputAssembly = {};
+		lineInputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+		lineInputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+		lineInputAssembly.primitiveRestartEnable = VK_FALSE;
+		
+		VkGraphicsPipelineCreateInfo linePipelineInfo = {};
+		linePipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+		linePipelineInfo.stageCount = 2;
+		linePipelineInfo.pStages = shaderStages;
+		linePipelineInfo.pVertexInputState = &vertexInputInfo;
+		linePipelineInfo.pInputAssemblyState = &lineInputAssembly;
+		linePipelineInfo.pViewportState = &viewportState;
+		linePipelineInfo.pRasterizationState = &rasterizer;
+		linePipelineInfo.pMultisampleState = &multisampling;
+		linePipelineInfo.pDepthStencilState = &depthStencil;
+		linePipelineInfo.pColorBlendState = &colorBlending;
+		linePipelineInfo.pDynamicState = &dynamicState;
+		linePipelineInfo.layout = g_debugRenderer.pipelineLayout;
+		linePipelineInfo.renderPass = g_debugRenderer.debugRenderPass;
+		linePipelineInfo.subpass = 0;
+		linePipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+		
+		VkResult lineResult = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &linePipelineInfo, nullptr, &g_debugRenderer.linePipeline);
+		if (lineResult != VK_SUCCESS) {
+			printf("[DEBUG RENDERER] Failed to create line pipeline: %d\n", lineResult);
+			fflush(stdout);
+			g_debugRenderer.failed = true;
+			return;
+		}
+		
+		// Create triangle pipeline
+		VkPipelineInputAssemblyStateCreateInfo triInputAssembly = {};
+		triInputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+		triInputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+		triInputAssembly.primitiveRestartEnable = VK_FALSE;
+		
+		VkGraphicsPipelineCreateInfo triPipelineInfo = linePipelineInfo;
+		triPipelineInfo.pInputAssemblyState = &triInputAssembly;
+		
+		VkResult triResult = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &triPipelineInfo, nullptr, &g_debugRenderer.trianglePipeline);
+		if (triResult != VK_SUCCESS) {
+			printf("[DEBUG RENDERER] Failed to create triangle pipeline: %d\n", triResult);
+			fflush(stdout);
+			g_debugRenderer.failed = true;
+			return;
+		}
+		
+		g_debugRenderer.pipelinesCreated = true;
+		printf("[DEBUG RENDERER] Pipelines created successfully\n");
+		fflush(stdout);
+		
+	} catch (const std::exception& e) {
+		printf("[DEBUG RENDERER] Exception during pipeline creation: %s\n", e.what());
+		fflush(stdout);
+		g_debugRenderer.failed = true;
+	}
+}
+
+static void renderDebugGeometry(
+	love::gfx::vulkan::Graphics* vulkanGraphics,
+	const std::vector<float>& lineVertices, size_t lineCount,
+	const std::vector<float>& triVertices, size_t triCount)
+{
+	printf("[DEBUG RENDERER] renderDebugGeometry called with lineCount=%zu, triCount=%zu\n", lineCount, triCount);
+	fflush(stdout);
+
+	// Skip entirely if debug renderer has failed
+	if (g_debugRenderer.failed) {
+		printf("[DEBUG RENDERER] Skipping: renderer failed\n");
+		fflush(stdout);
+		return;
+	}
+
+	printf("[DEBUG RENDERER] Passed failed check, initialized=%d\n", g_debugRenderer.initialized);
+	fflush(stdout);
+
+	// Skip if debug renderer failed or not initialized
+	// Pipelines are created in initializeDebugRendererPipelines() called from context_reset()
+	if (g_debugRenderer.failed || !g_debugRenderer.initialized) {
+		printf("[DEBUG RENDERER] Skipping: not initialized (initialized=%d, failed=%d)\n", 
+			g_debugRenderer.initialized, g_debugRenderer.failed);
+		fflush(stdout);
+		return;
+	}
+
+	printf("[DEBUG RENDERER] Passed initialized check, vulkanGraphics=%p, lineEmpty=%d, triEmpty=%d, lineVertices.size()=%zu\n", 
+		vulkanGraphics, lineVertices.empty(), triVertices.empty(), lineVertices.size());
+	fflush(stdout);
+
+	// Early exit if no valid graphics context or no geometry
+	if (!vulkanGraphics || (lineVertices.empty() && triVertices.empty())) {
+		printf("[DEBUG RENDERER] Skipping: no graphics context or geometry (vulkanGraphics=%p, lineEmpty=%d, triEmpty=%d)\n", 
+			vulkanGraphics, lineVertices.empty(), triVertices.empty());
+		fflush(stdout);
+		return;
+	}
+	
+	printf("[DEBUG RENDERER] Passed geometry check, checking isInRenderPass\n");
+	fflush(stdout);
+
+	// Skip if not in render pass - can't record draw commands
+	if (!vulkanGraphics->isInRenderPass()) {
+		printf("[DEBUG RENDERER] Skipping: not in render pass\n");
+		fflush(stdout);
+		return;
+	}
+
+	printf("[DEBUG RENDERER] Passed render pass check, entering try block\n");
+	fflush(stdout);
+
+	try {
+		VmaAllocator allocator = vulkanGraphics->getAllocator();
+		VkDevice device = vulkanGraphics->getDevice();
+		
+		if (allocator == VK_NULL_HANDLE || device == VK_NULL_HANDLE) {
+			printf("[DEBUG RENDERER] Invalid allocator or device\n");
+			fflush(stdout);
+			g_debugRenderer.failed = true;
+			return;
+		}
+
+		printf("[DEBUG RENDERER] Allocator and device valid, starting vertex buffer creation\n");
+		fflush(stdout);
+
+		// Phase 1: Create/update vertex buffers
+		if (!lineVertices.empty() && lineCount > 0) {
+			printf("[DEBUG RENDERER] Creating line vertex buffer (size=%zu bytes)\n", lineVertices.size() * sizeof(float));
+			fflush(stdout);
+			size_t requiredSize = lineVertices.size() * sizeof(float);
+			if (requiredSize == 0) {
+				printf("[DEBUG RENDERER] Line vertex buffer has zero size\n");
+				fflush(stdout);
+				return;
+			}
+			
+			// Recreate buffer if size changed
+			printf("[DEBUG RENDERER] Check buffer: lineVertexBuffer=%p, bufferSize=%zu, requiredSize=%zu\n", 
+				g_debugRenderer.lineVertexBuffer, g_debugRenderer.lineVertexBufferSize, requiredSize);
+			fflush(stdout);
+			if (g_debugRenderer.lineVertexBuffer == VK_NULL_HANDLE || requiredSize > g_debugRenderer.lineVertexBufferSize) {
+				printf("[DEBUG RENDERER] Recreating line vertex buffer\n");
+				fflush(stdout);
+				if (g_debugRenderer.lineVertexBuffer != VK_NULL_HANDLE) {
+					vmaDestroyBuffer(allocator, g_debugRenderer.lineVertexBuffer, g_debugRenderer.lineVertexAllocation);
+					g_debugRenderer.lineVertexBuffer = VK_NULL_HANDLE;
+					g_debugRenderer.lineVertexAllocation = nullptr;
+				}
+				
+				VkBufferCreateInfo bufferInfo = {};
+				bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+				bufferInfo.size = requiredSize;
+				bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+				bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+				
+				VmaAllocationCreateInfo allocInfo = {};
+				allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+				allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+				
+				VkResult result = vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &g_debugRenderer.lineVertexBuffer, 
+					&g_debugRenderer.lineVertexAllocation, nullptr);
+				if (result != VK_SUCCESS) {
+					printf("[DEBUG RENDERER] Failed to create line vertex buffer: %d\n", result);
+					fflush(stdout);
+					g_debugRenderer.lineVertexBuffer = VK_NULL_HANDLE;
+					return;
+				}
+				printf("[DEBUG RENDERER] Line vertex buffer created successfully\n");
+				fflush(stdout);
+				g_debugRenderer.lineVertexBufferSize = requiredSize;
+			}
+			
+			// Upload vertex data
+			printf("[DEBUG RENDERER] Uploading line vertex data (%zu bytes)\n", requiredSize);
+			fflush(stdout);
+			if (g_debugRenderer.lineVertexBuffer != VK_NULL_HANDLE && g_debugRenderer.lineVertexAllocation != nullptr) {
+				void* mappedData = nullptr;
+				VkResult mapResult = vmaMapMemory(allocator, g_debugRenderer.lineVertexAllocation, &mappedData);
+				if (mapResult == VK_SUCCESS && mappedData != nullptr) {
+					memcpy(mappedData, lineVertices.data(), requiredSize);
+					vmaUnmapMemory(allocator, g_debugRenderer.lineVertexAllocation);
+					printf("[DEBUG RENDERER] Line vertex data uploaded successfully\n");
+					fflush(stdout);
+				} else {
+					printf("[DEBUG RENDERER] Failed to map line vertex buffer memory: %d\n", mapResult);
+					fflush(stdout);
+				}
+			}
+		}
+
+		if (!triVertices.empty() && triCount > 0) {
+			size_t requiredSize = triVertices.size() * sizeof(float);
+			if (requiredSize == 0) {
+				printf("[DEBUG RENDERER] Triangle vertex buffer has zero size\n");
+				fflush(stdout);
+				return;
+			}
+			
+			// Recreate buffer if size changed
+			if (g_debugRenderer.triVertexBuffer == VK_NULL_HANDLE || requiredSize > g_debugRenderer.triVertexBufferSize) {
+				if (g_debugRenderer.triVertexBuffer != VK_NULL_HANDLE) {
+					vmaDestroyBuffer(allocator, g_debugRenderer.triVertexBuffer, g_debugRenderer.triVertexAllocation);
+					g_debugRenderer.triVertexBuffer = VK_NULL_HANDLE;
+					g_debugRenderer.triVertexAllocation = nullptr;
+				}
+				
+				VkBufferCreateInfo bufferInfo = {};
+				bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+				bufferInfo.size = requiredSize;
+				bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+				bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+				
+				VmaAllocationCreateInfo allocInfo = {};
+				allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+				allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+				
+				VkResult result = vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &g_debugRenderer.triVertexBuffer,
+					&g_debugRenderer.triVertexAllocation, nullptr);
+				if (result != VK_SUCCESS) {
+					printf("[DEBUG RENDERER] Failed to create triangle vertex buffer: %d\n", result);
+					fflush(stdout);
+					g_debugRenderer.triVertexBuffer = VK_NULL_HANDLE;
+					return;
+				}
+				g_debugRenderer.triVertexBufferSize = requiredSize;
+			}
+			
+			// Upload vertex data
+			if (g_debugRenderer.triVertexBuffer != VK_NULL_HANDLE && g_debugRenderer.triVertexAllocation != nullptr) {
+				void* mappedData = nullptr;
+				VkResult mapResult = vmaMapMemory(allocator, g_debugRenderer.triVertexAllocation, &mappedData);
+				if (mapResult == VK_SUCCESS && mappedData != nullptr) {
+					memcpy(mappedData, triVertices.data(), requiredSize);
+					vmaUnmapMemory(allocator, g_debugRenderer.triVertexAllocation);
+				} else {
+					printf("[DEBUG RENDERER] Failed to map triangle vertex buffer memory: %d\n", mapResult);
+					fflush(stdout);
+				}
+			}
+		}
+		
+		printf("[DEBUG RENDERER] Vertex buffers ready, checking pipelines (initialized=%d, pipelinesCreated=%d, linePipeline=%p)\n", 
+			g_debugRenderer.initialized, g_debugRenderer.pipelinesCreated, g_debugRenderer.linePipeline);
+		fflush(stdout);
+		
+		// Skip drawing if pipelines aren't created yet
+		if (!g_debugRenderer.pipelinesCreated || g_debugRenderer.linePipeline == VK_NULL_HANDLE) {
+			printf("[DEBUG RENDERER] Pipelines not ready, skipping draw (pipelinesCreated=%d, linePipeline=%p)\n", 
+				g_debugRenderer.pipelinesCreated, g_debugRenderer.linePipeline);
+			fflush(stdout);
+			return;
+		}
+		
+		// Phase 3: Record draw commands using the current frame's command buffer
+		// Use the same command buffer that's active in the current render pass
+		auto commandBuffers = vulkanGraphics->getCommandBuffersForDataTransfer();
+		size_t currentFrame = vulkanGraphics->getCurrentFrame();
+		if (currentFrame >= commandBuffers.size()) {
+			printf("[DEBUG RENDERER] Invalid frame index: %zu >= %zu\n", currentFrame, commandBuffers.size());
+			fflush(stdout);
+			return;
+		}
+		VkCommandBuffer cmd = commandBuffers.at(currentFrame);
+		if (cmd == VK_NULL_HANDLE) {
+			printf("[DEBUG RENDERER] Invalid command buffer\n");
+			fflush(stdout);
+			return;
+		}
+		
+		if (cmd != VK_NULL_HANDLE && g_debugRenderer.initialized) {
+			printf("[DEBUG RENDERER] About to draw - cmd=%p, linePipeline=%p, triPipeline=%p, lineBuffer=%p, triBuffer=%p\n",
+				cmd, g_debugRenderer.linePipeline, g_debugRenderer.trianglePipeline, 
+				g_debugRenderer.lineVertexBuffer, g_debugRenderer.triVertexBuffer);
+			fflush(stdout);
+			try {
+				// Set viewport and scissor
+				VkViewport viewport = {};
+				viewport.x = 0.0f;
+				viewport.y = 0.0f;
+				viewport.width = (float)vulkanGraphics->getWidth();
+				viewport.height = (float)vulkanGraphics->getHeight();
+				viewport.minDepth = 0.0f;
+				viewport.maxDepth = 1.0f;
+				vkCmdSetViewport(cmd, 0, 1, &viewport);
+				
+				VkRect2D scissor = {};
+				scissor.offset = {0, 0};
+				scissor.extent = {(uint32_t)vulkanGraphics->getWidth(), (uint32_t)vulkanGraphics->getHeight()};
+				vkCmdSetScissor(cmd, 0, 1, &scissor);
+				
+				// Draw lines with debug pipeline
+				if (g_debugRenderer.linePipeline != VK_NULL_HANDLE && g_debugRenderer.lineVertexBuffer != VK_NULL_HANDLE && !lineVertices.empty()) {
+					VkDeviceSize offset = 0;
+					vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g_debugRenderer.linePipeline);
+					vkCmdBindVertexBuffers(cmd, 0, 1, &g_debugRenderer.lineVertexBuffer, &offset);
+					uint32_t vertexCount = lineVertices.size() / 7; // 7 floats per vertex
+					if (vertexCount > 0) {
+						printf("[DEBUG RENDERER] Drawing %u line vertices\n", vertexCount);
+						fflush(stdout);
+						vkCmdDraw(cmd, vertexCount, 1, 0, 0);
+					}
+				}
+				
+				// Draw triangles with debug pipeline
+				if (g_debugRenderer.trianglePipeline != VK_NULL_HANDLE && g_debugRenderer.triVertexBuffer != VK_NULL_HANDLE && !triVertices.empty()) {
+					VkDeviceSize offset = 0;
+					vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g_debugRenderer.trianglePipeline);
+					vkCmdBindVertexBuffers(cmd, 0, 1, &g_debugRenderer.triVertexBuffer, &offset);
+					uint32_t vertexCount = triVertices.size() / 7; // 7 floats per vertex
+					if (vertexCount > 0) {
+						printf("[DEBUG RENDERER] Drawing %u triangle vertices\n", vertexCount);
+						fflush(stdout);
+						vkCmdDraw(cmd, vertexCount, 1, 0, 0);
+					}
+				}
+			} catch (const std::exception& drawEx) {
+				printf("[DEBUG RENDERER] Error during draw: %s\n", drawEx.what());
+				fflush(stdout);
+				g_debugRenderer.failed = true;
+			}
+		}
+		
+	} catch (const std::exception& e) {
+		printf("[DEBUG RENDERER] Error: %s\n", e.what());
+		fflush(stdout);
+		g_debugRenderer.failed = true;
+	}
+}
+#endif
 
 // This is needed to allow SDL-libretro to compile.
 // @see SDL_LIBRETROaudio.c:37
@@ -489,12 +1251,29 @@ static void context_reset(void)
 	// printf("FRAMEBUFFER: %d\n", RARCH_GL_FRAMEBUFFER);
 	// printf("hw_render: %d\n", hw_render.get_current_framebuffer());
 	ChaiLove::getInstance()->chai_gfx.init();
+
+	// DISABLED: clearAllDescriptors() - may be clearing active descriptors
+	// love::gfx::vulkan::Shader::clearAllDescriptors();
+	
 	ChaiLove::getInstance()->chai_collisions.clearWorlds();
 	ChaiLove::getInstance()->chai_collisions.init(0);
+	
+	#ifdef JPH_DEBUG_RENDERER
+	// NOTE: Debug rendering now uses app->graphics.line() instead of custom Vulkan pipelines
+	// No initialization needed - just draw directly in retro_run()
+	#endif
 }
 
 static void context_destroy(void)
 {
+	#ifdef JPH_DEBUG_RENDERER
+	// Clean up debug renderer resources
+	auto* vulkanGraphics = static_cast<love::gfx::vulkan::Graphics*>(ChaiLove::getInstance()->chai_gfx.instance);
+	if (vulkanGraphics) {
+		cleanupDebugRenderer(vulkanGraphics->getAllocator(), vulkanGraphics->getDevice());
+	}
+	#endif
+	
 	ChaiLove::getInstance()->chai_gfx.destroy();
 	ChaiLove::getInstance()->chai_collisions.destroy();
 }
@@ -770,7 +1549,109 @@ void retro_run(void) {
 
 	// Render the game.
 	app->draw();
-	
+
+	#ifdef JPH_DEBUG_RENDERER
+	#if ENABLE_DEBUG_GEOMETRY_RENDERING
+	// Render physics debug geometry using points (simpler than polyline)
+	try {
+		// Get line vertices from the default world group (0)
+		auto lineVertices = app->chai_collisions.getDebugRendererLineVertices(0);
+		size_t lineCount = app->chai_collisions.getDebugRendererLineCount(0);
+		
+		// Debug output to verify geometry is being collected
+		if (lineCount > 0 && runCount % 60 == 0) {
+			printf("[DEBUG RENDERER] Drawing %zu lines as points\n", lineCount);
+			fflush(stdout);
+		}
+		
+		// Draw line endpoints as points (simple and efficient)
+		if (lineCount > 0 && lineVertices.size() >= lineCount * 14 && vulkanGraphics) {
+			// Save the current state
+			vulkanGraphics->push();
+
+			// Compute world-space bounds for an orthographic projection
+			float minX = FLT_MAX, minY = FLT_MAX, minZ = FLT_MAX;
+			float maxX = -FLT_MAX, maxY = -FLT_MAX, maxZ = -FLT_MAX;
+			for (size_t i = 0; i < lineCount; i++) {
+				size_t idx = i * 14;
+				float x1 = lineVertices[idx + 0];
+				float y1 = lineVertices[idx + 1];
+				float z1 = lineVertices[idx + 2];
+				float x2 = lineVertices[idx + 7];
+				float y2 = lineVertices[idx + 8];
+				float z2 = lineVertices[idx + 9];
+				minX = std::min({minX, x1, x2});
+				minY = std::min({minY, y1, y2});
+				minZ = std::min({minZ, z1, z2});
+				maxX = std::max({maxX, x1, x2});
+				maxY = std::max({maxY, y1, y2});
+				maxZ = std::max({maxZ, z1, z2});
+			}
+
+			// Debug output
+			if (runCount % 60 == 0) {
+				printf("[DEBUG] World bounds: X[%.2f, %.2f] Y[%.2f, %.2f] Z[%.2f, %.2f]\n",
+					minX, maxX, minY, maxY, minZ, maxZ);
+			}
+
+			// Expand bounds slightly to avoid clipping
+			float margin = 0.1f; // 10%
+			float width = maxX - minX;
+			float height = maxY - minY;
+			float depth = maxZ - minZ;
+			if (width <= 0.0f) width = 1.0f;
+			if (height <= 0.0f) height = 1.0f;
+			if (depth <= 0.0f) depth = 1.0f;
+			float padX = width * margin;
+			float padY = height * margin;
+			float padZ = depth * margin;
+			
+			// Create orthographic projection for the physics world bounds
+			love::Matrix4 physicsOrtho = love::Matrix4::ortho(minX - padX, maxX + padX,
+				maxY + padY, minY - padY, minZ - padZ, maxZ + padZ);
+			vulkanGraphics->setProjection(physicsOrtho);
+			vulkanGraphics->replaceTransform(love::Matrix4());
+
+			// Disable depth testing and writing for debug overlay; set point size
+			vulkanGraphics->setDepthMode(love::gfx::COMPARE_ALWAYS, false);
+			vulkanGraphics->setPointSize(12.0f);
+
+			// Collect all point positions and colors (world space, will be projected by physicsOrtho)
+			std::vector<love::Vector2> positions;
+			std::vector<love::Colorf> colors;
+			positions.reserve(lineCount * 2);
+			colors.reserve(lineCount * 2);
+
+			for (size_t i = 0; i < lineCount; i++) {
+				size_t idx = i * 14;
+				positions.push_back(love::Vector2(lineVertices[idx + 0], lineVertices[idx + 1]));
+				colors.push_back(love::Colorf(1.0f, 0.0f, 0.0f, 1.0f));
+				positions.push_back(love::Vector2(lineVertices[idx + 7], lineVertices[idx + 8]));
+				colors.push_back(love::Colorf(1.0f, 0.0f, 0.0f, 1.0f));
+			}
+
+			// Draw in world space using the physics ortho projection
+			if (!positions.empty()) {
+				vulkanGraphics->points(positions.data(), colors.data(), positions.size());
+			}
+
+			// Restore the previous projection/transform
+			vulkanGraphics->resetProjection();
+			vulkanGraphics->pop();
+		}
+		
+		// Clear debug geometry for next frame
+		app->chai_collisions.clearDebugRendererGeometry(0);
+	} catch (const std::exception& e) {
+		printf("[DEBUG RENDERER ERROR] Exception in debug rendering: %s\n", e.what());
+		fflush(stdout);
+	} catch (...) {
+		printf("[DEBUG RENDERER ERROR] Unknown exception in debug rendering\n");
+		fflush(stdout);
+	}
+	runCount++;
+	#endif // ENABLE_DEBUG_GEOMETRY_RENDERING
+	#endif // JPH_DEBUG_RENDERER
 
 	// Copy the video buffer to the screen.
 	// video_cb(app->videoBuffer, app->config.window.width, app->config.window.height, app->config.window.width << 2);
@@ -787,8 +1668,11 @@ void retro_run(void) {
 
 		vulkanGraphics->submitGpuCommands(love::gfx::vulkan::SUBMIT_NOPRESENT, nullptr);
 		
+		// NOTE: Debug rendering now uses app->graphics.line() - no pipeline creation needed
+		
 		// CRITICAL FIX: Advance frame after submitting GPU commands in libretro mode
 		// This ensures each frame uses a different command buffer and prevents "every other frame" persistence
+		// advanceFrame() internally calls beginFrame() to start recording the next frame's command buffer
 		// std::printf("[FRAMEADVANCE] Advancing to next frame\n");
 		// fflush(stdout);
 		vulkanGraphics->advanceFrame();
@@ -798,7 +1682,9 @@ void retro_run(void) {
 		image.image_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		image.create_info = cg.instance->getCurrentSwapchainImageViewCreateInfo();
 		vulkan->set_image(vulkan->handle, &image, 0, NULL, VK_QUEUE_FAMILY_IGNORED);
-   		vulkan->set_command_buffers(vulkan->handle, 1, cmd);
+		// CRITICAL FIX: Don't set command buffers here - already done in submitGpuCommands()
+		// This was causing duplicate render passes with clearing, making Pass #2 wipe out Pass #1
+   		// vulkan->set_command_buffers(vulkan->handle, 1, cmd);
 		video_cb(RETRO_HW_FRAME_BUFFER_VALID, app->chai_gfx.width, app->chai_gfx.height, 0);
 	}
 

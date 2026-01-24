@@ -1041,11 +1041,17 @@ love::gfx::FontMod *Graphics::getFont()
 
 void Graphics::setShader(love::gfx::Shader *shader)
 {
+	// std::printf("[GRAPHICS] setShader called with shader=%p\n", shader);
+	// fflush(stdout);
+	
 	if (shader == nullptr)
 		return setShader();
 
 	shader->attach();
 	states.back().shader.set(shader);
+	
+	// std::printf("[GRAPHICS] Shader set in state, current shader=%p\n", states.back().shader.get());
+	// fflush(stdout);
 }
 
 void Graphics::setShader()
@@ -2422,6 +2428,7 @@ void Graphics::points(const Vector2 *positions, const Colorf *colors, size_t num
 	cmd.formats[1] = CommonFormat::RGBAub;
 	cmd.vertexCount = (int) numpoints;
 	cmd.standardShaderType = Shader::STANDARD_POINTS;
+	cmd.texture = getTextureOrDefaultForActiveShader(nullptr); // Use default texture for active shader
 
 	BatchedVertexData data = requestBatchedDraw(cmd);
 
@@ -2461,6 +2468,7 @@ void Graphics::points(const Vector2 *positions, const Colorf *colors, size_t num
 		for (int i = 0; i < cmd.vertexCount; i++)
 			colordata[i] = c;
 	}
+
 }
 
 int Graphics::calculateEllipsePoints(float rx, float ry) const

@@ -636,6 +636,10 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         // sceneShader->send("jointCount", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(0) }));
 
         // gfx::Graphics::flushBatchedDrawsGlobal();
+        // Force update to populate offsetMatrices with physics data
+        // mesh->update(std::vector<float>{0, 0, 0}, std::vector<float>{0, 0, 0}, std::vector<float>{1, 1, 1}, nullptr);
+        
+        // Pass static matrix as scene transform, physics data is applied inside draw()
         auto matrix = matrices[i];
         mesh->draw(cg.instance, matrix, sceneShader, view == 0 ? deltaTime : 0, computeShader);
         drawnMeshIndices.insert(i);  // Mark as drawn
@@ -1003,21 +1007,30 @@ void chai_scene::draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2
             
             // __mem_leak_check(leakCountBefore, leakSizeBefore, false, "", false);
             
-            cg.instance->setShader(sceneShader->shader);
+            if (sceneShader && sceneShader->shader) {
+                cg.instance->setShader(sceneShader->shader);
+            } else {
+                printf("[SCENE] Warning: sceneShader=%p, shader=%p - using default shader\n", 
+                    sceneShader, sceneShader ? sceneShader->shader : nullptr);
+                fflush(stdout);
+                cg.instance->setShader();
+            }
             cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
-            sceneShader->newFrame();
-            sceneShader->send("viewMatrix", viewMatrix1);
+            if (sceneShader) {
+                sceneShader->newFrame();
+                sceneShader->send("viewMatrix", viewMatrix1);
+            }
             
             // Draw background BEFORE scene meshes so scene draws on top
             if (background_mesh != nullptr && meshes.size() > 0) {
-                // std::printf("[BACKGROUND] Drawing background first\n");
-                
-                // Disable culling for background
+                // CRITICAL FIX: Background must render behind everything
+                // Use COMPARE_ALWAYS with DEPTH WRITE DISABLED so:
+                // 1. Background always renders (COMPARE_ALWAYS)
+                // 2. But doesn't block foreground objects (write=false keeps depth at far)
+                // This allows foreground meshes to render on top with normal depth testing
                 cg.instance->setMeshCullMode(gfx::CULL_NONE);
-                cg.instance->setDepthMode(gfx::CompareMode::COMPARE_ALWAYS, true);
+                cg.instance->setDepthMode(gfx::CompareMode::COMPARE_ALWAYS, false);  // CRITICAL: write=false
                 
-                auto mat = sceneShader->shader->getUniformInfo("viewMatrix");
-
                 // Use identity matrix since vertices are already positioned/scaled in model space
                 float modelMatData[16] = {
                     1.0f, 0.0f, 0.0f, 0.0f,
@@ -1025,19 +1038,10 @@ void chai_scene::draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2
                     0.0f, 0.0f, 1.0f, 0.0f,
                     0.0f, 0.0f, 0.0f, 1.0f
                 };
-
                 
+                Matrix4 bgMatrix(modelMatData);
 
-                float modelMatData2[16] = {
-                    1.0f, 0.0f, 0.0f, 0.0f,
-                    0.0f, 1.0f, 0.0f, 0.0f,
-                    0.0f, 0.0f, 1.0f, 0.0f,
-                    0.0f, 0.0f, 0.0f, 1.0f
-                };
-                
-                Matrix4 bgMatrix(modelMatData2);
-
-                // Append to existing modelMatrix array instead of starting fresh
+                // Send background model matrix to shader
                 std::vector<glm::mat4> bgMatVec;
                 bgMatVec.push_back(glm::make_mat4(modelMatData));
                 int bgModelIdx = sceneShader->send("modelMatrix", bgMatVec);
@@ -1047,7 +1051,7 @@ void chai_scene::draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2
                 
                 background_mesh->draw(cg.instance, bgMatrix);
                 
-                // Restore normal state for scene
+                // Restore normal state for scene meshes
                 cg.instance->setMeshCullMode(gfx::CULL_BACK);
                 cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
             }
@@ -1711,7 +1715,15 @@ void chai_scene::draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2
 void chai_scene::prepareScreen() {
     auto& cg = ChaiLove::getInstance()->chai_gfx;
     cg.instance->setActive(true);
-    cg.instance->setShader(sceneShader->shader);
+    
+    if (sceneShader && sceneShader->shader) {
+        cg.instance->setShader(sceneShader->shader);
+    } else {
+        printf("[SCENE] Warning: prepareScreen - sceneShader=%p, shader=%p - using default shader\n", 
+            sceneShader, sceneShader ? sceneShader->shader : nullptr);
+        fflush(stdout);
+        cg.instance->setShader();
+    }
     cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
 
     // Create a framebuffer for the loading screen

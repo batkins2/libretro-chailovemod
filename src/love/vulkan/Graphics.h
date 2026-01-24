@@ -345,6 +345,13 @@ public:
 
     // LIBRETRO BUFFER UPLOAD FIX
     bool isInRenderPass() const { return renderPassState.active; }
+    VkPipeline getCurrentPipeline() const { return renderPassState.pipeline; }
+    VkRenderPass getCurrentRenderPass() const { return renderPassState.beginInfo.renderPass; }
+	RenderPassConfiguration getCurrentRenderPassConfiguration() const { return renderPassState.renderPassConfiguration; }
+	VkSampleCountFlagBits getCurrentMsaa() const { return renderPassState.msaa; }
+    VkPipelineCache getPipelineCache() const { return pipelineCache; }
+	// Public wrapper to retrieve a compatible render pass from the current Graphics
+	VkRenderPass getCompatibleRenderPass(RenderPassConfiguration &configuration) { return getRenderPass(configuration); }
     void deferBufferUpload(Buffer* buffer, size_t offset, size_t size, const void* data);
 
 	// Add this in the public section:

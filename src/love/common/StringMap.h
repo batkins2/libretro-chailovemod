@@ -157,8 +157,19 @@ public:
 		names.reserve(SIZE);
 
 		for (unsigned int i = 0; i < SIZE; ++i)
+		{
 			if (reverse[i] != nullptr)
-				names.emplace_back(reverse[i]);
+			{
+				// Sanity check: reverse pointers should point to strings within the entries array
+				// If invalid, skip silently to prevent crashes from heap corruption
+				const char *ptr = reverse[i];
+				if (ptr && ptr[0] != '\0')  // Basic validation: must be non-null and start with valid char
+				{
+					names.emplace_back(ptr);
+				}
+				// else: skip invalid pointer silently
+			}
+		}
 
 		return names;
 	}

@@ -40,6 +40,11 @@
 #include <set>
 #include <sstream>
 #include <array>
+#include <cstdio>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 #include "../../ChaiLove.h"
 
@@ -144,6 +149,11 @@ Graphics::Graphics()
     
 	// Initialize magic number first for corruption detection
     magicNumber = GRAPHICS_MAGIC;
+
+	// Pre-reserve clear color storage to avoid heap allocations during render pass setup
+	renderPassState.clearColors.reserve(8);
+	// Pre-reserve color attachment storage to avoid heap allocations during render pass setup
+	renderPassState.renderPassConfiguration.colorAttachments.reserve(4);
 
 	commandBufferRecording = false;  // Initialize command buffer recording flag
 
@@ -428,24 +438,16 @@ void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallback
         return;
     }
 
-    // LIBRETRO FIX: Force startRenderPass() in libretro mode when submitting with SUBMIT_NOPRESENT
-    if (libretroMode && submitMode == SUBMIT_NOPRESENT && !renderPassState.active) {
-        // std::printf("[CHAILOVE DEBUG] LIBRETRO MODE: Forcing startRenderPass() before submitGpuCommands(SUBMIT_NOPRESENT)\n");
-        
-        // Force windowClearRequested if not already set
-        if (!renderPassState.windowClearRequested) {
-            // std::printf("[CHAILOVE DEBUG] Setting windowClearRequested = true for libretro\n");
-            renderPassState.windowClearRequested = true;
-            
-            // Set a default clear color if none is set - use BRIGHT GREEN to be sure
-            renderPassState.mainWindowClearColorValue.hasValue = true;
-            renderPassState.mainWindowClearColorValue.value = ColorD(0.0, 1.0, 0.0, 1.0); // Bright green 
-            // std::printf("[CHAILOVE DEBUG] Set default clear color to bright GREEN\n");
-        }
-        
-        // startRenderPass(currentFrame);
-        // std::printf("[CHAILOVE DEBUG] startRenderPass() called successfully before submit\n");
-    } else {
+	// LIBRETRO FIX: Ensure clear is requested for NOPRESENT, but don't start pass here
+	if (libretroMode && submitMode == SUBMIT_NOPRESENT && !renderPassState.active) {
+		if (!renderPassState.windowClearRequested) {
+			renderPassState.windowClearRequested = true;
+			renderPassState.mainWindowClearColorValue.hasValue = true;
+			renderPassState.mainWindowClearColorValue.value = ColorD(0.0, 1.0, 0.0, 1.0);
+		}
+		// Do not start the render pass here; let present()/prepareDraw own pass begin
+		// std::printf("[CHAILOVE DEBUG] NOPRESENT: Clear requested, pass will start later\n");
+	} else {
         // std::printf("[CHAILOVE DEBUG] NOT triggering libretro fix because:\n");
         // std::printf("[CHAILOVE DEBUG] - libretroMode: %s\n", libretroMode ? "true" : "false");
         // std::printf("[CHAILOVE DEBUG] - submitMode == SUBMIT_NOPRESENT: %s\n", (submitMode == SUBMIT_NOPRESENT) ? "true" : "false");
@@ -565,7 +567,13 @@ void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallback
 
             currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 
-            beginFrame();
+			// CRITICAL FIX: Don't call beginFrame() in libretro mode here!
+			// In libretro mode, advanceFrame() is called explicitly in retro_run()
+			// Calling beginFrame() here would start recording a SECOND command buffer
+			// which ends up with duplicate rendering (actions 1895-2002 in RenderDoc)
+            if (!libretroMode) {
+				beginFrame();
+			}
         }
     }
 }
@@ -578,27 +586,18 @@ void Graphics::present(void *screenshotCallbackdata)
     if (isRenderTargetActive())
         throw love::Exception("present cannot be called while a render target is active.");
 
-    // LIBRETRO FIX: Force startRenderPass() in libretro mode to trigger clearing
-    if (libretroMode && !renderPassState.active) {
-        // std::printf("[CHAILOVE DEBUG] LIBRETRO MODE: Forcing startRenderPass() to trigger clearing\n");
-        
-        // Force windowClearRequested if not already set
-        // if (!renderPassState.windowClearRequested) {
-        //     // std::printf("[CHAILOVE DEBUG] Setting windowClearRequested = true for libretro\n");
-        //     renderPassState.windowClearRequested = true;
-            
-        //     // Set a default clear color if none is set
-        //     renderPassState.mainWindowClearColorValue.hasValue = true;
-        //     renderPassState.mainWindowClearColorValue.value = ColorD(1.0, 0.0, 1.0, 1.0); // Bright magenta for visibility
-        //     // std::printf("[CHAILOVE DEBUG] Set default clear color to bright magenta\n");
-        // }
-        
-        startRenderPass(currentFrame);
-        // std::printf("[CHAILOVE DEBUG] startRenderPass() called successfully\n");
-    } else if (!renderPassState.active && renderPassState.windowClearRequested) {
-        // Original logic for non-libretro mode
-        startRenderPass(currentFrame);
-    }
+	// CRITICAL FIX: In libretro mode, always ensure clear is requested if not set
+	// This prevents black screen when game doesn't call love.graphics.clear()
+	if (libretroMode && !renderPassState.windowClearRequested) {
+		renderPassState.windowClearRequested = true;
+		renderPassState.mainWindowClearColorValue.hasValue = true;
+		renderPassState.mainWindowClearColorValue.value = ColorD(0.0, 0.0, 0.0, 1.0);
+	}
+
+	// Start render pass if needed (for clear operations or if no draws happened)
+	if (!renderPassState.active && renderPassState.windowClearRequested) {
+		startRenderPass(currentFrame);
+	}
 
     deprecations.draw(this);
 
@@ -1900,7 +1899,8 @@ void Graphics::beginFrame()
 	// This prevents state from persisting between frames
 	renderPassState.active = false;
 	commandBufferRecording = false;
-	renderPassState.windowClearRequested = false;  // Reset clear flag after each frame
+	// Don't reset windowClearRequested here - it's set by clear() and needed for next frame
+	// renderPassState.windowClearRequested = false;  // This was breaking rendering in libretro
 	
 	// Log VMA statistics every 60 frames to track memory usage
 	static int statsFrameCounter = 0;
@@ -2186,6 +2186,8 @@ VkCommandBuffer Graphics::getCommandBufferForDataTransfer()
 
 VkCommandBuffer Graphics::getCommandBufferForDataTransfer(int frameIndex)
 {
+	// CRITICAL FIX: In libretro mode, end any active render pass before data transfers
+	// This ensures texture uploads happen OUTSIDE of render passes
 	if (renderPassState.active)
 		endRenderPass();
 
@@ -3358,10 +3360,17 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
 		if (!commandBufferRecording) {
 			// std::printf("[CHAILOVE DEBUG] prepareDraw: Starting command buffer recording\n");
 			startRecordingGraphicsCommands(currentFrame);
-		}else {
+		} else {
 			// Command buffer is already recording, but we still need to set up render pass configuration
-			// std::printf("[CHAILOVE DEBUG] prepareDraw: Command buffer already recording, setting up render pass configuration\n");
-			setDefaultRenderPass();
+			// CRITICAL: Don't reset render pass config if loadOp is already set to LOAD (preserving framebuffer)
+			bool shouldPreserve = !renderPassState.renderPassConfiguration.colorAttachments.empty() &&
+			                      renderPassState.renderPassConfiguration.colorAttachments[0].loadOp == VK_ATTACHMENT_LOAD_OP_LOAD;
+			
+			if (!shouldPreserve) {
+				// std::printf("[CHAILOVE DEBUG] prepareDraw: Setting default render pass (will clear)\n");
+				setDefaultRenderPass();
+			}
+			// else: Keep existing config with LOAD operation to preserve framebuffer
 		}
 
 		// std::printf("[CHAILOVE DEBUG] prepareDraw: No active render pass, starting one automatically\n");
@@ -3482,7 +3491,11 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
     // VALIDATE DESCRIPTOR SETS BEFORE BINDING
     // std::printf("[CHAILOVE DEBUG] Setting up descriptor sets\n");
     try {
-        s->setMainTex(texture);
+        // Only set texture if it's provided and valid
+        if (texture != nullptr) {
+            s->setMainTex(texture);
+        }
+        // Always push descriptor sets
         s->cmdPushDescriptorSets(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS);
         // std::printf("[CHAILOVE DEBUG] Descriptor sets bound successfully\n");
     } catch (const std::exception& e) {
@@ -3522,13 +3535,13 @@ void Graphics::setDefaultRenderPass()
     // std::printf("[CHAILOVE DEBUG] ========== PIXEL FORMAT DEBUG ==========\n");
     // std::printf("[CHAILOVE DEBUG] Checking supported pixel formats:\n");
     
-    // Test key pixel formats
-    std::vector<love::PixelFormat> testFormats = {
-        love::PixelFormat::PIXELFORMAT_RGBA8_UNORM,
-        love::PixelFormat::PIXELFORMAT_BGRA8_UNORM
-    };
+	// Test key pixel formats (stack array to avoid heap allocation)
+	const love::PixelFormat testFormats[] = {
+		love::PixelFormat::PIXELFORMAT_RGBA8_UNORM,
+		love::PixelFormat::PIXELFORMAT_BGRA8_UNORM
+	};
     
-    for (auto format : testFormats) {
+	for (auto format : testFormats) {
         bool supported = isPixelFormatSupported(format, PIXELFORMATUSAGEFLAGS_RENDERTARGET);
         // std::printf("[CHAILOVE DEBUG] Format %d supported: %s\n", (int)format, supported ? "YES" : "NO");
     }
@@ -3587,22 +3600,26 @@ void Graphics::setDefaultRenderPass()
     renderPassState.msaa = msaaSamples;
     renderPassState.numColorAttachments = 1;
     
-    // CRITICAL FIX: Try multiple pixel formats until we find a supported one
+	// Safe to clear at frame start before rendering
+	renderPassState.renderPassConfiguration.colorAttachments.clear();
+	renderPassState.clearColors.clear();
+
+	// CRITICAL FIX: Try multiple pixel formats until we find a supported one
     VkFormat colorFormat = VK_FORMAT_UNDEFINED;
     
     if (!swapChainImages.empty()) {
         colorFormat = swapChainImageFormat;
         // std::printf("[CHAILOVE DEBUG] Using swapchain color format: %d\n", colorFormat);
     } else {
-        // Try different formats in order of preference
-        std::vector<VkFormat> candidateFormats = {
-            VK_FORMAT_R8G8B8A8_UNORM,  // Most common
-            VK_FORMAT_B8G8R8A8_UNORM,  // Alternative
-            VK_FORMAT_R8G8B8A8_SRGB,   // sRGB variant
-            VK_FORMAT_B8G8R8A8_SRGB    // sRGB alternative
-        };
+		// Try different formats in order of preference (stack array to avoid heap allocs)
+		constexpr VkFormat candidateFormats[] = {
+			VK_FORMAT_R8G8B8A8_UNORM,  // Most common
+			VK_FORMAT_B8G8R8A8_UNORM,  // Alternative
+			VK_FORMAT_R8G8B8A8_SRGB,   // sRGB variant
+			VK_FORMAT_B8G8R8A8_SRGB    // sRGB alternative
+		};
         
-        for (auto format : candidateFormats) {
+		for (auto format : candidateFormats) {
             // Test if this Vulkan format works
             VkFormatProperties props;
             vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &props);
@@ -3622,14 +3639,13 @@ void Graphics::setDefaultRenderPass()
         }
     }
 
-    // Create render pass configuration
-    RenderPassConfiguration renderPassConfiguration{};
-	// Support multiview for split screen on window render pass
-	uint32_t windowViewCount2 = (multiviewFeatureEnabled && requestedMultiviewViewCount > 1) ? std::min(requestedMultiviewViewCount, 4u) : 1;
-	uint32_t windowViewMask = windowViewCount2 > 1 ? ((1u << windowViewCount2) - 1u) : 0;
-	renderPassConfiguration.staticData.viewCount = windowViewCount2;
-	renderPassConfiguration.staticData.viewMask = windowViewMask;
-	renderPassConfiguration.staticData.correlationMask = windowViewMask;
+    // Use the pre-existing renderPassState.renderPassConfiguration instead of creating a new local one
+    // Support multiview for split screen on window render pass
+    uint32_t windowViewCount2 = (multiviewFeatureEnabled && requestedMultiviewViewCount > 1) ? std::min(requestedMultiviewViewCount, 4u) : 1;
+    uint32_t windowViewMask = windowViewCount2 > 1 ? ((1u << windowViewCount2) - 1u) : 0;
+    renderPassState.renderPassConfiguration.staticData.viewCount = windowViewCount2;
+    renderPassState.renderPassConfiguration.staticData.viewMask = windowViewMask;
+    renderPassState.renderPassConfiguration.staticData.correlationMask = windowViewMask;
 	if (windowViewCount2 > 1) {
 		std::printf("[MULTIVIEW] setDefaultRenderPass: Enabled %u-view rendering (mask=0x%x, multiviewFeatureEnabled=%d, requestedCount=%u)\n", 
 			windowViewCount2, windowViewMask, multiviewFeatureEnabled, requestedMultiviewViewCount);
@@ -3638,21 +3654,30 @@ void Graphics::setDefaultRenderPass()
     // CRITICAL FIX: Determine if we need depth/stencil and set appropriate load operations
     VkFormat dsformat = (backbufferHasDepth || backbufferHasStencil) ? depthStencilFormat : VK_FORMAT_UNDEFINED;
     
-    // For the window render pass, we typically want to clear the color attachment
-    // and load the depth/stencil if it exists (since it may contain useful data from previous frames)
-    VkAttachmentLoadOp colorLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;  // Clear color each frame
-    VkAttachmentLoadOp depthLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;   // Clear depth each frame  
-    VkAttachmentLoadOp stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Clear stencil each frame
+    // Check if we should preserve framebuffer (if LOAD was set by endRenderPass)
+    bool preserveFramebuffer = !renderPassState.renderPassConfiguration.colorAttachments.empty() &&
+                               renderPassState.renderPassConfiguration.colorAttachments[0].loadOp == VK_ATTACHMENT_LOAD_OP_LOAD;
     
-    ColorAttachment colorAttachment;
-    colorAttachment.format = colorFormat;
-    colorAttachment.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachment.msaaLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    colorAttachment.loadOp = colorLoadOp;
-    colorAttachment.msaaSamples = msaaSamples;
+    // For the window render pass, we typically want to clear the color attachment
+    // BUT: if endRenderPass set LOAD, preserve framebuffer contents for subsequent passes
+    VkAttachmentLoadOp colorLoadOp = preserveFramebuffer ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR;
+    VkAttachmentLoadOp depthLoadOp = preserveFramebuffer ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR;
+    VkAttachmentLoadOp stencilLoadOp = preserveFramebuffer ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_CLEAR;
+    
+	// Pre-reserve to avoid heap allocation/reallocation during push_back
+	if (renderPassState.renderPassConfiguration.colorAttachments.capacity() < 1) {
+		renderPassState.renderPassConfiguration.colorAttachments.reserve(1);
+	}
 
-    // Set up color attachment  
-    renderPassConfiguration.colorAttachments.push_back(colorAttachment);
+	ColorAttachment colorAttachment;
+	colorAttachment.format = colorFormat;
+	colorAttachment.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorAttachment.msaaLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	colorAttachment.loadOp = colorLoadOp;
+	colorAttachment.msaaSamples = msaaSamples;
+
+	// Set up color attachment  
+	renderPassState.renderPassConfiguration.colorAttachments.push_back(colorAttachment);
 
 	renderPassState.packedColorAttachmentFormats = static_cast<uint64_t>(love::PixelFormat::PIXELFORMAT_NORMAL);
 
@@ -3660,7 +3685,7 @@ void Graphics::setDefaultRenderPass()
     // std::printf("[CHAILOVE DEBUG] ColorAttachment setup complete with format: %d\n", colorFormat);
 
     // Set up depth/stencil attachment if needed
-    renderPassConfiguration.staticData.depthStencilAttachment = { 
+    renderPassState.renderPassConfiguration.staticData.depthStencilAttachment = { 
         dsformat, 
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, 
         depthLoadOp,
@@ -3672,7 +3697,7 @@ void Graphics::setDefaultRenderPass()
     uint32_t numClearValues = 0;
     
     // Count color attachments that need clearing
-    for (const auto& colorAtt : renderPassConfiguration.colorAttachments) {
+    for (const auto& colorAtt : renderPassState.renderPassConfiguration.colorAttachments) {
         if (colorAtt.loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR) {
             numClearValues++;
         }
@@ -3687,40 +3712,42 @@ void Graphics::setDefaultRenderPass()
     // std::printf("[CHAILOVE DEBUG] Calculated numClearValues: %u (color attachments: %zu, depth format: %d)\n", 
             //    numClearValues, renderPassConfiguration.colorAttachments.size(), dsformat);
     
-    // Set up clear values array with the correct size
-    renderPassState.clearColors.resize(numClearValues);
-    
-    uint32_t clearIndex = 0;
-    
-    // Initialize color clear values
-    for (size_t i = 0; i < renderPassConfiguration.colorAttachments.size(); i++) {
-        if (renderPassConfiguration.colorAttachments[i].loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR) {
-            renderPassState.clearColors[clearIndex].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-            // std::printf("[CHAILOVE DEBUG] Set clear value [%u] for color attachment %zu\n", clearIndex, i);
-            clearIndex++;
-        }
-    }
-    
-    // Initialize depth/stencil clear value if needed
-    if (dsformat != VK_FORMAT_UNDEFINED && 
-        (depthLoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR || stencilLoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR)) {
-        renderPassState.clearColors[clearIndex].depthStencil = {1.0f, 0};
-        // std::printf("[CHAILOVE DEBUG] Set clear value [%u] for depth/stencil attachment\n", clearIndex);
-        clearIndex++;
-    }
-    
-    // Set up the beginInfo with correct clear value count
-    renderPassState.beginInfo.clearValueCount = numClearValues;
-    renderPassState.beginInfo.pClearValues = numClearValues > 0 ? renderPassState.clearColors.data() : nullptr;
+	// Use pre-reserved clearColors to avoid allocations; resize should not reallocate when capacity is sufficient
+	if (renderPassState.clearColors.capacity() < numClearValues) {
+		renderPassState.clearColors.reserve(numClearValues);
+	}
+	renderPassState.clearColors.resize(numClearValues);
+
+	uint32_t clearIndex = 0;
+
+	// Initialize color clear values
+	for (size_t i = 0; i < renderPassState.renderPassConfiguration.colorAttachments.size(); i++) {
+		if (renderPassState.renderPassConfiguration.colorAttachments[i].loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR) {
+			renderPassState.clearColors[clearIndex].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+			// std::printf("[CHAILOVE DEBUG] Set clear value [%u] for color attachment %zu\n", clearIndex, i);
+			clearIndex++;
+		}
+	}
+
+	// Initialize depth/stencil clear value if needed
+	if (dsformat != VK_FORMAT_UNDEFINED && 
+		(depthLoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR || stencilLoadOp == VK_ATTACHMENT_LOAD_OP_CLEAR)) {
+		renderPassState.clearColors[clearIndex].depthStencil = {1.0f, 0};
+		// std::printf("[CHAILOVE DEBUG] Set clear value [%u] for depth/stencil attachment\n", clearIndex);
+		clearIndex++;
+	}
+
+	// Update beginInfo pointers
+	renderPassState.beginInfo.clearValueCount = numClearValues;
+	renderPassState.beginInfo.pClearValues = numClearValues > 0 ? renderPassState.clearColors.data() : nullptr;
     
     // std::printf("[CHAILOVE DEBUG] Final clear setup: count=%u, pClearValues=%p\n", 
             //    renderPassState.beginInfo.clearValueCount, renderPassState.beginInfo.pClearValues);
 
     if (msaaSamples & VK_SAMPLE_COUNT_1_BIT)
-        renderPassConfiguration.staticData.resolve = false;
-    else
-        renderPassConfiguration.staticData.resolve = true;
-
+		renderPassState.renderPassConfiguration.staticData.resolve = false;
+	else
+		renderPassState.renderPassConfiguration.staticData.resolve = true;
     FramebufferConfiguration framebufferConfiguration{};
     
     // Only set depth view if we have depth/stencil
@@ -3791,7 +3818,7 @@ void Graphics::setDefaultRenderPass()
     }
     
 
-    renderPassState.renderPassConfiguration = std::move(renderPassConfiguration);
+    // renderPassConfiguration is now directly in renderPassState.renderPassConfiguration, no move needed
     renderPassState.framebufferConfiguration = std::move(framebufferConfiguration);
 
     // Can't call clear() here because it depends on current RT state, which might not be
@@ -3830,6 +3857,8 @@ void Graphics::setDefaultRenderPass()
 void Graphics::setRenderPass(const RenderTargets &rts, int pixelw, int pixelh)
 {
 	RenderPassConfiguration renderPassConfiguration{};
+	// Pre-reserve capacity to prevent heap allocations during push_back
+	renderPassConfiguration.colorAttachments.reserve(rts.colors.size() + 4);
 	VkSampleCountFlagBits msaa = VK_SAMPLE_COUNT_1_BIT;
 	uint32_t viewCount = (multiviewFeatureEnabled && requestedMultiviewViewCount > 1) ? std::min(requestedMultiviewViewCount, 4u) : 1;
 	uint32_t viewMask = viewCount > 1 ? ((1u << viewCount) - 1u) : 0;
@@ -4035,6 +4064,9 @@ void Graphics::startRenderPass(int bufferIndex)
     //     std::printf("[RENDER PASS] startRenderPass() called #%d (last 60 frames had 60 calls)\n", renderPassCount);
     // }
     
+    // CRITICAL: Flush any pending draws before starting a new render pass
+    flushBatchedDraws();
+    
     // std::printf("[STARTRRP] Frame %zu, Buffer %u: Checking if active=%d\n", 
     //     currentFrame,
     //     currentFrame % 2,
@@ -4059,11 +4091,17 @@ void Graphics::startRenderPass(int bufferIndex)
         //     pixelWidth, pixelHeight);
         // fflush(stdout);
         
+        // Check if we should preserve framebuffer (used for render pass creation and shader state)
+        bool shouldLoad = !renderPassState.renderPassConfiguration.colorAttachments.empty() && 
+                          renderPassState.renderPassConfiguration.colorAttachments[0].loadOp == VK_ATTACHMENT_LOAD_OP_LOAD;
+        
         // CRITICAL: Create minimal render pass for pipeline compatibility
         if (renderPassState.beginInfo.renderPass == VK_NULL_HANDLE) {
             // std::printf("[CHAILOVE DEBUG] Creating minimal render pass for libretro\n");
             
             RenderPassConfiguration minimalConfig{};
+            // Pre-reserve capacity to prevent heap allocations during push_back
+            minimalConfig.colorAttachments.reserve(4);
             
             // CRITICAL FIX: Use actual colorFormat and depthStencilFormat, not hardcoded values
             // The render pass format MUST match the actual image formats
@@ -4075,12 +4113,20 @@ void Graphics::startRenderPass(int bufferIndex)
             VkAttachmentDescription colorAttachment = {};
             colorAttachment.format = actualColorFormat;  // Use actual image format
             colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+            // CRITICAL FIX: Always clear the window render pass, never load
             colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
             colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            
+            // if (currentFrame % 60 == 0) {
+            //     std::printf("[DEBUG] Creating render pass: shouldLoad=%d, loadOp=%s\n",
+            //         shouldLoad, shouldLoad ? "LOAD" : "CLEAR");
+            //     fflush(stdout);
+            // }
             colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-            colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-            colorAttachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            // CRITICAL: When using LOAD, initial layout must preserve existing contents
+			colorAttachment.initialLayout = shouldLoad ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
+			colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
             // Validate that depth format is actually supported
             VkFormatProperties depthProps;
@@ -4090,26 +4136,29 @@ void Graphics::startRenderPass(int bufferIndex)
             VkAttachmentDescription depthAttachment = {};
             depthAttachment.format = depthStencilFormat;  // Use actual depthStencilFormat
             depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+            // CRITICAL FIX: Always clear depth/stencil at frame start, never load
+            // Depth/stencil should always reset each frame like color
             depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-            depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
             depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-            depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
+            // Initial layout is always UNDEFINED for a fresh frame clear
             depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-            minimalConfig.colorAttachments.push_back({
-                colorAttachment.format,
-                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                colorAttachment.loadOp,
-                VK_SAMPLE_COUNT_1_BIT
-            });
+			minimalConfig.colorAttachments.push_back({
+				colorAttachment.format,
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				colorAttachment.loadOp,
+				VK_SAMPLE_COUNT_1_BIT
+			});
             // Only add depth attachment if format is actually supported
             if (depthFormatSupported) {
                 minimalConfig.staticData.depthStencilAttachment = {
                     depthAttachment.format,
                     VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                    depthAttachment.loadOp,
-                    depthAttachment.stencilLoadOp,
+                    depthAttachment.loadOp,  // VK_ATTACHMENT_LOAD_OP_CLEAR for frame start
+                    depthAttachment.stencilLoadOp,  // VK_ATTACHMENT_LOAD_OP_CLEAR for frame start
                     VK_SAMPLE_COUNT_1_BIT
                 };
             } else {
@@ -4126,7 +4175,22 @@ void Graphics::startRenderPass(int bufferIndex)
             VkRenderPass minimalRenderPass = getRenderPass(minimalConfig);
             renderPassState.beginInfo.renderPass = minimalRenderPass;
             
-            // std::printf("[CHAILOVE DEBUG] Minimal render pass created: %p\n", (void*)minimalRenderPass);
+            // Update renderPassConfiguration to match minimalConfig
+            renderPassState.renderPassConfiguration = minimalConfig;
+            renderPassState.isWindow = true;  // Mark as window render pass for proper state handling
+            
+			// Set initial clear values matching attachment count
+			uint32_t clearCount = depthFormatSupported ? 2u : 1u;
+			renderPassState.beginInfo.clearValueCount = clearCount;  // Color (+ Depth/Stencil if supported)
+			renderPassState.clearColors.resize(clearCount);
+			renderPassState.clearColors[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};  // Black clear color
+			if (depthFormatSupported) {
+				renderPassState.clearColors[1].depthStencil = {1.0f, 0};  // Clear depth to 1.0, stencil to 0
+			}
+			renderPassState.beginInfo.pClearValues = renderPassState.clearColors.data();
+            
+            // std::printf("[CHAILOVE DEBUG] Minimal render pass created: %p (loadOp=%s)\n", 
+            //             (void*)minimalRenderPass, shouldLoad ? "LOAD" : "CLEAR");
         }
         
         // CRITICAL: Actually start the render pass for draw commands
@@ -4143,10 +4207,13 @@ void Graphics::startRenderPass(int bufferIndex)
             fbConfig.staticData.height = static_cast<uint32_t>(renderPassState.height);
             
             // Use fakeBackbuffer view if available
-            if (fakeBackbuffer != nullptr) {
-                VkImageView colorView = fakeBackbuffer->getRenderTargetView(0, 0);
-                fbConfig.colorViews.push_back(colorView);
-                fbConfig.staticData.depthView = depthImageView;
+			if (fakeBackbuffer != nullptr) {
+				VkImageView colorView = fakeBackbuffer->getRenderTargetView(0, 0);
+				fbConfig.colorViews.push_back(colorView);
+				// Only set depth view if render pass actually contains a depth attachment
+				fbConfig.staticData.depthView = (renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.format != VK_FORMAT_UNDEFINED)
+											  ? depthImageView
+											  : VK_NULL_HANDLE;
                 // std::printf("[CHAILOVE DEBUG] Using fakeBackbuffer for framebuffer: %p\n", fakeBackbuffer.get());
             } else {
 				// ERROR: fakeBackbuffer should always exist in libretro mode
@@ -4154,6 +4221,8 @@ void Graphics::startRenderPass(int bufferIndex)
             }
             
             renderPassState.beginInfo.framebuffer = getFramebuffer(fbConfig);
+            // Update framebufferConfiguration to match
+            renderPassState.framebufferConfiguration = fbConfig;
             // std::printf("[CHAILOVE DEBUG] Minimal framebuffer created: %p with %zu color views\n", 
                 // (void*)renderPassState.beginInfo.framebuffer, fbConfig.colorViews.size());
         }
@@ -4170,7 +4239,45 @@ void Graphics::startRenderPass(int bufferIndex)
         // renderPassState.clearColors[0] = clearValues[0];
         // renderPassState.beginInfo.pClearValues = clearValues;
                
-        renderPassState.active = true;
+		renderPassState.active = true;
+        
+		// Determine if we should clear attachments for this begin
+		bool doClear = renderPassState.windowClearRequested;
+
+		if (doClear) {
+			// Clear color attachments and depth/stencil
+			for (auto &att : renderPassState.renderPassConfiguration.colorAttachments) {
+				att.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			}
+			renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.depthLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+
+			// Set clear values
+			if (renderPassState.clearColors.size() < 2) {
+				renderPassState.clearColors.resize(2);
+			}
+			if (renderPassState.mainWindowClearColorValue.hasValue) {
+				auto texture = nullptr;
+				renderPassState.clearColors[0].color = Texture::getClearColor(texture, renderPassState.mainWindowClearColorValue.value);
+			} else {
+				renderPassState.clearColors[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+			}
+			renderPassState.clearColors[1].depthStencil = {1.0f, 0};
+			renderPassState.beginInfo.clearValueCount = 2;
+			renderPassState.beginInfo.pClearValues = renderPassState.clearColors.data();
+		} else {
+			// Preserve framebuffer contents (LOAD) if no clear requested
+			for (auto &att : renderPassState.renderPassConfiguration.colorAttachments) {
+				att.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			}
+			renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.depthLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+			renderPassState.beginInfo.clearValueCount = 0;
+			renderPassState.beginInfo.pClearValues = nullptr;
+		}
+
+		// Consume the clear request on begin so present() doesn't start a second pass
+		renderPassState.windowClearRequested = false;
 
         // if (renderPassState.isWindow && renderPassState.windowClearRequested)
         //     renderPassState.renderPassConfiguration.colorAttachments.at(0).loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -4246,6 +4353,15 @@ void Graphics::startRenderPass(int bufferIndex)
         // CRITICAL: Actually begin the render pass
         // std::printf("[CHAILOVE DEBUG] Beginning minimal render pass for libretro\n");
         vkCmdBeginRenderPass(currentCommandBuffer, &renderPassState.beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+        
+        // CRITICAL: Invalidate shader and pipeline state to force complete rebind
+        if (shouldLoad) {
+            // Preserve the current shader to avoid switching to default shader
+            auto currentShader = Shader::current;
+            Shader::current = nullptr;
+            Shader::current = currentShader;
+            renderPassState.pipeline = VK_NULL_HANDLE;
+        }
         
         // Set viewport
         VkViewport viewport{};

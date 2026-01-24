@@ -594,31 +594,40 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
             tex = cm->textures[texture.source] ?: nullptr;
         }
         
-        if (false && tex == nullptr) {
-            // Set the texture to a single color texture if no texture is found  
+        if (tex == nullptr) {
+            // Set the texture to a single color texture using base color factor if no texture is found  
             gfx::Texture::Settings settings;
             settings.width = 64;
             settings.height = 64;
             settings.format = PIXELFORMAT_RGBA8_UNORM;
             auto slices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
 
-            uint8_t* blackPixel = new uint8_t[64*64*4];
-            // Fill the pixel data with a solid color (e.g., blue)
-            // This will create a blue texture
-           
+            uint8_t* colorPixel = new uint8_t[64*64*4];
+            
+            // Get base color from material or use white as default
+            uint8_t r = 255, g = 255, b = 255, a = 255;
+            
+            if (material.pbrMetallicRoughness.baseColorFactor.size() >= 4) {
+                r = static_cast<uint8_t>(material.pbrMetallicRoughness.baseColorFactor[0] * 255.0f);
+                g = static_cast<uint8_t>(material.pbrMetallicRoughness.baseColorFactor[1] * 255.0f);
+                b = static_cast<uint8_t>(material.pbrMetallicRoughness.baseColorFactor[2] * 255.0f);
+                a = static_cast<uint8_t>(material.pbrMetallicRoughness.baseColorFactor[3] * 255.0f);
+            }
+            
+            // Fill the pixel data with the base color
             for (int j = 0; j < 64*64*4; j+=4) {
-                blackPixel[j] = 255; // Red
-                blackPixel[j + 1] = 0; // Green
-                blackPixel[j + 2] = 255; // Blue
-                blackPixel[j + 3] = 255; // Alpha
+                colorPixel[j] = r;         // Red
+                colorPixel[j + 1] = g;     // Green
+                colorPixel[j + 2] = b;     // Blue
+                colorPixel[j + 3] = a;     // Alpha
             }
             auto gfxInstance = Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS);
             tex = gfxInstance->newTexture(settings, &slices);        
             Rect rect;
             rect.w = 64;
             rect.h = 64;
-            tex->replacePixels(blackPixel, 4*64*64, 0, 0, rect, true);
-            delete[] blackPixel;  // Free allocated pixel buffer
+            tex->replacePixels(colorPixel, 4*64*64, 0, 0, rect, true);
+            delete[] colorPixel;  // Free allocated pixel buffer
             gfx::SamplerState sampler = gfx::SamplerState();
 
             sampler.wrapU = gfx::SamplerState::WrapMode::WRAP_REPEAT;
@@ -797,10 +806,10 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
             auto camera = model.cameras[0];
 
             if (camera.type == "perspective") {
-                cm->cameraParams[count]["fov"] = std::vector<float> { camera.perspective.yfov };
-                cm->cameraParams[count]["aspectRatio"] = std::vector<float> { camera.perspective.aspectRatio };
-                cm->cameraParams[count]["near"] = std::vector<float> { camera.perspective.znear };
-                cm->cameraParams[count]["far"] = std::vector<float> { camera.perspective.zfar };
+                cm->cameraParams[count]["fov"] = std::vector<float> { static_cast<float>(camera.perspective.yfov) };
+                cm->cameraParams[count]["aspectRatio"] = std::vector<float> { static_cast<float>(camera.perspective.aspectRatio) };
+                cm->cameraParams[count]["near"] = std::vector<float> { static_cast<float>(camera.perspective.znear) };
+                cm->cameraParams[count]["far"] = std::vector<float> { static_cast<float>(camera.perspective.zfar) };
             }
 
             // Retrieve the camera position
@@ -860,8 +869,8 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
                     lightPosition = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
                 }
                 cm->lightParams[count]["position"] = std::vector<float> { lightPosition.x, lightPosition.y, lightPosition.z };
-                cm->lightParams[count]["color"] = std::vector<float> { lightNode.color[0], lightNode.color[1], lightNode.color[2] };
-                cm->lightParams[count]["intensity"] = std::vector<float> { lightNode.intensity/2500.0f };
+                cm->lightParams[count]["color"] = std::vector<float> { static_cast<float>(lightNode.color[0]), static_cast<float>(lightNode.color[1]), static_cast<float>(lightNode.color[2]) };
+                cm->lightParams[count]["intensity"] = std::vector<float> { static_cast<float>(lightNode.intensity/2500.0f) };
 
                 if (lightNode.type == "directional") {
                     // glm::vec3 lightDirection(0.0f, -1.0f, 0.0f); // Default direction
@@ -1422,11 +1431,13 @@ void chai_mesh::update(std::vector<float> position, std::vector<float> rotation,
     auto po = cc.getPhysicsObjects(id);
     for (int i = 0; i < po.size(); i++) {
         auto physicsObjectMatrix = po[i];
-        debug->pushDebugMessagef("Replacing Object Matrix: %d\n", i);
-        debug->pushDebugMessagef("Matrix: %f %f %f %f\n", matrices[i].getColumn(0).x, matrices[i].getColumn(0).y, matrices[i].getColumn(0).z, matrices[i].getColumn(0).w);
-        debug->pushDebugMessagef("Matrix: %f %f %f %f\n", matrices[i].getColumn(1).x, matrices[i].getColumn(1).y, matrices[i].getColumn(1).z, matrices[i].getColumn(1).w);
-        debug->pushDebugMessagef("Matrix: %f %f %f %f\n", matrices[i].getColumn(2).x, matrices[i].getColumn(2).y, matrices[i].getColumn(2).z, matrices[i].getColumn(2).w);
-        debug->pushDebugMessagef("Matrix: %f %f %f %f\n", matrices[i].getColumn(3).x, matrices[i].getColumn(3).y, matrices[i].getColumn(3).z, matrices[i].getColumn(3).w);
+        if (debug) {
+            debug->pushDebugMessagef("Replacing Object Matrix: %d\n", i);
+            debug->pushDebugMessagef("Matrix: %f %f %f %f\n", matrices[i].getColumn(0).x, matrices[i].getColumn(0).y, matrices[i].getColumn(0).z, matrices[i].getColumn(0).w);
+            debug->pushDebugMessagef("Matrix: %f %f %f %f\n", matrices[i].getColumn(1).x, matrices[i].getColumn(1).y, matrices[i].getColumn(1).z, matrices[i].getColumn(1).w);
+            debug->pushDebugMessagef("Matrix: %f %f %f %f\n", matrices[i].getColumn(2).x, matrices[i].getColumn(2).y, matrices[i].getColumn(2).z, matrices[i].getColumn(2).w);
+            debug->pushDebugMessagef("Matrix: %f %f %f %f\n", matrices[i].getColumn(3).x, matrices[i].getColumn(3).y, matrices[i].getColumn(3).z, matrices[i].getColumn(3).w);
+        }
 
         // matrices[i] = matrices[i].inverse();
         glm::mat4 mat = glm::mat4(
@@ -1628,15 +1639,27 @@ void chai_mesh::update(std::vector<float> position, std::vector<float> rotation,
         };
         offsetMatrices[i] = Matrix4(diffData);
 
-        debug->visualizeMatrix(physMat);
+        if (debug) {
+            debug->visualizeMatrix(physMat);
 
-        debug->pushDebugMessagef("New Object Matrix: %d\n", i);
-        debug->pushDebugMessagef("Matrix: %f %f %f %f\n", offsetMatrices[i].getColumn(0).x, offsetMatrices[i].getColumn(0).y, offsetMatrices[i].getColumn(0).z, offsetMatrices[i].getColumn(0).w);
-        debug->pushDebugMessagef("Matrix: %f %f %f %f\n", offsetMatrices[i].getColumn(1).x, offsetMatrices[i].getColumn(1).y, offsetMatrices[i].getColumn(1).z, offsetMatrices[i].getColumn(1).w);
-        debug->pushDebugMessagef("Matrix: %f %f %f %f\n", offsetMatrices[i].getColumn(2).x, offsetMatrices[i].getColumn(2).y, offsetMatrices[i].getColumn(2).z, offsetMatrices[i].getColumn(2).w);
-        debug->pushDebugMessagef("Matrix: %f %f %f %f\n", offsetMatrices[i].getColumn(3).x, offsetMatrices[i].getColumn(3).y, offsetMatrices[i].getColumn(3).z, offsetMatrices[i].getColumn(3).w);
-        // debug->displayDebugMessages();
-        // ChaiLove::getInstance()->script->debugbreak();
+            debug->pushDebugMessagef("New Object Matrix: %d\n", i);
+            debug->pushDebugMessagef("Matrix: %f %f %f %f\n", offsetMatrices[i].getColumn(0).x, offsetMatrices[i].getColumn(0).y, offsetMatrices[i].getColumn(0).z, offsetMatrices[i].getColumn(0).w);
+            debug->pushDebugMessagef("Matrix: %f %f %f %f\n", offsetMatrices[i].getColumn(1).x, offsetMatrices[i].getColumn(1).y, offsetMatrices[i].getColumn(1).z, offsetMatrices[i].getColumn(1).w);
+            debug->pushDebugMessagef("Matrix: %f %f %f %f\n", offsetMatrices[i].getColumn(2).x, offsetMatrices[i].getColumn(2).y, offsetMatrices[i].getColumn(2).z, offsetMatrices[i].getColumn(2).w);
+            debug->pushDebugMessagef("Matrix: %f %f %f %f\n", offsetMatrices[i].getColumn(3).x, offsetMatrices[i].getColumn(3).y, offsetMatrices[i].getColumn(3).z, offsetMatrices[i].getColumn(3).w);
+            // debug->displayDebugMessages();
+            // ChaiLove::getInstance()->script->debugbreak();
+        }
+    }
+
+    // If there's only one physics object but multiple offsetMatrices (sub-meshes),
+    // apply the physics transform to all sub-mesh offsets
+    if (po.size() == 1 && offsetMatrices.size() > 1) {
+        // printf("[DEBUG chai_mesh::update] Applying single physics transform to all %zu sub-meshes\n", offsetMatrices.size());
+        const Matrix4& physicsTransform = offsetMatrices[0];
+        for (size_t j = 1; j < offsetMatrices.size(); j++) {
+            offsetMatrices[j] = physicsTransform;
+        }
     }
 
 }
@@ -2372,19 +2395,25 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
             // printf("Matrix: %f %f %f %f\n", tempMat.getColumn(1).x, tempMat.getColumn(1).y, tempMat.getColumn(1).z, tempMat.getColumn(1).w);
             // printf("Matrix: %f %f %f %f\n", tempMat.getColumn(2).x, tempMat.getColumn(2).y, tempMat.getColumn(2).z, tempMat.getColumn(2).w);
             // printf("Matrix: %f %f %f %f\n", tempMat.getColumn(3).x, tempMat.getColumn(3).y, tempMat.getColumn(3).z, tempMat.getColumn(3).w);
-            auto mat = offsetMatrices[i];
-            if (offsetMatrices[i].getColumn(0).x == 1.0f && offsetMatrices[i].getColumn(0).y == 0.0f && offsetMatrices[i].getColumn(0).z == 0.0f && offsetMatrices[i].getColumn(0).w == 0.0f &&
+            
+            // Check if offsetMatrix is identity
+            bool isIdentity = (offsetMatrices[i].getColumn(0).x == 1.0f && offsetMatrices[i].getColumn(0).y == 0.0f && offsetMatrices[i].getColumn(0).z == 0.0f && offsetMatrices[i].getColumn(0).w == 0.0f &&
                 offsetMatrices[i].getColumn(1).x == 0.0f && offsetMatrices[i].getColumn(1).y == 1.0f && offsetMatrices[i].getColumn(1).z == 0.0f && offsetMatrices[i].getColumn(1).w == 0.0f &&
                 offsetMatrices[i].getColumn(2).x == 0.0f && offsetMatrices[i].getColumn(2).y == 0.0f && offsetMatrices[i].getColumn(2).z == 1.0f && offsetMatrices[i].getColumn(2).w == 0.0f &&
-                offsetMatrices[i].getColumn(3).x == 0.0f && offsetMatrices[i].getColumn(3).y == 0.0f && offsetMatrices[i].getColumn(3).z == 0.0f && offsetMatrices[i].getColumn(3).w == 1.0f) {
+                offsetMatrices[i].getColumn(3).x == 0.0f && offsetMatrices[i].getColumn(3).y == 0.0f && offsetMatrices[i].getColumn(3).z == 0.0f && offsetMatrices[i].getColumn(3).w == 1.0f);
+            
+            auto mat = offsetMatrices[i];
+            if (isIdentity) {
+                // Identity offset - use static model matrix
                 mat = matrices[i] * m;
             } else {
-                // matrices[i] = offsetMatrices[i];
+                // Physics-updated offset - compose with transform
+                mat = offsetMatrices[i] * m;
             }
 
             // Add a small random offset to the translation z component (assuming mat is Matrix4)
             auto col = mat.getColumn(3);
-            col.z += std::rand() % 1000 * 0.001f * 0.01f;
+            // col.z += std::rand() % 1000 * 0.001f * 0.01f;
             mat.setColumn(3, col);
             
             activeMatrix = mat;
@@ -2469,16 +2498,7 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
             }
            
             if (msh != nullptr) {
-                // static int meshDrawCount = 0;
-                // meshDrawCount++;
-                // 
-                // if (meshDrawCount % 1000 == 0) {
-                //     printf("[MESH LEAK] msh->draw() called %d times | mesh has %zu vertices\n", 
-                //            meshDrawCount, msh->getVertexCount());
-                //     fflush(stdout);
-                // }
-                
-                msh->draw(gfx, m);
+                msh->draw(gfx, mat);  // Use physics-updated matrix, not 'm'
             }
         }
         currentTime = dt;
