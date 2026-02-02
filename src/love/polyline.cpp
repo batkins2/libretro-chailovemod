@@ -72,6 +72,16 @@ void Polyline::render(const Vector2 *coords, size_t count, size_t size_hint, flo
 
 	vertex_count = normals.size();
 
+	// Guard against degenerate polylines (no valid segments)
+	if (vertex_count < 2)
+	{
+		overdraw = nullptr;
+		overdraw_vertex_count = 0;
+		overdraw_vertex_start = 0;
+		vertices = nullptr;
+		return;
+	}
+
 	size_t extra_vertices = 0;
 
 	if (draw_overdraw)

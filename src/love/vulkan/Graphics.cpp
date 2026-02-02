@@ -28,6 +28,7 @@
 #include "../window/Window.h"
 #include "Buffer.h"
 #include "Graphics.h"
+#include <chrono>
 #include "GraphicsReadback.h"
 #include "Shader.h"
 #include "Vulkan.h"
@@ -443,7 +444,7 @@ void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallback
 		if (!renderPassState.windowClearRequested) {
 			renderPassState.windowClearRequested = true;
 			renderPassState.mainWindowClearColorValue.hasValue = true;
-			renderPassState.mainWindowClearColorValue.value = ColorD(0.0, 1.0, 0.0, 1.0);
+			renderPassState.mainWindowClearColorValue.value = ColorD(0.0, 0.0, 0.0, 1.0);
 		}
 		// Do not start the render pass here; let present()/prepareDraw own pass begin
 		// std::printf("[CHAILOVE DEBUG] NOPRESENT: Clear requested, pass will start later\n");
@@ -558,7 +559,19 @@ void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallback
         {
             if (!inFlightFences.empty())
             {
+                // PERF: Time fence wait to detect GPU stalls
+                static int fenceWaitCounter = 0;
+                static double totalFenceWaitTime = 0.0;
+                auto fenceStart = std::chrono::high_resolution_clock::now();
                 vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+                auto fenceEnd = std::chrono::high_resolution_clock::now();
+                auto fenceMs = std::chrono::duration<double, std::milli>(fenceEnd - fenceStart).count();
+                totalFenceWaitTime += fenceMs;
+                if (++fenceWaitCounter % 60 == 0) {
+                    // std::printf("[PERF FENCE] 60 waits | Last: %.2f ms | Avg: %.2f ms | Total: %.2f ms\n",
+                    //     fenceMs, totalFenceWaitTime / fenceWaitCounter, totalFenceWaitTime);
+                    // fflush(stdout);
+                }
                 vkResetFences(device, 1, &inFlightFences[currentFrame]);
             }
 
@@ -2014,6 +2027,7 @@ void Graphics::beginFrame()
 
 	Vulkan::resetShaderSwitches();
 
+	// PERF: Call shader newFrame() to reset descriptor pools and recycle descriptor sets
 	for (const auto &shader : usedShadersInFrame)
 		shader->newFrame();
 	usedShadersInFrame.clear();
@@ -4455,9 +4469,9 @@ void Graphics::startRenderPass(int bufferIndex)
             
             // FORCE BRIGHT COLOR FOR TESTING: Clear with bright magenta to make it obvious
             VkClearColorValue clearColor = {};
-            clearColor.float32[0] = 1.0f; // Red
+            clearColor.float32[0] = 0.0f; // Red
             clearColor.float32[1] = 0.0f; // Green  
-            clearColor.float32[2] = 1.0f; // Blue (magenta)
+            clearColor.float32[2] = 0.0f; // Blue (magenta)
             clearColor.float32[3] = 1.0f; // Alpha
             
             // Also try to use the requested clear color if available
@@ -4911,8 +4925,20 @@ VkPipeline Graphics::createGraphicsPipeline(Shader *shader, const GraphicsPipeli
 	pipelineInfo.renderPass = configuration.renderPass;
 
 	VkPipeline graphicsPipeline;
+	// PERF: Time pipeline creation
+	static int pipelineCreateCounter = 0;
+	static double totalPipelineTime = 0.0;
+	auto pipelineStart = std::chrono::high_resolution_clock::now();
 	if (vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS)
 		throw love::Exception("failed to create graphics pipeline");
+	auto pipelineEnd = std::chrono::high_resolution_clock::now();
+	auto pipelineMs = std::chrono::duration<double, std::milli>(pipelineEnd - pipelineStart).count();
+	totalPipelineTime += pipelineMs;
+	if (++pipelineCreateCounter % 10 == 0) {
+		// std::printf("[PERF PIPELINE] Created %d pipelines | Last: %.2f ms | Avg: %.2f ms | Total: %.2f ms\n",
+		// 	pipelineCreateCounter, pipelineMs, totalPipelineTime / pipelineCreateCounter, totalPipelineTime);
+		// fflush(stdout);
+	}
 	return graphicsPipeline;
 }
 

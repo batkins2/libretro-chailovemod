@@ -1022,7 +1022,7 @@ void chai_scene::draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2
             }
             
             // Draw background BEFORE scene meshes so scene draws on top
-            if (background_mesh != nullptr && meshes.size() > 0) {
+            if (false && background_mesh != nullptr && meshes.size() > 0) {
                 // CRITICAL FIX: Background must render behind everything
                 // Use COMPARE_ALWAYS with DEPTH WRITE DISABLED so:
                 // 1. Background always renders (COMPARE_ALWAYS)

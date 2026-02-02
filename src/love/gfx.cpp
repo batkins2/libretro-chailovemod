@@ -95,8 +95,10 @@ bool isDebugEnabled()
 {
 	if (!debugModeQueried)
 	{
-		const char *debugenv = getenv("LOVE_GRAPHICS_DEBUG");
-		debugMode = debugenv != nullptr && debugenv[0] != '0';
+		// PERF: Force debug mode OFF - validation layers cause ~100ms overhead per frame
+		// const char *debugenv = getenv("LOVE_GRAPHICS_DEBUG");
+		// debugMode = debugenv != nullptr && debugenv[0] != '0';
+		debugMode = false;
 		debugModeQueried = true;
 	}
 

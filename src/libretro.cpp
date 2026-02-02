@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <sstream>
 #include <optional>
+#include <chrono>
 #ifdef _WIN32
 #include <windows.h>
 #include <psapi.h>
@@ -120,8 +121,9 @@ struct DebugRendererState {
 
 static DebugRendererState g_debugRenderer;
 
-// Enable debug rendering with proper initialization guards in place
-#define ENABLE_DEBUG_GEOMETRY_RENDERING 1
+// Disable debug rendering by default to avoid massive per-frame overhead.
+// Re-enable only when actively debugging physics.
+#define ENABLE_DEBUG_GEOMETRY_RENDERING 0
 
 static void cleanupDebugRenderer(VmaAllocator allocator, VkDevice device) {
 	if (allocator == VK_NULL_HANDLE || device == VK_NULL_HANDLE) {
@@ -1525,8 +1527,14 @@ void retro_run(void) {
 		update_variables();
 	}
 
+	// PERF: Add frame timing to identify bottleneck
+	static int perfCounter = 0;
+	auto frameStart = std::chrono::high_resolution_clock::now();
+	
 	// Update the game.
+	auto updateStart = std::chrono::high_resolution_clock::now();
 	app->update();
+	auto updateEnd = std::chrono::high_resolution_clock::now();
 
 	// Clear the color and depth buffers
     // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1548,11 +1556,13 @@ void retro_run(void) {
     }	
 
 	// Render the game.
+	auto drawStart = std::chrono::high_resolution_clock::now();
 	app->draw();
+	auto drawEnd = std::chrono::high_resolution_clock::now();
 
 	#ifdef JPH_DEBUG_RENDERER
 	#if ENABLE_DEBUG_GEOMETRY_RENDERING
-	// Render physics debug geometry using points (simpler than polyline)
+	// Render physics debug geometry as polylines
 	try {
 		// Get line vertices from the default world group (0)
 		auto lineVertices = app->chai_collisions.getDebugRendererLineVertices(0);
@@ -1560,11 +1570,11 @@ void retro_run(void) {
 		
 		// Debug output to verify geometry is being collected
 		if (lineCount > 0 && runCount % 60 == 0) {
-			printf("[DEBUG RENDERER] Drawing %zu lines as points\n", lineCount);
+			printf("[DEBUG RENDERER] Drawing %zu line segments as polylines\n", lineCount);
 			fflush(stdout);
 		}
 		
-		// Draw line endpoints as points (simple and efficient)
+		// Draw lines as polylines (not points!)
 		if (lineCount > 0 && lineVertices.size() >= lineCount * 14 && vulkanGraphics) {
 			// Save the current state
 			vulkanGraphics->push();
@@ -1612,27 +1622,36 @@ void retro_run(void) {
 			vulkanGraphics->setProjection(physicsOrtho);
 			vulkanGraphics->replaceTransform(love::Matrix4());
 
-			// Disable depth testing and writing for debug overlay; set point size
+			// Disable depth testing and writing for debug overlay
 			vulkanGraphics->setDepthMode(love::gfx::COMPARE_ALWAYS, false);
-			vulkanGraphics->setPointSize(12.0f);
+			// Use thin, rough lines for debug visualization
+			vulkanGraphics->setLineWidth(0.25f);
+			vulkanGraphics->setLineStyle(love::gfx::Graphics::LINE_ROUGH);
+			vulkanGraphics->setLineJoin(love::gfx::Graphics::LINE_JOIN_NONE);
 
-			// Collect all point positions and colors (world space, will be projected by physicsOrtho)
-			std::vector<love::Vector2> positions;
-			std::vector<love::Colorf> colors;
-			positions.reserve(lineCount * 2);
-			colors.reserve(lineCount * 2);
-
+			// Draw each line segment
 			for (size_t i = 0; i < lineCount; i++) {
 				size_t idx = i * 14;
-				positions.push_back(love::Vector2(lineVertices[idx + 0], lineVertices[idx + 1]));
-				colors.push_back(love::Colorf(1.0f, 0.0f, 0.0f, 1.0f));
-				positions.push_back(love::Vector2(lineVertices[idx + 7], lineVertices[idx + 8]));
-				colors.push_back(love::Colorf(1.0f, 0.0f, 0.0f, 1.0f));
-			}
-
-			// Draw in world space using the physics ortho projection
-			if (!positions.empty()) {
-				vulkanGraphics->points(positions.data(), colors.data(), positions.size());
+				float x1 = lineVertices[idx + 0];
+				float y1 = lineVertices[idx + 1];
+				float a1 = lineVertices[idx + 6] / 255.0f;
+				
+				float x2 = lineVertices[idx + 7];
+				float y2 = lineVertices[idx + 8];
+				
+				// Vary color per line (ignore source color to avoid black)
+				float t = (float)(i % 12) / 11.0f;
+				float vr = 0.2f + 0.8f * (1.0f - t);
+				float vg = 0.2f + 0.8f * t;
+				float vb = 0.4f + 0.4f * ((i % 3) / 2.0f);
+				float va = (a1 > 0.1f) ? a1 : 1.0f;
+				// Draw line from (x1,y1) to (x2,y2) with color
+				vulkanGraphics->setColor(love::Colorf(vr, vg, vb, va));
+				love::Vector2 lineVerts[2] = {
+					love::Vector2(x1, y1),
+					love::Vector2(x2, y2)
+				};
+				vulkanGraphics->polyline(lineVerts, 2);
 			}
 
 			// Restore the previous projection/transform
@@ -1657,7 +1676,8 @@ void retro_run(void) {
 	// video_cb(app->videoBuffer, app->config.window.width, app->config.window.height, app->config.window.width << 2);
 	if (!app->event.m_pauserendering) {
 			
-		vulkan->wait_sync_index(vulkan->handle);
+		// PERF: Removed blocking wait_sync_index() - let GPU run asynchronously
+		// vulkan->wait_sync_index(vulkan->handle);
 
 		vk.index = vulkan->get_sync_index(vulkan->handle);
 		VkCommandBuffer cmd[] = {cg.instance->getCommandBufferForDataTransfer()}; 
@@ -1666,7 +1686,9 @@ void retro_run(void) {
 		// 	cmd[i] = buffers[i];
 		// }		
 
+		auto submitStart = std::chrono::high_resolution_clock::now();
 		vulkanGraphics->submitGpuCommands(love::gfx::vulkan::SUBMIT_NOPRESENT, nullptr);
+		auto submitEnd = std::chrono::high_resolution_clock::now();
 		
 		// NOTE: Debug rendering now uses app->graphics.line() - no pipeline creation needed
 		
@@ -1675,7 +1697,9 @@ void retro_run(void) {
 		// advanceFrame() internally calls beginFrame() to start recording the next frame's command buffer
 		// std::printf("[FRAMEADVANCE] Advancing to next frame\n");
 		// fflush(stdout);
+		auto advanceStart = std::chrono::high_resolution_clock::now();
 		vulkanGraphics->advanceFrame();
+		auto advanceEnd = std::chrono::high_resolution_clock::now();
 
 		retro_vulkan_image image;
 		image.image_view = cg.instance->getCurrentSwapchainImageView();
@@ -1686,17 +1710,32 @@ void retro_run(void) {
 		// This was causing duplicate render passes with clearing, making Pass #2 wipe out Pass #1
    		// vulkan->set_command_buffers(vulkan->handle, 1, cmd);
 		video_cb(RETRO_HW_FRAME_BUFFER_VALID, app->chai_gfx.width, app->chai_gfx.height, 0);
+		
+		// PERF: Print timing breakdown every 60 frames
+		auto frameEnd = std::chrono::high_resolution_clock::now();
+		if (++perfCounter >= 60) {
+			perfCounter = 0;
+			auto updateMs = std::chrono::duration<double, std::milli>(updateEnd - updateStart).count();
+			auto drawMs = std::chrono::duration<double, std::milli>(drawEnd - drawStart).count();
+			auto submitMs = std::chrono::duration<double, std::milli>(submitEnd - submitStart).count();
+			auto advanceMs = std::chrono::duration<double, std::milli>(advanceEnd - advanceStart).count();
+			auto totalMs = std::chrono::duration<double, std::milli>(frameEnd - frameStart).count();
+			// std::printf("[PERF] Frame: %.2f ms | Update: %.2f ms | Draw: %.2f ms | Submit: %.2f ms | Advance: %.2f ms\n",
+			// 	totalMs, updateMs, drawMs, submitMs, advanceMs);
+			// fflush(stdout);
+		}
 	}
 
-	// CRITICAL FIX: Process cleanup callbacks that were queued
-	// In normal mode this happens in beginFrame(), but that's never called in libretro
-	// Must be called AFTER drawing so cleanup happens for the completed frame
-	vulkanGraphics->processCleanupCallbacks();
-	
-	// CRITICAL FIX: Call shader newFrame() to reset descriptor pools and destroy pipelines
-	// This was never being called in libretro mode, causing infinite accumulation
-	// Must be called AFTER drawing to clean up resources from the frame we just rendered
-	vulkanGraphics->callShaderNewFrame();
+	// PERF: Throttle cleanup callbacks and shader resets to reduce per-frame overhead
+	static int cleanupCounter = 0;
+	if (++cleanupCounter >= 60)
+	{
+		cleanupCounter = 0;
+		// Process cleanup callbacks that were queued
+		vulkanGraphics->processCleanupCallbacks();
+		// Disabled: callShaderNewFrame() causes expensive pipeline recreation
+		// vulkanGraphics->callShaderNewFrame();
+	}
 
 	// One-time aggressive cleanup after first frame to release initialization memory
 	static bool firstFrameCleanupDone = false;

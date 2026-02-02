@@ -514,7 +514,7 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_collisions::addCharacterController), "addCharacterController");
 	chai.add(fun(&chai_collisions::applyForceToCharacter), "applyForceToCharacter");
 	chai.add(fun(&chai_collisions::applyForceToRigidMesh), "applyForceToRigidMesh");
-	chai.add(fun(static_cast<void (chai_collisions::*)(int, int, int, int, int, float, float, float, float, float, float, float, float, float, float)>(&chai_collisions::createVehicle)), "createVehicle");
+	chai.add(fun(static_cast<void (chai_collisions::*)(int, int, int, int, int, float, float, float, float, float, float, float, float, float, float, float, float, float)>(&chai_collisions::createVehicle)), "createVehicle");
 	chai.add(fun(&chai_collisions::setCharacterControllerPosition), "setCharacterControllerPosition");
 	chai.add(fun(&chai_collisions::setRigidMeshPosition), "setRigidMeshPosition");
 	chai.add(fun(&chai_collisions::getCharacterController), "getCharacterController");

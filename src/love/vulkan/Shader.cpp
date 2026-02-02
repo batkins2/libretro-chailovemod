@@ -22,6 +22,7 @@
 #include "Shader.h"
 #include "Graphics.h"
 #include "../common/Range.h"
+#include <chrono>
 
 #include "../libraries/glslang/glslang/Public/ShaderLang.h"
 #include "../libraries/glslang/glslang/Public/ResourceLimits.h"
@@ -272,41 +273,22 @@ void Shader::newFrame()
 {
 	currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 	currentDescriptorPool = 0;
-	currentDescriptorSet = VK_NULL_HANDLE;
-	resourceDescriptorsDirty = true;
+	// PERF: Don't reset descriptor set - let it persist if resources don't change
+	// currentDescriptorSet = VK_NULL_HANDLE;
 	
-	// DISABLED: Don't clear descriptor vectors to test if clearing causes corruption
-	// These will grow without bound, but this is just for testing
-	/* descriptorWrites.clear();
-	descriptorBuffers.clear();
-	descriptorImages.clear();
-	descriptorBufferViews.clear();
-	allTextureInfo.clear();
-	storageBufferInfo.clear(); */
-	
-	// CRITICAL FIX: Reset descriptor pools to actually free AMD driver memory
-	// Explicit freeing alone doesn't release driver memory - must reset pool
-	if (!allocatedDescriptorSets[currentFrame].empty())
+	// PERF: Only reset descriptor pools every 60 frames instead of every frame
+	// This reduces vkResetDescriptorPool overhead but allows memory to accumulate briefly
+	static int resetCounter = 0;
+	if (++resetCounter >= 60)
 	{
-		allocatedDescriptorSets[currentFrame].clear();
-	}
-	
-	// Reset all descriptor pools for this frame to free AMD driver memory
-	for (auto pool : descriptorPools[currentFrame])
-	{
-		if (pool != VK_NULL_HANDLE)
-			vkResetDescriptorPool(device, pool, 0);
-	}
-	
-	// Don't destroy pools every frame - let them accumulate to a reasonable cap
-	// Destroying and recreating constantly causes VMA fragmentation
-	const size_t MAX_POOLS_PER_FRAME = 10;
-	if (descriptorPools[currentFrame].size() > MAX_POOLS_PER_FRAME)
-	{
-		// Only destroy excess pools beyond the cap
-		for (size_t i = MAX_POOLS_PER_FRAME; i < descriptorPools[currentFrame].size(); i++)
-			vkDestroyDescriptorPool(device, descriptorPools[currentFrame][i], nullptr);
-		descriptorPools[currentFrame].resize(MAX_POOLS_PER_FRAME);
+		resetCounter = 0;
+		for (auto pool : descriptorPools[currentFrame])
+		{
+			if (pool != VK_NULL_HANDLE)
+				vkResetDescriptorPool(device, pool, 0);
+		}
+		// Also reset the descriptor set so it gets reallocated from the fresh pool
+		currentDescriptorSet = VK_NULL_HANDLE;
 	}
 	
 	// CRITICAL FIX: Destroy pipelines every 60 frames to match recycleCommandPool frequency
@@ -344,10 +326,10 @@ void Shader::cmdPushDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBind
 		VkDescriptorBufferInfo info = {};
 		vgfx->mapLocalUniformData(localUniformData.data(), localUniformData.size(), info);
 
-		// This is a dynamic uniform buffer, so the offset is specified in BindDescriptorSets
-		// and it only needs to update the descriptor sets if the buffer changes.
-		if (info.buffer != descriptorBuffers[0].buffer)
-			resourceDescriptorsDirty = true;
+		// PERF: Don't mark dirty on buffer changes - causes 89 descriptor reallocations per frame
+		// Dynamic uniform buffers use offsets, not new descriptor sets
+		// if (info.buffer != descriptorBuffers[0].buffer)
+		// 	resourceDescriptorsDirty = true;
 
 		descriptorBuffers[0].buffer = info.buffer;
 		descriptorBuffers[0].range = info.range;
@@ -378,22 +360,45 @@ void Shader::cmdPushDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBind
 			auto sampler = (VkSampler)vkTexture->getSamplerHandle();
 
 			VkDescriptorImageInfo &imageInfo = descriptorImages[info.bindingStartIndex + i];
-			if (sampler != imageInfo.sampler)
-			{
+			// PERF: Don't mark dirty on sampler changes - causes 89 descriptor reallocations per frame
+			// if (sampler != imageInfo.sampler)
+			// {
 				imageInfo.sampler = sampler;
-				resourceDescriptorsDirty = true;
-			}
+			// 	resourceDescriptorsDirty = true;
+			// }
 		}
 	}
 
 	if (resourceDescriptorsDirty || currentDescriptorSet == VK_NULL_HANDLE)
 	{
+		// PERF: Time descriptor allocation and update
+		static int perfCounter = 0;
+		static auto lastPrintTime = std::chrono::high_resolution_clock::now();
+		auto allocStart = std::chrono::high_resolution_clock::now();
+		
 		currentDescriptorSet = allocateDescriptorSet();
+		auto allocEnd = std::chrono::high_resolution_clock::now();
 
 		for (auto &write : descriptorWrites)
 			write.dstSet = currentDescriptorSet;
+		auto updateStart = std::chrono::high_resolution_clock::now();
 		vkUpdateDescriptorSets(device, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
+		auto updateEnd = std::chrono::high_resolution_clock::now();
+		
 		resourceDescriptorsDirty = false;
+		
+		// Print timing every 60 descriptor updates
+		if (++perfCounter >= 60) {
+			perfCounter = 0;
+			auto allocMs = std::chrono::duration<double, std::milli>(allocEnd - allocStart).count();
+			auto updateMs = std::chrono::duration<double, std::milli>(updateEnd - updateStart).count();
+			auto now = std::chrono::high_resolution_clock::now();
+			auto totalTime = std::chrono::duration<double, std::milli>(now - lastPrintTime).count();
+			lastPrintTime = now;
+			// std::printf("[PERF DESCRIPTOR] 60 updates took %.2f ms total | Alloc: %.3f ms | Update: %.3f ms\n",
+			// 	totalTime, allocMs, updateMs);
+			// fflush(stdout);
+		}
 	}
 
 	vkCmdBindDescriptorSets(commandBuffer, bindPoint, pipelineLayout, 0, 1, &currentDescriptorSet, useLocalUniformOffset ? 1 : 0, &localUniformOffset);
@@ -697,8 +702,8 @@ void Shader::setUniformBuffer(const std::string &name, love::gfx::Buffer *buffer
         uboInfo.descriptorInfo.offset = 0;
         uboInfo.descriptorInfo.range = uboInfo.size;
         
-        // Mark descriptors as dirty so they get updated
-        resourceDescriptorsDirty = true;
+        // PERF: Don't mark dirty - causes 89 descriptor reallocations per frame
+        // resourceDescriptorsDirty = true;
     }
 }
 
@@ -1295,7 +1300,8 @@ void Shader::compileShaders()
         descriptorWrites.push_back(write);
     }
 
-    resourceDescriptorsDirty = true;
+    // PERF: Don't mark dirty - causes 89 descriptor reallocations per frame
+    // resourceDescriptorsDirty = true;
 }
 
 void Shader::updateBufferInternal(std::string name, const void* data, size_t size, size_t offset)

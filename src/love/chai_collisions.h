@@ -232,13 +232,13 @@ class chai_collisions
     std::vector<float> getRigidMesh(int ref);
     int addBox(float x, float y, float z, float width, float height, float depth, std::vector<int> group, int index);
     std::vector<std::pair<glm::vec3, glm::vec3>> getBoundingBox(int mesh);
-    std::vector<Matrix4> getPhysicsObjects(int mesh);
+    std::vector<Matrix4> getPhysicsObjects(int mesh, std::vector<float> scale);
     int portalCollide(int index);
     void teleportCharacter(int characterIndex, float x, float y, float z);
     void teleportRigidMesh(std::vector<int> rigidMeshIndex, float x, float y, float z);
     void drawWireframeBox(const JPH::Vec3& min, const JPH::Vec3& max);
     void drawPhysicsDebug();
-    void createVehicle(int frontLeftWheelMeshRef, int frontRightWheelMeshRef, int rearLeftWheelMeshRef, int rearRightWheelMeshRef, int chassisMeshRef, float mass, float wheelRadius, float wheelWidth, float suspensionRestLength, float suspensionStiffness, float suspensionDamping, float suspensionCompression, float frictionSlip, float maxSuspensionTravelCm, float maxSuspensionForce);
+    void createVehicle(int frontLeftWheelMeshRef, int frontRightWheelMeshRef, int rearLeftWheelMeshRef, int rearRightWheelMeshRef, int chassisMeshRef, float mass, float wheelRadius, float wheelWidth, float suspensionRestLength, float suspensionStiffness, float suspensionDamping, float suspensionCompression, float frictionSlip, float maxSuspensionTravelCm, float maxSuspensionForce, float scaleX, float scaleY, float scaleZ);
 
     void clearWorlds()
     {
@@ -246,6 +246,7 @@ class chai_collisions
     }
 
     void debugDraw();
+    std::vector<float> getVehicleBoneTransform(int vehicleIndex, const std::string& boneName);
     uint8_t* buffer = nullptr;
      
     class CharacterController
@@ -306,6 +307,8 @@ class chai_collisions
         JPH::Vec3 centroid;  // Store mesh centroid for position calculations
         glm::vec3 nodePosition;  // GLTF node translation
         glm::quat nodeRotation;  // GLTF node rotation
+        glm::vec3 nodeScale;  // GLTF node scale
+        JPH::Vec3 com;  // Store original center of mass before geometry recentering
     };
 
     class Vehicle
@@ -315,12 +318,14 @@ class chai_collisions
                 float suspRestLen = 0.5f, float suspStiffness = 100.0f, float suspDamping = 5.0f, float wheelRadius = 0.3f)
             : vehicleConstraint(constraint), chassisBodyID(chassisID), frameCounter(0),
               suspensionRestLength(suspRestLen), suspensionStiffness(suspStiffness), suspensionDamping(suspDamping), wheelRadius(wheelRadius),
-              constraintActive(false), settledFrames(0), restVelocityThreshold(0.5f), framesUntilActivation(60), activationWarmupFrames(5), rigidSuspension(false)
+              constraintActive(false), settledFrames(0), restVelocityThreshold(0.5f), framesUntilActivation(60), activationWarmupFrames(5), rigidSuspension(false),
+              chassisMeshRef(-1)
         {
             for (int i = 0; i < 4; i++) {
                 wheelBodyIDs[i] = wheelIDs[i];
                 wheelLocalPos[i] = wheelLocalPositions[i];
                 wheelVelocity[i] = JPH::Vec3::sZero();  // Track wheel velocity for damping
+                wheelCOMOffsets[i] = JPH::Vec3::sZero();  // Initialize COM offsets
             }
             lastVelocity = JPH::Vec3::sZero();
         }
@@ -333,7 +338,20 @@ class chai_collisions
         JPH::BodyID wheelBodyIDs[4];
         JPH::Vec3 wheelLocalPos[4];  // Local position of each wheel relative to chassis
         JPH::Vec3 wheelVelocity[4];  // Track wheel contact velocity for suspension damping
+        JPH::Vec3 wheelCOMOffsets[4];  // Original COM offset for each wheel (for correcting visual orbiting)
+        int chassisMeshRef;  // Reference to the chassis mesh for querying armature bones
+        chai_mesh* chassisMeshPtr = nullptr;  // Direct pointer to chassis mesh for skeleton data
         int frameCounter;
+        
+        // Armature bone override transforms (for skeletal animation control from physics)
+        struct BoneTransform {
+            JPH::RVec3 position;
+            JPH::Quat rotation;
+            bool active;
+            BoneTransform() : position(JPH::RVec3::sZero()), rotation(JPH::Quat::sIdentity()), active(false) {}
+        };
+        BoneTransform chassisBoneTransform;
+        BoneTransform wheelBoneTransforms[4];
         
         // Suspension parameters
         float suspensionRestLength;
@@ -406,6 +424,8 @@ class chai_collisions
         std::map<int, WorldJolt*> worlds;
     };
     std::vector<RigidMesh *> rigidMeshes;
+    // Map to store DEF-Wheel bone positions from chassis meshes: meshRef -> [4 wheel positions]
+    std::map<int, std::vector<glm::vec3>> chassisWheelBones;
     // std::vector<btRigidBody *> cameraBox;
     // std::vector<btRigidBody *> portalBox;
     std::vector<CharacterController *> characterControllers;

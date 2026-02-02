@@ -2,6 +2,7 @@
 #include "data/DataModule.h"
 #include "image/CompressedImageData.h"
 #include "image/FormatHandler.h"
+#include <map>
 
 #ifndef TINY_GLTF_H_
 #define TINYGLTF_USE_RAPIDJSON
@@ -17,6 +18,9 @@
 
 namespace love
 {
+// Keep pixel buffers alive for fallback textures
+static std::map<gfx::Texture*, uint8_t*> s_fallbackTextureBuffers;
+
 chai_mesh::chai_mesh(std::vector<chai_meshData*> &data) {
     this->data = data;
     m_cachedAnimationDurations.clear();
@@ -592,6 +596,8 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
         // #endif
             auto texture = model.textures[material.pbrMetallicRoughness.baseColorTexture.index];
             tex = cm->textures[texture.source] ?: nullptr;
+        } else {
+            tex = nullptr;
         }
         
         if (tex == nullptr) {
@@ -604,30 +610,52 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
 
             uint8_t* colorPixel = new uint8_t[64*64*4];
             
-            // Get base color from material or use white as default
+            // Get base color from material or use white as default - FORCE OPAQUE
             uint8_t r = 255, g = 255, b = 255, a = 255;
-            
             if (material.pbrMetallicRoughness.baseColorFactor.size() >= 4) {
                 r = static_cast<uint8_t>(material.pbrMetallicRoughness.baseColorFactor[0] * 255.0f);
                 g = static_cast<uint8_t>(material.pbrMetallicRoughness.baseColorFactor[1] * 255.0f);
                 b = static_cast<uint8_t>(material.pbrMetallicRoughness.baseColorFactor[2] * 255.0f);
-                a = static_cast<uint8_t>(material.pbrMetallicRoughness.baseColorFactor[3] * 255.0f);
+                // ALWAYS force alpha to 255 - ignore material alpha
+                printf("[DEBUG] Base color factor: R=%d G=%d B=%d A=255 (FORCED) (raw: %.4f %.4f %.4f %.4f)\n", 
+                    r, g, b,
+                    material.pbrMetallicRoughness.baseColorFactor[0],
+                    material.pbrMetallicRoughness.baseColorFactor[1],
+                    material.pbrMetallicRoughness.baseColorFactor[2],
+                    material.pbrMetallicRoughness.baseColorFactor[3]);
             }
-            
+
+            printf("[DEBUG] Creating fallback texture with color: R=%d G=%d B=%d A=%d\n", r, g, b, a);
+
             // Fill the pixel data with the base color
+            // Using RGBA byte order to match PIXELFORMAT_RGBA8_UNORM
             for (int j = 0; j < 64*64*4; j+=4) {
                 colorPixel[j] = r;         // Red
                 colorPixel[j + 1] = g;     // Green
                 colorPixel[j + 2] = b;     // Blue
                 colorPixel[j + 3] = a;     // Alpha
             }
+            
+            // Verify first few pixels
+            printf("[DEBUG] First pixel data (RGBA): R=%d G=%d B=%d A=%d\n", 
+                colorPixel[0], colorPixel[1], colorPixel[2], colorPixel[3]);
+            printf("[DEBUG] Last pixel data (RGBA): R=%d G=%d B=%d A=%d\n", 
+                colorPixel[64*64*4-4], colorPixel[64*64*4-3], colorPixel[64*64*4-2], colorPixel[64*64*4-1]);
+            
             auto gfxInstance = Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS);
-            tex = gfxInstance->newTexture(settings, &slices);        
+            tex = gfxInstance->newTexture(settings, &slices);
+            printf("[DEBUG] Created fallback texture: %p\n", (void*)tex);
+            
+            // Now update with actual pixel data
             Rect rect;
             rect.w = 64;
             rect.h = 64;
             tex->replacePixels(colorPixel, 4*64*64, 0, 0, rect, true);
-            delete[] colorPixel;  // Free allocated pixel buffer
+            printf("[DEBUG] Texture pixels replaced\n");
+            
+            // Store buffer in static map to keep it alive for the texture
+            s_fallbackTextureBuffers[tex] = colorPixel;
+            printf("[DEBUG] Pixel buffer stored in map for texture %p\n", (void*)tex);
             gfx::SamplerState sampler = gfx::SamplerState();
 
             sampler.wrapU = gfx::SamplerState::WrapMode::WRAP_REPEAT;
@@ -1036,7 +1064,9 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
         auto usage = gfx::BufferDataUsage::BUFFERDATAUSAGE_DYNAMIC;
         if (readyData != nullptr) {
             auto m = instance->newMesh(vf, readyData->prepD.data(), readyData->prepD.size() * sizeof(float), gfx::PrimitiveType::PRIMITIVE_TRIANGLES, usage);
+            printf("[DEBUG] Created mesh: %p with texture: %p\n", (void*)m, (void*)tex);
             m->setTexture(tex);
+            printf("[DEBUG] Texture set on mesh (readyData)\n");
                 
             // GLuint vbo;
             // glGenBuffers(1, &vbo);
@@ -1054,7 +1084,9 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
             return p;
         } else {
             auto m = instance->newMesh(vf, prepD.data(), prepD.size() * sizeof(float), gfx::PrimitiveType::PRIMITIVE_TRIANGLES, usage);
+            printf("[DEBUG] Created mesh: %p with texture: %p\n", (void*)m, (void*)tex);
             m->setTexture(tex);
+            printf("[DEBUG] Texture set on mesh (new data)\n");
             auto d = new chai_meshData(prepD, cm->animations);
 
             // GLuint vbo;
@@ -1428,7 +1460,7 @@ std::vector<int> getChildNodes(std::map<int, std::vector<int>> nodeChildren, int
 
 void chai_mesh::update(std::vector<float> position, std::vector<float> rotation, std::vector<float> scale, chai_debug *debug) {
     auto cc = ChaiLove::getInstance()->chai_collisions;
-    auto po = cc.getPhysicsObjects(id);
+    auto po = cc.getPhysicsObjects(id, scale);
     for (int i = 0; i < po.size(); i++) {
         auto physicsObjectMatrix = po[i];
         if (debug) {
@@ -1946,7 +1978,15 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
             
                 if (jointOrder.find(i) != jointOrder.end()) {
                     for (auto joint : jointOrder[i]) {
-                        auto matrix = skins[i][joint];
+                        // Safety check: ensure skin data exists and has correct size
+                        if (skins.find(i) == skins.end() || skins[i].find(joint) == skins[i].end()) {
+                            continue;
+                        }
+                        auto& matrix = skins[i][joint];
+                        if (matrix.size() < 16) {
+                            continue;
+                        }
+                        
                         jointIBMatrix[joint] = glm::mat4(
                             matrix[0], matrix[1], matrix[2], matrix[3],
                             matrix[4], matrix[5], matrix[6], matrix[7],
@@ -1966,6 +2006,8 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                     // }
                 }
             }
+
+            // Wheels are rigged by armature to chassis - no physics override needed
 
             // Process animations every frame (removed currentTime != dt condition)
             // Since we clear jointMatrix every frame, we must process animations every frame too
@@ -2498,6 +2540,11 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
             }
            
             if (msh != nullptr) {
+                // Force opaque blending mode for mesh rendering
+                gfx::BlendState opaqueBlend;
+                opaqueBlend.enable = false;  // Disable blending - write directly
+                gfx->setBlendState(opaqueBlend);
+                
                 msh->draw(gfx, mat);  // Use physics-updated matrix, not 'm'
             }
         }

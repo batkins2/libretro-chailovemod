@@ -3,6 +3,7 @@
 #include <libretro.h>
 #include <SDL2/SDL.h>
 #include <string>
+#include <chrono>
 
 ChaiLove* ChaiLove::m_instance = NULL;
 retro_input_state_t ChaiLove::input_state_cb = NULL;
@@ -165,7 +166,23 @@ void ChaiLove::draw() {
 
 	// Render the game.
 	if (script != NULL) {
+		// PERF: Time ChaiScript execution vs Vulkan recording
+		static int drawCounter = 0;
+		static double totalScriptTime = 0.0;
+		static double totalVulkanTime = 0.0;
+		auto scriptStart = std::chrono::high_resolution_clock::now();
+		
 		script->draw();
+		
+		auto scriptEnd = std::chrono::high_resolution_clock::now();
+		auto scriptMs = std::chrono::duration<double, std::milli>(scriptEnd - scriptStart).count();
+		totalScriptTime += scriptMs;
+		
+		if (++drawCounter % 60 == 0) {
+			// std::printf("[PERF CHAISCRIPT] 60 draw() calls | Last: %.2f ms | Avg: %.2f ms | Total: %.2f ms\n",
+			// 	scriptMs, totalScriptTime / drawCounter, totalScriptTime);
+			// fflush(stdout);
+		}
 	}
 
 	// Render the in-game console.
