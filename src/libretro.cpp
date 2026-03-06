@@ -123,7 +123,7 @@ static DebugRendererState g_debugRenderer;
 
 // Disable debug rendering by default to avoid massive per-frame overhead.
 // Re-enable only when actively debugging physics.
-#define ENABLE_DEBUG_GEOMETRY_RENDERING 0
+#define ENABLE_DEBUG_GEOMETRY_RENDERING 1
 
 static void cleanupDebugRenderer(VmaAllocator allocator, VkDevice device) {
 	if (allocator == VK_NULL_HANDLE || device == VK_NULL_HANDLE) {
@@ -1394,7 +1394,7 @@ void retro_run(void) {
 	static int statsFrameCounter = 0;
 	static uint32_t lastAllocCount = 0;
 	static SIZE_T lastSystemRAM = 0;
-	if (false && ++statsFrameCounter >= 60)
+	if (++statsFrameCounter >= 60)
 	{
 		statsFrameCounter = 0;
 		
@@ -1413,18 +1413,19 @@ void retro_run(void) {
 		SIZE_T ramDelta = systemRAM - lastSystemRAM;
 		
 		// Track heap allocations vs committed memory to identify fragmentation
-		_HEAPINFO hinfo;
-		int heapstatus;
-		hinfo._pentry = NULL;
+		// DISABLED: _heapwalk() causes freeze at frame 58-60
+		// _HEAPINFO hinfo;
+		// int heapstatus;
+		// hinfo._pentry = NULL;
 		size_t totalHeapUsed = 0;
 		size_t totalHeapCommitted = 0;
-		while ((heapstatus = _heapwalk(&hinfo)) == _HEAPOK) {
-			if (hinfo._useflag == _USEDENTRY) {
-				totalHeapUsed += hinfo._size;
-			}
-			totalHeapCommitted += hinfo._size;
-		}
-		size_t heapWaste = totalHeapCommitted - totalHeapUsed;
+		// while ((heapstatus = _heapwalk(&hinfo)) == _HEAPOK) {
+		// 	if (hinfo._useflag == _USEDENTRY) {
+		// 		totalHeapUsed += hinfo._size;
+		// 	}
+		// 	totalHeapCommitted += hinfo._size;
+		// }
+		size_t heapWaste = 0; // totalHeapCommitted - totalHeapUsed;
 		
 		SIZE_T workingSet = pmc.WorkingSetSize / (1024 * 1024);
 		SIZE_T privateBytes = pmc.PrivateUsage / (1024 * 1024);
@@ -1450,20 +1451,27 @@ void retro_run(void) {
 			stagingDelta,
 			systemRAM,
 			ramDelta);
-		std::printf("[HEAP] Used: %zu MB | Waste: %zu MB | WorkingSet: %llu MB | PageFaults: +%llu\n",
-			totalHeapUsed / (1024 * 1024),
-			heapWaste / (1024 * 1024),
-			workingSet,
-			pageFaultDelta);
+		// std::printf("[HEAP] Used: %zu MB | Waste: %zu MB | WorkingSet: %llu MB | PageFaults: +%llu\n",
+		// 	totalHeapUsed / (1024 * 1024),
+		// 	heapWaste / (1024 * 1024),
+		// 	workingSet,
+		// 	pageFaultDelta);
+		
+		// Check if descriptor fix reduced leak
+		// if (ramDelta > 100) {
+		// 	std::printf("[LEAK ANALYSIS] Still leaking %llu MB/min after descriptor fix - investigating other sources\n", ramDelta);
+		// } else {
+		// 	std::printf("[LEAK FIXED] Memory stable at +%llu MB/min - descriptor fix successful!\n", ramDelta);
+		// }
 		
 		// PROOF: Show the leak is in untracked memory (driver private allocations)
-		static size_t lastUntracked = 0;
-		size_t untrackedDelta = untracked > lastUntracked ? untracked - lastUntracked : 0;
-		std::printf("[LEAK PROOF] Tracked: %zu MB (GPU+Heap+Staging) | Untracked: %zu MB (+%zu) <- DRIVER PRIVATE\n",
-			trackedTotal,
-			untracked,
-			untrackedDelta);
-		lastUntracked = untracked;
+		// static size_t lastUntracked = 0;
+		// size_t untrackedDelta = untracked > lastUntracked ? untracked - lastUntracked : 0;
+		// std::printf("[LEAK PROOF] Tracked: %zu MB (GPU+Heap+Staging) | Untracked: %zu MB (+%zu) <- DRIVER PRIVATE\n",
+		// 	trackedTotal,
+		// 	untracked,
+		// 	untrackedDelta);
+		// lastUntracked = untracked;
 		
 		fflush(stdout);
 		
@@ -1495,14 +1503,15 @@ void retro_run(void) {
 		
 		static int recycleCounter = 0;
 		
-		// FINDING: Leak is ~120 MB/min without recycling, ~77 MB/min with it at 60 frames
-		// This proves recycling HELPS but doesn't eliminate the AMD driver leak
-		// The leak is from normal rendering operations, not cleanup
-		if (++recycleCounter >= 60) {  // Back to 60 frames - this actually helps
+		// MEMORY LEAK FIX: Recycle less frequently and WITHOUT pipeline cache destruction
+		// The leak was caused by destroying/recreating pipeline cache every 60 frames
+		// Now recycle command pool every 120 frames, but keep pipeline cache intact
+		if (++recycleCounter >= 120) {  // Reduced frequency: 120 frames = 2 seconds
 			recycleCounter = 0;
 			
-			// Simple recycling without aggressive workarounds
-			vulkanGraphics->recycleCommandPool(true);
+			// Recycle command pool WITHOUT destroying pipeline cache (false parameter)
+			// This prevents frequent pipeline recreation that causes AMD driver leaks
+			vulkanGraphics->recycleCommandPool(false);
 			
 			// WORKAROUND: Aggressive Windows memory management
 			HANDLE hProcess = GetCurrentProcess();
@@ -1529,7 +1538,10 @@ void retro_run(void) {
 
 	// PERF: Add frame timing to identify bottleneck
 	static int perfCounter = 0;
+	static int frameNumber = 0;
 	auto frameStart = std::chrono::high_resolution_clock::now();
+	
+	frameNumber++;
 	
 	// Update the game.
 	auto updateStart = std::chrono::high_resolution_clock::now();
@@ -1680,15 +1692,15 @@ void retro_run(void) {
 		// vulkan->wait_sync_index(vulkan->handle);
 
 		vk.index = vulkan->get_sync_index(vulkan->handle);
-		VkCommandBuffer cmd[] = {cg.instance->getCommandBufferForDataTransfer()}; 
+		auto cmd = cg.instance->getCommandBuffersForDataTransfer(); 
 		// VkCommandBuffer cmd[buffers.size()];
 		// for (size_t i = 0; i < buffers.size(); i++) {
 		// 	cmd[i] = buffers[i];
 		// }		
 
-		auto submitStart = std::chrono::high_resolution_clock::now();
+		// auto submitStart = std::chrono::high_resolution_clock::now();
 		vulkanGraphics->submitGpuCommands(love::gfx::vulkan::SUBMIT_NOPRESENT, nullptr);
-		auto submitEnd = std::chrono::high_resolution_clock::now();
+		// auto submitEnd = std::chrono::high_resolution_clock::now();
 		
 		// NOTE: Debug rendering now uses app->graphics.line() - no pipeline creation needed
 		
@@ -1697,9 +1709,9 @@ void retro_run(void) {
 		// advanceFrame() internally calls beginFrame() to start recording the next frame's command buffer
 		// std::printf("[FRAMEADVANCE] Advancing to next frame\n");
 		// fflush(stdout);
-		auto advanceStart = std::chrono::high_resolution_clock::now();
+		// auto advanceStart = std::chrono::high_resolution_clock::now();
 		vulkanGraphics->advanceFrame();
-		auto advanceEnd = std::chrono::high_resolution_clock::now();
+		// auto advanceEnd = std::chrono::high_resolution_clock::now();
 
 		retro_vulkan_image image;
 		image.image_view = cg.instance->getCurrentSwapchainImageView();
@@ -1715,26 +1727,34 @@ void retro_run(void) {
 		auto frameEnd = std::chrono::high_resolution_clock::now();
 		if (++perfCounter >= 60) {
 			perfCounter = 0;
-			auto updateMs = std::chrono::duration<double, std::milli>(updateEnd - updateStart).count();
-			auto drawMs = std::chrono::duration<double, std::milli>(drawEnd - drawStart).count();
-			auto submitMs = std::chrono::duration<double, std::milli>(submitEnd - submitStart).count();
-			auto advanceMs = std::chrono::duration<double, std::milli>(advanceEnd - advanceStart).count();
-			auto totalMs = std::chrono::duration<double, std::milli>(frameEnd - frameStart).count();
+			// auto updateMs = std::chrono::duration<double, std::milli>(updateEnd - updateStart).count();
+			// auto drawMs = std::chrono::duration<double, std::milli>(drawEnd - drawStart).count();
+			// auto submitMs = std::chrono::duration<double, std::milli>(submitEnd - submitStart).count();
+			// auto advanceMs = std::chrono::duration<double, std::milli>(advanceEnd - advanceStart).count();
+			// auto totalMs = std::chrono::duration<double, std::milli>(frameEnd - frameStart).count();
 			// std::printf("[PERF] Frame: %.2f ms | Update: %.2f ms | Draw: %.2f ms | Submit: %.2f ms | Advance: %.2f ms\n",
 			// 	totalMs, updateMs, drawMs, submitMs, advanceMs);
 			// fflush(stdout);
 		}
 	}
 
-	// PERF: Throttle cleanup callbacks and shader resets to reduce per-frame overhead
-	static int cleanupCounter = 0;
-	if (++cleanupCounter >= 60)
+	// CRITICAL FIX: Process cleanup callbacks EVERY frame to release staging buffers immediately
+	// Staging buffers, StreamBuffers, and other resources queue cleanup via queueCleanUp()
+	// In normal mode, beginFrame() processes these every frame - libretro mode must do the same
+	vulkanGraphics->processCleanupCallbacks();
+	
+	// PERF: Throttle shader resets and staging buffer cleanup to reduce per-frame overhead
+	static int shaderResetCounter = 0;
+	if (++shaderResetCounter >= 60)
 	{
-		cleanupCounter = 0;
-		// Process cleanup callbacks that were queued
-		vulkanGraphics->processCleanupCallbacks();
-		// Disabled: callShaderNewFrame() causes expensive pipeline recreation
-		// vulkanGraphics->callShaderNewFrame();
+		shaderResetCounter = 0;
+		// Call shader newFrame() to prevent descriptor pool/pipeline memory leaks
+		// The shader newFrame() has built-in throttling (pools every 10 frames, pipelines every 60)
+		vulkanGraphics->callShaderNewFrame();
+		
+		// CRITICAL FIX: Clean up unused staging buffers to prevent pool accumulation
+		// Staging buffers are released via callbacks but remain in pool - remove unused ones
+		vulkanGraphics->cleanupUnusedStagingBuffers();
 	}
 
 	// One-time aggressive cleanup after first frame to release initialization memory

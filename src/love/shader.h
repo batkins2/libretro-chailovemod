@@ -212,6 +212,12 @@ public:
 	virtual void attach() = 0;
 
 	/**
+	 * Force descriptor sets to be reallocated on next draw (Vulkan-specific).
+	 * Default implementation does nothing for non-Vulkan backends.
+	 **/
+	virtual void invalidateDescriptorSets() {}
+
+	/**
 	 * Attach a default shader.
 	 **/
 	static void attachDefault(StandardShader defaultType);

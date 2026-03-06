@@ -37,6 +37,8 @@ public:
     void prepareScreen();
     void update(float dt);
     void initFramebuffer();
+    void initShadowMap();
+    void renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &lightProjection, int view);
     float getFramerate();
     float getAverageFramerate();
     float getMinFramerate();
@@ -53,8 +55,10 @@ private:
     float currentTime = 0.01f;
     float deltaTime = 0.01f;
     std::vector<glm::mat4> viewMatrix;
-    // GLuint shadowMapFBO = 0;
-    // GLuint shadowMap = 0;
+    // Shadow mapping resources
+    love::gfx::Texture *shadowMapTexture = nullptr;
+    bool shadowMapInitialized = false;
+    static constexpr int SHADOW_MAP_SIZE = 2048;
     love::gfx::Texture *background_tex = nullptr;
     love::gfx::Mesh *background_mesh = nullptr;
     bool frameOddEven = false;

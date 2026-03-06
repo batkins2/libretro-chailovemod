@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <ctime>
 #include <chrono>
+#include <dbghelp.h>
 
 #ifdef __HAVE_CHAISCRIPT__
 #include "chaiscript/extras/math.hpp"
@@ -351,6 +352,8 @@ script::script(const std::string& file) {
 	chai.add(user_type<Joystick>(), "Joystick");
 	chai.add(fun(static_cast<bool (Joystick::*)(const std::string&)>(&Joystick::isDown)), "isDown");
 	chai.add(fun(static_cast<bool (Joystick::*)(int)>(&Joystick::isDown)), "isDown");
+	chai.add(fun(static_cast<float (Joystick::*)(int)>(&Joystick::getAxis)), "getAxis");
+	chai.add(fun(static_cast<float (Joystick::*)(const std::string&)>(&Joystick::getAxis)), "getAxis");
 	chai.add(fun(&Joystick::getName), "getName");
 	chai.add(fun(&Joystick::isConnected), "isConnected");
 	chai.add(fun(&Joystick::getID), "getID");
@@ -524,6 +527,7 @@ script::script(const std::string& file) {
 	chai.add(fun(&chai_collisions::portalCollide), "portalCollide");
 	chai.add(fun(&chai_collisions::teleportCharacter), "teleportCharacter");
 	chai.add(fun(&chai_collisions::teleportRigidMesh), "teleportRigidMesh");
+	chai.add(fun(&chai_collisions::setVehicleControl), "setVehicleControls");
 	chai.add(user_type<chai_gui>(), "chai_gui");
 	chai.add(constructor<chai_gui(const chai_gui &)>(), "chai_gui");
 	chai.add(fun(&chai_gui::operator=), "=");
@@ -656,6 +660,8 @@ script::script(const std::string& file) {
 	chai.add(fun(&joystick::getJoystickCount), "getJoystickCount");
 	chai.add(fun(static_cast<bool (joystick::*)(int, const std::string&)>(&joystick::isDown)), "isDown");
 	chai.add(fun(static_cast<bool (joystick::*)(int, int)>(&joystick::isDown)), "isDown");
+	chai.add(fun(static_cast<float (joystick::*)(int, int)>(&joystick::getAxis)), "getAxis");
+	chai.add(fun(static_cast<float (joystick::*)(int, const std::string&)>(&joystick::getAxis)), "getAxis");
 	chai.add(fun(&joystick::operator[]), "[]");
 
 	// Math
@@ -890,6 +896,31 @@ void script::draw() {
 		}
 		catch (const std::exception& e) {
 			LibretroLog::log(RETRO_LOG_ERROR) << "[ChaiLove] [script] Failed to call draw(): " << e.what() << std::endl;
+
+			void* stack[100];
+			WORD frames = RtlCaptureStackBackTrace(0, 100, stack, NULL);
+			HANDLE process = GetCurrentProcess();
+			SymInitialize(process, NULL, TRUE);
+			char symbolBuffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME * sizeof(TCHAR)];
+			SYMBOL_INFO* symbol = reinterpret_cast<SYMBOL_INFO*>(symbolBuffer);
+			symbol->MaxNameLen = MAX_SYM_NAME;
+			symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+			IMAGEHLP_LINE64 line = {};
+			line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
+			DWORD displacement = 0;
+			for (WORD i = 0; i < frames; i++) {
+				DWORD64 address = reinterpret_cast<DWORD64>(stack[i]);
+				if (SymFromAddr(process, address, nullptr, symbol)) {
+					if (SymGetLineFromAddr64(process, address, &displacement, &line)) {
+						LibretroLog::log(RETRO_LOG_ERROR) << "  Frame " << i << ": " << symbol->Name << " (" << line.FileName << ":" << line.LineNumber << ")" << std::endl;
+					} else {
+						LibretroLog::log(RETRO_LOG_ERROR) << "  Frame " << i << ": " << symbol->Name << " (0x" << std::hex << address << std::dec << ")" << std::endl;
+					}
+				} else {
+					LibretroLog::log(RETRO_LOG_ERROR) << "  Frame " << i << ": 0x" << std::hex << address << std::dec << std::endl;
+				}
+			}
+
 			hasDraw = false;
 		}
 	} else {

@@ -239,6 +239,7 @@ class chai_collisions
     void drawWireframeBox(const JPH::Vec3& min, const JPH::Vec3& max);
     void drawPhysicsDebug();
     void createVehicle(int frontLeftWheelMeshRef, int frontRightWheelMeshRef, int rearLeftWheelMeshRef, int rearRightWheelMeshRef, int chassisMeshRef, float mass, float wheelRadius, float wheelWidth, float suspensionRestLength, float suspensionStiffness, float suspensionDamping, float suspensionCompression, float frictionSlip, float maxSuspensionTravelCm, float maxSuspensionForce, float scaleX, float scaleY, float scaleZ);
+    void setVehicleControl(int vehicleIndex, float throttle, float steering, float brake);
 
     void clearWorlds()
     {
@@ -369,6 +370,13 @@ class chai_collisions
         int framesUntilActivation;          // Number of settled frames required before activation
         JPH::Vec3 lastVelocity;             // Last frame's velocity for rest detection
         int activationWarmupFrames;         // Frames to use chassis-based wheel sync after activation
+        
+        // Vehicle control inputs
+        float throttleInput = 0.0f;         // Engine throttle input [-1, 1]
+        float steeringInput = 0.0f;         // Steering input [-1, 1]
+        float brakeInput = 0.0f;            // Brake input [0, 1]
+
+        JPH::Vec3 scale; // Store scale for wheel positioning
     };
 
     class MyContactListener;
@@ -434,7 +442,8 @@ class chai_collisions
 
     void setProcessFrequency(float fps) { m_processInterval = 1.0f / fps; }
     void setDebugFrequency(float fps) { m_debugInterval = 1.0f / fps; }
-    void processDebugRendering(WorldJolt* world);
+    void processDebugRendering(WorldJolt* world, const glm::mat4* viewMatrix = nullptr, const glm::mat4* projectionMatrix = nullptr);
+    void renderDebugWithCamera(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix);
     bool calculateWorldBounds(JPH::AABox& worldBounds, WorldJolt* world);    
     void setupDebugCamera(const JPH::AABox& worldBounds);
 

@@ -276,37 +276,26 @@ void Shader::newFrame()
 	// PERF: Don't reset descriptor set - let it persist if resources don't change
 	// currentDescriptorSet = VK_NULL_HANDLE;
 	
-	// PERF: Only reset descriptor pools every 60 frames instead of every frame
-	// This reduces vkResetDescriptorPool overhead but allows memory to accumulate briefly
-	static int resetCounter = 0;
-	if (++resetCounter >= 60)
+	// Clear descriptor set tracking for the current frame.
+	allocatedDescriptorSets[currentFrame].clear();
+
+	// Reset (not destroy) pools for the current frame only.
+	// vkResetDescriptorPool recycles memory cheaply and is safe because currentFrame
+	// has already finished on the GPU (ring-buffered by MAX_FRAMES_IN_FLIGHT).
+	// Never touch other frames' pools — the GPU may still be executing them.
+	for (auto pool : descriptorPools[currentFrame])
 	{
-		resetCounter = 0;
-		for (auto pool : descriptorPools[currentFrame])
-		{
-			if (pool != VK_NULL_HANDLE)
-				vkResetDescriptorPool(device, pool, 0);
-		}
-		// Also reset the descriptor set so it gets reallocated from the fresh pool
-		currentDescriptorSet = VK_NULL_HANDLE;
+		if (pool != VK_NULL_HANDLE)
+			vkResetDescriptorPool(device, pool, 0);
 	}
+	currentDescriptorPool = 0;
+	currentDescriptorSet = VK_NULL_HANDLE;
 	
-	// CRITICAL FIX: Destroy pipelines every 60 frames to match recycleCommandPool frequency
-	// Pipelines accumulate in AMD driver memory - must be destroyed in sync with recycling
-	static int frameCounter = 0;
-	frameCounter++;
-	if (frameCounter >= 60)  // Changed from 120 to 60 to match recycling
-	{
-		frameCounter = 0;
-		
-		for (const auto &kvp : graphicsPipelinesDynamicState)
-			vkDestroyPipeline(device, kvp.second, nullptr);
-		graphicsPipelinesDynamicState.clear();
-		
-		for (const auto &kvp : graphicsPipelinesNoDynamicState)
-			vkDestroyPipeline(device, kvp.second, nullptr);
-		graphicsPipelinesNoDynamicState.clear();
-	}
+	// MEMORY LEAK FIX: Do NOT destroy pipelines frequently!
+	// Destroying and recreating pipelines every 60 frames causes AMD driver memory leaks
+	// Pipelines should be cached and reused - only destroyed on shader unload
+	// The AMD driver leak is NOT from pipeline accumulation, but from frequent recreation
+	// Keep pipelines cached for the lifetime of the shader for optimal performance
 }
 
 void Shader::cmdPushDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBindPoint bindPoint)
@@ -371,34 +360,13 @@ void Shader::cmdPushDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBind
 
 	if (resourceDescriptorsDirty || currentDescriptorSet == VK_NULL_HANDLE)
 	{
-		// PERF: Time descriptor allocation and update
-		static int perfCounter = 0;
-		static auto lastPrintTime = std::chrono::high_resolution_clock::now();
-		auto allocStart = std::chrono::high_resolution_clock::now();
-		
 		currentDescriptorSet = allocateDescriptorSet();
-		auto allocEnd = std::chrono::high_resolution_clock::now();
 
 		for (auto &write : descriptorWrites)
 			write.dstSet = currentDescriptorSet;
-		auto updateStart = std::chrono::high_resolution_clock::now();
 		vkUpdateDescriptorSets(device, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
-		auto updateEnd = std::chrono::high_resolution_clock::now();
-		
+
 		resourceDescriptorsDirty = false;
-		
-		// Print timing every 60 descriptor updates
-		if (++perfCounter >= 60) {
-			perfCounter = 0;
-			auto allocMs = std::chrono::duration<double, std::milli>(allocEnd - allocStart).count();
-			auto updateMs = std::chrono::duration<double, std::milli>(updateEnd - updateStart).count();
-			auto now = std::chrono::high_resolution_clock::now();
-			auto totalTime = std::chrono::duration<double, std::milli>(now - lastPrintTime).count();
-			lastPrintTime = now;
-			// std::printf("[PERF DESCRIPTOR] 60 updates took %.2f ms total | Alloc: %.3f ms | Update: %.3f ms\n",
-			// 	totalTime, allocMs, updateMs);
-			// fflush(stdout);
-		}
 	}
 
 	vkCmdBindDescriptorSets(commandBuffer, bindPoint, pipelineLayout, 0, 1, &currentDescriptorSet, useLocalUniformOffset ? 1 : 0, &localUniformOffset);

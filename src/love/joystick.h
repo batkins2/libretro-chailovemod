@@ -85,7 +85,45 @@ class joystick {
 	int getButtonKey(const std::string& name);
 	std::string getButtonName(int key);
 
-	private:
+	/**
+	 * Converts an axis index to its name.
+	 *
+	 * @param axis The axis index.
+	 *
+	 * @return The name of the axis.
+	 */
+	std::string getAxisName(int axis);
+
+	/**
+	 * Converts an axis name to its index.
+	 *
+	 * @param name The axis name.
+	 *
+	 * @return The axis index, or -1 if not found.
+	 */
+	int getAxisKey(const std::string& name);
+
+	/**
+	 * Gets the position of an axis on a joystick.
+	 *
+	 * @param joystick The joystick index.
+	 * @param axis The axis index (0=left X, 1=left Y, 2=right X, 3=right Y).
+	 *
+	 * @return The current position of the axis, normalized to [-1.0, 1.0].
+	 */
+	float getAxis(int joystick, int axis);
+
+	/**
+	 * Gets the position of an axis on a joystick by name.
+	 *
+	 * @param joystick The joystick index.
+	 * @param axis The axis name ("leftx", "lefty", "rightx", "righty").
+	 *
+	 * @return The current position of the axis, normalized to [-1.0, 1.0].
+	 */
+	float getAxis(int joystick, const std::string& axis);
+
+private:
 	std::vector<Joystick*> m_joysticks;
 };
 

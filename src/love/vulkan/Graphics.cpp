@@ -59,6 +59,125 @@ namespace gfx
 namespace vulkan
 {
 
+ShadowMap::ShadowMap(int width, int height, love::gfx::vulkan::Graphics* vulkanGraphics) {
+    createImage(width, height, vulkanGraphics);
+    createImageView(vulkanGraphics);
+    createSampler(vulkanGraphics);	
+}
+
+ShadowMap::~ShadowMap() {
+	auto& cg = ChaiLove::getInstance()->chai_gfx;
+	auto* vulkanGraphics = static_cast<love::gfx::vulkan::Graphics*>(cg.instance);
+    vkDestroySampler(vulkanGraphics->getDevice(), sampler, nullptr);
+    vkDestroyImageView(vulkanGraphics->getDevice(), imageView, nullptr);
+    vmaFreeMemory(vulkanGraphics->getVmaAllocator(), memory);
+    vkDestroyImage(vulkanGraphics->getDevice(), image, nullptr);
+}
+
+void ShadowMap::createImage(int width, int height, love::gfx::vulkan::Graphics* vulkanGraphics) {
+    VkImageCreateInfo imageInfo{};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.format = VK_FORMAT_D32_SFLOAT;
+    imageInfo.extent.width = width;
+    imageInfo.extent.height = height;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    VmaAllocationCreateInfo allocInfo{};
+    allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+	vmaCreateImage(vulkanGraphics->getVmaAllocator(), &imageInfo, &allocInfo, &image, &memory, nullptr);
+}
+
+void ShadowMap::createImageView(love::gfx::vulkan::Graphics* vulkanGraphics) {
+    VkImageViewCreateInfo viewInfo{};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = image;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = VK_FORMAT_D32_SFLOAT;
+    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = 1;
+
+    vkCreateImageView(vulkanGraphics->getDevice(), &viewInfo, nullptr, &imageView);
+}
+
+void ShadowMap::createSampler(love::gfx::vulkan::Graphics* vulkanGraphics) {
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.maxAnisotropy = 1.0f;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_TRUE;
+    samplerInfo.compareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+
+    vkCreateSampler(vulkanGraphics->getDevice(), &samplerInfo, nullptr, &sampler);
+
+}
+
+VkFramebuffer ShadowMap::createShadowFramebuffer(ShadowMap* shadowMap, VkRenderPass renderPass, love::gfx::vulkan::Graphics* vulkanGraphics) {
+    VkImageView attachments[] = { shadowMap->getView() };
+    VkFramebufferCreateInfo framebufferInfo{};
+    framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    framebufferInfo.renderPass = renderPass;
+    framebufferInfo.attachmentCount = 1;
+    framebufferInfo.pAttachments = attachments;
+    framebufferInfo.width = 1024; // Shadow map size
+    framebufferInfo.height = 1024;
+    framebufferInfo.layers = 1;
+
+    VkFramebuffer framebuffer;
+    vkCreateFramebuffer(vulkanGraphics->getDevice(), &framebufferInfo, nullptr, &framebuffer);
+    return framebuffer;
+}
+
+VkRenderPass ShadowMap::createShadowMapRenderPass(love::gfx::vulkan::Graphics* vulkanGraphics) {
+    VkAttachmentDescription depthAttachment{};
+    depthAttachment.format = VK_FORMAT_D32_SFLOAT;
+    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+    VkAttachmentReference depthAttachmentRef{};
+    depthAttachmentRef.attachment = 0;
+    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass{};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.pDepthStencilAttachment = &depthAttachmentRef;
+
+    VkRenderPassCreateInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    renderPassInfo.attachmentCount = 1;
+    renderPassInfo.pAttachments = &depthAttachment;
+    renderPassInfo.subpassCount = 1;
+    renderPassInfo.pSubpasses = &subpass;
+
+	VkRenderPass renderPass;
+    vkCreateRenderPass(vulkanGraphics->getDevice(), &renderPassInfo, nullptr, &renderPass);
+    return renderPass;
+}
+
 static const std::vector<const char*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
 };
@@ -146,7 +265,7 @@ static void checkOptionalInstanceExtensions(OptionalInstanceExtensions& ext)
 Graphics::Graphics()
     : love::gfx::Graphics("love.graphics.vulkan")
 {
-    // std::printf("[CHAILOVE DEBUG] Graphics::Graphics() constructor called\n");
+	// std::printf("[CHAILOVE DEBUG] Graphics::Graphics() constructor called\n");
     
 	// Initialize magic number first for corruption detection
     magicNumber = GRAPHICS_MAGIC;
@@ -254,7 +373,11 @@ bool Graphics::bindVAO()
 
 love::gfx::Texture *Graphics::newTexture(const love::gfx::Texture::Settings &settings, const love::gfx::Texture::Slices *data)
 {
-	return new Texture(this, settings, data);
+	static int textureCreationCount = 0;
+	auto tex = new Texture(this, settings, data);
+	std::printf("[GFX PIPELINE] Texture created #%d: %p (size: %dx%d)\n", 
+	       ++textureCreationCount, (void*)tex, settings.width, settings.height);
+	return tex;
 }
 
 love::gfx::Texture *Graphics::newTextureView(love::gfx::Texture *base, const Texture::ViewSettings &viewsettings)
@@ -264,7 +387,11 @@ love::gfx::Texture *Graphics::newTextureView(love::gfx::Texture *base, const Tex
 
 love::gfx::Buffer *Graphics::newBuffer(const love::gfx::Buffer::Settings &settings, const std::vector<love::gfx::Buffer::DataDeclaration> &format, const void *data, size_t size, size_t arraylength)
 {
-	return new Buffer(this, settings, format, data, size, arraylength);
+	static int bufferCreationCount = 0;
+	auto buf = new Buffer(this, settings, format, data, size, arraylength);
+	std::printf("[GFX PIPELINE] Buffer created #%d: %p (size: %zu bytes)\n", 
+	       ++bufferCreationCount, (void*)buf, size);
+	return buf;
 }
 
 love::gfx::Buffer *Graphics::newBuffer(const love::gfx::Buffer::Settings &settings, love::gfx::DataFormat format, const void *data, size_t size, size_t arraylength)
@@ -478,8 +605,11 @@ void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallback
             throw love::Exception("Vulkan interface not available in libretro mode");
         }
         
-        // Wait for the current index to be available
-        vulkan->wait_sync_index(vulkan->handle);
+        // PERF: Do NOT call wait_sync_index here — it is already called in beginFrame()
+        // (via advanceFrame() at the end of the previous retro_run()). Calling it again
+        // here waits on the same sync index a second time, blocking the CPU needlessly
+        // and reducing GPU-CPU overlap. The fence-wait responsibility belongs in beginFrame().
+        // vulkan->wait_sync_index(vulkan->handle);
         
         // Get the sync index
         uint32_t sync_index = vulkan->get_sync_index(vulkan->handle);
@@ -627,29 +757,6 @@ void Graphics::present(void *screenshotCallbackdata)
         }
         else if (result != VK_SUCCESS)
             throw love::Exception("failed to present swap chain image!");
-    }
-
-    // Process the 2 vertex buffers in batchedDrawState
-    // std::printf("[CHAILOVE DEBUG] Processing batchedDrawState buffers\n");
-    
-    for (int i = 0; i < 2; i++) {
-        if (batchedDrawState.vb[i] != nullptr) {
-            // std::printf("[CHAILOVE DEBUG] - vb[%d]: %p\n", i, batchedDrawState.vb[i]);
-            if (batchedDrawState.vb[i]->getSize() > 0) {
-                // std::printf("[CHAILOVE DEBUG]   Size: %zu bytes\n", batchedDrawState.vb[i]->getSize());
-            }
-        } else {
-            // std::printf("[CHAILOVE DEBUG] - vb[%d]: nullptr\n", i);
-        }
-    }
-    
-    if (batchedDrawState.indexBuffer != nullptr) {
-        // std::printf("[CHAILOVE DEBUG] - indexBuffer: %p\n", batchedDrawState.indexBuffer);
-        if (batchedDrawState.indexBuffer->getSize() > 0) {
-            // std::printf("[CHAILOVE DEBUG]   Size: %zu bytes\n", batchedDrawState.indexBuffer->getSize());
-        }
-    } else {
-        // std::printf("[CHAILOVE DEBUG] - indexBuffer: nullptr\n");
     }
 
     drawCalls = 0;
@@ -965,6 +1072,12 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
         if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
             throw std::runtime_error("failed to create descriptor set layout!");
         }
+
+		shadowMaps.push_back(std::make_unique<ShadowMap>(1024, 1024, this));
+	
+		shadowMapRenderPass = shadowMaps[0]->createShadowMapRenderPass(this);
+		shadowFramebuffer = shadowMaps[0]->createShadowFramebuffer(shadowMaps[0].get(), shadowMapRenderPass, this);
+
 
         // std::printf("[CHAILOVE DEBUG] Libretro initialization completed successfully\n");
         // RETURN EARLY - don't continue with normal initialization
@@ -2032,7 +2145,18 @@ void Graphics::beginFrame()
 		shader->newFrame();
 	usedShadersInFrame.clear();
 
+	// CRITICAL FIX: Advance all stream buffers to next frame
 	localUniformBuffer->nextFrame();
+	
+	// Advance batched draw stream buffers to prevent memory accumulation
+	for (int i = 0; i < 2; i++) {
+		if (batchedDrawState.vb[i] != nullptr) {
+			batchedDrawState.vb[i]->nextFrame();
+		}
+	}
+	if (batchedDrawState.indexBuffer != nullptr) {
+		batchedDrawState.indexBuffer->nextFrame();
+	}
 }
 
 void Graphics::startRecordingGraphicsCommands(int commandBufferIndex)
@@ -2156,10 +2280,38 @@ void Graphics::endRecordingGraphicsCommands()
 		endRenderPass();
 
 	if (vkEndCommandBuffer(commandBuffers.at(currentFrame)) != VK_SUCCESS) {
-		// throw love::Exception("failed to record command buffer");
+		throw love::Exception("failed to record command buffer");
     }
 	
 	commandBufferRecording = false;
+}
+
+void Graphics::beginShadowRenderPass()
+{
+	VkRenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = shadowMapRenderPass; // defined elsewhere
+    renderPassInfo.framebuffer = shadowFramebuffer;
+    renderPassInfo.renderArea.offset = {0, 0};
+    renderPassInfo.renderArea.extent.width = 1024;
+    renderPassInfo.renderArea.extent.height = 1024;
+
+    VkClearValue clearValue{};
+    clearValue.depthStencil = {1.0f, 0};
+
+    renderPassInfo.pClearValues = &clearValue;
+    renderPassInfo.clearValueCount = 1;
+
+    vkCmdBeginRenderPass(commandBuffers.at(currentFrame), &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    // Bind pipeline and draw objects visible from light
+    vkCmdBindPipeline(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, renderPassState.pipeline);
+}
+
+void Graphics::endShadowRenderPass()
+{
+	vkCmdEndRenderPass(commandBuffers.at(currentFrame));
+	beginFrame(); // Start a new frame to reset state after shadow pass
 }
 
 void Graphics::setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void *data)
@@ -4987,84 +5139,98 @@ int Graphics::getVsync() const
 
 Graphics::StagingBuffer* Graphics::acquireStagingBuffer(size_t size)
 {
+	static int acquireCount = 0;
+
+	// Helper: compute current live pool size in MB (accurate, not a cumulative counter)
+	auto currentPoolMB = [&]() -> size_t {
+		size_t bytes = 0;
+		for (auto &sb : stagingBufferPool) bytes += sb.size;
+		return bytes / (1024 * 1024);
+	};
+
 	// Try to find an existing buffer that's large enough and not in use
 	for (auto &sb : stagingBufferPool)
 	{
 		if (!sb.inUse && sb.size >= size)
 		{
 			sb.inUse = true;
+			if (++acquireCount % 100 == 0) {
+				std::printf("[STAGING] Reused buffer #%d (size: %zu, pool: %zu, live: %zu MB)\n",
+				       acquireCount, size, stagingBufferPool.size(), currentPoolMB());
+			}
 			return &sb;
 		}
 	}
-	
+
 	// Cap the pool size to prevent unbounded growth
 	const size_t MAX_STAGING_BUFFERS = 50;
 	if (stagingBufferPool.size() >= MAX_STAGING_BUFFERS)
 	{
-		// Pool is full - find the smallest unused buffer and destroy it to make room
+		// Pool is full - find the smallest unused buffer and replace it in-place
 		StagingBuffer* smallestUnused = nullptr;
 		for (auto &sb : stagingBufferPool)
 		{
 			if (!sb.inUse && (smallestUnused == nullptr || sb.size < smallestUnused->size))
 				smallestUnused = &sb;
 		}
-		
+
 		if (smallestUnused)
 		{
-			// Destroy the smallest unused buffer and reuse its slot
+			// Destroy old, recreate at the required size
 			vmaDestroyBuffer(vmaAllocator, smallestUnused->buffer, smallestUnused->allocation);
-			
-			// Recreate with new size
-			size_t allocSize = 1024 * 1024; // Start at 1MB minimum
-			while (allocSize < size)
-				allocSize *= 2;
-			
+
+			size_t allocSize = 1024 * 1024;
+			while (allocSize < size) allocSize *= 2;
+
 			VkBufferCreateInfo bufferInfo{};
 			bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 			bufferInfo.size = allocSize;
 			bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 			bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-			
+
 			VmaAllocationCreateInfo allocInfo{};
 			allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
 			allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-			
+
 			if (vmaCreateBuffer(vmaAllocator, &bufferInfo, &allocInfo, &smallestUnused->buffer, &smallestUnused->allocation, &smallestUnused->allocInfo) != VK_SUCCESS)
 				throw love::Exception("Failed to create staging buffer");
-			
+
 			smallestUnused->size = allocSize;
 			smallestUnused->inUse = true;
+			std::printf("[STAGING] REPLACED buffer #%d (size: %zu, pool: %zu, live: %zu MB)\n",
+				++acquireCount, allocSize, stagingBufferPool.size(), currentPoolMB());
 			return smallestUnused;
 		}
-		
-		// All buffers are in use - just create a new one anyway and let it grow
-		// The cap will be enforced next time when there are unused buffers
+
+		// All buffers are in use - grow past the cap for this frame
 	}
-	
-	// No suitable buffer found, create a new one
-	// Round up to nearest power of 2 for better reuse
-	size_t allocSize = 1024 * 1024; // Start at 1MB minimum
-	while (allocSize < size)
-		allocSize *= 2;
-	
+
+	// No suitable buffer found — allocate a new one (round up to power-of-2, min 1 MB)
+	size_t allocSize = 1024 * 1024;
+	while (allocSize < size) allocSize *= 2;
+
 	VkBufferCreateInfo bufferInfo{};
 	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	bufferInfo.size = allocSize;
 	bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	
+
 	VmaAllocationCreateInfo allocInfo{};
 	allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
 	allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
-	
+
 	StagingBuffer newBuffer;
 	newBuffer.size = allocSize;
 	newBuffer.inUse = true;
-	
+
 	if (vmaCreateBuffer(vmaAllocator, &bufferInfo, &allocInfo, &newBuffer.buffer, &newBuffer.allocation, &newBuffer.allocInfo) != VK_SUCCESS)
 		throw love::Exception("Failed to create staging buffer");
-	
+
+	// 'live: X MB' reflects current pool memory — not a cumulative counter that
+	// never decreases.  Add allocSize after push_back to include the new buffer.
 	stagingBufferPool.push_back(newBuffer);
+	std::printf("[STAGING] NEW buffer #%d (size: %zu, pool: %zu, live: %zu MB)\n",
+	       ++acquireCount, allocSize, stagingBufferPool.size(), currentPoolMB());
 	return &stagingBufferPool.back();
 }
 
@@ -5098,15 +5264,23 @@ void Graphics::cleanupStagingBufferPool()
 
 void Graphics::cleanupUnusedStagingBuffers()
 {
-	// WORKAROUND #7: Remove unused staging buffers to prevent AMD driver memory leak
-	// Keep only buffers that are actively in use, destroy the rest
+	// Keep a warm pool so the very next frame can reuse buffers without
+	// triggering new VMA allocations.  Previously we destroyed the entire
+	// unused set every 60 frames, which caused a create→destroy→create churn
+	// of 20 × 1 MB VMA buffers per second and inflated 'totalAllocated'.
+	const size_t MIN_WARM_BUFFERS = 20;
+	if (stagingBufferPool.size() <= MIN_WARM_BUFFERS)
+		return; // pool is already at or below the comfortable steady-state size
+
+	size_t remaining = stagingBufferPool.size();
 	auto it = stagingBufferPool.begin();
-	while (it != stagingBufferPool.end())
+	while (it != stagingBufferPool.end() && remaining > MIN_WARM_BUFFERS)
 	{
 		if (!it->inUse && it->buffer != VK_NULL_HANDLE)
 		{
 			vmaDestroyBuffer(vmaAllocator, it->buffer, it->allocation);
 			it = stagingBufferPool.erase(it);
+			--remaining;
 		}
 		else
 		{
@@ -5130,16 +5304,18 @@ void Graphics::processCleanupCallbacks()
 
 void Graphics::callShaderNewFrame()
 {
-	// CRITICAL FIX: In libretro mode, beginFrame() is never called, so shader->newFrame()
-	// is never called. This causes descriptor pools to never reset and pipelines to never
-	// be destroyed, leading to massive AMD driver memory leaks (120+ MB/min).
+	// NOTE: beginFrame() (called every frame via advanceFrame()) already calls
+	// shader->newFrame() for all usedShadersInFrame and also calls
+	// localUniformBuffer->nextFrame(). By the time this function is invoked
+	// (every 60 frames from retro_run), usedShadersInFrame has already been
+	// cleared by beginFrame(), so the loop below is a no-op for shaders.
+	// DO NOT call localUniformBuffer->nextFrame() here — it is already advanced
+	// once per frame in beginFrame(). A second call would double-advance the
+	// UBO ring buffer every 60 frames, writing frame N+1 data into the slot
+	// still being read by the GPU for frame N → causes flickering every 60 frames.
 	for (const auto &shader : usedShadersInFrame)
 		shader->newFrame();
 	usedShadersInFrame.clear();
-	
-	// Also advance the stream buffer frame
-	if (localUniformBuffer)
-		localUniformBuffer->nextFrame();
 }
 
 void Graphics::recycleCommandPool(bool recreatePipelineCache)
@@ -5524,6 +5700,7 @@ void Graphics::cleanup()
 	framebufferUsages.clear();
 
 	vkDestroyCommandPool(device, commandPool, nullptr);
+	vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 	vkDestroyPipelineCache(device, pipelineCache, nullptr);
 	vkDestroyDevice(device, nullptr);
 }

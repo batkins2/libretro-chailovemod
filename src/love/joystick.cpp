@@ -159,4 +159,58 @@ int joystick::getButtonKey(const std::string& name) {
 	return -1;
 }
 
+float joystick::getAxis(int joystick, int axis) {
+	if (joystick < 0 || joystick >= getJoystickCount()) {
+		return 0.0f;
+	}
+	return m_joysticks[joystick]->getAxis(axis);
+}
+
+float joystick::getAxis(int joystick, const std::string& axis) {
+	if (joystick < 0 || joystick >= getJoystickCount()) {
+		return 0.0f;
+	}
+	return m_joysticks[joystick]->getAxis(axis);
+}
+
+std::string joystick::getAxisName(int axis) {
+	switch (axis) {
+		case 0:
+			return "leftx";
+		case 1:
+			return "lefty";
+		case 2:
+			return "rightx";
+		case 3:
+			return "righty";
+		case 4:
+			return "triggerleft";
+		case 5:
+			return "triggerright";
+	}
+	return "unknown";
+}
+
+int joystick::getAxisKey(const std::string& name) {
+	if (name == "leftx") {
+		return 0;
+	}
+	if (name == "lefty") {
+		return 1;
+	}
+	if (name == "rightx") {
+		return 2;
+	}
+	if (name == "righty") {
+		return 3;
+	}
+	if (name == "triggerleft" || name == "lefttrigger") {
+		return 4;
+	}
+	if (name == "triggerright" || name == "righttrigger") {
+		return 5;
+	}
+	return -1;
+}
+
 }  // namespace love

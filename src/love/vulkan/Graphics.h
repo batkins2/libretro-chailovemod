@@ -48,6 +48,27 @@ namespace gfx
 namespace vulkan
 {
 
+class ShadowMap {
+public:
+    ShadowMap(int width, int height, love::gfx::vulkan::Graphics* vulkanGraphics);
+    ~ShadowMap();
+
+    VkImageView getView() const { return imageView; }
+    VkSampler getSampler() const { return sampler; }
+	VkRenderPass createShadowMapRenderPass(love::gfx::vulkan::Graphics* vulkanGraphics);
+	VkFramebuffer createShadowFramebuffer(ShadowMap* shadowMap, VkRenderPass renderPass, love::gfx::vulkan::Graphics* vulkanGraphics);
+
+private:
+    VkImage image;
+    VmaAllocation memory;
+    VkImageView imageView;
+    VkSampler sampler;
+
+    void createImage(int width, int height, love::gfx::vulkan::Graphics* vulkanGraphics);
+    void createImageView(love::gfx::vulkan::Graphics* vulkanGraphics);
+    void createSampler(love::gfx::vulkan::Graphics* vulkanGraphics);
+};	
+
 struct ColorAttachment
 {
 	VkFormat format = VK_FORMAT_UNDEFINED;
@@ -374,6 +395,9 @@ public:
 		return descriptorSet;
 	}
 
+	void beginShadowRenderPass();
+	void endShadowRenderPass();
+
 	void setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void *data);
 	
 	// Frame management for libretro mode
@@ -384,6 +408,10 @@ public:
 	
 	size_t getCurrentFrame() const {
 		return currentFrame;
+	}
+
+	void endRecordingGraphicsCommandsImpl() {
+		endRecordingGraphicsCommands();
 	}
 
 protected:
@@ -504,6 +532,10 @@ private:
 	std::vector<std::vector<std::function<void()>>> readbackCallbacks;
 	std::set<StrongRef<Shader>> usedShadersInFrame;
 	RenderpassState renderPassState;
+
+	std::vector<std::unique_ptr<ShadowMap>> shadowMaps;
+    VkRenderPass shadowMapRenderPass;
+	VkFramebuffer shadowFramebuffer;
 
 	bool libretroMode = false;
 	bool commandBufferRecording = false;  // Track if command buffer is in recording state

@@ -412,7 +412,7 @@ SOURCES_CXX += $(wildcard \
 	$(CORE_DIR)/vendor/jolt/Jolt/Renderer/*.cpp \
 )
 # Enable Jolt debug renderer for vehicle physics visualization
-FLAGS += -DJPH_DEBUG_RENDERER=1
+# FLAGS += -DJPH_DEBUG_RENDERER=1
 
 # tracy
 # FLAGS += -I$(CORE_DIR)/vendor/tracy/public

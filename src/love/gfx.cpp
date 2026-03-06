@@ -1069,8 +1069,9 @@ love::gfx::Shader *Graphics::getShader() const
 
 void Graphics::setRenderTarget(RenderTarget rt, uint32 temporaryRTFlags)
 {
-	if (rt.texture == nullptr)
+	if (rt.texture == nullptr) {
 		return setRenderTarget();
+	}
 
 	RenderTargets rts;
 	rts.colors.push_back(rt);

@@ -195,6 +195,12 @@ public:
 
 	void setMainTex(gfx::Texture *texture);
 
+	// Force descriptor set to be reallocated on next draw (fixes clone texture conflicts)
+	void invalidateDescriptorSets() { 
+		resourceDescriptorsDirty = true;
+		currentDescriptorSet = VK_NULL_HANDLE;
+	}
+
 	VkPipeline getCachedGraphicsPipeline(Graphics *vgfx, const GraphicsPipelineConfigurationCore &configuration);
 	VkPipeline getCachedGraphicsPipeline(Graphics *vgfx, const GraphicsPipelineConfigurationFull &configuration);
 

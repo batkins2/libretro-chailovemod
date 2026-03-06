@@ -74,10 +74,48 @@ class chai_mesh {
         // cameraParams = std::map<std::string, std::vector<float>>();
     }
     bool cloned = false;
+    chai_mesh *sourceInstance = nullptr;  // Points to source mesh for clones
+    std::vector<chai_mesh*> instances;     // List of all instances (including self)
     chai_mesh *clone() const;
-    chai_mesh& operator=(const chai_mesh& m) {
-		return *this;
-	};
+    chai_mesh& operator=(const chai_mesh& other) {
+        if (this == &other) return *this;
+        meshes            = other.meshes;
+        nodeMatrix        = other.nodeMatrix;
+        nodeParent        = other.nodeParent;
+        nodeChildren      = other.nodeChildren;
+        jointOrder        = other.jointOrder;
+        skins             = other.skins;
+        meshToNode        = other.meshToNode;
+        jointList         = other.jointList;
+        jointMatrix       = other.jointMatrix;
+        activeAnimations  = other.activeAnimations;
+        animations        = other.animations;
+        nodeNames         = other.nodeNames;
+        m_cachedAnimationDurations = other.m_cachedAnimationDurations;
+        matrices          = other.matrices;
+        offsetMatrices    = other.offsetMatrices;
+        cameraParams      = other.cameraParams;
+        lightParams       = other.lightParams;
+        textures          = other.textures;
+        vf                = other.vf;
+        visible           = other.visible;
+        subVisible        = other.subVisible;
+        specular          = other.specular;
+        normalTextures            = other.normalTextures;
+        metallicRoughnessTextures = other.metallicRoughnessTextures;
+        emissiveTextures          = other.emissiveTextures;
+        occlusionTextures         = other.occlusionTextures;
+        materialPropsList         = other.materialPropsList;
+        currentTime = other.currentTime;
+        mesh        = other.mesh;
+        instance    = other.instance;
+        tex         = other.tex;
+        img         = other.img;
+        slices      = other.slices;
+        buf         = other.buf;
+        cloned      = true;  // treat as a clone (shared texture pointers)
+        return *this;
+    };
     int getId() {
         return id;
     };
@@ -94,7 +132,7 @@ class chai_mesh {
     void stopAnimations();
     bool isAnimationPlaying(const std::string &name);
     float getAnimationPercent(const std::string &name);
-    void draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt, chai_shader *computeShader);
+    void draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt, chai_shader *computeShader, bool shadows);
     void setVisible(bool visible);
     void reloadMesh();
     // void preloadAnimations();
@@ -165,6 +203,30 @@ class chai_mesh {
     int specularW = 0;
     int specularH = 0;
     uint8_t* specData = nullptr;
+
+    // ---- Blender-level PBR material data ----------------------------------------
+    struct PBRMaterialProps {
+        float metallicFactor    = 0.0f;   // glTF pbrMetallicRoughness.metallicFactor
+        float roughnessFactor   = 1.0f;   // glTF pbrMetallicRoughness.roughnessFactor
+        float normalScale       = 1.0f;   // glTF normalTexture.scale
+        float occlusionStrength = 1.0f;   // glTF occlusionTexture.strength
+        glm::vec3 emissiveFactor = glm::vec3(0.0f); // glTF emissiveFactor [r,g,b]
+        float alphaCutoff       = 0.5f;   // glTF alphaCutoff (MASK mode)
+        bool hasNormalMap            = false;
+        bool hasMetallicRoughnessMap = false;
+        bool hasEmissiveMap          = false;
+        bool hasOcclusionMap         = false;
+        bool doubleSided             = false;
+        bool alphaBlend              = false; // true when alphaMode == "BLEND"
+        bool alphaMask               = false; // true when alphaMode == "MASK"
+    };
+    // Per-submesh additional PBR texture maps (indexed same as meshes[])
+    std::vector<gfx::Texture*> normalTextures;            // tangent-space normal map
+    std::vector<gfx::Texture*> metallicRoughnessTextures; // glTF ORM: R=occlusion(opt), G=roughness, B=metallic
+    std::vector<gfx::Texture*> emissiveTextures;          // emissive / glow map
+    std::vector<gfx::Texture*> occlusionTextures;         // ambient occlusion map
+    std::vector<PBRMaterialProps> materialPropsList;       // scalar factors per submesh
+    // ---- end PBR ----------------------------------------------------------------
     // GLuint specularMap = 0;
     std::map<std::string, float> m_cachedAnimationDurations;
     // std::map<int, GLuint> cachedVBOs;

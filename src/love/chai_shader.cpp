@@ -30,9 +30,15 @@ chai_shader::~chai_shader() {
     m_intCache.clear();
     m_mat4Cache.clear();
     
-    // delete shader;
-    // delete fragmentShader;
-    // delete instance;
+    // Release shader objects (they're reference counted via Object)
+    if (shader != nullptr) {
+        shader->release();
+        shader = nullptr;
+    }
+    if (fragmentShader != nullptr) {
+        fragmentShader->release();
+        fragmentShader = nullptr;
+    }
 }
 
 chai_shader::chai_shader(const chai_shader &c) {
@@ -41,6 +47,14 @@ chai_shader::chai_shader(const chai_shader &c) {
     instance = c.instance;
     modelCount = c.modelCount;
     modelJointOffset = c.modelJointOffset;
+    
+    // Retain the shader objects when copying to prevent double-release
+    if (shader != nullptr) {
+        shader->retain();
+    }
+    if (fragmentShader != nullptr) {
+        fragmentShader->retain();
+    }
     
     // fprintf(stderr, "[MODELCOUNT] Copy constructor called: copying modelCount=%d from %p to %p\n",
     //         c.modelCount, (void*)&c, (void*)this);
@@ -106,10 +120,6 @@ size_t chai_shader::sendMap(const std::string &uniform, const std::map<int, glm:
             return 0;
 
         int startidx = 0;
-        if (uniform == "jointMatrix") {
-            // this->sendConstant("jointOffset", std::vector<chaiscript::Boxed_Value>({ chaiscript::Boxed_Value(modelJointOffset) }));
-            startidx = modelJointOffset;
-        }
         
         m_floatCache.resize(order.size() * 16);  // Reuse allocated memory
         size_t idx = 0;
@@ -117,31 +127,32 @@ size_t chai_shader::sendMap(const std::string &uniform, const std::map<int, glm:
             auto m = data.find(j)->second;
             for (int c = 0; c < 4; ++c) {
                 m_floatCache[idx++] = m[c].x;
-                // printf("%f ", m[c].x);
                 m_floatCache[idx++] = m[c].y;
-                // printf("%f ", m[c].y);
                 m_floatCache[idx++] = m[c].z;
-                // printf("%f ", m[c].z);
                 m_floatCache[idx++] = m[c].w;
-                // printf("%f\n", m[c].w);
                 startidx+=4;
             }          
         }
         auto returnOffset = modelJointOffset;
         if (uniform == "jointMatrix") {
-            // printf("[SENDMAP] Updated jointMatrix with %zu matrices, modelJointOffset was %d, now %d\n",
-            //        order.size(), modelJointOffset, modelJointOffset + static_cast<int>(order.size()));
             modelJointOffset += order.size();
+        }
+
+        if (info->floats == nullptr) {
+            printf("[SENDMAP] ERROR: info->floats is null for uniform '%s' — skipping memcpy\n", uniform.c_str());
+            return returnOffset;
         }
         std::memcpy(info->floats + returnOffset * info->matrix.columns * info->matrix.rows, m_floatCache.data(), m_floatCache.size()*sizeof(float));
         shader->updateUniform(info, startidx/(info->matrix.columns*info->matrix.rows) + (uniform == "jointMatrix" ? returnOffset : 0));
         return returnOffset;
-        // shader->setPushConstant(info, prepD.data(), startidx/(info->matrix.columns*info->matrix.rows));
     }
     return 0;
 }
 
 void chai_shader::sendConstant(const std::string &uniform, const std::vector<chaiscript::Boxed_Value> &data) {
+    // Push constants are already efficient - don't batch them, send immediately
+    // (Batching is only needed for descriptor set updates, not push constants)
+    
     if (!instance || !instance->isCreated())
         return;
 
@@ -214,6 +225,9 @@ void chai_shader::sendConstant(const std::string &uniform, const std::vector<cha
 }
 
 void chai_shader::sendConstant(const std::string &uniform, const std::vector<glm::vec4> &data) {
+    // Push constants are already efficient - don't batch them, send immediately
+    // (Batching is only needed for descriptor set updates, not push constants)
+    
     if (!instance || !instance->isCreated()) {
         // printf("[SENDCONSTANT] Instance not created for uniform '%s'\n", uniform.c_str());
         return;
@@ -263,7 +277,7 @@ void chai_shader::sendConstant(const std::string &uniform, const std::vector<glm
     //     printf("%f ", m_floatCache[i]);
     // }
     // printf("\n");
-    shader->setPushConstant(info, m_floatCache.data(), count * sizeof(float));
+    shader->setPushConstant(info, (float*)m_floatCache.data(), (int)(count * sizeof(float)));
 }
 
 int chai_shader::send(const std::string &uniform, const std::vector<chaiscript::Boxed_Value> &data) {
@@ -344,23 +358,23 @@ int chai_shader::send(const std::string &uniform, const std::vector<chaiscript::
                 m_floatCache[i] = chaiscript::boxed_cast<float>(data[i]);  // Direct use, no temporary binding
                 startidx++;
             }
+            
             if (uniform == "modelMatrix") {
+                int matrixCount = startidx / (info->matrix.columns * info->matrix.rows);
                 std::memcpy(info->floats + modelCount * (info->matrix.columns * info->matrix.rows), m_floatCache.data(), m_floatCache.size()*sizeof(float));
+                shader->updateUniform(info, modelCount + matrixCount);
+                auto returnIdx = modelCount;
+                modelCount += matrixCount;
+                return returnIdx;
             } else {
                 std::memcpy(info->floats, m_floatCache.data(), m_floatCache.size()*sizeof(float));
+                if (info->matrix.rows != 0) {
+                    shader->updateUniform(info, startidx/(info->matrix.columns*info->matrix.rows));
+                } else {
+                    shader->updateUniform(info, startidx / info->matrix.columns);
+                }
+                return 0;
             }
-            if (info->matrix.rows != 0) {
-                shader->updateUniform(info, startidx/(info->matrix.columns*info->matrix.rows) * (uniform == "modelMatrix" ? modelCount + 1 : 1));
-            } else {
-                shader->updateUniform(info, startidx / info->matrix.columns);
-            }
-            auto returnIdx = modelCount;
-            if (uniform == "modelMatrix") {              
-                // printf("[MODELCOUNT] send(modelMatrix) on shader %p: BEFORE increment: modelCount=%d, will return %d\n", 
-                //        (void*)this, modelCount, returnIdx);
-                modelCount++;
-            }
-            return returnIdx;
         }       
     }
     return -1;
@@ -410,32 +424,19 @@ int chai_shader::send(const std::string &uniform, const std::vector<glm::mat4> &
         }
         if (uniform == "modelMatrix") {
             std::memcpy(info->floats + modelCount * (info->matrix.columns * info->matrix.rows), m_floatCache.data(), m_floatCache.size()*sizeof(float));
+            shader->updateUniform(info, modelCount + data.size());
+            auto returnIdx = modelCount;
+            modelCount += data.size();
+            return returnIdx;
         } else {
             std::memcpy(info->floats, m_floatCache.data(), m_floatCache.size()*sizeof(float));
-        }
-        if (info->matrix.rows != 0) {
-            shader->updateUniform(info, startidx/(info->matrix.columns*info->matrix.rows) * (uniform == "modelMatrix" ? modelCount + 1 : 1));
-        } else {
-            shader->updateUniform(info, startidx / info->matrix.columns);
-        }
-        auto returnIdx = modelCount;
-        if (uniform == "modelMatrix") {
-            // static int sendModelMatrixCount = 0;
-            // sendModelMatrixCount++;
-            // printf("[MODELCOUNT] send(modelMatrix) #%d on shader %p: BEFORE increment: modelCount=%d, will return %d\n", 
-            //        modelCount, (void*)this, modelCount, returnIdx);
-            // printf("               data[0]: [%f,%f,%f,%f] [%f,%f,%f,%f] [%f,%f,%f,%f] [%f,%f,%f,%f]\n",
-            //        data[0][0].x, data[0][0].y, data[0][0].z, data[0][0].w,
-            //        data[0][1].x, data[0][1].y, data[0][1].z, data[0][1].w,
-            //        data[0][2].x, data[0][2].y, data[0][2].z, data[0][2].w,
-            //        data[0][3].x, data[0][3].y, data[0][3].z, data[0][3].w);
-            // fflush(stdout);            
-            modelCount++;
-            // printf("[MODELCOUNT] send(modelMatrix) #%d on shader %p: AFTER increment: modelCount=%d\n", 
-            //        sendModelMatrixCount, (void*)this, modelCount);
-            // fflush(stdout);
-        }
-        return returnIdx;      
+            if (info->matrix.rows != 0) {
+                shader->updateUniform(info, startidx/(info->matrix.columns*info->matrix.rows));
+            } else {
+                shader->updateUniform(info, startidx / info->matrix.columns);
+            }
+            return 0;
+        }      
     }
     return -1;
 }
@@ -476,6 +477,43 @@ void chai_shader::send(const std::string &uniform, const glm::vec3 &data) {
         info->floats[2] = data.z;
         shader->updateUniform(info, 1);
     }
+}
+
+void chai_shader::send(const std::string &uniform, const glm::vec4 &data) {
+    if (instance->isCreated()) {
+        const love::gfx::Shader::UniformInfo* info = nullptr;
+        try {
+            info = shader->getUniformInfo(uniform);
+        } catch (std::exception &e) {
+            return;
+        }
+        if (info == nullptr || info->data == nullptr ||
+            info->baseType == gfx::Shader::UNIFORM_SAMPLER ||
+            info->baseType == gfx::Shader::UNIFORM_STORAGETEXTURE ||
+            info->baseType == gfx::Shader::UNIFORM_TEXELBUFFER ||
+            info->baseType == gfx::Shader::UNIFORM_STORAGEBUFFER)
+            return;
+
+        info->floats[0] = data.x;
+        info->floats[1] = data.y;
+        info->floats[2] = data.z;
+        info->floats[3] = data.w;
+        shader->updateUniform(info, 1);
+    }
+}
+
+void chai_shader::sendTexture(const std::string &uniform, gfx::Texture *tex) {
+    if (!instance || !instance->isCreated() || shader == nullptr || tex == nullptr)
+        return;
+    const love::gfx::Shader::UniformInfo* info = nullptr;
+    try {
+        info = shader->getUniformInfo(uniform);
+    } catch (std::exception &e) {
+        return;
+    }
+    if (info == nullptr || info->baseType != gfx::Shader::UNIFORM_SAMPLER)
+        return;
+    shader->sendTextures(info, &tex, 1);
 }
 
 void chai_shader::send(const std::string &uniform, const std::vector<glm::vec3> &data) {
@@ -540,14 +578,24 @@ int chai_shader::send(const std::string &uniform, const glm::mat4 &data) {
             || info->baseType == gfx::Shader::UNIFORM_TEXELBUFFER || info->baseType == gfx::Shader::UNIFORM_STORAGEBUFFER)
             return -1;
 
-        // LEAK FIX: Use matrix pool instead of resizing m_floatCache
-        // Avoid vector resize() operations that cause capacity growth
         size_t slot = cacheMatrix(data);
         const float* matrixData = getCachedMatrix(slot);
-        
-        std::memcpy(info->floats, matrixData, 16 * sizeof(float));
-        shader->updateUniform(info, 1);
-        return 0;      
+
+        if (uniform == "modelMatrix") {
+            // Multi-slot path: same behaviour as send(vector<mat4>) for modelMatrix.
+            // Each model occupies its own slot indexed by modelCount so the GPU
+            // can distinguish per-object model matrices via jointInfo.z.
+            std::memcpy(info->floats + modelCount * 16, matrixData, 16 * sizeof(float));
+            shader->updateUniform(info, modelCount + 1);
+            auto returnIdx = modelCount;
+            modelCount++;
+            return returnIdx;
+        } else {
+            // Single-slot path for global matrices (viewMatrix, projectionMatrix, etc.)
+            std::memcpy(info->floats, matrixData, 16 * sizeof(float));
+            shader->updateUniform(info, 1);
+            return 0;
+        }
     }
     return -1;
 }
@@ -557,13 +605,122 @@ chai_shader *chai_shader::newShader() const {
 }
 
 void chai_shader::newFrame() {
-    // static int newFrameCount = 0;
-    // newFrameCount++;
-    // fprintf(stderr, "[MODELCOUNT] newFrame() #%d called on shader %p: NOT resetting modelCount (currently %d)\n", 
-    //        newFrameCount, (void*)this, modelCount);
-    // fflush(stderr);
     modelCount = 0;
     modelJointOffset = 0;
+    m_nextMatrixSlot = 0;
+}
+
+void chai_shader::invalidateDescriptorSets() {
+    if (shader != nullptr) {
+        shader->invalidateDescriptorSets();
+    }
+}
+
+// SendConstant queue implementation
+void chai_shader::beginConstantBatch() {
+    return;
+    m_batchMode = true;
+    m_constantQueue.clear();
+}
+
+void chai_shader::endConstantBatch() {
+    return;
+    flushConstantQueue();
+    m_batchMode = false;
+}
+
+void chai_shader::flushConstantQueue() {
+    if (m_constantQueue.empty()) {
+        return;
+    }
+    
+    if (!instance || !instance->isCreated()) {
+        m_constantQueue.clear();
+        return;
+    }
+    
+    // Assign offsets assuming vec4 alignment (16 bytes per uniform)
+    size_t currentOffset = 0;
+    size_t maxSize = 0;
+    
+    for (auto& entry : m_constantQueue) {
+        entry.offset = currentOffset;
+        
+        if (entry.isVec4) {
+            entry.dataSize = entry.data.size() * 4 * sizeof(float);  // vec4 = 16 bytes
+        } else {
+            entry.dataSize = entry.boxedData.size() * sizeof(float);
+        }
+        
+        currentOffset += entry.dataSize;
+        if (entry.dataSize > maxSize) {
+            maxSize = entry.dataSize;
+        }
+    }
+    
+    // Allocate merged buffer
+    size_t totalSize = currentOffset;
+    if (totalSize == 0) {
+        m_constantQueue.clear();
+        return;
+    }
+    
+    m_pushConstantBuffer.resize(totalSize, 0);
+    
+    // Copy each constant to its correct offset in the merged buffer
+    for (const auto& entry : m_constantQueue) {
+        if (entry.dataSize == 0) continue;
+        
+        if (entry.isVec4) {
+            // Convert vec4 data to floats
+            std::vector<float> floats;
+            floats.reserve(entry.data.size() * 4);
+            for (const auto& v : entry.data) {
+                floats.push_back(v.x);
+                floats.push_back(v.y);
+                floats.push_back(v.z);
+                floats.push_back(v.w);
+            }
+            std::memcpy(m_pushConstantBuffer.data() + entry.offset, 
+                       floats.data(), 
+                       floats.size() * sizeof(float));
+        } else {
+            // Handle boxed values (convert to floats)
+            std::vector<float> floats;
+            for (const auto& bv : entry.boxedData) {
+                try {
+                    floats.push_back(chaiscript::boxed_cast<float>(bv));
+                } catch (...) {}
+            }
+            if (!floats.empty()) {
+                std::memcpy(m_pushConstantBuffer.data() + entry.offset,
+                           floats.data(),
+                           floats.size() * sizeof(float));
+            }
+        }
+    }
+    
+    // Send the entire merged push constant block in ONE call
+    if (!m_constantQueue.empty()) {
+        const love::gfx::Shader::UniformInfo* firstInfo = nullptr;
+        try {
+            firstInfo = shader->getUniformInfo(m_constantQueue[0].uniformName);
+        } catch (...) {}
+        
+        if (firstInfo) {
+            shader->setPushConstant(firstInfo, m_pushConstantBuffer.data(), totalSize);
+        }
+    }
+    
+    m_constantQueue.clear();
+}
+
+void chai_shader::queueConstant(const std::string &uniform, const std::vector<glm::vec4> &data) {
+    m_constantQueue.emplace_back(uniform, data);
+}
+
+void chai_shader::queueConstant(const std::string &uniform, const std::vector<chaiscript::Boxed_Value> &data) {
+    m_constantQueue.emplace_back(uniform, data);
 }
 
 }

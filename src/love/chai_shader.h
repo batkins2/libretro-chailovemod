@@ -32,7 +32,11 @@ class chai_shader {
     int send(const std::string &uniform, const std::vector<int> &data);
     void send(const std::string &uniform, float data);
     void send(const std::string &uniform, const glm::vec3 &data);
+    void send(const std::string &uniform, const glm::vec4 &data);
     void send(const std::string &uniform, const std::vector<glm::vec3> &data);
+    /// Send a texture to a named sampler uniform (PBR maps etc.)
+    void sendTexture(const std::string &uniform, gfx::Texture *tex);
+    void invalidateDescriptorSets();
     void newFrame();
     love::gfx::Graphics *instance;
     gfx::Shader *shader = nullptr;
@@ -42,6 +46,32 @@ class chai_shader {
     std::vector<float> m_floatCache;
     std::vector<int> m_intCache;
     std::vector<glm::mat4> m_mat4Cache;
+    
+    // SendConstant queue system for batching push constant updates
+    struct ConstantQueueEntry {
+        std::string uniformName;
+        std::vector<glm::vec4> data;
+        bool isVec4;
+        std::vector<chaiscript::Boxed_Value> boxedData;
+        size_t offset;  // Offset in push constant block
+        size_t dataSize; // Size in bytes
+        
+        ConstantQueueEntry(const std::string& name, const std::vector<glm::vec4>& d)
+            : uniformName(name), data(d), isVec4(true), offset(0), dataSize(0) {}
+        ConstantQueueEntry(const std::string& name, const std::vector<chaiscript::Boxed_Value>& d)
+            : uniformName(name), boxedData(d), isVec4(false), offset(0), dataSize(0) {}
+    };
+    
+    std::vector<ConstantQueueEntry> m_constantQueue;
+    bool m_batchMode = false;
+    std::vector<uint8_t> m_pushConstantBuffer;  // Merged push constant data
+    
+    // Queue management methods
+    void beginConstantBatch();
+    void endConstantBatch();
+    void flushConstantQueue();
+    void queueConstant(const std::string &uniform, const std::vector<glm::vec4> &data);
+    void queueConstant(const std::string &uniform, const std::vector<chaiscript::Boxed_Value> &data);
     
     // LEAK FIX: Pre-allocated matrix storage to bypass ChaiScript Boxed_Value allocations
     // Instead of passing vectors through ChaiScript (which boxes them), store matrices here

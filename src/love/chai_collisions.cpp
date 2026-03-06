@@ -26,6 +26,10 @@
 
 namespace love
 {
+// Physics-to-render scale factor: 1 physics unit = PHYSICS_TO_RENDER_SCALE render units
+// Set to 1.0 for 1:1 matching between physics and render space
+static constexpr float PHYSICS_TO_RENDER_SCALE = 1.0f;
+
 chai_collisions::chai_collisions()
 {
     setProcessFrequency(360); // Default to 60 FPS
@@ -984,11 +988,11 @@ std::vector<int> chai_collisions::addRigidMesh(std::string meshPath, int meshRef
                 }
                 
                 if (found) {
-                    // Apply chassis node scale to bone position
-                    bonePos = bonePos * nodeScale;
-                    printf("[addRigidMesh] After scale (%.3f, %.3f, %.3f): bone at (%.3f, %.3f, %.3f)\n",
-                           nodeScale.x, nodeScale.y, nodeScale.z, bonePos.x, bonePos.y, bonePos.z);
-                    foundBones.push_back(bonePos);
+                    // Don't scale bone positions - they're chassis-local coordinates
+                    // The nodeScale is only applied to mesh vertices, not to body positions
+                    printf("[addRigidMesh] Bone at (%.3f, %.3f, %.3f) (unscaled chassis-local)\n",
+                           bonePos.x, bonePos.y, bonePos.z);
+                    foundBones.push_back(bonePos);  // Apply mesh scale to bone positions for correct wheel placement
                 }
             }
             
@@ -1035,8 +1039,14 @@ void chai_collisions::setRigidMeshPosition(std::vector<int> rigidMeshIndex, floa
         // Get the current rotation (optional, keep current orientation)
         JPH::Quat rotation = bodyInterface.GetRotation(rigidMeshes[i]->bodyID);
 
-        // Set the new position (and keep current rotation)
-        bodyInterface.SetPositionAndRotation(rigidMeshes[i]->bodyID, JPH::RVec3(x, y, z), JPH::Quat::sIdentity(), JPH::EActivation::Activate);
+        // x, y, z are physics-space coordinates (same space as Jolt).
+        // The 0.4f render scale is applied later in chai_mesh::update() and is
+        // purely a visual transform - it must not affect where bodies are placed.
+        bodyInterface.SetPositionAndRotation(rigidMeshes[i]->bodyID, 
+                                            JPH::RVec3(x, y, z), 
+                                            JPH::Quat::sIdentity(), 
+                                            JPH::EActivation::Activate);
+        rigidMeshes[i]->nodePosition = glm::vec3(x, y, z);
 
         // auto r = rigidMeshes[i]->rigidBody;
         // for (auto g : group) {
@@ -1181,16 +1191,21 @@ void chai_collisions::createVehicle(int frontLeftWheelMeshRef, int frontRightWhe
             chassisRM = rm;
             chassisShape = rm->shape;  // Retrieve stored shape
             
-            // Get old body's transform before removing it
-            chassisPos = bodyInterface.GetPosition(rm->bodyID);
-            chassisRot = bodyInterface.GetRotation(rm->bodyID);
+            // BodyCreationSettings::mPosition = COM position in world space.
+            // GetCenterOfMassTransform() returns the COM transform, so the new
+            // body's COM will be at the same location as the old body's COM.
+            // GetWorldTransform() returns shape origin (COM - comOffset) which
+            // would cause the new body to be offset by comOffset from expected.
+            JPH::RMat44 comXform = bodyInterface.GetCenterOfMassTransform(rm->bodyID);
+            chassisPos = comXform.GetTranslation();
+            chassisRot = comXform.GetQuaternion();
             
             if (!chassisShape) {
                 printf("ERROR: Chassis meshRef %d has no stored shape (makeShape was false)\n", chassisMeshRef);
                 return;
             }
             
-            printf("Found chassis shape for meshRef %d at position (%.2f, %.2f, %.2f)\n", 
+            printf("Found chassis shape for meshRef %d at GLTF position (%.2f, %.2f, %.2f)\n", 
                    chassisMeshRef, chassisPos.GetX(), chassisPos.GetY(), chassisPos.GetZ());
             
             // Remove old body from physics system
@@ -1261,13 +1276,9 @@ void chai_collisions::createVehicle(int frontLeftWheelMeshRef, int frontRightWhe
     
     printf("Created new chassis body from shape, BodyID: %u\n", (uint32)chassisBodyID.GetIndex());
     
-    // Apply scale parameters to chassis position
-    chassisPos = JPH::RVec3(
-        chassisPos.GetX() * scaleX,
-        chassisPos.GetY() * scaleY,
-        chassisPos.GetZ() * scaleZ
-    );
-    printf("[Vehicle] Scaled chassis position: (%.3f, %.3f, %.3f)\n", chassisPos.GetX(), chassisPos.GetY(), chassisPos.GetZ());
+    // Don't scale chassis position - it's already correctly positioned from GLTF node translation
+    // Scaling was causing second vehicle chassis to be displaced from its wheels
+    printf("[Vehicle] Using chassis position from GLTF: (%.3f, %.3f, %.3f)\n", chassisPos.GetX(), chassisPos.GetY(), chassisPos.GetZ());
     
     JPH::Mat44 chassisTransform = JPH::Mat44::sRotationTranslation(chassisRot, chassisPos);
     
@@ -1302,15 +1313,10 @@ void chai_collisions::createVehicle(int frontLeftWheelMeshRef, int frontRightWhe
             glm::vec3 bonePos = chassisWheelBones[chassisMeshRef][i];
             printf("[Vehicle] Wheel %d bone pos from GLTF: (%.3f, %.3f, %.3f)\n", i, bonePos.x, bonePos.y, bonePos.z);
             
-            // Apply scale parameters to bone position
-            bonePos = glm::vec3(
-                bonePos.x * scaleX,
-                bonePos.y * scaleY,
-                bonePos.z * scaleZ
-            );
-            printf("[Vehicle] Wheel %d after scale: (%.3f, %.3f, %.3f)\n", i, bonePos.x, bonePos.y, bonePos.z);
+            // Don't scale - bone positions are already scaled when extracted from GLTF (line 988)
+            printf("[Vehicle] Wheel %d using as-is (already scaled): (%.3f, %.3f, %.3f)\n", i, bonePos.x, bonePos.y, bonePos.z);
             
-            // Use bone position directly from GLTF
+            // Use bone position from GLTF directly
             JPH::RVec3 boneWorldPos(bonePos.x, bonePos.y, bonePos.z);
             JPH::Vec3 localPos = JPH::Vec3(boneWorldPos);
             wheelPositions[i] = localPos;
@@ -1387,18 +1393,18 @@ void chai_collisions::createVehicle(int frontLeftWheelMeshRef, int frontRightWhe
                 bodyInterface.RemoveBody(rm->bodyID);
                 bodyInterface.DestroyBody(rm->bodyID);
                 
-                // Position wheel body in world space using chassis position + rotated chassis-local wheel offset
-                JPH::RVec3 wheelBodyWorldPos = wheelPositions[i];
+                // Transform chassis-local bone position to world space by applying chassis rotation + translation
+                JPH::Vec3 rotatedLocalPos = chassisRot * wheelPositions[i];
+                JPH::RVec3 wheelBodyWorldPos = chassisPos + JPH::RVec3(rotatedLocalPos);
                 
-                printf("Wheel %d: Initial position (%.3f, %.3f, %.3f) from chassis (%.3f, %.3f, %.3f) + local offset (%.3f, %.3f, %.3f)\n",
-                       i, wheelBodyWorldPos.GetX(), wheelBodyWorldPos.GetY(), wheelBodyWorldPos.GetZ(),
-                       chassisPos.GetX(), chassisPos.GetY(), chassisPos.GetZ(),
-                       wheelPositions[i].GetX(), wheelPositions[i].GetY(), wheelPositions[i].GetZ());
+                printf("Wheel %d: Local (%.3f, %.3f, %.3f) -> World (%.3f, %.3f, %.3f)\n",
+                       i, wheelPositions[i].GetX(), wheelPositions[i].GetY(), wheelPositions[i].GetZ(),
+                       wheelBodyWorldPos.GetX(), wheelBodyWorldPos.GetY(), wheelBodyWorldPos.GetZ());
                 
                 // Create wheel body as Kinematic so it follows the VehicleConstraint
                 JPH::BodyCreationSettings wheelSettings(
                     wheelShapes[i],
-                    wheelPositions[i],
+                    wheelBodyWorldPos,  // World space position: chassisPos + chassisRot * localBonePos
                     wheelRot[i],
                     JPH::EMotionType::Kinematic,
                     Layers::MOVING
@@ -1460,13 +1466,7 @@ void chai_collisions::createVehicle(int frontLeftWheelMeshRef, int frontRightWhe
     
     // Build a VehicleConstraint instead of fixed constraints
     const JPH::BodyLockInterface& lockInterface = ps->GetBodyLockInterface();
-    JPH::BodyLockWrite chassisLock(lockInterface, chassisBodyID);
-    if (!chassisLock.Succeeded()) {
-        printf("ERROR: Failed to lock chassis body\n");
-        return;
-    }
-    JPH::Body& chassisBodyRef = chassisLock.GetBody();
-
+    
     // Configure vehicle-level settings
     JPH::VehicleConstraintSettings vehicleSettings;
     vehicleSettings.mUp = JPH::Vec3::sAxisY();
@@ -1559,8 +1559,17 @@ void chai_collisions::createVehicle(int frontLeftWheelMeshRef, int frontRightWhe
 
     vehicleSettings.mController = controllerSettings;
 
-    // Create and register the vehicle constraint
-    JPH::VehicleConstraint* vehicleConstraint = new JPH::VehicleConstraint(chassisBodyRef, vehicleSettings);
+    // Create and register the vehicle constraint (need to lock chassis body for this)
+    JPH::VehicleConstraint* vehicleConstraint = nullptr;
+    {
+        JPH::BodyLockWrite chassisLock(lockInterface, chassisBodyID);
+        if (!chassisLock.Succeeded()) {
+            printf("ERROR: Failed to lock chassis body for constraint creation\n");
+            return;
+        }
+        JPH::Body& chassisBodyRef = chassisLock.GetBody();
+        vehicleConstraint = new JPH::VehicleConstraint(chassisBodyRef, vehicleSettings);
+    }  // Release chassisLock here before accessing other bodies
     
     // Use a cast-cylinder collision tester for robust wheel-ground detection
     // Takes ObjectLayer (not BroadPhaseLayer) to test against
@@ -1595,12 +1604,16 @@ void chai_collisions::createVehicle(int frontLeftWheelMeshRef, int frontRightWhe
         printf("  VC reported rotation: (%.3f, %.3f, %.3f, %.3f)\n", 
                vcRot.GetX(), vcRot.GetY(), vcRot.GetZ(), vcRot.GetW());
         
-        // Get actual wheel body position
-        JPH::RVec3 bodyPos = bodyInterface.GetPosition(wheelBodyIDs[i]);
-        JPH::Quat bodyRot = bodyInterface.GetRotation(wheelBodyIDs[i]);
-        printf("  Body actual position: (%.3f, %.3f, %.3f)\n", bodyPos.GetX(), bodyPos.GetY(), bodyPos.GetZ());
-        printf("  Body actual rotation: (%.3f, %.3f, %.3f, %.3f)\n", 
-               bodyRot.GetX(), bodyRot.GetY(), bodyRot.GetZ(), bodyRot.GetW());
+        // Get actual wheel body position using proper locking
+        JPH::BodyLockRead wheelLock(lockInterface, wheelBodyIDs[i]);
+        if (wheelLock.Succeeded()) {
+            const JPH::Body& wheelBody = wheelLock.GetBody();
+            JPH::RVec3 bodyPos = wheelBody.GetPosition();
+            JPH::Quat bodyRot = wheelBody.GetRotation();
+            printf("  Body actual position: (%.3f, %.3f, %.3f)\n", bodyPos.GetX(), bodyPos.GetY(), bodyPos.GetZ());
+            printf("  Body actual rotation: (%.3f, %.3f, %.3f, %.3f)\n", 
+                   bodyRot.GetX(), bodyRot.GetY(), bodyRot.GetZ(), bodyRot.GetW());
+        }
     }
     printf("=========================================================\n\n");
 
@@ -1625,6 +1638,8 @@ void chai_collisions::createVehicle(int frontLeftWheelMeshRef, int frontRightWhe
         }
     }
     
+    vehicle->scale = JPH::Vec3(scaleX, scaleY, scaleZ);
+
     vehicles.push_back(vehicle);
 
     printf("[Vehicle] Created vehicle: chassis meshRef=%d, BodyID=%u, wheels=%u/%u/%u/%u\n",
@@ -1713,7 +1728,11 @@ void chai_collisions::setCharacterControllerPosition(int characterIndex, float x
     // JPH::BodyInterface& bodyInterface = ps->GetBodyInterface();
 
     // Set the new position (teleport character)
-    characterControllers[characterIndex]->character->SetPosition(JPH::RVec3(x, y, z));
+    // Convert render space coordinates to physics space
+    characterControllers[characterIndex]->character->SetPosition(
+        JPH::RVec3(x / PHYSICS_TO_RENDER_SCALE, 
+                   y / PHYSICS_TO_RENDER_SCALE, 
+                   z / PHYSICS_TO_RENDER_SCALE));
 
     // btPairCachingGhostObject *ghostObject = characterControllers[characterIndex]->ghostObject;
     
@@ -1736,7 +1755,11 @@ void chai_collisions::setCharacterControllerPosition(int characterIndex, float x
 
 void chai_collisions::teleportCharacter(int characterIndex, float x, float y, float z)
 {
-    characterControllers[characterIndex]->character->SetPosition(JPH::RVec3(x, y, z));
+    // Convert render space coordinates to physics space
+    characterControllers[characterIndex]->character->SetPosition(
+        JPH::RVec3(x / PHYSICS_TO_RENDER_SCALE, 
+                   y / PHYSICS_TO_RENDER_SCALE, 
+                   z / PHYSICS_TO_RENDER_SCALE));
     // btPairCachingGhostObject *ghostObject = characterControllers[characterIndex]->ghostObject;
     // ghostObject->setWorldTransform(btTransform(btQuaternion(0, 0, 0, 1), btVector3(x, y, z)));
 }
@@ -1775,7 +1798,10 @@ std::vector<float> chai_collisions::getCharacterController(int ref)
     // Get the world space position of the character controller's body
     JPH::RVec3 pos = bodyInterface.GetCenterOfMassTransform(characterControllers[ref]->bodyID).GetTranslation();
 
-    return std::vector<float>{ (float)pos.GetX(), (float)pos.GetY(), (float)pos.GetZ() };
+    // Convert physics space coordinates to render space
+    return std::vector<float>{ (float)pos.GetX() * PHYSICS_TO_RENDER_SCALE, 
+                              (float)pos.GetY() * PHYSICS_TO_RENDER_SCALE, 
+                              (float)pos.GetZ() * PHYSICS_TO_RENDER_SCALE };
     // return std::vector<float>{
     //     characterControllers[ref]->ghostObject->getWorldTransform().getOrigin().getX(),
     //     characterControllers[ref]->ghostObject->getWorldTransform().getOrigin().getY(),
@@ -1797,7 +1823,10 @@ std::vector<float> chai_collisions::getRigidMesh(int ref)
     // Get the world space position of the rigid mesh's body
     JPH::RVec3 pos = bodyInterface.GetCenterOfMassTransform(rigidMeshes[ref]->bodyID).GetTranslation();
 
-    return std::vector<float>{ (float)pos.GetX(), (float)pos.GetY(), (float)pos.GetZ() };
+    // Convert physics space coordinates to render space
+    return std::vector<float>{ (float)pos.GetX() * PHYSICS_TO_RENDER_SCALE, 
+                              (float)pos.GetY() * PHYSICS_TO_RENDER_SCALE, 
+                              (float)pos.GetZ() * PHYSICS_TO_RENDER_SCALE };
 }
 
 #ifdef JPH_DEBUG_RENDERER
@@ -2163,13 +2192,56 @@ std::vector<Matrix4> chai_collisions::getPhysicsObjects(int mesh, std::vector<fl
 
         JPH::RVec3 pos;
         JPH::Quat bodyRot;
+        JPH::Mat44 postScaled;
+        JPH::Vec3 bodyScale(scale[0], scale[1], scale[2]);
 
         // For all bodies (including wheels), use physics body positions
         // The mesh assets are already positioned correctly relative to their bodies
-        JPH::RMat44 comXform = bodyInterface.GetCenterOfMassTransform(m->bodyID);
-        pos = comXform.GetTranslation();
-        bodyRot = comXform.GetQuaternion();
-        
+        JPH::RMat44 comXform = bodyInterface.GetWorldTransform(m->bodyID);
+        if (bodyInterface.GetObjectLayer(m->bodyID) == Layers::WHEEL) {
+            int vehicleIndex = -1;
+            int wheelIndex = -1;
+            for (size_t i = 0; i < vehicles.size(); i++) {
+                for (size_t w = 0; w < 4; w++) {
+                    if (vehicles[i]->wheelBodyIDs[w] == m->bodyID) {
+                        vehicleIndex = i;
+                        wheelIndex = w;
+                        break;
+                    }
+                }
+                if (vehicleIndex != -1) {
+                    break;
+                }
+            }
+            if (vehicleIndex != -1 && wheelIndex != -1) {
+                // Use bone transform relative to chassis
+                Vehicle* vehicle = vehicles[vehicleIndex];
+                if (vehicle->wheelBoneTransforms[wheelIndex].active) {
+                    // Get chassis transform
+                    JPH::RMat44 chassisTransform = bodyInterface.GetWorldTransform(vehicle->chassisBodyID);
+                    JPH::RVec3 chassisPos = chassisTransform.GetTranslation();
+                    JPH::Quat chassisRot = chassisTransform.GetQuaternion();
+                    
+                    // Apply bone transform (local to chassis)
+                    JPH::RVec3 boneLocalPos = vehicle->wheelBoneTransforms[wheelIndex].position;
+                    JPH::Quat boneLocalRot = vehicle->wheelBoneTransforms[wheelIndex].rotation;
+                    
+                    // Convert to world space
+                    pos = chassisPos + JPH::RVec3(chassisRot * JPH::Vec3(boneLocalPos));
+                    bodyRot = chassisRot * boneLocalRot;
+                } else {
+                    // Fallback to wheel body transform
+                    JPH::RMat44 wheelBodyTransform = bodyInterface.GetWorldTransform(vehicles[vehicleIndex]->wheelBodyIDs[wheelIndex]);
+                    pos = wheelBodyTransform.GetTranslation();
+                    bodyRot = wheelBodyTransform.GetQuaternion();
+                }
+            }
+        } else {
+            pos = comXform.GetTranslation();
+            bodyRot = comXform.GetQuaternion();
+        }
+      
+
         // Store scale from RigidMesh into the scale output vector
         if (scale.size() > 0 && m->nodeScale.x > 0) {
             m->nodeScale.x = scale[0];
@@ -2177,20 +2249,48 @@ std::vector<Matrix4> chai_collisions::getPhysicsObjects(int mesh, std::vector<fl
             m->nodeScale.z = scale[2];
         }
 
-        // Wheels are managed by VehicleConstraint - don't apply COM offset corrections
-        // The constraint already positions them correctly at the suspension mount points
-        if (bodyInterface.GetObjectLayer(m->bodyID) != Layers::WHEEL) {
-            // Subtract COM offset for non-wheel bodies
-            JPH::Vec3 offset = bodyRot * m->com;
-            pos -= JPH::RVec3(offset);
+        // postScaled = comXform.PreScaled(bodyScale);
+
+        // Apply COM offset corrections
+        if (bodyInterface.GetObjectLayer(m->bodyID) == Layers::WHEEL) {
+            // For wheels, add the COM offset (stored at vehicle creation)
+            int vehicleIndex = -1;
+            int wheelIndex = -1;
+            for (size_t i = 0; i < vehicles.size(); i++) {
+                for (size_t w = 0; w < 4; w++) {
+                    if (vehicles[i]->wheelBodyIDs[w] == m->bodyID) {
+                        vehicleIndex = i;
+                        wheelIndex = w;
+                        break;
+                    }
+                }
+                if (vehicleIndex != -1) break;
+            }
+            if (vehicleIndex != -1 && wheelIndex != -1) {
+                JPH::RVec3 posBefore = pos;
+                JPH::Vec3 offset = bodyRot * vehicles[vehicleIndex]->wheelCOMOffsets[wheelIndex];
+                pos += JPH::RVec3(offset);
+                // printf("[WHEEL] Body %u vehicle %d wheel %d: COM offset=(%.3f,%.3f,%.3f) pos before=(%.3f,%.3f,%.3f) after=(%.3f,%.3f,%.3f)\n",
+                //     m->bodyID.GetIndex(), vehicleIndex, wheelIndex,
+                //     offset.GetX(), offset.GetY(), offset.GetZ(),
+                //     posBefore.GetX(), posBefore.GetY(), posBefore.GetZ(),
+                //     pos.GetX(), pos.GetY(), pos.GetZ());
+            }
+        } else {
+            // GetWorldTransform gives the body's origin (shape local origin) directly in world space
+            // No COM offset math needed - avoids positional inaccuracy
+            // pos = bodyRot * pos;
         }
 
         // Only push valid transforms to avoid GLM crash
         if (std::isfinite((float)pos.GetX()) && std::isfinite((float)pos.GetY()) && std::isfinite((float)pos.GetZ()) &&
             std::isfinite(bodyRot.GetX()) && std::isfinite(bodyRot.GetY()) && std::isfinite(bodyRot.GetZ()) && std::isfinite(bodyRot.GetW())) {
-            glm::vec3 translation((float)pos.GetX(), (float)pos.GetY(), (float)pos.GetZ());
+            // Apply physics-to-render scale conversion
+            glm::vec3 translation((float)pos.GetX() * PHYSICS_TO_RENDER_SCALE, 
+                                 (float)pos.GetY() * PHYSICS_TO_RENDER_SCALE, 
+                                 (float)pos.GetZ() * PHYSICS_TO_RENDER_SCALE);
             glm::quat rotation(bodyRot.GetW(), bodyRot.GetX(), bodyRot.GetY(), bodyRot.GetZ());
-            glm::mat4 modelMat = glm::translate(glm::mat4(1.0f), translation) * glm::mat4_cast(rotation);
+            glm::mat4 modelMat = glm::translate(glm::mat4(1.0f), translation) * glm::mat4_cast(rotation);           
             Matrix4 mat = Matrix4(new float[16]{
                 modelMat[0][0], modelMat[0][1], modelMat[0][2], modelMat[0][3],
                 modelMat[1][0], modelMat[1][1], modelMat[1][2], modelMat[1][3],
@@ -2202,6 +2302,19 @@ std::vector<Matrix4> chai_collisions::getPhysicsObjects(int mesh, std::vector<fl
     }
 
     return objects;
+}
+
+void chai_collisions::setVehicleControl(int vehicleIndex, float throttle, float steering, float brake)
+{
+    // printf("setVehicleControl called for vehicleIndex %d: throttle=%f, steering=%f, brake=%f\n", vehicleIndex, throttle, steering, brake);
+    if (vehicleIndex < 0 || vehicleIndex >= vehicles.size() || !vehicles[vehicleIndex]) {
+        return;
+    }
+    
+    Vehicle* vehicle = vehicles[vehicleIndex];
+    vehicle->steeringInput = steering;
+    vehicle->throttleInput = throttle;
+    vehicle->brakeInput = brake;
 }
 
 std::vector<float> chai_collisions::getVehicleBoneTransform(int vehicleIndex, const std::string& boneName)
@@ -2294,7 +2407,7 @@ public:
         case Layers::NON_MOVING:
             return inObject2 == Layers::MOVING || inObject2 == Layers::AI || inObject2 == Layers::WHEEL;
         case Layers::MOVING:
-            return inObject2 == Layers::NON_MOVING || inObject2 == Layers::AI; // MOVING doesn't collide with WHEEL
+            return inObject2 == Layers::NON_MOVING || inObject2 == Layers::AI || inObject2 == Layers::MOVING; // Allow vehicle-to-vehicle collisions
         case Layers::AI:
             return true;
         case Layers::BOUNDARY:
@@ -2623,6 +2736,7 @@ void chai_collisions::init(int group = 0)
     
 
 }
+
 void chai_collisions::destroy()
 {
     
@@ -2931,7 +3045,10 @@ void chai_collisions::process(float deltaTime)
                     cc->collisionNormal = JPH::Vec3::sZero();
                     // printf("Applying force to character %d: (%f, %f, %f)\n", cc->index, cc->velocityX, cc->velocityY, cc->velocityZ);
    
-                    cc->character->SetLinearVelocity(JPH::Vec3(cc->velocityX, cc->velocityY + cc->character->GetLinearVelocity().GetY(), cc->velocityZ));
+                    // Convert velocity from render space to physics space
+                    cc->character->SetLinearVelocity(JPH::Vec3(cc->velocityX / PHYSICS_TO_RENDER_SCALE, 
+                                                               cc->velocityY / PHYSICS_TO_RENDER_SCALE + cc->character->GetLinearVelocity().GetY(), 
+                                                               cc->velocityZ / PHYSICS_TO_RENDER_SCALE));
                     // cc->character->PostSimulation(cCollisionTolerance);
                     cc->collidedX = false;
                     cc->collidedZ = false;
@@ -3068,22 +3185,33 @@ void chai_collisions::process(float deltaTime)
         }
 
         // Update vehicle wheel transforms and suspension after physics step
-        JPH::BodyInterface& bodyInterface = dw.second->physics_system->GetBodyInterface();
+        // Use GetBodyInterfaceNoLock() since we're inside the physics update cycle
+        JPH::BodyInterface& bodyInterface = dw.second->physics_system->GetBodyInterfaceNoLock();
         std::vector<Vehicle*> brokenVehicles;  // Track vehicles to remove
 
         // Debug: report when no vehicles are present
         static int vehicleReportCounter = 0;
         if (vehicles.empty() && (vehicleReportCounter++ % 120 == 0)) {
-            printf("[Vehicle Debug] No vehicles registered in update loop\n");
+            // printf("[Vehicle Debug] No vehicles registered in update loop\n");
         }
         
         for (auto* vehicle : vehicles) {
-            if (!vehicle) continue;  // Guard against null vehicle
+            if (!vehicle) {
+                // printf("[Vehicle Debug] Null vehicle pointer in update loop\n");
+                continue;
+            }
             
             vehicle->frameCounter++;
+            
+            // Debug every 30 frames
+            if (vehicle->frameCounter % 30 == 0) {
+                // printf("[Vehicle Debug] Processing vehicle frame=%d, constraintActive=%d\n", 
+                //        vehicle->frameCounter, vehicle->constraintActive);
+            }
 
             // Skip if chassis body is invalid
             if (vehicle->chassisBodyID.IsInvalid()) {
+                // printf("[Vehicle Debug] Chassis body ID invalid, removing vehicle\n");
                 brokenVehicles.push_back(vehicle);
                 continue;
             }
@@ -3095,28 +3223,51 @@ void chai_collisions::process(float deltaTime)
             vehicle->chassisBoneTransform.rotation = chassisXform.GetQuaternion();
             vehicle->chassisBoneTransform.active = true;
             
+            if (vehicle->frameCounter % 30 == 0) {
+                // printf("[Vehicle Debug] Chassis transform: pos=(%.2f, %.2f, %.2f)\n",
+                //        vehicle->chassisBoneTransform.position.GetX(),
+                //        vehicle->chassisBoneTransform.position.GetY(),
+                //        vehicle->chassisBoneTransform.position.GetZ());
+            }
+            
             // Update wheel body positions from VehicleConstraint (which handles suspension and ground contact)
             if (vehicle->vehicleConstraint) {
+                if (vehicle->frameCounter % 30 == 0) {
+                    // printf("[Vehicle Debug] Updating %d wheels from constraint\n", 4);
+                }
                 for (int i = 0; i < 4; ++i) {
                     if (vehicle->wheelBodyIDs[i].IsInvalid()) continue;
-                    if (!bodyInterface.IsAdded(vehicle->wheelBodyIDs[i])) continue;
-                    
-                    // Get wheel transform from VehicleConstraint (includes suspension compression)
-                    JPH::RMat44 wheelTransform = vehicle->vehicleConstraint->GetWheelWorldTransform(i, JPH::Vec3::sAxisX(), JPH::Vec3::sAxisY());
-                    JPH::RVec3 wheelPos = wheelTransform.GetTranslation();
-                    JPH::Quat wheelRot = wheelTransform.GetQuaternion();
-                    
-                    // Apply left/right rotation offset to match creation-time rotations
-                    bool isLeftWheel = (i == 0 || i == 2);
-                    if (isLeftWheel) {
-                        // Left wheels: correct by 180° around Y-axis
-                        JPH::Quat leftRotation = JPH::Quat::sRotation(JPH::Vec3::sAxisY(), JPH::DegreesToRadians(180.0f));
-                        wheelRot = wheelRot * leftRotation;
+                    if (!bodyInterface.IsAdded(vehicle->wheelBodyIDs[i])) {
+                        if (vehicle->frameCounter % 30 == 0) {
+                            // printf("[Vehicle Debug] Wheel %d body not added to physics\n", i);
+                        }
+                        continue;
                     }
-                    // Right wheels use constraint rotation as-is
                     
-                    // Apply transform to wheel body
-                    bodyInterface.SetPositionAndRotation(vehicle->wheelBodyIDs[i], wheelPos, wheelRot, JPH::EActivation::Activate);
+                    // GetWheelWorldTransform returns a true world-space transform (position + rotation)
+                    // including suspension travel. Use it directly for the physics body.
+                    JPH::RMat44 wheelWorldTransform = vehicle->vehicleConstraint->GetWheelWorldTransform(i, JPH::Vec3::sAxisX(), JPH::Vec3::sAxisY());
+                    JPH::RVec3 wheelWorldPos = wheelWorldTransform.GetTranslation();
+                    JPH::Quat wheelWorldRot = wheelWorldTransform.GetQuaternion();
+                    
+                    // getPhysicsObjects() treats wheelBoneTransforms as chassis-LOCAL and then applies
+                    // chassisRot on top, so we must store the chassis-local rotation here.
+                    // localRot = chassisRot^-1 * wheelWorldRot
+                    JPH::Quat chassisWorldRot = bodyInterface.GetRotation(vehicle->chassisBodyID);
+                    JPH::Quat wheelLocalRot = chassisWorldRot.Conjugated() * wheelWorldRot;
+                    
+                    // Left wheels (0, 2) need 180° Y offset to face outwards, matching creation-time rotation
+                    if (i == 0 || i == 2) {
+                        wheelLocalRot = wheelLocalRot * JPH::Quat::sRotation(JPH::Vec3::sAxisY(), JPH::DegreesToRadians(180.0f));
+                    }
+
+                    JPH::Vec3 riggedBonePos(chassisWheelBones[vehicle->chassisMeshRef][i].x, chassisWheelBones[vehicle->chassisMeshRef][i].y, chassisWheelBones[vehicle->chassisMeshRef][i].z);
+                    vehicle->wheelBoneTransforms[i].position = riggedBonePos;
+                    vehicle->wheelBoneTransforms[i].rotation = wheelLocalRot;
+                    vehicle->wheelBoneTransforms[i].active = true;
+                    
+                    // Apply world transform to wheel physics body
+                    bodyInterface.SetPositionAndRotation(vehicle->wheelBodyIDs[i], wheelWorldPos, wheelWorldRot, JPH::EActivation::Activate);
                 }
             }
             
@@ -3132,16 +3283,27 @@ void chai_collisions::process(float deltaTime)
                 JPH::RVec3 chassisPos = bodyInterface.GetPosition(vehicle->chassisBodyID);
                 JPH::Quat chassisRotChecked = bodyInterface.GetRotation(vehicle->chassisBodyID);
                 JPH::Vec3 chassisVel = bodyInterface.GetLinearVelocity(vehicle->chassisBodyID);
+                
+                if (vehicle->frameCounter % 30 == 0) {
+                    // printf("[Vehicle Debug] Chassis state: pos=(%.2f,%.2f,%.2f) vel=(%.2f,%.2f,%.2f)\n",
+                    //        chassisPos.GetX(), chassisPos.GetY(), chassisPos.GetZ(),
+                    //        chassisVel.GetX(), chassisVel.GetY(), chassisVel.GetZ());
+                }
 
-                // Apply mild forward throttle via vehicle controller if available
+                // Apply vehicle control inputs via vehicle controller if available
                 if (vehicle->vehicleConstraint != nullptr) {
                     if (auto* controller = static_cast<JPH::WheeledVehicleController*>(vehicle->vehicleConstraint->GetController())) {
-                        const float throttle = 0.50f;   // 50% throttle
-                        const float brake    = 0.0f;
-                        const float steering = -1.0f;    // Try -1.0 for left, 1.0 for right
-                        const float handbrake = 0.0f;
-                        controller->SetDriverInput(throttle, steering, brake, handbrake);
-                        // printf("  [Debug] SetDriverInput: throttle=%.2f, steering=%.2f\n", throttle, steering);
+                        // Use the control inputs set by setVehicleControl()
+                        // Throttle: [-1, 1] where 1 is forward, -1 is reverse
+                        // Steering: [-1, 1] where -1 is left, 1 is right
+                        // Brake: [0, 1] where 1 is full brake
+                        // Handbrake: [0, 1] where 1 is full handbrake
+                        const float handbrake = 0.0f; // Not exposed in control interface yet
+                        controller->SetDriverInput(vehicle->throttleInput, vehicle->steeringInput, vehicle->brakeInput, handbrake);
+                        if (vehicle->frameCounter % 30 == 0 && (vehicle->throttleInput != 0.0f || vehicle->steeringInput != 0.0f || vehicle->brakeInput != 0.0f)) {
+                            // printf("[Vehicle Debug] Driver input: throttle=%.2f, steering=%.2f, brake=%.2f\n", 
+                            //        vehicle->throttleInput, vehicle->steeringInput, vehicle->brakeInput);
+                        }
                     }
                 }
 
@@ -3161,6 +3323,9 @@ void chai_collisions::process(float deltaTime)
                 }
                 
                 // Constraint is added immediately; ensure flag stays true
+                if (!vehicle->constraintActive) {
+                    // printf("[Vehicle Debug] Activating constraint for vehicle\n");
+                }
                 vehicle->constraintActive = true;
                 vehicle->activationWarmupFrames = std::max(0, vehicle->activationWarmupFrames);
                 
@@ -3303,15 +3468,31 @@ void chai_collisions::process(float deltaTime)
         // }
 
         // Debug rendering at reduced frequency
-        processDebugRendering(dw.second);
+        // processDebugRendering(dw.second, nullptr, nullptr);
     }
 }
 
-void chai_collisions::processDebugRendering(WorldJolt* world)
+void chai_collisions::renderDebugWithCamera(const glm::mat4& viewMatrix, const glm::mat4& projectionMatrix)
+{
+    // Render debug visualization for all worlds with the provided camera matrices
+    if (!worlds || worlds->worlds.empty()) {
+        return;
+    }
+    
+    for (auto& worldPair : worlds->worlds) {
+        if (worldPair.second) {
+            processDebugRendering(worldPair.second, &viewMatrix, &projectionMatrix);
+        }
+    }
+}
+
+void chai_collisions::processDebugRendering(WorldJolt* world, const glm::mat4* viewMatrix, const glm::mat4* projectionMatrix)
 {
     // If debug renderer is compiled out, do nothing
 #ifndef JPH_DEBUG_RENDERER
     (void)world;
+    (void)viewMatrix;
+    (void)projectionMatrix;
     return;
 #else
     // Early exit if world is invalid

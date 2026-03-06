@@ -277,6 +277,7 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, const std::st
         // Check if the shader already has a position() function or needs multiview wrapper
         bool hasPositionFunc = false;
         bool hasViewMatrixUsage = false;
+        bool hasLightSpaceUsage = false;
         for (const auto &piece : lines) {
             if (strstr(piece.c_str(), "vec4 position(") != NULL ||
                 strstr(piece.c_str(), "void vertexmain(") != NULL) {
@@ -290,24 +291,13 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, const std::st
         // If the shader uses viewMatrix, inject multiview selection code
         std::string a = multiviewHeader;
         
-        // Add helper function to select view matrix based on gl_ViewIndex
-        if (hasViewMatrixUsage) {
-            a += "// Multiview helper - select view matrix based on gl_ViewIndex\n";
-            a += "mat4 getViewMatrix(mat4 view1, mat4 view2, int splitMode) {\n";
-            a += "    if (splitMode == 1 && gl_ViewIndex == 1) {\n";
-            a += "        return view2;\n";
-            a += "    }\n";
-            a += "    return view1;\n";
-            a += "}\n\n";
-        }
+        // Note: All uniforms and varyings are handled externally
         
         for (const auto &piece : lines) a += piece+'\n';
        
         std::vector<std::string> code;
-        std::string c = "uniform sampler2D shadowMap;";
-            c += "uniform int shadow;";
-            c += "varying vec3 lighting;";
-            c += "varying vec4 fragPosLightSpace;";
+        std::string c = "// Fragment shader - shadow and lighting calculations\n";
+            c += "// Uniforms (shadowMap, shadow, miscInfo, lightSpaceMatrix) are added externally\n";
             c += "float grid (vec2 vBC, float width) {";
             c += "vec3 bary = vec3(vBC.x, vBC.y, 1.0 - vBC.x - vBC.y);";
             c += "vec3 d = fwidth(bary);";
@@ -315,23 +305,29 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, const std::st
             c += "return min(min(a3.x, a3.y), a3.z);";
             c += "}";
             c += "float ShadowCalculation() {";
+            c += "if (fragPosLightSpace.w <= 0.0) { return 0.0; }";  // Return no shadow if not set
             c += "vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;";
             c += "projCoords = projCoords * 0.5 + 0.5;";
-            // c += "projCoords.z = 1.0 - projCoords.z;";
-            // c += "projCoords.y = 1.0 - projCoords.y;";
+            c += "if (projCoords.z < 0.0 || projCoords.z > 1.0) { return 0.0; }";  // Out of depth range
+            c += "if (projCoords.x < 0.0 || projCoords.x > 1.0 || projCoords.y < 0.0 || projCoords.y > 1.0) { return 0.0; }";  // Out of shadow map
             c += "float closestDepth = texture2D(shadowMap, projCoords.xy).r;";
             c += "float currentDepth = projCoords.z;";
-            c += "float shadow = currentDepth > closestDepth ? 0.5 : 0.0;";
+            // Fragment is in shadow if its depth is greater than the closest depth in shadow map
+            c += "float shadow = currentDepth > closestDepth ? 1.0 : 0.0;";
             c += "return shadow;";
             c += "}";
             c += "vec4 effect( vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords ){ ";
+            // During shadow pass (miscInfo.x > 0.5), discard all fragments after depth write
+            // Depth is written automatically by rasterizer, we just need to skip color output
+            c += "if (miscInfo.x > 0.5) { discard; }";
             c += "vec4 pixel = Texel(texture, texture_coords );";
-            // c += "return vec4(1.0,.0,.0,1.0);";
             c += "float shadows = 0.0;";
+            c += "// Sample shadows only during normal rendering pass (shadow == 1)";
             c += "if (shadow == 1) {";
             c += "shadows = ShadowCalculation();";
-            c += "}"; 
-            c += "vec3 finalColor = (1.0 - shadows) * pixel.rgb * lighting;";
+            c += "}";
+            c += "// Apply shadow: 0.0 = fully lit, 1.0 = in shadow (darken by 50%)";
+            c += "vec3 finalColor = (1.0 - shadows * 0.5) * pixel.rgb * lighting;";
             c += "return vec4(finalColor, pixel.a) * color;";
             // c += "return vec4(vec3(grid(vec2(finalColor.x, finalColor.y), 1.0)), 1);";
             c += "}";

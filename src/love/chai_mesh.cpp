@@ -18,9 +18,6 @@
 
 namespace love
 {
-// Keep pixel buffers alive for fallback textures
-static std::map<gfx::Texture*, uint8_t*> s_fallbackTextureBuffers;
-
 chai_mesh::chai_mesh(std::vector<chai_meshData*> &data) {
     this->data = data;
     m_cachedAnimationDurations.clear();
@@ -134,17 +131,25 @@ void loadTexture(gfx::Mesh *mesh, std::string texture) {
     // Assuming pixelData is a byte array containing the ARGB data.
     uint8_t* pixelData = static_cast<uint8_t*>(img->surface->pixels);
     uint8_t* copyOfPixelData = new uint8_t[dataSize * 4];
-    for (size_t i = 0; i < dataSize * 4; i += 4) {
-        uint8_t alpha = pixelData[i];        // ARGB - Alpha at index 0
-        uint8_t blue = pixelData[i + 1];      // ARGB - Red at index 1
-        uint8_t green = pixelData[i + 2];    // ARGB - Green at index 2
-        uint8_t red = pixelData[i + 3];     // ARGB - Blue at index 3
+    
+    try {
+        for (size_t i = 0; i < dataSize * 4; i += 4) {
+            uint8_t alpha = pixelData[i];        // ARGB - Alpha at index 0
+            uint8_t blue = pixelData[i + 1];      // ARGB - Red at index 1
+            uint8_t green = pixelData[i + 2];    // ARGB - Green at index 2
+            uint8_t red = pixelData[i + 3];     // ARGB - Blue at index 3
 
-        // Swap to RGBA format
-        copyOfPixelData[i] = red;                 // RGBA - Red at index 0
-        copyOfPixelData[i + 1] = green;           // RGBA - Green at index 1
-        copyOfPixelData[i + 2] = blue;            // RGBA - Blue at index 2
-        copyOfPixelData[i + 3] = alpha;           // RGBA - Alpha at index 3
+            // Swap to RGBA format
+            copyOfPixelData[i] = red;                 // RGBA - Red at index 0
+            copyOfPixelData[i + 1] = green;           // RGBA - Green at index 1
+            copyOfPixelData[i + 2] = blue;            // RGBA - Blue at index 2
+            copyOfPixelData[i + 3] = alpha;           // RGBA - Alpha at index 3
+        }
+    } catch (...) {
+        SDL_UnlockSurface(img->surface);
+        delete img;
+        delete[] copyOfPixelData;
+        throw;
     }
 
     SDL_UnlockSurface(img->surface);
@@ -164,7 +169,11 @@ void loadTexture(gfx::Mesh *mesh, std::string texture) {
     tex->replacePixels(copyOfPixelData, dataSize*4, 0, 0, rect, false);
     delete[] copyOfPixelData;  // Free allocated pixel buffer
 
-    mesh->setTexture(tex);
+    if (tex) {
+        mesh->setTexture(tex);
+        // Note: texture is not tracked here as loadTexture is a standalone function
+        // The caller should manage the texture lifetime or it should be tracked elsewhere
+    }
 }
 
 std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, love::gfx::Graphics *instance, const std::string &type, std::vector<gfx::Buffer::DataDeclaration> &vf, chai_mesh *cm, chai_meshData *readyData = nullptr) {
@@ -595,7 +604,14 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
         // raise(SIGTRAP);
         // #endif
             auto texture = model.textures[material.pbrMetallicRoughness.baseColorTexture.index];
-            tex = cm->textures[texture.source] ?: nullptr;
+            // Check if texture.source is within bounds of cm->textures vector
+            if (texture.source >= 0 && texture.source < static_cast<int>(cm->textures.size())) {
+                tex = cm->textures[texture.source];
+            } else {
+                printf("[WARNING] Texture source index %d out of bounds (textures size: %zu)\n", 
+                       texture.source, cm->textures.size());
+                tex = nullptr;
+            }
         } else {
             tex = nullptr;
         }
@@ -647,15 +663,14 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
             printf("[DEBUG] Created fallback texture: %p\n", (void*)tex);
             
             // Now update with actual pixel data
-            Rect rect;
+            Rect rect = {};   // zero-init: x=0, y=0, w=0, h=0
             rect.w = 64;
             rect.h = 64;
-            tex->replacePixels(colorPixel, 4*64*64, 0, 0, rect, true);
+            tex->replacePixels(colorPixel, 4*64*64, 0, 0, rect, false);
             printf("[DEBUG] Texture pixels replaced\n");
             
-            // Store buffer in static map to keep it alive for the texture
-            s_fallbackTextureBuffers[tex] = colorPixel;
-            printf("[DEBUG] Pixel buffer stored in map for texture %p\n", (void*)tex);
+            // Since replacePixels with false makes a copy, we can delete our copy
+            delete[] colorPixel;
             gfx::SamplerState sampler = gfx::SamplerState();
 
             sampler.wrapU = gfx::SamplerState::WrapMode::WRAP_REPEAT;
@@ -678,6 +693,79 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
                 cm->specular[i] = true;
             } 
         }
+
+        // ---- Blender-level PBR material data ----------------------------------------
+        // Grow all PBR vectors to cover mesh index i (resize is safer than
+        // while+push_back; avoids repeated capacity checks).
+        if ((int)cm->normalTextures.size() <= i)            cm->normalTextures.resize(i + 1, nullptr);
+        if ((int)cm->metallicRoughnessTextures.size() <= i) cm->metallicRoughnessTextures.resize(i + 1, nullptr);
+        if ((int)cm->emissiveTextures.size() <= i)          cm->emissiveTextures.resize(i + 1, nullptr);
+        if ((int)cm->occlusionTextures.size() <= i)         cm->occlusionTextures.resize(i + 1, nullptr);
+        if ((int)cm->materialPropsList.size() <= i)         cm->materialPropsList.resize(i + 1);
+
+        chai_mesh::PBRMaterialProps& props = cm->materialPropsList[i];
+
+        // Scalar PBR factors
+        props.metallicFactor  = static_cast<float>(material.pbrMetallicRoughness.metallicFactor);
+        props.roughnessFactor = static_cast<float>(material.pbrMetallicRoughness.roughnessFactor);
+        if (material.emissiveFactor.size() >= 3) {
+            props.emissiveFactor = glm::vec3(
+                static_cast<float>(material.emissiveFactor[0]),
+                static_cast<float>(material.emissiveFactor[1]),
+                static_cast<float>(material.emissiveFactor[2]));
+        }
+        props.doubleSided  = material.doubleSided;
+        props.alphaBlend   = (material.alphaMode == "BLEND");
+        props.alphaMask    = (material.alphaMode == "MASK");
+        props.alphaCutoff  = static_cast<float>(material.alphaCutoff);
+
+        // Normal map (tangent-space)
+        if (material.normalTexture.index > -1) {
+            auto& normalTexRef = model.textures[material.normalTexture.index];
+            if (normalTexRef.source >= 0 && normalTexRef.source < (int)cm->textures.size()) {
+                cm->normalTextures[i]  = cm->textures[normalTexRef.source];
+                props.normalScale      = static_cast<float>(material.normalTexture.scale);
+                props.hasNormalMap     = true;
+                printf("[PBR] Mesh %d: normal map source=%d scale=%.3f\n",
+                       i, normalTexRef.source, props.normalScale);
+            }
+        }
+
+        // Metallic-roughness map (glTF: G=roughness, B=metallic)
+        if (material.pbrMetallicRoughness.metallicRoughnessTexture.index > -1) {
+            auto& mrTexRef = model.textures[material.pbrMetallicRoughness.metallicRoughnessTexture.index];
+            if (mrTexRef.source >= 0 && mrTexRef.source < (int)cm->textures.size()) {
+                cm->metallicRoughnessTextures[i]  = cm->textures[mrTexRef.source];
+                props.hasMetallicRoughnessMap     = true;
+                printf("[PBR] Mesh %d: metallic-roughness map source=%d metallic=%.3f roughness=%.3f\n",
+                       i, mrTexRef.source, props.metallicFactor, props.roughnessFactor);
+            }
+        }
+
+        // Emissive map
+        if (material.emissiveTexture.index > -1) {
+            auto& emTexRef = model.textures[material.emissiveTexture.index];
+            if (emTexRef.source >= 0 && emTexRef.source < (int)cm->textures.size()) {
+                cm->emissiveTextures[i]  = cm->textures[emTexRef.source];
+                props.hasEmissiveMap     = true;
+                printf("[PBR] Mesh %d: emissive map source=%d factor=(%.3f,%.3f,%.3f)\n",
+                       i, emTexRef.source,
+                       props.emissiveFactor.x, props.emissiveFactor.y, props.emissiveFactor.z);
+            }
+        }
+
+        // Occlusion (AO) map
+        if (material.occlusionTexture.index > -1) {
+            auto& aoTexRef = model.textures[material.occlusionTexture.index];
+            if (aoTexRef.source >= 0 && aoTexRef.source < (int)cm->textures.size()) {
+                cm->occlusionTextures[i]     = cm->textures[aoTexRef.source];
+                props.occlusionStrength      = static_cast<float>(material.occlusionTexture.strength);
+                props.hasOcclusionMap        = true;
+                printf("[PBR] Mesh %d: occlusion map source=%d strength=%.3f\n",
+                       i, aoTexRef.source, props.occlusionStrength);
+            }
+        }
+        // ---- end Blender-level PBR -----------------------------------------------
     }
     cm->skins = std::map<
         int,
@@ -1065,6 +1153,7 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
         if (readyData != nullptr) {
             auto m = instance->newMesh(vf, readyData->prepD.data(), readyData->prepD.size() * sizeof(float), gfx::PrimitiveType::PRIMITIVE_TRIANGLES, usage);
             printf("[DEBUG] Created mesh: %p with texture: %p\n", (void*)m, (void*)tex);
+            printf("[MEMORY] Mesh created from readyData, current mesh count: %zu\n", cm->meshes.size() + 1);
             m->setTexture(tex);
             printf("[DEBUG] Texture set on mesh (readyData)\n");
                 
@@ -1085,6 +1174,7 @@ std::pair<gfx::Mesh*, chai_meshData*> loadMesh(int i, tinygltf::Model &model, lo
         } else {
             auto m = instance->newMesh(vf, prepD.data(), prepD.size() * sizeof(float), gfx::PrimitiveType::PRIMITIVE_TRIANGLES, usage);
             printf("[DEBUG] Created mesh: %p with texture: %p\n", (void*)m, (void*)tex);
+            printf("[MEMORY] Mesh created from new data, current mesh count: %zu\n", cm->meshes.size() + 1);
             m->setTexture(tex);
             printf("[DEBUG] Texture set on mesh (new data)\n");
             auto d = new chai_meshData(prepD, cm->animations);
@@ -1199,6 +1289,30 @@ void chai_mesh::setLightParams(const std::map<std::string, std::vector<float>> &
 
 std::vector<chai_meshData*> chai_mesh::loadMeshFromFile(const std::vector<chaiscript::Boxed_Value> &vertexFormat, const std::string *FileName, const std::string &type) {
     instance = Module::getInstance<gfx::Graphics>(Module::M_GRAPHICS);
+
+    // ── Clear previously-loaded state ─────────────────────────────────────────
+    // textures / meshes / subVisible are *appended to* in this function, so a
+    // second call (e.g. scene reload) would otherwise double-accumulate data,
+    // leak old GPU textures, and leave dangling pointers in PBR vectors.
+    if (!textures.empty()) {
+        for (auto t : textures) {
+            if (t != nullptr) t->~Drawable();
+        }
+        textures.clear();
+    }
+    if (!meshes.empty()) {
+        for (auto m : meshes) {
+            if (m != nullptr) delete m;
+        }
+        meshes.clear();
+    }
+    subVisible.clear();
+    normalTextures.clear();
+    metallicRoughnessTextures.clear();
+    emissiveTextures.clear();
+    occlusionTextures.clear();
+    materialPropsList.clear();
+    // ─────────────────────────────────────────────────────────────────────────
 
     auto cl = ChaiLove::getInstance();
     auto f = cl->getFSModule();
@@ -1460,8 +1574,9 @@ std::vector<int> getChildNodes(std::map<int, std::vector<int>> nodeChildren, int
 
 void chai_mesh::update(std::vector<float> position, std::vector<float> rotation, std::vector<float> scale, chai_debug *debug) {
     auto cc = ChaiLove::getInstance()->chai_collisions;
+    scale = {1.0f, 1.0f, 1.0f};
     auto po = cc.getPhysicsObjects(id, scale);
-    for (int i = 0; i < po.size(); i++) {
+    for (int i = 0; i < (int)po.size() && i < (int)offsetMatrices.size(); i++) {
         auto physicsObjectMatrix = po[i];
         if (debug) {
             debug->pushDebugMessagef("Replacing Object Matrix: %d\n", i);
@@ -1920,7 +2035,7 @@ void chai_mesh::update(std::vector<float> position, std::vector<float> rotation,
 //     std::printf("Preloaded Animations Matrices\n");
 // }
 
-void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt, chai_shader *computeShader) {
+void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *shader, float dt, chai_shader *computeShader, bool shadows) {
     
     if (dt > 0.0f)
         frameCount++;
@@ -1944,15 +2059,21 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
         m_isSpecularCache1.push_back(1);
     }
     
-    if (m_jointInfoCache.size() != 4) {
-        m_jointInfoCache.resize(4);
+    if (m_jointInfoCache.size() != 1) {
+        m_jointInfoCache.resize(1);
     }
 
     if (mesh != nullptr) {
         mesh->draw(gfx, m);
     } else {
         // preloadAnimations();
-        for (int i = 0; i < meshes.size(); i++) {                      
+        for (int i = 0; i < meshes.size(); i++) {
+            // Bounds check: ensure i is valid for all parallel arrays
+            if (i < 0 || i >= 1024) {
+                fprintf(stderr, "[MESH] Invalid mesh index %d, skipping\n", i);
+                continue;
+            }
+            
             auto msh = meshes[i];
 
             if (subVisible[i] == false && msh != nullptr) {
@@ -2486,11 +2607,13 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                     modelIdx = shader->send("modelMatrix", m_matrixCache);
                 }
             }
-            if (specular.size() > i && specular[i]) {
-                shader->send("isSpecular", m_isSpecularCache1);
-            } else {
-                shader->send("isSpecular", m_isSpecularCache0);
-            }
+            // if (specular.size() > i && specular[i]) {
+            //     shader->send("isSpecular", m_isSpecularCache1);
+            // } else {
+            //     shader->send("isSpecular", m_isSpecularCache0);
+            // }
+
+            shader->sendConstant("miscInfo", {glm::vec4(0.0f, 1.0f, 1.0f, shadows ? 1.0f : 0.0f)});
 
             if (jointList[i].size() > 0) {
             //     // Create a large buffer containing ALL joint matrices
@@ -2520,14 +2643,11 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                 // uint64_t leakSizeBefore, leakSizeAfter;
                 
                 // __mem_leak_check(leakCountBefore, leakSizeBefore, false, "", false);
-                if (msh == nullptr) {
+                // Bounds check: jointMatrix size must be reasonable (< 512 joints)
+                if (jointMatrix[i].size() > 512) {
+                    fprintf(stderr, "[MESH] Invalid jointMatrix size %zu for mesh %d, skipping\n", jointMatrix[i].size(), i);
+                } else {
                     auto offset = shader->sendMap("jointMatrix", jointMatrix[i], jointList[i]);
-                    
-                    // __mem_leak_check(leakCountAfter, leakSizeAfter, false, "", false);
-        
-                    // printf("Leak delta: %zu objects, %llu bytes\n", 
-                    //     leakCountAfter - leakCountBefore,
-                    //     leakSizeAfter - leakSizeBefore);
                     
                     m_jointInfoCache[0] = glm::vec4((float)jointMatrix[i].size(), (float)offset, (float)modelIdx, 0.0f);
                 }
@@ -2541,9 +2661,87 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
            
             if (msh != nullptr) {
                 // Force opaque blending mode for mesh rendering
-                gfx::BlendState opaqueBlend;
-                opaqueBlend.enable = false;  // Disable blending - write directly
-                gfx->setBlendState(opaqueBlend);
+                // gfx::BlendState opaqueBlend;
+                // opaqueBlend.enable = false;  // Disable blending - write directly
+                // gfx->setBlendState(opaqueBlend);
+
+                // Rebind the mesh's texture to the shader to ensure correct texture state.
+                // Only invalidate the descriptor set when the texture pointer changes —
+                // invalidating every draw was causing one allocation per mesh per frame.
+                auto meshTexture = msh->getTexture();
+                static gfx::Texture* lastBoundTexture = nullptr;
+                if (meshTexture != lastBoundTexture) {
+                    shader->invalidateDescriptorSets();
+                    lastBoundTexture = meshTexture;
+                }
+                if (meshTexture != nullptr) {
+                    auto mainTexInfo = shader->shader->getMainTextureInfo();
+                    if (mainTexInfo != nullptr) {
+                        shader->shader->sendTextures(mainTexInfo, &meshTexture, 1);
+                    }
+                }
+
+                // ---- Blender-level PBR: bind additional texture maps ----------------
+                // Helper: only bind when uniform exists AND is an active sampler in this shader.
+                // If the mesh has no map for this slot, fall back to the mesh's base color
+                // texture so the sampler is never left unbound (avoids Vulkan validation errors).
+                auto sendPBRTex = [&](const char* uniformName, gfx::Texture* pbrTex) {
+                    auto info = shader->shader->getUniformInfo(uniformName);
+                    if (info == nullptr || !info->active || info->baseType != gfx::Shader::UNIFORM_SAMPLER)
+                        return;
+                    // Use pbrTex if available, otherwise fall back to the base-color texture
+                    gfx::Texture* bindTex = (pbrTex != nullptr) ? pbrTex : meshTexture;
+                    if (bindTex != nullptr)
+                        shader->shader->sendTextures(info, &bindTex, 1);
+                };
+
+                gfx::Texture* pbrNormal  = (i < (int)normalTextures.size())            ? normalTextures[i]            : nullptr;
+                gfx::Texture* pbrMR      = (i < (int)metallicRoughnessTextures.size())  ? metallicRoughnessTextures[i]  : nullptr;
+                gfx::Texture* pbrEmit    = (i < (int)emissiveTextures.size())           ? emissiveTextures[i]           : nullptr;
+                gfx::Texture* pbrAO      = (i < (int)occlusionTextures.size())          ? occlusionTextures[i]          : nullptr;
+
+                sendPBRTex("normalMap",            pbrNormal);
+                sendPBRTex("metallicRoughnessMap", pbrMR);
+                sendPBRTex("emissiveMap",          pbrEmit);
+                sendPBRTex("occlusionMap",         pbrAO);
+
+                // PBR scalar material factors — only write when uniform has a valid data pointer
+                auto sendVec4Uniform = [&](const char* name, float x, float y, float z, float w) {
+                    auto info = shader->shader->getUniformInfo(name);
+                    if (info == nullptr || info->data == nullptr ||
+                        info->baseType == gfx::Shader::UNIFORM_SAMPLER ||
+                        info->baseType == gfx::Shader::UNIFORM_STORAGETEXTURE)
+                        return;
+                    int slot = (modelIdx >= 0) ? modelIdx : 0;
+                    info->floats[slot * 4 + 0] = x; info->floats[slot * 4 + 1] = y;
+                    info->floats[slot * 4 + 2] = z; info->floats[slot * 4 + 3] = w;
+                    shader->shader->updateUniform(info, slot + 1);
+                };
+
+                if (i >= 0 && i < (int)materialPropsList.size()) {
+                    const PBRMaterialProps& props = materialPropsList[i];
+
+                    sendVec4Uniform("metallicRoughnessFactors",
+                        props.metallicFactor, props.roughnessFactor,
+                        props.normalScale,    props.occlusionStrength);
+                    sendVec4Uniform("emissiveFactor",
+                        props.emissiveFactor.x, props.emissiveFactor.y,
+                        props.emissiveFactor.z, props.alphaCutoff);
+                    sendVec4Uniform("pbrFlags",
+                        props.hasNormalMap            ? 1.0f : 0.0f,
+                        props.hasMetallicRoughnessMap ? 1.0f : 0.0f,
+                        props.hasEmissiveMap          ? 1.0f : 0.0f,
+                        props.hasOcclusionMap         ? 1.0f : 0.0f);
+                    sendVec4Uniform("alphaMode",
+                        props.alphaBlend  ? 1.0f : 0.0f,
+                        props.alphaMask   ? 1.0f : 0.0f,
+                        props.doubleSided ? 1.0f : 0.0f, 0.0f);
+                    
+                } else {
+                    // No PBR material props — legacy lighting path: write miscInfo[modelIdx] (y=0)
+                    
+                }
+                // ---- end PBR --------------------------------------------------------
                 
                 msh->draw(gfx, mat);  // Use physics-updated matrix, not 'm'
             }
@@ -2772,6 +2970,13 @@ chai_mesh::~chai_mesh() {
     jointOrder.clear();
     nodeChildren.clear();
     
+    // Clear PBR texture vectors (textures are reference-counted by the graphics system)
+    normalTextures.clear();
+    metallicRoughnessTextures.clear();
+    emissiveTextures.clear();
+    occlusionTextures.clear();
+    materialPropsList.clear();
+
     // Free specular data buffer if allocated
     if (specData != nullptr) {
         delete[] specData;
@@ -2819,6 +3024,14 @@ chai_mesh::chai_mesh(const chai_mesh &c) {
 
     visible = c.visible;
     subVisible = c.subVisible;
+    specular = c.specular;
+
+    // PBR material data - share texture pointers (reference counted)
+    normalTextures            = c.normalTextures;
+    metallicRoughnessTextures = c.metallicRoughnessTextures;
+    emissiveTextures          = c.emissiveTextures;
+    occlusionTextures         = c.occlusionTextures;
+    materialPropsList         = c.materialPropsList;
 
     currentTime = c.currentTime;
     
