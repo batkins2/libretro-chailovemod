@@ -162,6 +162,9 @@ void chai_scene::initShadowMap() {
 }
 
 void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &lightProjection, int view) {
+    if (m_frameCount == 0) {
+        return; // Skip shadow pass on first frame to avoid uninitialized resources
+    }
     printf("[SHADOW] === SHADOW PASS START ===\n");
     
     if (!shadowMapInitialized) {
@@ -397,12 +400,12 @@ void chai_scene::drawMeshes(bool shadows, int view) {
             specSettings.height = mesh->specularH;
             specSettings.format = PIXELFORMAT_RGBA8_UNORM;
             auto specSlices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
-            background_tex = gfx->newTexture(specSettings, &specSlices);
-            Rect specRect = {};
-            specRect.w = mesh->specularW;
-            specRect.h = mesh->specularH;
-            background_tex->replacePixels(mesh->specData,
-                mesh->specularW * mesh->specularH * 4, 0, 0, specRect, false);
+            // background_tex = gfx->newTexture(specSettings, &specSlices);
+            // Rect specRect = {};
+            // specRect.w = mesh->specularW;
+            // specRect.h = mesh->specularH;
+            // background_tex->replacePixels(mesh->specData,
+            //     mesh->specularW * mesh->specularH * 4, 0, 0, specRect, false);
         }
         if (background_tex != nullptr) {
             sceneShader->sendTexture("specularMap", background_tex);

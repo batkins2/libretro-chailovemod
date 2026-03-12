@@ -402,7 +402,7 @@ public:
 	
 	// Frame management for libretro mode
 	void advanceFrame() {
-		currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+		currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT; // Advance by 2 to allow triple buffering with 3 command buffers
 		beginFrame();
 	}
 	

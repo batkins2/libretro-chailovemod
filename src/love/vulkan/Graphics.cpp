@@ -612,16 +612,16 @@ void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallback
         // vulkan->wait_sync_index(vulkan->handle);
         
         // Get the sync index
-        uint32_t sync_index = vulkan->get_sync_index(vulkan->handle);
+        // uint32_t sync_index = vulkan->get_sync_index(vulkan->handle);
         // std::printf("[CHAILOVE DEBUG] Got sync index: %u\n", sync_index);
         
         // Submit only the primary command buffer (contains all viewports in one buffer)
-        std::array<VkCommandBuffer, 1> libretroCommandBuffers = { commandBuffers.at(currentFrame) };
-        
+        std::array<VkCommandBuffer, 2> libretroCommandBuffers = { commandBuffers.at(currentFrame + 1),  commandBuffers.at(currentFrame) };
+
         // Set the command buffers for RetroArch
         vulkan->set_command_buffers(vulkan->handle, static_cast<unsigned>(libretroCommandBuffers.size()), libretroCommandBuffers.data());
         
-        // std::printf("[CHAILOVE DEBUG] Set command buffer for RetroArch\n");
+		// std::printf("[CHAILOVE DEBUG] Set command buffer for RetroArch\n");
         
         // Note: We don't submit here - RetroArch will handle the submission
         // This is different from the normal present() flow
@@ -630,13 +630,15 @@ void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallback
         {
             // Handle screenshot readback if needed
         }
-        
+
+
+
         // std::printf("[CHAILOVE DEBUG] Libretro command submission completed\n");
         return;
     }
 
     // Submit only the primary command buffer
-    std::array<VkCommandBuffer, 1> submitCommandbuffers = { commandBuffers.at(currentFrame) };
+    std::array<VkCommandBuffer, 2> submitCommandbuffers = { commandBuffers.at(currentFrame + 1), commandBuffers.at(currentFrame) };
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -2062,6 +2064,8 @@ void Graphics::beginFrame()
 	{
 		vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 		vkResetFences(device, 1, &inFlightFences[currentFrame]);
+		// vkWaitForFences(device, 1, &inFlightFences[currentFrame+1], VK_TRUE, UINT64_MAX);
+		// vkResetFences(device, 1, &inFlightFences[currentFrame]);
 	}
 	
 	// CRITICAL: Reset current frame's command buffer AFTER fence wait
@@ -2072,6 +2076,7 @@ void Graphics::beginFrame()
 			std::printf("[ERROR] Failed to reset command buffer %zu at beginFrame: %d\n", currentFrame, resetResult);
 			fflush(stdout);
 		}
+		// vkResetCommandBuffer(commandBuffers[currentFrame+1], 0);
 	}
 
 	if (swapChain != VK_NULL_HANDLE)
@@ -2100,12 +2105,19 @@ void Graphics::beginFrame()
 	for (auto &readbackCallback : readbackCallbacks.at(currentFrame))
 		readbackCallback();
 	readbackCallbacks.at(currentFrame).clear();
+	// for (auto &readbackCallback : readbackCallbacks.at(currentFrame+1))
+	// 	readbackCallback();
+	// readbackCallbacks.at(currentFrame+1).clear();
 
 	for (auto &cleanUpFn : cleanUpFunctions.at(currentFrame))
 		cleanUpFn();
 	cleanUpFunctions.at(currentFrame).clear();
+	// for (auto &cleanUpFn : cleanUpFunctions.at(currentFrame+1))
+	// 	cleanUpFn();
+	// cleanUpFunctions.at(currentFrame+1).clear();
 
 	startRecordingGraphicsCommands(currentFrame);
+	// startRecordingGraphicsCommands(currentFrame+1);
 
 	if (!swapChainImages.empty())
 	{
@@ -2115,6 +2127,12 @@ void Graphics::beginFrame()
 			swapChainPixelFormat, true,
 			VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		// Vulkan::cmdTransitionImageLayout(
+		// 	commandBuffers.at(currentFrame+1),
+		// 	swapChainImages[imageIndex],
+		// 	swapChainPixelFormat, true,
+		// 	VK_IMAGE_LAYOUT_UNDEFINED,
+		// 	VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 	}
 
 	if (transitionColorDepthLayouts)
@@ -2126,6 +2144,12 @@ void Graphics::beginFrame()
 				depthStencilPixelFormat, true,
 				VK_IMAGE_LAYOUT_UNDEFINED,
 				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+			// Vulkan::cmdTransitionImageLayout(
+			// 	commandBuffers.at(currentFrame+1),
+			// 	depthImage,
+			// 	depthStencilPixelFormat, true,
+			// 	VK_IMAGE_LAYOUT_UNDEFINED,
+			// 	VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
 		if (colorImage)
 			Vulkan::cmdTransitionImageLayout(
@@ -2134,6 +2158,12 @@ void Graphics::beginFrame()
 				swapChainPixelFormat, true,
 				VK_IMAGE_LAYOUT_UNDEFINED,
 				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+			// Vulkan::cmdTransitionImageLayout(
+			// 	commandBuffers.at(currentFrame+1),
+			// 	colorImage,
+			// 	swapChainPixelFormat, true,
+			// 	VK_IMAGE_LAYOUT_UNDEFINED,
+			// 	VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 		transitionColorDepthLayouts = false;
 	}
@@ -2302,17 +2332,32 @@ void Graphics::beginShadowRenderPass()
     renderPassInfo.pClearValues = &clearValue;
     renderPassInfo.clearValueCount = 1;
 
-    vkCmdBeginRenderPass(commandBuffers.at(currentFrame), &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+	currentFrame = 1; // Use first command buffer for shadow pass
 
-    // Bind pipeline and draw objects visible from light
-    vkCmdBindPipeline(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, renderPassState.pipeline);
+	if (!commandBufferRecording)
+		startRecordingGraphicsCommands(currentFrame); // Use next frame's command buffer for shadow pass
+
+	// if (renderPassState.active)
+	// 	endRenderPass();
+	renderPassState.active = true; // Manually set active to true to prevent endRenderPass() from doing anything
+    vkCmdBeginRenderPass(commandBuffers.at(currentFrame), &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+	if (renderPassState.pipeline != VK_NULL_HANDLE)
+		vkCmdBindPipeline(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, renderPassState.pipeline);
 }
 
 void Graphics::endShadowRenderPass()
 {
 	vkCmdEndRenderPass(commandBuffers.at(currentFrame));
-	beginFrame(); // Start a new frame to reset state after shadow pass
-}
+	renderPassState.active = false;
+
+	vkEndCommandBuffer(commandBuffers.at(currentFrame));
+	commandBufferRecording = false;
+
+	currentFrame = 0;
+
+	// startRecordingGraphicsCommands(currentFrame); // Start recording main pass commands on
+	// submitGpuCommands(SUBMIT_NOPRESENT, nullptr); // Submit shadow pass commands immediately to ensure shadow map is ready for main pass
+} 
 
 void Graphics::setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void *data)
 {

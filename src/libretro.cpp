@@ -1691,8 +1691,7 @@ void retro_run(void) {
 		// PERF: Removed blocking wait_sync_index() - let GPU run asynchronously
 		// vulkan->wait_sync_index(vulkan->handle);
 
-		vk.index = vulkan->get_sync_index(vulkan->handle);
-		auto cmd = cg.instance->getCommandBuffersForDataTransfer(); 
+		// auto cmd = cg.instance->getCommandBuffersForDataTransfer(); 
 		// VkCommandBuffer cmd[buffers.size()];
 		// for (size_t i = 0; i < buffers.size(); i++) {
 		// 	cmd[i] = buffers[i];
@@ -1701,6 +1700,7 @@ void retro_run(void) {
 		// auto submitStart = std::chrono::high_resolution_clock::now();
 		vulkanGraphics->submitGpuCommands(love::gfx::vulkan::SUBMIT_NOPRESENT, nullptr);
 		// auto submitEnd = std::chrono::high_resolution_clock::now();
+		vk.index = vulkan->get_sync_index(vulkan->handle);
 		
 		// NOTE: Debug rendering now uses app->graphics.line() - no pipeline creation needed
 		
@@ -1710,7 +1710,7 @@ void retro_run(void) {
 		// std::printf("[FRAMEADVANCE] Advancing to next frame\n");
 		// fflush(stdout);
 		// auto advanceStart = std::chrono::high_resolution_clock::now();
-		vulkanGraphics->advanceFrame();
+		// vulkanGraphics->advanceFrame();
 		// auto advanceEnd = std::chrono::high_resolution_clock::now();
 
 		retro_vulkan_image image;
