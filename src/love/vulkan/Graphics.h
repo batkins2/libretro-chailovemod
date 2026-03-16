@@ -57,6 +57,8 @@ public:
     VkSampler getSampler() const { return sampler; }
 	VkRenderPass createShadowMapRenderPass(love::gfx::vulkan::Graphics* vulkanGraphics);
 	VkFramebuffer createShadowFramebuffer(ShadowMap* shadowMap, VkRenderPass renderPass, love::gfx::vulkan::Graphics* vulkanGraphics);
+	VkPipeline createShadowPipeline(love::gfx::vulkan::Graphics* vulkanGraphics, VkRenderPass shadowRenderPass);
+	VkDescriptorSetLayout createShadowDescriptorSetLayout(love::gfx::vulkan::Graphics* vulkanGraphics);
 
 private:
     VkImage image;
@@ -236,6 +238,8 @@ struct RenderpassState
 	RenderPassConfiguration renderPassConfiguration{};
 	FramebufferConfiguration framebufferConfiguration{};
 	VkPipeline pipeline = VK_NULL_HANDLE;
+	VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+	VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
 	uint32_t numColorAttachments = 0;
 	uint32_t viewCount = 1;
 	uint64 packedColorAttachmentFormats = 0;
@@ -395,7 +399,7 @@ public:
 		return descriptorSet;
 	}
 
-	void beginShadowRenderPass();
+	void beginShadowRenderPass(gfx::Shader *shadowShader);
 	void endShadowRenderPass();
 
 	void setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void *data);
@@ -536,6 +540,7 @@ private:
 	std::vector<std::unique_ptr<ShadowMap>> shadowMaps;
     VkRenderPass shadowMapRenderPass;
 	VkFramebuffer shadowFramebuffer;
+	VkPipeline shadowPipeline;
 
 	bool libretroMode = false;
 	bool commandBufferRecording = false;  // Track if command buffer is in recording state

@@ -178,6 +178,133 @@ VkRenderPass ShadowMap::createShadowMapRenderPass(love::gfx::vulkan::Graphics* v
     return renderPass;
 }
 
+VkPipeline ShadowMap::createShadowPipeline(love::gfx::vulkan::Graphics* vulkanGraphics, VkRenderPass shadowRenderPass)
+{
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 0;
+    pipelineLayoutInfo.pSetLayouts = nullptr;
+
+    VkDescriptorSetLayout shadowDescriptorSetLayout = createShadowDescriptorSetLayout(vulkanGraphics);
+
+    VkPipelineLayoutCreateInfo shadowPipelineLayoutInfo{};
+    shadowPipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    shadowPipelineLayoutInfo.setLayoutCount = 1;
+    shadowPipelineLayoutInfo.pSetLayouts = &shadowDescriptorSetLayout;
+
+    VkPipelineLayout shadowPipelineLayout{};
+    if (vkCreatePipelineLayout(vulkanGraphics->getDevice(), &shadowPipelineLayoutInfo, nullptr, &shadowPipelineLayout) != VK_SUCCESS)
+        throw love::Exception("failed to create shadow pipeline layout");
+
+    VkPipelineShaderStageCreateInfo shaderStageInfo{};
+    shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    shaderStageInfo.pName = "main";
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = 0;
+    vertexInputInfo.vertexAttributeDescriptionCount = 0;
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo{};
+    inputAssemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssemblyInfo.primitiveRestartEnable = VK_FALSE;
+
+    VkPipelineViewportStateCreateInfo viewportInfo{};
+    viewportInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportInfo.viewportCount = 1;
+    viewportInfo.scissorCount = 1;
+
+    VkPipelineRasterizationStateCreateInfo rasterizerInfo{};
+    rasterizerInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizerInfo.depthClampEnable = VK_FALSE;
+    rasterizerInfo.rasterizerDiscardEnable = VK_FALSE;
+    rasterizerInfo.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizerInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizerInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizerInfo.depthBiasEnable = VK_FALSE;
+
+    VkPipelineMultisampleStateCreateInfo multisampleInfo{};
+    multisampleInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampleInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampleInfo.sampleShadingEnable = VK_FALSE;
+
+    VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.blendEnable = VK_FALSE;
+    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+    colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+    colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+    colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+    VkPipelineColorBlendStateCreateInfo colorBlendInfo{};
+    colorBlendInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlendInfo.logicOpEnable = VK_FALSE;
+    colorBlendInfo.attachmentCount = 1;
+    colorBlendInfo.pAttachments = &colorBlendAttachment;
+
+    VkPipelineDepthStencilStateCreateInfo depthStencilInfo{};
+    depthStencilInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencilInfo.depthTestEnable = VK_TRUE;
+    depthStencilInfo.depthWriteEnable = VK_TRUE;
+    depthStencilInfo.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencilInfo.stencilTestEnable = VK_FALSE;
+
+	VkPipelineDynamicStateCreateInfo dynamicStateInfo{};
+	VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+	dynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamicStateInfo.pDynamicStates = dynamicStates;
+	dynamicStateInfo.dynamicStateCount = sizeof(dynamicStates) / sizeof(dynamicStates[0]);
+
+    VkGraphicsPipelineCreateInfo shadowPipelineInfo{};
+    shadowPipelineInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    shadowPipelineInfo.layout = shadowPipelineLayout;
+    shadowPipelineInfo.renderPass = shadowRenderPass;
+    shadowPipelineInfo.stageCount = 1;
+    shadowPipelineInfo.pStages = &shaderStageInfo;
+    shadowPipelineInfo.pVertexInputState = &vertexInputInfo;
+    shadowPipelineInfo.pInputAssemblyState = &inputAssemblyInfo;
+    shadowPipelineInfo.pViewportState = &viewportInfo;
+    shadowPipelineInfo.pRasterizationState = &rasterizerInfo;
+    shadowPipelineInfo.pMultisampleState = &multisampleInfo;
+    shadowPipelineInfo.pColorBlendState = &colorBlendInfo;
+    shadowPipelineInfo.pDepthStencilState = &depthStencilInfo;
+    shadowPipelineInfo.pDynamicState = &dynamicStateInfo;
+    shadowPipelineInfo.subpass = 0;
+    shadowPipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+
+    VkPipeline shadowPipeline{};
+    if (vkCreateGraphicsPipelines(vulkanGraphics->getDevice(), vulkanGraphics->getPipelineCache(), 1, &shadowPipelineInfo, nullptr, &shadowPipeline) != VK_SUCCESS)
+        throw love::Exception("failed to create shadow pipeline");
+
+    return shadowPipeline;
+}
+
+VkDescriptorSetLayout ShadowMap::createShadowDescriptorSetLayout(love::gfx::vulkan::Graphics* vulkanGraphics)
+{
+    VkDescriptorSetLayoutBinding binding{};
+    binding.binding = 0;
+    binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    binding.descriptorCount = 1;
+    binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    binding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &binding;
+
+    VkDescriptorSetLayout shadowDescriptorSetLayout{};
+    if (vkCreateDescriptorSetLayout(vulkanGraphics->getDevice(), &layoutInfo, nullptr, &shadowDescriptorSetLayout) != VK_SUCCESS)
+        throw love::Exception("failed to create shadow descriptor set layout");
+
+    return shadowDescriptorSetLayout;
+}
+
 static const std::vector<const char*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
 };
@@ -616,7 +743,7 @@ void Graphics::submitGpuCommands(SubmitMode submitMode, void *screenshotCallback
         // std::printf("[CHAILOVE DEBUG] Got sync index: %u\n", sync_index);
         
         // Submit only the primary command buffer (contains all viewports in one buffer)
-        std::array<VkCommandBuffer, 2> libretroCommandBuffers = { commandBuffers.at(currentFrame + 1),  commandBuffers.at(currentFrame) };
+        std::array<VkCommandBuffer, 1> libretroCommandBuffers = { commandBuffers.at(currentFrame) };
 
         // Set the command buffers for RetroArch
         vulkan->set_command_buffers(vulkan->handle, static_cast<unsigned>(libretroCommandBuffers.size()), libretroCommandBuffers.data());
@@ -1079,6 +1206,7 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
 	
 		shadowMapRenderPass = shadowMaps[0]->createShadowMapRenderPass(this);
 		shadowFramebuffer = shadowMaps[0]->createShadowFramebuffer(shadowMaps[0].get(), shadowMapRenderPass, this);
+		shadowPipeline = shadowMaps[0]->createShadowPipeline(this, shadowMapRenderPass);
 
 
         // std::printf("[CHAILOVE DEBUG] Libretro initialization completed successfully\n");
@@ -2214,7 +2342,7 @@ void Graphics::startRecordingGraphicsCommands(int commandBufferIndex)
     
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
     beginInfo.pInheritanceInfo = nullptr;
     beginInfo.pNext = nullptr;  // Explicitly set to nullptr for clarity
 
@@ -2316,48 +2444,88 @@ void Graphics::endRecordingGraphicsCommands()
 	commandBufferRecording = false;
 }
 
-void Graphics::beginShadowRenderPass()
-{
-	VkRenderPassBeginInfo renderPassInfo{};
+void Graphics::beginShadowRenderPass(gfx::Shader *shadowShader)
+{   
+    // Ensure we're recording a command buffer
+    if (!commandBufferRecording) {
+		std::printf("[SHADOW PASS] Command buffer not recording, starting recording for shadow pass on frame %zu\n", currentFrame);
+        startRecordingGraphicsCommands(currentFrame);
+    }
+    
+    // Setup render pass info
+    VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = shadowMapRenderPass; // defined elsewhere
+    renderPassInfo.renderPass = shadowMapRenderPass;
     renderPassInfo.framebuffer = shadowFramebuffer;
     renderPassInfo.renderArea.offset = {0, 0};
+    
+    // Use actual shadow map dimensions
     renderPassInfo.renderArea.extent.width = 1024;
     renderPassInfo.renderArea.extent.height = 1024;
-
+    
+    // Clear depth buffer
     VkClearValue clearValue{};
     clearValue.depthStencil = {1.0f, 0};
-
+    
     renderPassInfo.pClearValues = &clearValue;
     renderPassInfo.clearValueCount = 1;
-
-	currentFrame = 1; // Use first command buffer for shadow pass
-
-	if (!commandBufferRecording)
-		startRecordingGraphicsCommands(currentFrame); // Use next frame's command buffer for shadow pass
-
-	// if (renderPassState.active)
-	// 	endRenderPass();
-	renderPassState.active = true; // Manually set active to true to prevent endRenderPass() from doing anything
+    
+	std::printf("[SHADOW PASS] Beginning shadow render pass on command buffer %zu\n", currentFrame);
+    // Begin render pass
     vkCmdBeginRenderPass(commandBuffers.at(currentFrame), &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-	if (renderPassState.pipeline != VK_NULL_HANDLE)
-		vkCmdBindPipeline(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, renderPassState.pipeline);
+    
+	std::printf("[SHADOW PASS] Started shadow render pass with framebuffer %p and render area (%d, %d)\n", shadowFramebuffer, renderPassInfo.renderArea.extent.width, renderPassInfo.renderArea.extent.height);
+
+	// Bind shadow pipeline	
+    vkCmdBindPipeline(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, shadowPipeline);
+    
+	std::printf("[SHADOW PASS] Bound shadow pipeline %p\n", renderPassState.pipeline);
+	// Bind descriptor sets
+    // vkCmdBindDescriptorSets(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, renderPassState.pipelineLayout, 0, 1, &renderPassState.descriptorSet, 0, nullptr);
+    
+    renderPassState.active = true;
 }
 
 void Graphics::endShadowRenderPass()
 {
-	vkCmdEndRenderPass(commandBuffers.at(currentFrame));
-	renderPassState.active = false;
+    // End render pass
+    vkCmdEndRenderPass(commandBuffers.at(currentFrame));
+    
+    // End command buffer recording
+    vkEndCommandBuffer(commandBuffers.at(currentFrame));
+    
+    // Submit shadow pass commands
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.waitSemaphoreCount = 0;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffers.at(currentFrame);
+    submitInfo.signalSemaphoreCount = 0;
+    
+    VkResult submitResult = vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    if (submitResult != VK_SUCCESS) {
+        // Handle error appropriately
+        return;
+    }
+    
+    // Ensure shadow map is ready before main pass
+    // Use memory barrier to ensure visibility
+    VkPipelineStageFlags srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    
+    VkMemoryBarrier memoryBarrier = {};
+    memoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    memoryBarrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+    memoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    
+    vkCmdPipelineBarrier(commandBuffers.at(currentFrame), srcStageMask, dstStageMask, 0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
+    
+    // Reset shadow pass state
+    // shadowRenderPassActive = false;
+    renderPassState.active = false;
 
-	vkEndCommandBuffer(commandBuffers.at(currentFrame));
-	commandBufferRecording = false;
-
-	currentFrame = 0;
-
-	// startRecordingGraphicsCommands(currentFrame); // Start recording main pass commands on
-	// submitGpuCommands(SUBMIT_NOPRESENT, nullptr); // Submit shadow pass commands immediately to ensure shadow map is ready for main pass
-} 
+    commandBufferRecording = false;
+}
 
 void Graphics::setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void *data)
 {
@@ -2405,7 +2573,7 @@ VkCommandBuffer Graphics::getCommandBufferForDataTransfer(int frameIndex)
 	if (!commandBufferRecording) {
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
         beginInfo.pInheritanceInfo = nullptr;
 
         if (vkBeginCommandBuffer(commandBuffers.at(frameIndex), &beginInfo) != VK_SUCCESS)
@@ -5116,6 +5284,8 @@ VkPipeline Graphics::createGraphicsPipeline(Shader *shader, const GraphicsPipeli
 	pipelineInfo.pColorBlendState = &colorBlending;
 	pipelineInfo.pDynamicState = &dynamicState;
 	pipelineInfo.layout = shader->getGraphicsPipelineLayout();
+	renderPassState.pipelineLayout = shader->getGraphicsPipelineLayout();
+	renderPassState.descriptorSet = shader->getDescriptorSet();
 	pipelineInfo.subpass = 0;
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 	pipelineInfo.basePipelineIndex = -1;

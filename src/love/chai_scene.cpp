@@ -165,6 +165,16 @@ void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &l
     if (m_frameCount == 0) {
         return; // Skip shadow pass on first frame to avoid uninitialized resources
     }
+    auto& cg = ChaiLove::getInstance()->chai_gfx;
+    auto vulkanGfx = dynamic_cast<gfx::vulkan::Graphics*>(cg.instance);
+    if (!vulkanGfx) {
+        printf("[SHADOW] ABORTING: vulkanGfx cast failed\n");
+        return;
+    }
+    if (vulkanGfx->getCurrentPipeline() == VK_NULL_HANDLE) {
+        printf("[SHADOW] ABORTING: Pipeline not initialized\n");
+        return;
+    }
     printf("[SHADOW] === SHADOW PASS START ===\n");
     
     if (!shadowMapInitialized) {
@@ -178,14 +188,9 @@ void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &l
     }
     
     printf("[SHADOW] shadowMapTexture OK, sceneShader OK\n");
-    auto& cg = ChaiLove::getInstance()->chai_gfx;
-    auto vulkanGfx = dynamic_cast<gfx::vulkan::Graphics*>(cg.instance);
-    if (!vulkanGfx) {
-        printf("[SHADOW] ABORTING: vulkanGfx cast failed\n");
-        return;
-    }
+    
 
-    vulkanGfx->beginShadowRenderPass();
+    vulkanGfx->beginShadowRenderPass(sceneShader->shader);
     
     printf("[SHADOW] Calling submitGpuCommands(SUBMIT_RESTART) to end previous command buffer\n");
     // CRITICAL: End current command buffer and start a fresh one

@@ -207,6 +207,8 @@ public:
 	const std::vector<TextureInfo> &getActiveTextureInfo() const { return allTextureInfo; }
 	const std::vector<BufferInfo> &getActiveStorageBufferInfo() const { return storageBufferInfo; }
 
+	const VkDescriptorSet getDescriptorSet() const { return currentDescriptorSet; }
+
 private:
 	void compileShaders();
 	void createDescriptorSetLayout();
