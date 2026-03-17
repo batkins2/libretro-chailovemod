@@ -178,7 +178,7 @@ VkRenderPass ShadowMap::createShadowMapRenderPass(love::gfx::vulkan::Graphics* v
     return renderPass;
 }
 
-VkPipeline ShadowMap::createShadowPipeline(love::gfx::vulkan::Graphics* vulkanGraphics, VkRenderPass shadowRenderPass)
+VkPipeline ShadowMap::createShadowPipeline(love::gfx::vulkan::Graphics* vulkanGraphics, VkRenderPass shadowRenderPass, Shader* shader)
 {
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -196,10 +196,18 @@ VkPipeline ShadowMap::createShadowPipeline(love::gfx::vulkan::Graphics* vulkanGr
     if (vkCreatePipelineLayout(vulkanGraphics->getDevice(), &shadowPipelineLayoutInfo, nullptr, &shadowPipelineLayout) != VK_SUCCESS)
         throw love::Exception("failed to create shadow pipeline layout");
 
-    VkPipelineShaderStageCreateInfo shaderStageInfo{};
-    shaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    shaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    shaderStageInfo.pName = "main";
+	
+	auto shaderModule = shader->getShaderModules();
+
+    VkPipelineShaderStageCreateInfo shaderStageInfo[2]{};
+    shaderStageInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderStageInfo[0].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	shaderStageInfo[0].module = shaderModule[0];
+    shaderStageInfo[0].pName = "main";
+	shaderStageInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shaderStageInfo[1].stage = VK_SHADER_STAGE_VERTEX_BIT;
+	shaderStageInfo[1].module = shaderModule[1];
+	shaderStageInfo[1].pName = "main";
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -264,8 +272,8 @@ VkPipeline ShadowMap::createShadowPipeline(love::gfx::vulkan::Graphics* vulkanGr
     shadowPipelineInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     shadowPipelineInfo.layout = shadowPipelineLayout;
     shadowPipelineInfo.renderPass = shadowRenderPass;
-    shadowPipelineInfo.stageCount = 1;
-    shadowPipelineInfo.pStages = &shaderStageInfo;
+    shadowPipelineInfo.stageCount = 2;
+    shadowPipelineInfo.pStages = shaderStageInfo;
     shadowPipelineInfo.pVertexInputState = &vertexInputInfo;
     shadowPipelineInfo.pInputAssemblyState = &inputAssemblyInfo;
     shadowPipelineInfo.pViewportState = &viewportInfo;
@@ -1206,7 +1214,7 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
 	
 		shadowMapRenderPass = shadowMaps[0]->createShadowMapRenderPass(this);
 		shadowFramebuffer = shadowMaps[0]->createShadowFramebuffer(shadowMaps[0].get(), shadowMapRenderPass, this);
-		shadowPipeline = shadowMaps[0]->createShadowPipeline(this, shadowMapRenderPass);
+		shadowPipeline = shadowMaps[0]->createShadowPipeline(this, shadowMapRenderPass, dynamic_cast<Shader*>(Shader::current));
 
 
         // std::printf("[CHAILOVE DEBUG] Libretro initialization completed successfully\n");

@@ -57,7 +57,7 @@ public:
     VkSampler getSampler() const { return sampler; }
 	VkRenderPass createShadowMapRenderPass(love::gfx::vulkan::Graphics* vulkanGraphics);
 	VkFramebuffer createShadowFramebuffer(ShadowMap* shadowMap, VkRenderPass renderPass, love::gfx::vulkan::Graphics* vulkanGraphics);
-	VkPipeline createShadowPipeline(love::gfx::vulkan::Graphics* vulkanGraphics, VkRenderPass shadowRenderPass);
+	VkPipeline createShadowPipeline(love::gfx::vulkan::Graphics* vulkanGraphics, VkRenderPass shadowRenderPass, Shader* shader);
 	VkDescriptorSetLayout createShadowDescriptorSetLayout(love::gfx::vulkan::Graphics* vulkanGraphics);
 
 private:

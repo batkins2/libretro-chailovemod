@@ -208,6 +208,8 @@ public:
 	const std::vector<BufferInfo> &getActiveStorageBufferInfo() const { return storageBufferInfo; }
 
 	const VkDescriptorSet getDescriptorSet() const { return currentDescriptorSet; }
+	const std::vector<VkShaderModule> &getShaderModules() const { return shaderModules; }
+	
 
 private:
 	void compileShaders();
