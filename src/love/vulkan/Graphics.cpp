@@ -119,7 +119,7 @@ void ShadowMap::createSampler(love::gfx::vulkan::Graphics* vulkanGraphics) {
     samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.anisotropyEnable = VK_TRUE;
     samplerInfo.maxAnisotropy = 1.0f;
     samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
     samplerInfo.unnormalizedCoordinates = VK_FALSE;
@@ -203,10 +203,12 @@ VkPipeline ShadowMap::createShadowPipeline(love::gfx::vulkan::Graphics* vulkanGr
 	auto shaderModule = shader->getShaderModules();
 
     VkPipelineShaderStageCreateInfo shaderStageInfo[2];
+	shaderStageInfo[0] = {};
     shaderStageInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStageInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
 	shaderStageInfo[0].module = shaderModule[0];
     shaderStageInfo[0].pName = "main";
+	shaderStageInfo[1] = {};
 	shaderStageInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 	shaderStageInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 	shaderStageInfo[1].module = shaderModule[1];
