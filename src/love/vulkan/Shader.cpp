@@ -1589,25 +1589,25 @@ VkDescriptorSet Shader::allocateDescriptorSet()
 	}
 }
 
-VkPipeline Shader::getCachedGraphicsPipeline(Graphics *vgfx, const GraphicsPipelineConfigurationCore &configuration)
+std::array<VkPipeline, 2> Shader::getCachedGraphicsPipeline(Graphics *vgfx, const GraphicsPipelineConfigurationCore &configuration)
 {
 	auto it = graphicsPipelinesDynamicState.find(configuration);
 	if (it != graphicsPipelinesDynamicState.end())
 		return it->second;
 
-	VkPipeline pipeline = vgfx->createGraphicsPipeline(this, configuration, nullptr);
+	std::array<VkPipeline, 2> pipeline = vgfx->createGraphicsPipeline(this, configuration, nullptr);
 	graphicsPipelinesDynamicState.insert({ configuration, pipeline });
 	
 	return pipeline;
 }
 
-VkPipeline Shader::getCachedGraphicsPipeline(Graphics *vgfx, const GraphicsPipelineConfigurationFull &configuration)
+std::array<VkPipeline, 2> Shader::getCachedGraphicsPipeline(Graphics *vgfx, const GraphicsPipelineConfigurationFull &configuration)
 {
 	auto it = graphicsPipelinesNoDynamicState.find(configuration);
 	if (it != graphicsPipelinesNoDynamicState.end())
 		return it->second;
 
-	VkPipeline pipeline = vgfx->createGraphicsPipeline(this, configuration.core, &configuration.noDynamicState);
+	std::array<VkPipeline, 2> pipeline = vgfx->createGraphicsPipeline(this, configuration.core, &configuration.noDynamicState);
 	graphicsPipelinesNoDynamicState.insert({ configuration, pipeline });
 	
 	return pipeline;

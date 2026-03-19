@@ -355,7 +355,7 @@ public:
 	// Force recycle command pool to prevent driver memory accumulation
 	void recycleCommandPool(bool recreatePipelineCache = true);
 
-	VkPipeline createGraphicsPipeline(Shader *shader, const GraphicsPipelineConfigurationCore &configuration, const GraphicsPipelineConfigurationNoDynamicState *noDynamicStateConfiguration);
+	std::array<VkPipeline, 2> createGraphicsPipeline(Shader *shader, const GraphicsPipelineConfigurationCore &configuration, const GraphicsPipelineConfigurationNoDynamicState *noDynamicStateConfiguration);
 
 	uint32 getDeviceApiVersion() const { return deviceApiVersion; }
 

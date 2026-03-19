@@ -201,8 +201,8 @@ public:
 		currentDescriptorSet = VK_NULL_HANDLE;
 	}
 
-	VkPipeline getCachedGraphicsPipeline(Graphics *vgfx, const GraphicsPipelineConfigurationCore &configuration);
-	VkPipeline getCachedGraphicsPipeline(Graphics *vgfx, const GraphicsPipelineConfigurationFull &configuration);
+	std::array<VkPipeline, 2> getCachedGraphicsPipeline(Graphics *vgfx, const GraphicsPipelineConfigurationCore &configuration);
+	std::array<VkPipeline, 2> getCachedGraphicsPipeline(Graphics *vgfx, const GraphicsPipelineConfigurationFull &configuration);
 
 	const std::vector<TextureInfo> &getActiveTextureInfo() const { return allTextureInfo; }
 	const std::vector<BufferInfo> &getActiveStorageBufferInfo() const { return storageBufferInfo; }
@@ -267,8 +267,8 @@ private:
 
 	std::unordered_map<std::string, AttributeInfo> attributes;
 
-	std::unordered_map<GraphicsPipelineConfigurationCore, VkPipeline, GraphicsPipelineConfigurationCoreHasher> graphicsPipelinesDynamicState;
-	std::unordered_map<GraphicsPipelineConfigurationFull, VkPipeline, GraphicsPipelineConfigurationFullHasher> graphicsPipelinesNoDynamicState;
+	std::unordered_map<GraphicsPipelineConfigurationCore, std::array<VkPipeline, 2>, GraphicsPipelineConfigurationCoreHasher> graphicsPipelinesDynamicState;
+	std::unordered_map<GraphicsPipelineConfigurationFull, std::array<VkPipeline, 2>, GraphicsPipelineConfigurationFullHasher> graphicsPipelinesNoDynamicState;
 
 	uint32_t currentFrame = 0;
 	uint32_t currentDescriptorPool = 0;

@@ -237,6 +237,7 @@ VkPipeline ShadowMap::createShadowPipeline(love::gfx::vulkan::Graphics* vulkanGr
     rasterizerInfo.cullMode = VK_CULL_MODE_BACK_BIT;
     rasterizerInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizerInfo.depthBiasEnable = VK_FALSE;
+    rasterizerInfo.lineWidth = 1.0f;
 
     VkPipelineMultisampleStateCreateInfo multisampleInfo{};
     multisampleInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -298,17 +299,29 @@ VkPipeline ShadowMap::createShadowPipeline(love::gfx::vulkan::Graphics* vulkanGr
 
 VkDescriptorSetLayout ShadowMap::createShadowDescriptorSetLayout(love::gfx::vulkan::Graphics* vulkanGraphics)
 {
-    VkDescriptorSetLayoutBinding binding{};
-    binding.binding = 0;
-    binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    binding.descriptorCount = 1;
-    binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    binding.pImmutableSamplers = nullptr;
+    // ✅ CORRECT: Create layout with BOTH bindings
+    VkDescriptorSetLayoutBinding bindings[2]{};
+
+    // Binding 0: Uniform Block
+    bindings[0].binding = 0;
+    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    bindings[0].descriptorCount = 1;
+    // ✅ INCLUDE BOTH STAGES if both use it
+    bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[0].pImmutableSamplers = NULL;
+
+    // Binding 1: Texture
+    bindings[1].binding = 1;
+    bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[1].descriptorCount = 1;
+    // ✅ FRAGMENT STAGE ONLY
+    bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    bindings[1].pImmutableSamplers = NULL;
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 1;
-    layoutInfo.pBindings = &binding;
+    layoutInfo.bindingCount = 2;
+    layoutInfo.pBindings = bindings;
 
     VkDescriptorSetLayout shadowDescriptorSetLayout{};
     if (vkCreateDescriptorSetLayout(vulkanGraphics->getDevice(), &layoutInfo, nullptr, &shadowDescriptorSetLayout) != VK_SUCCESS)
@@ -1218,7 +1231,7 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
 
 		shadowMapRenderPass = shadowMaps[0]->createShadowMapRenderPass(this);
 		shadowFramebuffer = shadowMaps[0]->createShadowFramebuffer(shadowMaps[0].get(), shadowMapRenderPass, this);
-		shadowPipeline = shadowMaps[0]->createShadowPipeline(this, shadowMapRenderPass, dynamic_cast<Shader*>(Shader::current));
+		// shadowPipeline = shadowMaps[0]->createShadowPipeline(this, shadowMapRenderPass, dynamic_cast<Shader*>(Shader::current));
 
 
         // std::printf("[CHAILOVE DEBUG] Libretro initialization completed successfully\n");
@@ -5120,9 +5133,9 @@ VkSampler Graphics::getCachedSampler(const SamplerState &samplerState)
 	}
 }
 
-VkPipeline Graphics::createGraphicsPipeline(Shader *shader, const GraphicsPipelineConfigurationCore &configuration, const GraphicsPipelineConfigurationNoDynamicState *noDynamicStateConfiguration)
+std::array<VkPipeline, 2> Graphics::createGraphicsPipeline(Shader *shader, const GraphicsPipelineConfigurationCore &configuration, const GraphicsPipelineConfigurationNoDynamicState *noDynamicStateConfiguration)
 {
-	VkGraphicsPipelineCreateInfo pipelineInfo{};
+	VkGraphicsPipelineCreateInfo pipelineInfo{}, shadowPipelineInfo{};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 
 	auto &shaderStages = shader->getShaderStages();
@@ -5296,19 +5309,21 @@ VkPipeline Graphics::createGraphicsPipeline(Shader *shader, const GraphicsPipeli
 	pipelineInfo.pColorBlendState = &colorBlending;
 	pipelineInfo.pDynamicState = &dynamicState;
 	pipelineInfo.layout = shader->getGraphicsPipelineLayout();
-	renderPassState.pipelineLayout = shader->getGraphicsPipelineLayout();
-	renderPassState.descriptorSet = shader->getDescriptorSet();
 	pipelineInfo.subpass = 0;
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 	pipelineInfo.basePipelineIndex = -1;
 	pipelineInfo.renderPass = configuration.renderPass;
 
-	VkPipeline graphicsPipeline;
+        shadowPipelineInfo = pipelineInfo;
+	shadowPipelineInfo.renderPass = shadowMapRenderPass;
+	
+
+	VkPipeline graphicsPipeline, graphicsShadowPipeline;
 	// PERF: Time pipeline creation
 	static int pipelineCreateCounter = 0;
 	static double totalPipelineTime = 0.0;
 	auto pipelineStart = std::chrono::high_resolution_clock::now();
-	if (vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS)
+	if (vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS && vkCreateGraphicsPipelines(device, pipelineCache, 1, &shadowPipelineInfo, nullptr, &graphicsShadowPipeline) != VK_SUCCESS)
 		throw love::Exception("failed to create graphics pipeline");
 	auto pipelineEnd = std::chrono::high_resolution_clock::now();
 	auto pipelineMs = std::chrono::duration<double, std::milli>(pipelineEnd - pipelineStart).count();
@@ -5318,7 +5333,7 @@ VkPipeline Graphics::createGraphicsPipeline(Shader *shader, const GraphicsPipeli
 		// 	pipelineCreateCounter, pipelineMs, totalPipelineTime / pipelineCreateCounter, totalPipelineTime);
 		// fflush(stdout);
 	}
-	return graphicsPipeline;
+	return {graphicsPipeline, graphicsShadowPipeline};
 }
 
 VkSampleCountFlagBits Graphics::getMsaaCount(int requestedMsaa) const
