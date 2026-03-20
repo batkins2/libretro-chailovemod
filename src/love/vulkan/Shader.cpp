@@ -222,9 +222,9 @@ void Shader::unloadVolatile()
 		if (computePipeline != VK_NULL_HANDLE)
 			vkDestroyPipeline(device, computePipeline, nullptr);
 		for (const auto &kvp : graphicsPipelinesCore)
-			vkDestroyPipeline(device, kvp.second, nullptr);
+			vkDestroyPipeline(device, kvp.second[0], nullptr);
 		for (const auto &kvp : graphicsPipelinesFull)
-			vkDestroyPipeline(device, kvp.second, nullptr);
+			vkDestroyPipeline(device, kvp.second[0], nullptr);
 	});
 
 	shaderModules.clear();

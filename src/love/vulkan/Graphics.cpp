@@ -2502,12 +2502,13 @@ void Graphics::beginShadowRenderPass(gfx::Shader *shadowShader)
 	std::printf("[SHADOW PASS] Started shadow render pass with framebuffer %p and render area (%d, %d)\n", shadowFramebuffer, renderPassInfo.renderArea.extent.width, renderPassInfo.renderArea.extent.height);
 
 	// Bind shadow pipeline
-    vkCmdBindPipeline(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, shadowPipeline);
+    // vkCmdBindPipeline(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, renderPassState.pipeline[1]);
 
 	std::printf("[SHADOW PASS] Bound shadow pipeline %p\n", renderPassState.pipeline);
 	// Bind descriptor sets
     // vkCmdBindDescriptorSets(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, renderPassState.pipelineLayout, 0, 1, &renderPassState.descriptorSet, 0, nullptr);
 
+    isShadowPass = true;
     renderPassState.active = true;
 }
 
@@ -2535,19 +2536,20 @@ void Graphics::endShadowRenderPass()
 
     // Ensure shadow map is ready before main pass
     // Use memory barrier to ensure visibility
-    VkPipelineStageFlags srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    // VkPipelineStageFlags srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    // VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
-    VkMemoryBarrier memoryBarrier = {};
-    memoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-    memoryBarrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
-    memoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    // VkMemoryBarrier memoryBarrier = {};
+    // memoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    // memoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    // memoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-    vkCmdPipelineBarrier(commandBuffers.at(currentFrame), srcStageMask, dstStageMask, 0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
+    // vkCmdPipelineBarrier(commandBuffers.at(currentFrame), srcStageMask, dstStageMask, 0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
 
     // Reset shadow pass state
     // shadowRenderPassActive = false;
     renderPassState.active = false;
+    isShadowPass = false;
 
     commandBufferRecording = false;
 }
@@ -3874,7 +3876,10 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
     VkPipeline pipeline = VK_NULL_HANDLE;
 
     try {
-        pipeline = s->getCachedGraphicsPipeline(this, configuration);
+        if (isShadowPass)
+        	pipeline = s->getCachedGraphicsPipeline(this, configuration)[1];
+        else
+		pipeline = s->getCachedGraphicsPipeline(this, configuration)[0];
         // std::printf("[CHAILOVE DEBUG] Pipeline retrieved successfully: %p\n", (void*)pipeline);
     } catch (const std::exception& e) {
         // std::printf("[CHAILOVE ERROR] Failed to get graphics pipeline: %s\n", e.what());
@@ -3886,10 +3891,10 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
         return;
     }
 
-    if (pipeline != renderPassState.pipeline) {
+    if (isShadowPass || pipeline != renderPassState.pipeline[0]) {
         // std::printf("[CHAILOVE DEBUG] Binding new pipeline: %p (was %p)\n", (void*)pipeline, (void*)renderPassState.pipeline);
         vkCmdBindPipeline(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-        renderPassState.pipeline = pipeline;
+        renderPassState.pipeline[0] = pipeline;
     }
 
     // VALIDATE DESCRIPTOR SETS BEFORE BINDING
@@ -4000,7 +4005,7 @@ void Graphics::setDefaultRenderPass()
     // std::printf("[CHAILOVE DEBUG] Final render area extent: %ux%u\n", renderWidth, renderHeight);
 
     renderPassState.isWindow = true;
-    renderPassState.pipeline = VK_NULL_HANDLE;
+    renderPassState.pipeline[0] = VK_NULL_HANDLE;
     renderPassState.msaa = msaaSamples;
     renderPassState.numColorAttachments = 1;
 
@@ -4343,7 +4348,7 @@ void Graphics::setRenderPass(const RenderTargets &rts, int pixelw, int pixelh)
 	renderPassState.isWindow = false;
 	renderPassState.renderPassConfiguration = renderPassConfiguration;
 	renderPassState.framebufferConfiguration = configuration;
-	renderPassState.pipeline = VK_NULL_HANDLE;
+	renderPassState.pipeline[0] = VK_NULL_HANDLE;
 	renderPassState.width = static_cast<float>(pixelw);
 	renderPassState.height = static_cast<float>(pixelh);
 	renderPassState.viewCount = viewCount;
@@ -4764,7 +4769,7 @@ void Graphics::startRenderPass(int bufferIndex)
             auto currentShader = Shader::current;
             Shader::current = nullptr;
             Shader::current = currentShader;
-            renderPassState.pipeline = VK_NULL_HANDLE;
+            renderPassState.pipeline[0] = VK_NULL_HANDLE;
         }
 
         // Set viewport
@@ -5318,14 +5323,15 @@ std::array<VkPipeline, 2> Graphics::createGraphicsPipeline(Shader *shader, const
 	shadowPipelineInfo.renderPass = shadowMapRenderPass;
 	
 
-	VkPipeline graphicsPipeline, graphicsShadowPipeline;
+	VkPipeline graphicsPipeline[2];
+        VkGraphicsPipelineCreateInfo pipelineInfos[2] = {pipelineInfo, shadowPipelineInfo};
 	// PERF: Time pipeline creation
 	static int pipelineCreateCounter = 0;
 	static double totalPipelineTime = 0.0;
 	auto pipelineStart = std::chrono::high_resolution_clock::now();
-	if (vkCreateGraphicsPipelines(device, pipelineCache, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS && vkCreateGraphicsPipelines(device, pipelineCache, 1, &shadowPipelineInfo, nullptr, &graphicsShadowPipeline) != VK_SUCCESS)
-		throw love::Exception("failed to create graphics pipeline");
-	auto pipelineEnd = std::chrono::high_resolution_clock::now();
+	if (vkCreateGraphicsPipelines(device, pipelineCache, 2, pipelineInfos, nullptr, graphicsPipeline) != VK_SUCCESS)
+                throw love::Exception("failed to create graphics pipeline");
+        auto pipelineEnd = std::chrono::high_resolution_clock::now();
 	auto pipelineMs = std::chrono::duration<double, std::milli>(pipelineEnd - pipelineStart).count();
 	totalPipelineTime += pipelineMs;
 	if (++pipelineCreateCounter % 10 == 0) {
@@ -5333,7 +5339,8 @@ std::array<VkPipeline, 2> Graphics::createGraphicsPipeline(Shader *shader, const
 		// 	pipelineCreateCounter, pipelineMs, totalPipelineTime / pipelineCreateCounter, totalPipelineTime);
 		// fflush(stdout);
 	}
-	return {graphicsPipeline, graphicsShadowPipeline};
+        // std::printf("[GFX PIPELINE] Shadow Pipeline: %p", graphicsShadowPipeline);
+	return {graphicsPipeline[0], graphicsPipeline[1]};
 }
 
 VkSampleCountFlagBits Graphics::getMsaaCount(int requestedMsaa) const

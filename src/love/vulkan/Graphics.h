@@ -237,7 +237,7 @@ struct RenderpassState
 	bool isWindow = false;
 	RenderPassConfiguration renderPassConfiguration{};
 	FramebufferConfiguration framebufferConfiguration{};
-	VkPipeline pipeline = VK_NULL_HANDLE;
+	std::array<VkPipeline, 2> pipeline = {VK_NULL_HANDLE, VK_NULL_HANDLE};
 	VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
 	VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
 	uint32_t numColorAttachments = 0;
@@ -370,7 +370,8 @@ public:
 
     // LIBRETRO BUFFER UPLOAD FIX
     bool isInRenderPass() const { return renderPassState.active; }
-    VkPipeline getCurrentPipeline() const { return renderPassState.pipeline; }
+    VkPipeline getCurrentPipeline() const { return renderPassState.pipeline[0]; }
+    VkPipeline getCurrentShadowPipeline() const { return renderPassState.pipeline[1]; }
     VkRenderPass getCurrentRenderPass() const { return renderPassState.beginInfo.renderPass; }
 	RenderPassConfiguration getCurrentRenderPassConfiguration() const { return renderPassState.renderPassConfiguration; }
 	VkSampleCountFlagBits getCurrentMsaa() const { return renderPassState.msaa; }
@@ -555,6 +556,7 @@ private:
     VkQueue externalQueue = VK_NULL_HANDLE;
     VkCommandPool externalCommandPool = VK_NULL_HANDLE;
 	bool ownsCommandPool = false;  // Track if we created the command pool ourselves
+        bool isShadowPass = false;
 
 	VmaVulkanFunctions vmaVulkanFunctions = {};
 
