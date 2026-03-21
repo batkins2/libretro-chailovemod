@@ -2537,7 +2537,7 @@ void Graphics::beginShadowRenderPass(gfx::Shader *shadowShader)
 void Graphics::endShadowRenderPass(chai_shader *shadowShader)
 {
 	auto uniformInfo = shadowShader->shader->getUniformInfo("shadowMap");
-	
+
 	// Update the descriptor set with the shadow map texture
 	VkDescriptorImageInfo imageInfo{};
 	imageInfo.sampler = shadowMaps[0]->getSampler();
@@ -2546,7 +2546,7 @@ void Graphics::endShadowRenderPass(chai_shader *shadowShader)
 
 	VkWriteDescriptorSet descriptorWrite{};
 	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrite.dstSet = descriptorSet;
+	descriptorWrite.dstSet = allocateDescriptorSet();
 	descriptorWrite.dstBinding = uniformInfo->location; // Use the provided location
 	descriptorWrite.dstArrayElement = 0;
 	descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -2554,7 +2554,7 @@ void Graphics::endShadowRenderPass(chai_shader *shadowShader)
 	descriptorWrite.pImageInfo = &imageInfo;
 
 	vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
-	
+
     // End render pass
     vkCmdEndRenderPass(commandBuffers.at(currentFrame));
 
@@ -2581,7 +2581,7 @@ void Graphics::endShadowRenderPass(chai_shader *shadowShader)
     isShadowPass = false;
 
     commandBufferRecording = false;
-	
+
 }
 
 void Graphics::setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void *data)
@@ -5355,7 +5355,7 @@ std::array<VkPipeline, 2> Graphics::createGraphicsPipeline(Shader *shader, const
 	shadowColorBlending.pAttachments = nullptr;
 	shadowPipelineInfo.pColorBlendState = &shadowColorBlending;
 	shadowPipelineInfo.renderPass = shadowMapRenderPass;
-	
+
 
 	VkPipeline graphicsPipeline[2];
     VkGraphicsPipelineCreateInfo pipelineInfos[2] = {pipelineInfo, shadowPipelineInfo};
