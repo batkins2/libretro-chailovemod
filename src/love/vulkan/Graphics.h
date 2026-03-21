@@ -27,6 +27,9 @@
 #include "ShaderStage.h"
 #include "Shader.h"
 #include "Texture.h"
+#ifndef __HAVE_CHAI_SHADER__
+#include "../chai_shader.h"
+#endif
 
 // libraries
 #include "../libraries/xxHash/xxhash.h"
@@ -53,12 +56,14 @@ public:
     ShadowMap(int width, int height, love::gfx::vulkan::Graphics* vulkanGraphics);
     ~ShadowMap();
 
+	VkImage getImage() const { return image; }
     VkImageView getView() const { return imageView; }
     VkSampler getSampler() const { return sampler; }
 	VkRenderPass createShadowMapRenderPass(love::gfx::vulkan::Graphics* vulkanGraphics);
 	VkFramebuffer createShadowFramebuffer(ShadowMap* shadowMap, VkRenderPass renderPass, love::gfx::vulkan::Graphics* vulkanGraphics);
 	VkPipeline createShadowPipeline(love::gfx::vulkan::Graphics* vulkanGraphics, VkRenderPass shadowRenderPass, Shader* shader);
 	VkDescriptorSetLayout createShadowDescriptorSetLayout(love::gfx::vulkan::Graphics* vulkanGraphics);
+	void updateShadowDescriptorSet(VkDescriptorSet descriptorSet, int location, VkSampler shadowSampler, VkImageView shadowImageView, love::gfx::vulkan::Graphics* vulkanGraphics);
 
 private:
     VkImage image;
@@ -401,7 +406,7 @@ public:
 	}
 
 	void beginShadowRenderPass(gfx::Shader *shadowShader);
-	void endShadowRenderPass();
+	void endShadowRenderPass(chai_shader *shadowShader);
 
 	void setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void *data);
 	

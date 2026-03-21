@@ -192,26 +192,26 @@ void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &l
 
     vulkanGfx->beginShadowRenderPass(sceneShader->shader);
     
-    printf("[SHADOW] Calling submitGpuCommands(SUBMIT_RESTART) to end previous command buffer\n");
+    // printf("[SHADOW] Calling submitGpuCommands(SUBMIT_RESTART) to end previous command buffer\n");
     // CRITICAL: End current command buffer and start a fresh one
     // This ensures the shadow pass is in a completely separate command buffer
     // vulkanGfx->submitGpuCommands(love::gfx::vulkan::SUBMIT_RESTART);
-    printf("[SHADOW] Returned from first submitGpuCommands\n");
+    // printf("[SHADOW] Returned from first submitGpuCommands\n");
     
     // For shadow map rendering, we MUST use a temporary color attachment because
     // Vulkan requires at least one color attachment. However, we set it to depth-only mode.
     gfx::Graphics::RenderTargets shadowRenderTargets;
     
     // Create temporary color texture (needed for render pass, but won't be written to)
-    auto tempColorTex = cg.instance->getTemporaryTexture(PIXELFORMAT_RGBA8_UNORM, 
-                                                         shadowMapTexture->getPixelWidth(0), 
-                                                         shadowMapTexture->getPixelHeight(0), 
-                                                         1);
-    shadowRenderTargets.colors.push_back(gfx::Graphics::RenderTarget(tempColorTex));
+    // auto tempColorTex = cg.instance->getTemporaryTexture(PIXELFORMAT_RGBA8_UNORM, 
+    //                                                      shadowMapTexture->getPixelWidth(0), 
+    //                                                      shadowMapTexture->getPixelHeight(0), 
+    //                                                      1);
+    // shadowRenderTargets.colors.push_back(gfx::Graphics::RenderTarget(tempColorTex));
     shadowRenderTargets.depthStencil = gfx::Graphics::RenderTarget(shadowMapTexture);
     
-    printf("[SHADOW] Setting shadow render targets: colors=%zu, depth=%p, tempColor=%p\n", 
-           shadowRenderTargets.colors.size(), shadowMapTexture, tempColorTex);
+    // printf("[SHADOW] Setting shadow render targets: colors=%zu, depth=%p, tempColor=%p\n", 
+    //        shadowRenderTargets.colors.size(), shadowMapTexture, tempColorTex);
     
     // Switch to shadow map render target - this will start a NEW render pass
     // cg.instance->setRenderTargets(shadowRenderTargets);
@@ -233,25 +233,25 @@ void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &l
     printf("[SHADOW] Clear completed\n");
     
     // Set shader uniforms for shadow pass
-    sceneShader->sendInt("shadow", 0);  // Not sampling shadows during shadow pass
+    // sceneShader->sendInt("shadow", 0);  // Not sampling shadows during shadow pass
     
-    // Set light space matrices for shadow rendering
-    glm::mat4 lightSpaceMatrix = lightProjection * lightView;
-    m_lightSpaceMatrixCache.clear();
-    m_lightSpaceMatrixCache.push_back(lightSpaceMatrix);
-    sceneShader->send("lightSpaceMatrix", m_lightSpaceMatrixCache[0]);
-    printf("[SHADOW] Light space matrix sent\n");
+    // // Set light space matrices for shadow rendering
+    // glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+    // m_lightSpaceMatrixCache.clear();
+    // m_lightSpaceMatrixCache.push_back(lightSpaceMatrix);
+    // sceneShader->send("lightSpaceMatrix", m_lightSpaceMatrixCache[0]);
+    // printf("[SHADOW] Light space matrix sent\n");
     
-    m_projectionMatrixCache.clear();
-    m_projectionMatrixCache.push_back(lightProjection);
-    sceneShader->send("projectionMatrix", m_projectionMatrixCache);
-    sceneShader->send("projectionMatrix2", m_projectionMatrixCache);
-    printf("[SHADOW] Projection matrix sent\n");
+    // m_projectionMatrixCache.clear();
+    // m_projectionMatrixCache.push_back(lightProjection);
+    // sceneShader->send("projectionMatrix", m_projectionMatrixCache);
+    // sceneShader->send("projectionMatrix2", m_projectionMatrixCache);
+    // printf("[SHADOW] Projection matrix sent\n");
     
-    m_vmCache.clear();
-    m_vmCache.push_back(lightView);
-    sceneShader->send("viewMatrix", m_vmCache[0]);
-    printf("[SHADOW] View matrix sent\n");
+    // m_vmCache.clear();
+    // m_vmCache.push_back(lightView);
+    // sceneShader->send("viewMatrix", m_vmCache[0]);
+    // printf("[SHADOW] View matrix sent\n");
     
     // Render meshes from light's perspective to shadow map
     printf("[SHADOW] About to call drawMeshes(true, %d)\n", view);
@@ -262,24 +262,24 @@ void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &l
     // This ensures all shadow geometry is actually rendered to the shadow map
     // before we switch render targets. Without this, shadow draws get batched
     // with main scene renders, causing them to be in the same render pass.
-    printf("[SHADOW] Flushing batched draws to ensure shadow render pass completes\n");
+    // printf("[SHADOW] Flushing batched draws to ensure shadow render pass completes\n");
     // gfx::Graphics::flushBatchedDrawsGlobal();
-    printf("[SHADOW] Batched draws flushed\n");
+    // printf("[SHADOW] Batched draws flushed\n");
     
     // CRITICAL: End shadow command buffer and start fresh for main rendering
     // This ensures shadow map is completely finished before we switch back to screen
-    printf("[SHADOW] Calling submitGpuCommands(SUBMIT_RESTART) for shadow completion\n");
+    // printf("[SHADOW] Calling submitGpuCommands(SUBMIT_RESTART) for shadow completion\n");
     // vulkanGfx->submitGpuCommands(love::gfx::vulkan::SUBMIT_RESTART);
-    printf("[SHADOW] Returned from second submitGpuCommands\n");
+    // printf("[SHADOW] Returned from second submitGpuCommands\n");
     
     // Restore default render target (back to screen) - this will start ANOTHER NEW render pass
     printf("[SHADOW] Restoring screen render target\n");
     // cg.instance->setRenderTarget();
-    printf("[SHADOW] setRenderTarget() completed\n");
+    // printf("[SHADOW] setRenderTarget() completed\n");
     
     // Re-enable color writes for normal rendering
-    // cg.instance->setColorMask({true, true, true, true});
-    printf("[SHADOW] Color mask re-enabled\n");
+    
+    // printf("[SHADOW] Color mask re-enabled\n");
     
     // Reset renderingShadowMap flag via miscInfo constant (miscInfo.x = 0.0)
     // std::vector<glm::vec4> miscDataReset;
@@ -287,7 +287,8 @@ void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &l
     // miscDataReset.push_back(glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
     // sceneShader->sendConstant("miscInfo", miscDataReset);
     
-    vulkanGfx->endShadowRenderPass();
+    vulkanGfx->endShadowRenderPass(sceneShader);
+    cg.instance->setColorMask({true, true, true, true});
     printf("[SHADOW] === SHADOW PASS COMPLETE ===\n");
     
     // vulkanGfx->submitGpuCommands(love::gfx::vulkan::SUBMIT_NOPRESENT, nullptr);

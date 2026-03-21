@@ -330,6 +330,28 @@ VkDescriptorSetLayout ShadowMap::createShadowDescriptorSetLayout(love::gfx::vulk
     return shadowDescriptorSetLayout;
 }
 
+void ShadowMap::updateShadowDescriptorSet(VkDescriptorSet descriptorSet, int location, VkSampler shadowSampler, VkImageView shadowImageView, love::gfx::vulkan::Graphics* vulkanGraphics)
+{
+	// Update the descriptor set with the shadow map texture
+	VkDescriptorImageInfo imageInfo{};
+	imageInfo.sampler = shadowSampler;
+	imageInfo.imageView = shadowImageView;
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+	VkWriteDescriptorSet descriptorWrite{};
+	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrite.dstSet = descriptorSet;
+	descriptorWrite.dstBinding = location; // Use the provided location
+	descriptorWrite.dstArrayElement = 0;
+	descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrite.descriptorCount = 1;
+	descriptorWrite.pImageInfo = &imageInfo;
+
+	auto device = vulkanGraphics->getDevice();
+
+	vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+}
+
 static const std::vector<const char*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
 };
@@ -2497,7 +2519,7 @@ void Graphics::beginShadowRenderPass(gfx::Shader *shadowShader)
 
 	std::printf("[SHADOW PASS] Beginning shadow render pass on command buffer %zu\n", currentFrame);
     // Begin render pass
-    vkCmdBeginRenderPass(commandBuffers.at(currentFrame), &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    // vkCmdBeginRenderPass(commandBuffers.at(currentFrame), &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 	std::printf("[SHADOW PASS] Started shadow render pass with framebuffer %p and render area (%d, %d)\n", shadowFramebuffer, renderPassInfo.renderArea.extent.width, renderPassInfo.renderArea.extent.height);
 
@@ -2509,15 +2531,34 @@ void Graphics::beginShadowRenderPass(gfx::Shader *shadowShader)
     // vkCmdBindDescriptorSets(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, renderPassState.pipelineLayout, 0, 1, &renderPassState.descriptorSet, 0, nullptr);
 
     isShadowPass = true;
-    renderPassState.active = true;
+    // renderPassState.active = true;
 }
 
-void Graphics::endShadowRenderPass()
+void Graphics::endShadowRenderPass(chai_shader *shadowShader)
 {
+	auto uniformInfo = shadowShader->shader->getUniformInfo("shadowMap");
+	
+	// Update the descriptor set with the shadow map texture
+	VkDescriptorImageInfo imageInfo{};
+	imageInfo.sampler = shadowMaps[0]->getSampler();
+	imageInfo.imageView = shadowMaps[0]->getView();
+	imageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+	VkWriteDescriptorSet descriptorWrite{};
+	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrite.dstSet = descriptorSet;
+	descriptorWrite.dstBinding = uniformInfo->location; // Use the provided location
+	descriptorWrite.dstArrayElement = 0;
+	descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	descriptorWrite.descriptorCount = 1;
+	descriptorWrite.pImageInfo = &imageInfo;
+
+	vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+	
     // End render pass
     vkCmdEndRenderPass(commandBuffers.at(currentFrame));
 
-    // End command buffer recording
+	// End command buffer recording
     vkEndCommandBuffer(commandBuffers.at(currentFrame));
 
     // Submit shadow pass commands
@@ -2534,24 +2575,13 @@ void Graphics::endShadowRenderPass()
         return;
     }
 
-    // Ensure shadow map is ready before main pass
-    // Use memory barrier to ensure visibility
-    // VkPipelineStageFlags srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    // VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-
-    // VkMemoryBarrier memoryBarrier = {};
-    // memoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-    // memoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    // memoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-    // vkCmdPipelineBarrier(commandBuffers.at(currentFrame), srcStageMask, dstStageMask, 0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
-
     // Reset shadow pass state
     // shadowRenderPassActive = false;
     renderPassState.active = false;
     isShadowPass = false;
 
     commandBufferRecording = false;
+	
 }
 
 void Graphics::setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void *data)
@@ -5240,7 +5270,7 @@ std::array<VkPipeline, 2> Graphics::createGraphicsPipeline(Shader *shader, const
     if (colorBlendAttachment.colorWriteMask == 0) {
         // std::printf("[CHAILOVE ERROR] COLOR WRITE MASK IS ZERO - THIS CAUSES DEPTH-ONLY RENDERING!\n");
         // Force enable all color channels for debugging
-        colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        // colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
         // std::printf("[CHAILOVE DEBUG] Forced colorWriteMask to: 0x%X\n", colorBlendAttachment.colorWriteMask);
     }
 	colorBlendAttachment.blendEnable = Vulkan::getBool(blendState.enable);
@@ -5319,27 +5349,19 @@ std::array<VkPipeline, 2> Graphics::createGraphicsPipeline(Shader *shader, const
 	pipelineInfo.basePipelineIndex = -1;
 	pipelineInfo.renderPass = configuration.renderPass;
 
-        shadowPipelineInfo = pipelineInfo;
+    shadowPipelineInfo = pipelineInfo;
+	auto shadowColorBlending = colorBlending;
+	shadowColorBlending.attachmentCount = 0; // No color attachments for shadow pipeline
+	shadowColorBlending.pAttachments = nullptr;
+	shadowPipelineInfo.pColorBlendState = &shadowColorBlending;
 	shadowPipelineInfo.renderPass = shadowMapRenderPass;
 	
 
 	VkPipeline graphicsPipeline[2];
-        VkGraphicsPipelineCreateInfo pipelineInfos[2] = {pipelineInfo, shadowPipelineInfo};
+    VkGraphicsPipelineCreateInfo pipelineInfos[2] = {pipelineInfo, shadowPipelineInfo};
 	// PERF: Time pipeline creation
-	static int pipelineCreateCounter = 0;
-	static double totalPipelineTime = 0.0;
-	auto pipelineStart = std::chrono::high_resolution_clock::now();
 	if (vkCreateGraphicsPipelines(device, pipelineCache, 2, pipelineInfos, nullptr, graphicsPipeline) != VK_SUCCESS)
                 throw love::Exception("failed to create graphics pipeline");
-        auto pipelineEnd = std::chrono::high_resolution_clock::now();
-	auto pipelineMs = std::chrono::duration<double, std::milli>(pipelineEnd - pipelineStart).count();
-	totalPipelineTime += pipelineMs;
-	if (++pipelineCreateCounter % 10 == 0) {
-		// std::printf("[PERF PIPELINE] Created %d pipelines | Last: %.2f ms | Avg: %.2f ms | Total: %.2f ms\n",
-		// 	pipelineCreateCounter, pipelineMs, totalPipelineTime / pipelineCreateCounter, totalPipelineTime);
-		// fflush(stdout);
-	}
-        // std::printf("[GFX PIPELINE] Shadow Pipeline: %p", graphicsShadowPipeline);
 	return {graphicsPipeline[0], graphicsPipeline[1]};
 }
 
