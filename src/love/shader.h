@@ -199,6 +199,8 @@ public:
 	Shader(StrongRef<ShaderStage> stages[], const CompileOptions &options);
 	virtual ~Shader();
 
+	Shader *getCurrentShader() const { return current; }
+
 	size_t updateBuffer(std::string name, const void *data, size_t size, size_t offset);
 	void setBufferOffset(std::string name, size_t offset);
 	/**

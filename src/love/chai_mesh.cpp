@@ -2671,7 +2671,7 @@ void chai_mesh::draw(love::gfx::Graphics *gfx, const Matrix4 &m, chai_shader *sh
                 auto meshTexture = msh->getTexture();
                 static gfx::Texture* lastBoundTexture = nullptr;
                 if (meshTexture != lastBoundTexture) {
-                    shader->invalidateDescriptorSets();
+                    // shader->invalidateDescriptorSets();
                     lastBoundTexture = meshTexture;
                 }
                 if (meshTexture != nullptr) {

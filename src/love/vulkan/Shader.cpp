@@ -197,7 +197,7 @@ bool Shader::loadVolatile()
 	descriptorPools.resize(MAX_FRAMES_IN_FLIGHT);
 	allocatedDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
 	currentFrame = 0;
-	newFrame();
+	// newFrame();
 
 	return true;
 }
@@ -271,6 +271,7 @@ VkPipeline Shader::getComputePipeline() const
 
 void Shader::newFrame()
 {
+	return;
 	currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 	currentDescriptorPool = 0;
 	// PERF: Don't reset descriptor set - let it persist if resources don't change
@@ -360,10 +361,32 @@ void Shader::cmdPushDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBind
 
 	if (resourceDescriptorsDirty || currentDescriptorSet == VK_NULL_HANDLE)
 	{
+		// VkDescriptorSet prevDescriptorSet = VK_NULL_HANDLE;
+
+		// if (currentDescriptorSet != VK_NULL_HANDLE)
+		// {
+		// 	prevDescriptorSet = currentDescriptorSet;			
+		// }
 		currentDescriptorSet = allocateDescriptorSet();
 
-		for (auto &write : descriptorWrites)
+		for (auto &write : descriptorWrites) 
 			write.dstSet = currentDescriptorSet;
+		
+		// if (prevDescriptorSet != VK_NULL_HANDLE)
+		// {
+		// 	for (auto &write : descriptorWrites) { 
+		// 		if (write.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER && write.dstBinding == 2) 
+		// 		{
+					// VkDescriptorImageInfo imageInfo{};
+					// imageInfo.sampler = vgfx->shadowMaps[0]->getSampler();
+					// imageInfo.imageView = vgfx->shadowMaps[0]->getView();
+					// imageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+					// write.pImageInfo = &imageInfo;
+					// std::printf("[SHADER] Updated shadow map descriptor for uniform '%s' with imageView %pin new descriptor set %p\n", write.pImageInfo->sampler, (void*)write.pImageInfo->imageView, (void*)currentDescriptorSet);
+		// 		}
+		// 	}
+		// }
+
 		vkUpdateDescriptorSets(device, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
 
 		resourceDescriptorsDirty = false;
@@ -1131,6 +1154,96 @@ void Shader::compileShaders()
 		descriptorWrites.push_back(write);
 	}
 
+	// VkSampler dummySampler = VK_NULL_HANDLE;
+
+	// VkSamplerCreateInfo samplerInfo = {};
+	// samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+
+	// // Set all parameters to default values (e.g., zero)
+	// samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	// samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	// samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+	// samplerInfo.anisotropyEnable = VK_FALSE;
+	// samplerInfo.maxAnisotropy = 1.0f;
+	// samplerInfo.compareEnable = VK_FALSE;
+	// samplerInfo.compareOp = VK_COMPARE_OP_NEVER;
+	// samplerInfo.mipLodBias = 0.0f;
+	// samplerInfo.minFilter = VK_FILTER_NEAREST;
+	// samplerInfo.magFilter = VK_FILTER_NEAREST;
+	// samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	// samplerInfo.mipLodBias = 0.0f;
+	// samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	// samplerInfo.unnormalizedCoordinates = VK_FALSE;
+
+	// // Create the sampler
+	// vkCreateSampler(device, &samplerInfo, nullptr, &dummySampler);
+
+	// VkImage dummyImage = VK_NULL_HANDLE;
+
+	// VkImageCreateInfo imageInfo = {};
+	// imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+
+	// // Set all parameters to default values (e.g., zero)
+	// imageInfo.imageType = VK_IMAGE_TYPE_2D;
+	// imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+	// imageInfo.extent.width = 1; // Dummy dimensions
+	// imageInfo.extent.height = 1;
+	// imageInfo.extent.depth = 1;
+	// imageInfo.mipLevels = 1;
+	// imageInfo.arrayLayers = 1;
+	// imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	// imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+
+	// // Set other optional parameters to default values
+	// imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	// imageInfo.usage = (VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+	// imageInfo.flags = 0;
+
+	// // Create the dummy image
+	// vkCreateImage(device, &imageInfo, nullptr, &dummyImage);
+
+	
+	// VkDeviceMemory dummyImageMemory;
+	
+	// VkMemoryRequirements memRequirements;
+    // vkGetImageMemoryRequirements(device, dummyImage, &memRequirements);
+
+    // VkMemoryAllocateInfo allocInfo = {};
+    // allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    // allocInfo.allocationSize = memRequirements.size;
+    // allocInfo.memoryTypeIndex = 0; // Choose a memory type from the device's properties
+
+    // vkAllocateMemory(device, &allocInfo, nullptr, &dummyImageMemory);
+    
+   	// // Bind the image to its allocated memory
+	// vkBindImageMemory(device, dummyImage, dummyImageMemory, 0);
+
+
+	// VkImageView dummyImageView = VK_NULL_HANDLE;
+
+	// VkImageViewCreateInfo imageViewInfo = {};
+	// imageViewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+
+	// // Set all parameters to default values (e.g., zero)
+	// imageViewInfo.image = dummyImage; // Dummy image handle
+	// imageViewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	// imageViewInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+	// imageViewInfo.components = {
+	// 	.r = VK_COMPONENT_SWIZZLE_IDENTITY,
+	// 	.g = VK_COMPONENT_SWIZZLE_IDENTITY,
+	// 	.b = VK_COMPONENT_SWIZZLE_IDENTITY,
+	// 	.a = VK_COMPONENT_SWIZZLE_IDENTITY
+	// };
+	// imageViewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	// imageViewInfo.subresourceRange.baseMipLevel = 0;
+	// imageViewInfo.subresourceRange.levelCount = 1;
+	// imageViewInfo.subresourceRange.baseArrayLayer = 0;
+	// imageViewInfo.subresourceRange.layerCount = 1;
+
+	// // Create the image view
+	// vkCreateImageView(device, &imageViewInfo, nullptr, &dummyImageView);
+
 	for (auto &u : reflection.sampledTextures)
     {
         UniformInfo &info = u.second;
@@ -1142,6 +1255,19 @@ void Shader::compileShaders()
 		for (int i = 0; i < info.count; i++)
 		{
 			VkDescriptorImageInfo imageInfo{};
+			// if (info.name.c_str() == std::string("shadowMap") && !vgfx->shadowMaps.empty())
+			// {
+			// 	imageInfo.sampler = vgfx->shadowMaps[0]->getSampler();
+			// 	imageInfo.imageView = vgfx->shadowMaps[0]->getView();
+			// 	std::printf("[SHADER] Set shadow map descriptor for uniform '%s' with imageView %p and sampler %p in descriptor set %p\n", info.name.c_str(), (void*)imageInfo.imageView, (void*)imageInfo.sampler, (void*)currentDescriptorSet);
+			// 	imageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+				
+			// } else
+			// {
+			// 	imageInfo.sampler = dummySampler;
+			// 	imageInfo.imageView = dummyImageView;
+			// 	imageInfo.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			// }
 			descriptorImages.push_back(imageInfo);
 
 			allTextureInfo.push_back({ nullptr, info.access });
@@ -1155,13 +1281,19 @@ void Shader::compileShaders()
 			}
 		}
 
+		VkDescriptorImageInfo imageInfo{};
+		
+
         VkWriteDescriptorSet write{};
         write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         write.dstBinding = info.location;
         write.dstArrayElement = 0;
         write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         write.descriptorCount = static_cast<uint32_t>(info.count);
-        write.pImageInfo = &descriptorImages[info.bindingStartIndex];
+		// if (info.location == 2)			
+			write.pImageInfo = &descriptorImages[info.bindingStartIndex];
+		// else
+		// 	write.pImageInfo = &imageInfo;
 
         descriptorWrites.push_back(write);
     }
@@ -1603,6 +1735,10 @@ std::array<VkPipeline, 2> Shader::getCachedGraphicsPipeline(Graphics *vgfx, cons
 
 std::array<VkPipeline, 2> Shader::getCachedGraphicsPipeline(Graphics *vgfx, const GraphicsPipelineConfigurationFull &configuration)
 {
+	for (const auto &pair : graphicsPipelinesNoDynamicState)
+	{
+		return pair.second;
+	}
 	auto it = graphicsPipelinesNoDynamicState.find(configuration);
 	if (it != graphicsPipelinesNoDynamicState.end())
 		return it->second;

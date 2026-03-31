@@ -162,19 +162,17 @@ void chai_scene::initShadowMap() {
 }
 
 void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &lightProjection, int view) {
-    if (m_frameCount == 0) {
-        return; // Skip shadow pass on first frame to avoid uninitialized resources
-    }
+   
     auto& cg = ChaiLove::getInstance()->chai_gfx;
     auto vulkanGfx = dynamic_cast<gfx::vulkan::Graphics*>(cg.instance);
     if (!vulkanGfx) {
         printf("[SHADOW] ABORTING: vulkanGfx cast failed\n");
         return;
     }
-    if (vulkanGfx->getCurrentPipeline() == VK_NULL_HANDLE) {
-        printf("[SHADOW] ABORTING: Pipeline not initialized\n");
-        return;
-    }
+    // if (vulkanGfx->getCurrentPipeline() == VK_NULL_HANDLE) {
+    //     printf("[SHADOW] ABORTING: Pipeline not initialized\n");
+    //     return;
+    // }
     printf("[SHADOW] === SHADOW PASS START ===\n");
     
     if (!shadowMapInitialized) {
@@ -190,7 +188,7 @@ void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &l
     printf("[SHADOW] shadowMapTexture OK, sceneShader OK\n");
     
 
-    vulkanGfx->beginShadowRenderPass(sceneShader->shader);
+    vulkanGfx->beginShadowRenderPass(sceneShader->shader, shadowMapTexture);
     
     // printf("[SHADOW] Calling submitGpuCommands(SUBMIT_RESTART) to end previous command buffer\n");
     // CRITICAL: End current command buffer and start a fresh one
@@ -208,7 +206,7 @@ void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &l
     //                                                      shadowMapTexture->getPixelHeight(0), 
     //                                                      1);
     // shadowRenderTargets.colors.push_back(gfx::Graphics::RenderTarget(tempColorTex));
-    shadowRenderTargets.depthStencil = gfx::Graphics::RenderTarget(shadowMapTexture);
+    shadowRenderTargets.colors.push_back(gfx::Graphics::RenderTarget(shadowMapTexture));
     
     // printf("[SHADOW] Setting shadow render targets: colors=%zu, depth=%p, tempColor=%p\n", 
     //        shadowRenderTargets.colors.size(), shadowMapTexture, tempColorTex);
@@ -218,18 +216,18 @@ void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &l
     printf("[SHADOW] setRenderTargets completed\n");
     
     // Disable ALL color writes immediately - we ONLY write depth
-    cg.instance->setColorMask({false, false, false, false});
+    // cg.instance->setColorMask({false, false, false, false});
     printf("[SHADOW] Color mask disabled\n");
     
     // Enable depth testing and depth writes for shadow pass
-    cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LESS, true);
+    // cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LESS, true);
     printf("[SHADOW] Depth mode set\n");
     
     // Clear the depth buffer to far depth (1.0)
-    gfx::OptionalColorD clearColor;  // No color clear needed
-    love::OptionalInt clearStencil;  // No stencil in DEPTH32_FLOAT
-    love::OptionalDouble clearDepth(1.0);
-    cg.instance->clear(clearColor, clearStencil, clearDepth);
+    // gfx::OptionalColorD clearColor;  // No color clear needed
+    // love::OptionalInt clearStencil;  // No stencil in DEPTH32_FLOAT
+    // love::OptionalDouble clearDepth(1.0);
+    // cg.instance->clear(clearColor, clearStencil, clearDepth);
     printf("[SHADOW] Clear completed\n");
     
     // Set shader uniforms for shadow pass
@@ -288,7 +286,7 @@ void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &l
     // sceneShader->sendConstant("miscInfo", miscDataReset);
     
     vulkanGfx->endShadowRenderPass(sceneShader);
-    cg.instance->setColorMask({true, true, true, true});
+    // cg.instance->setColorMask({true, true, true, true});
     printf("[SHADOW] === SHADOW PASS COMPLETE ===\n");
     
     // vulkanGfx->submitGpuCommands(love::gfx::vulkan::SUBMIT_NOPRESENT, nullptr);
@@ -1197,7 +1195,7 @@ void chai_scene::draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2
                         }
 
                         // Restore default render target (back to screen)
-                        cg.instance->setRenderTarget();
+                        // cg.instance->setRenderTarget();
                         
                         // Re-enable color writes for normal rendering
                         cg.instance->setColorMask({true, true, true, true});

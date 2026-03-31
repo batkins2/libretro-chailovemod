@@ -198,7 +198,7 @@ public:
 	// Force descriptor set to be reallocated on next draw (fixes clone texture conflicts)
 	void invalidateDescriptorSets() { 
 		resourceDescriptorsDirty = true;
-		currentDescriptorSet = VK_NULL_HANDLE;
+		// currentDescriptorSet = VK_NULL_HANDLE;
 	}
 
 	std::array<VkPipeline, 2> getCachedGraphicsPipeline(Graphics *vgfx, const GraphicsPipelineConfigurationCore &configuration);

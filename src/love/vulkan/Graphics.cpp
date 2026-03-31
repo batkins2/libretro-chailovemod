@@ -109,6 +109,8 @@ void ShadowMap::createImageView(love::gfx::vulkan::Graphics* vulkanGraphics) {
     viewInfo.subresourceRange.layerCount = 1;
 
     vkCreateImageView(vulkanGraphics->getDevice(), &viewInfo, nullptr, &imageView);
+
+	std::printf("[SHADOW MAP] Created shadow map image view %p for image %p\n", (void*)imageView, (void*)image);
 }
 
 void ShadowMap::createSampler(love::gfx::vulkan::Graphics* vulkanGraphics) {
@@ -119,8 +121,8 @@ void ShadowMap::createSampler(love::gfx::vulkan::Graphics* vulkanGraphics) {
     samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    samplerInfo.anisotropyEnable = VK_TRUE;
-    samplerInfo.maxAnisotropy = 1.0f;
+    // samplerInfo.anisotropyEnable = VK_TRUE;
+    // samplerInfo.maxAnisotropy = 1.0f;
     samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
     samplerInfo.unnormalizedCoordinates = VK_FALSE;
     samplerInfo.compareEnable = VK_TRUE;
@@ -132,18 +134,20 @@ void ShadowMap::createSampler(love::gfx::vulkan::Graphics* vulkanGraphics) {
 }
 
 VkFramebuffer ShadowMap::createShadowFramebuffer(ShadowMap* shadowMap, VkRenderPass renderPass, love::gfx::vulkan::Graphics* vulkanGraphics) {
-    VkImageView attachments[] = { shadowMap->getView() };
+    VkImageView attachments[] = { shadowMap->getView(), shadowMap->getView() };
     VkFramebufferCreateInfo framebufferInfo{};
     framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
     framebufferInfo.renderPass = renderPass;
-    framebufferInfo.attachmentCount = 1;
+    framebufferInfo.attachmentCount = 2;
     framebufferInfo.pAttachments = attachments;
     framebufferInfo.width = 1024; // Shadow map size
     framebufferInfo.height = 1024;
     framebufferInfo.layers = 1;
 
+	auto device = vulkanGraphics->getDevice();
+
     VkFramebuffer framebuffer;
-    vkCreateFramebuffer(vulkanGraphics->getDevice(), &framebufferInfo, nullptr, &framebuffer);
+    vkCreateFramebuffer(device, &framebufferInfo, nullptr, &framebuffer);
     return framebuffer;
 }
 
@@ -159,26 +163,46 @@ VkRenderPass ShadowMap::createShadowMapRenderPass(love::gfx::vulkan::Graphics* v
     depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
     VkAttachmentReference depthAttachmentRef{};
-    depthAttachmentRef.attachment = 0;
+    depthAttachmentRef.attachment = 1;
     depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
+	std::array<VkSubpassDependency, 2> dependencies{};
+	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[0].dstSubpass = 0;
+	dependencies[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	dependencies[0].dstStageMask = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+	dependencies[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	dependencies[0].dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+	dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+	dependencies[1].srcSubpass = 0;
+	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[1].srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+	dependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	dependencies[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+	const VkAttachmentDescription attachments[] = { depthAttachment, depthAttachment };
     VkRenderPassCreateInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &depthAttachment;
+    renderPassInfo.attachmentCount = 2;
+    renderPassInfo.pAttachments = attachments;
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
+	renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+	renderPassInfo.pDependencies = dependencies.data();
 
 	VkRenderPass renderPass;
     vkCreateRenderPass(vulkanGraphics->getDevice(), &renderPassInfo, nullptr, &renderPass);
     return renderPass;
 }
 
-VkPipeline ShadowMap::createShadowPipeline(love::gfx::vulkan::Graphics* vulkanGraphics, VkRenderPass shadowRenderPass, Shader* shader)
+VkGraphicsPipelineCreateInfo ShadowMap::createShadowPipelineInfo(love::gfx::vulkan::Graphics* vulkanGraphics, VkRenderPass shadowRenderPass, Shader* shader)
 {
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -200,19 +224,19 @@ VkPipeline ShadowMap::createShadowPipeline(love::gfx::vulkan::Graphics* vulkanGr
         throw love::Exception("failed to create shadow pipeline layout");
 
 
-	auto shaderModule = shader->getShaderModules();
+	// auto shaderModule = shader->getShaderModules();
 
-    VkPipelineShaderStageCreateInfo shaderStageInfo[2];
-	shaderStageInfo[0] = {};
-    shaderStageInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    shaderStageInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-	shaderStageInfo[0].module = shaderModule[0];
-    shaderStageInfo[0].pName = "main";
-	shaderStageInfo[1] = {};
-	shaderStageInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	shaderStageInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	shaderStageInfo[1].module = shaderModule[1];
-	shaderStageInfo[1].pName = "main";
+    // VkPipelineShaderStageCreateInfo shaderStageInfo[2];
+	// shaderStageInfo[0] = {};
+    // shaderStageInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    // shaderStageInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+	// shaderStageInfo[0].module = shaderModule[0];
+    // shaderStageInfo[0].pName = "main";
+	// shaderStageInfo[1] = {};
+	// shaderStageInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	// shaderStageInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	// shaderStageInfo[1].module = shaderModule[1];
+	// shaderStageInfo[1].pName = "main";
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -277,8 +301,9 @@ VkPipeline ShadowMap::createShadowPipeline(love::gfx::vulkan::Graphics* vulkanGr
     shadowPipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     shadowPipelineInfo.layout = shadowPipelineLayout;
     shadowPipelineInfo.renderPass = shadowRenderPass;
-    shadowPipelineInfo.stageCount = 2;
-    shadowPipelineInfo.pStages = shaderStageInfo;
+    shadowPipelineInfo.stageCount = 2; // Shader stages will be set later when creating the actual pipeline, as they depend on the shader used for the shadow pass
+    // shadowPipelineInfo.pStages = shaderStageInfo;
+	shadowPipelineInfo.pStages = nullptr; // Shader stages will be set later when creating the actual pipeline, as they depend on the shader used for the shadow pass
     shadowPipelineInfo.pVertexInputState = &vertexInputInfo;
     shadowPipelineInfo.pInputAssemblyState = &inputAssemblyInfo;
     shadowPipelineInfo.pViewportState = &viewportInfo;
@@ -290,11 +315,12 @@ VkPipeline ShadowMap::createShadowPipeline(love::gfx::vulkan::Graphics* vulkanGr
     shadowPipelineInfo.subpass = 0;
     shadowPipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
+	return shadowPipelineInfo;
     VkPipeline shadowPipeline{};
     if (vkCreateGraphicsPipelines(device, pipelineCache, 1, &shadowPipelineInfo, nullptr, &shadowPipeline) != VK_SUCCESS)
         throw love::Exception("failed to create shadow pipeline");
 
-    return shadowPipeline;
+    // return shadowPipeline;
 }
 
 VkDescriptorSetLayout ShadowMap::createShadowDescriptorSetLayout(love::gfx::vulkan::Graphics* vulkanGraphics)
@@ -1102,7 +1128,7 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
 
         // Create our internal resources that don't conflict with RetroArch
         if (localUniformBuffer == nullptr)
-            localUniformBuffer.set(new StreamBuffer(this, BUFFERUSAGE_UNIFORM, 1024 * 1024 * 2), Acquire::NORETAIN);
+            localUniformBuffer.set(new StreamBuffer(this, BUFFERUSAGE_UNIFORM, 1024 * 1024 * 4), Acquire::NORETAIN);
 
         // Create defaultVertexBuffer
         if (defaultVertexBuffer == nullptr) {
@@ -1177,6 +1203,12 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
                 };
         fakeBackbuffer.set(new Texture(this, settings, nullptr), Acquire::NORETAIN);
 
+		shadowMaps.push_back(std::make_unique<ShadowMap>(1024, 1024, this));
+
+		shadowMapRenderPass = shadowMaps[0]->createShadowMapRenderPass(this);
+		shadowFramebuffer = shadowMaps[0]->createShadowFramebuffer(shadowMaps[0].get(), shadowMapRenderPass, this);
+		shadowPipelineInfo = shadowMaps[0]->createShadowPipelineInfo(this, shadowMapRenderPass, dynamic_cast<Shader*>(Shader::current));
+
         // Create default shaders
         createDefaultShaders();
 
@@ -1249,11 +1281,6 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
             throw std::runtime_error("failed to create descriptor set layout!");
         }
 
-		shadowMaps.push_back(std::make_unique<ShadowMap>(1024, 1024, this));
-
-		shadowMapRenderPass = shadowMaps[0]->createShadowMapRenderPass(this);
-		shadowFramebuffer = shadowMaps[0]->createShadowFramebuffer(shadowMaps[0].get(), shadowMapRenderPass, this);
-		// shadowPipeline = shadowMaps[0]->createShadowPipeline(this, shadowMapRenderPass, dynamic_cast<Shader*>(Shader::current));
 
 
         // std::printf("[CHAILOVE DEBUG] Libretro initialization completed successfully\n");
@@ -1308,7 +1335,7 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
     }
 
     if (localUniformBuffer == nullptr)
-        localUniformBuffer.set(new StreamBuffer(this, BUFFERUSAGE_UNIFORM, 1024 * 1024 * 2), Acquire::NORETAIN);
+        localUniformBuffer.set(new StreamBuffer(this, BUFFERUSAGE_UNIFORM, 1024 * 1024 * 4), Acquire::NORETAIN);
 
     // Create our render target texture for libretro
     auto settings = love::gfx::Texture::Settings{
@@ -2346,8 +2373,8 @@ void Graphics::beginFrame()
 	Vulkan::resetShaderSwitches();
 
 	// PERF: Call shader newFrame() to reset descriptor pools and recycle descriptor sets
-	for (const auto &shader : usedShadersInFrame)
-		shader->newFrame();
+	// for (const auto &shader : usedShadersInFrame)
+	// 	shader->newFrame();
 	usedShadersInFrame.clear();
 
 	// CRITICAL FIX: Advance all stream buffers to next frame
@@ -2491,7 +2518,7 @@ void Graphics::endRecordingGraphicsCommands()
 	commandBufferRecording = false;
 }
 
-void Graphics::beginShadowRenderPass(gfx::Shader *shadowShader)
+void Graphics::beginShadowRenderPass(gfx::Shader *shadowShader, gfx::Texture *shadowMap)
 {
     // Ensure we're recording a command buffer
     if (!commandBufferRecording) {
@@ -2500,63 +2527,98 @@ void Graphics::beginShadowRenderPass(gfx::Shader *shadowShader)
     }
 
     // Setup render pass info
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = shadowMapRenderPass;
-    renderPassInfo.framebuffer = shadowFramebuffer;
-    renderPassInfo.renderArea.offset = {0, 0};
+    // VkRenderPassBeginInfo renderPassInfo{};
+    // renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    // renderPassInfo.renderPass = shadowMapRenderPass;
+    // renderPassInfo.framebuffer = shadowFramebuffer;
+    // renderPassInfo.renderArea.offset = {0, 0};
 
-    // Use actual shadow map dimensions
-    renderPassInfo.renderArea.extent.width = 1024;
-    renderPassInfo.renderArea.extent.height = 1024;
+    // // Use actual shadow map dimensions
+    // renderPassInfo.renderArea.extent.width = 1024;
+    // renderPassInfo.renderArea.extent.height = 1024;
 
-    // Clear depth buffer
-    VkClearValue clearValue{};
-    clearValue.depthStencil = {1.0f, 0};
+    // // Clear depth buffer
+    // VkClearValue clearValue{};
+    // clearValue.depthStencil = {1.0f, 0};
 
-    renderPassInfo.pClearValues = &clearValue;
-    renderPassInfo.clearValueCount = 1;
+    // renderPassInfo.pClearValues = &clearValue;
+    // renderPassInfo.clearValueCount = 2;
 
-	std::printf("[SHADOW PASS] Beginning shadow render pass on command buffer %zu\n", currentFrame);
-    // Begin render pass
+	// std::printf("[SHADOW PASS] Beginning shadow render pass on command buffer %zu\n", currentFrame);
+    // // Begin render pass
     // vkCmdBeginRenderPass(commandBuffers.at(currentFrame), &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-	std::printf("[SHADOW PASS] Started shadow render pass with framebuffer %p and render area (%d, %d)\n", shadowFramebuffer, renderPassInfo.renderArea.extent.width, renderPassInfo.renderArea.extent.height);
+	// VkViewport shadowViewport{};
+	// shadowViewport.x = 0.0f;
+	// shadowViewport.y = 0.0f;
+	// shadowViewport.width = 1024.0f;
+	// shadowViewport.height = 1024.0f;
+	// shadowViewport.minDepth = 0.0f;
+	// shadowViewport.maxDepth = 1.0f;
 
-	// Bind shadow pipeline
-    // vkCmdBindPipeline(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, renderPassState.pipeline[1]);
+	// vkCmdSetViewport(commandBuffers.at(currentFrame), 0, 1, &shadowViewport);
 
-	std::printf("[SHADOW PASS] Bound shadow pipeline %p\n", renderPassState.pipeline);
-	// Bind descriptor sets
-    // vkCmdBindDescriptorSets(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, renderPassState.pipelineLayout, 0, 1, &renderPassState.descriptorSet, 0, nullptr);
+	// VkRect2D shadowScissor{};
+	// shadowScissor.offset = {0, 0};
+	// shadowScissor.extent.width = 1024;
+	// shadowScissor.extent.height = 1024;
+	// vkCmdSetScissor(commandBuffers.at(currentFrame), 0, 1, &shadowScissor);
+
+	// vkCmdSetDepthBias(commandBuffers.at(currentFrame), 1.25f, 0.0f, 1.75f);
+
+
+	// std::printf("[SHADOW PASS] Started shadow render pass with framebuffer %p and render area (%d, %d)\n", shadowFramebuffer, renderPassInfo.renderArea.extent.width, renderPassInfo.renderArea.extent.height);
+
+	// // Bind shadow pipeline
+    // // vkCmdBindPipeline(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, renderPassState.pipeline[1]);
+
+	// std::printf("[SHADOW PASS] Bound shadow pipeline %p\n", renderPassState.pipeline);
+	// // Bind descriptor sets
+    // // vkCmdBindDescriptorSets(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, renderPassState.pipelineLayout, 0, 1, &renderPassState.descriptorSet, 0, nullptr);
 
     isShadowPass = true;
+	startShadowPass = true;
     // renderPassState.active = true;
+
+	auto vShader = static_cast<Shader *>(shadowShader);
+	gfx::Graphics::RenderTargets shadowRenderTargets;
+	auto targets = gfx::Graphics::RenderTarget(shadowMap);
+	shadowRenderTargets.depthStencil = targets;
+	setRenderTargetsInternal(shadowRenderTargets, 1024, 1024, false);
+	// vShader->cmdPushDescriptorSets(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS);
+	
 }
 
 void Graphics::endShadowRenderPass(chai_shader *shadowShader)
 {
-	auto uniformInfo = shadowShader->shader->getUniformInfo("shadowMap");
-
-	// Update the descriptor set with the shadow map texture
-	VkDescriptorImageInfo imageInfo{};
-	imageInfo.sampler = shadowMaps[0]->getSampler();
-	imageInfo.imageView = shadowMaps[0]->getView();
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-
-	VkWriteDescriptorSet descriptorWrite{};
-	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrite.dstSet = allocateDescriptorSet();
-	descriptorWrite.dstBinding = uniformInfo->location; // Use the provided location
-	descriptorWrite.dstArrayElement = 0;
-	descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	descriptorWrite.descriptorCount = 1;
-	descriptorWrite.pImageInfo = &imageInfo;
-
-	vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
 
     // End render pass
     vkCmdEndRenderPass(commandBuffers.at(currentFrame));
+
+	// Create pipeline barrier to ensure shadow pass writes are visible to subsequent passes
+	VkImageMemoryBarrier barrier{};
+	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	barrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = shadowMaps[0]->getImage();
+	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	barrier.subresourceRange.baseMipLevel = 0;
+	barrier.subresourceRange.levelCount = 1;
+	barrier.subresourceRange.baseArrayLayer = 0;
+	barrier.subresourceRange.layerCount = 1;
+	barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	vkCmdPipelineBarrier(
+		commandBuffers.at(currentFrame),
+		VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+		VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+		VK_DEPENDENCY_BY_REGION_BIT,
+		0, nullptr,
+		0, nullptr,
+		1, &barrier
+	);
 
 	// End command buffer recording
     vkEndCommandBuffer(commandBuffers.at(currentFrame));
@@ -2582,6 +2644,7 @@ void Graphics::endShadowRenderPass(chai_shader *shadowShader)
 
     commandBufferRecording = false;
 
+	startShadowPass = true;
 }
 
 void Graphics::setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void *data)
@@ -3804,7 +3867,7 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
 
 			if (!shouldPreserve) {
 				// std::printf("[CHAILOVE DEBUG] prepareDraw: Setting default render pass (will clear)\n");
-				setDefaultRenderPass();
+				// setDefaultRenderPass();
 			}
 			// else: Keep existing config with LOAD operation to preserve framebuffer
 		}
@@ -3906,10 +3969,11 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
     VkPipeline pipeline = VK_NULL_HANDLE;
 
     try {
-        if (isShadowPass)
+        if (isShadowPass) {
         	pipeline = s->getCachedGraphicsPipeline(this, configuration)[1];
-        else
-		pipeline = s->getCachedGraphicsPipeline(this, configuration)[0];
+		} else {
+			pipeline = s->getCachedGraphicsPipeline(this, configuration)[0];
+		}
         // std::printf("[CHAILOVE DEBUG] Pipeline retrieved successfully: %p\n", (void*)pipeline);
     } catch (const std::exception& e) {
         // std::printf("[CHAILOVE ERROR] Failed to get graphics pipeline: %s\n", e.what());
@@ -3921,10 +3985,18 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
         return;
     }
 
-    if (isShadowPass || pipeline != renderPassState.pipeline[0]) {
-        // std::printf("[CHAILOVE DEBUG] Binding new pipeline: %p (was %p)\n", (void*)pipeline, (void*)renderPassState.pipeline);
+	bool pushDescriptor = false;
+
+    if (startShadowPass || (isShadowPass && pipeline != renderPassState.pipeline[1]) || (!isShadowPass && pipeline != renderPassState.pipeline[0])) {
+        std::printf("[CHAILOVE DEBUG] Binding new pipeline: %p\n", (void*)pipeline);
         vkCmdBindPipeline(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-        renderPassState.pipeline[0] = pipeline;
+		s->invalidateDescriptorSets();
+			
+		pushDescriptor = true;
+		if (isShadowPass) 
+            renderPassState.pipeline[1] = pipeline;		
+        else
+            renderPassState.pipeline[0] = pipeline;
     }
 
     // VALIDATE DESCRIPTOR SETS BEFORE BINDING
@@ -3934,13 +4006,20 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
         if (texture != nullptr) {
             s->setMainTex(texture);
         }
-        // Always push descriptor sets
-        s->cmdPushDescriptorSets(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS);
+        if (pushDescriptor || startShadowPass) {
+			std::printf("[CHAILOVE DEBUG] Pushing descriptor sets (pushDescriptor=%s, startShadowPass=%s)\n",
+				pushDescriptor ? "true" : "false", startShadowPass ? "true" : "false");
+        	s->cmdPushDescriptorSets(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS);
+		}
         // std::printf("[CHAILOVE DEBUG] Descriptor sets bound successfully\n");
     } catch (const std::exception& e) {
         // std::printf("[CHAILOVE ERROR] Failed to bind descriptor sets: %s\n", e.what());
         return;
     }
+
+	if (startShadowPass) {
+		startShadowPass = false;
+	}
 
     VkBuffer vkbuffers[BufferBindings::MAX];
     VkDeviceSize vkoffsets[BufferBindings::MAX];
@@ -4711,8 +4790,8 @@ void Graphics::startRenderPass(int bufferIndex)
 			}
 			renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.depthLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 			renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-			renderPassState.beginInfo.clearValueCount = 0;
-			renderPassState.beginInfo.pClearValues = nullptr;
+			renderPassState.beginInfo.clearValueCount = 2;
+			renderPassState.beginInfo.pClearValues = renderPassState.clearColors.data();
 		}
 
 		// Consume the clear request on begin so present() doesn't start a second pass
@@ -4815,7 +4894,7 @@ void Graphics::startRenderPass(int bufferIndex)
         // Apply scissor
         applyScissor();
 
-        // std::printf("[CHAILOVE DEBUG] Libretro minimal render pass active\n");
+		// std::printf("[CHAILOVE DEBUG] Libretro minimal render pass active\n");
         return;
     }
 
@@ -5170,7 +5249,7 @@ VkSampler Graphics::getCachedSampler(const SamplerState &samplerState)
 
 std::array<VkPipeline, 2> Graphics::createGraphicsPipeline(Shader *shader, const GraphicsPipelineConfigurationCore &configuration, const GraphicsPipelineConfigurationNoDynamicState *noDynamicStateConfiguration)
 {
-	VkGraphicsPipelineCreateInfo pipelineInfo{}, shadowPipelineInfo{};
+	VkGraphicsPipelineCreateInfo pipelineInfo{};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 
 	auto &shaderStages = shader->getShaderStages();
@@ -5349,12 +5428,30 @@ std::array<VkPipeline, 2> Graphics::createGraphicsPipeline(Shader *shader, const
 	pipelineInfo.basePipelineIndex = -1;
 	pipelineInfo.renderPass = configuration.renderPass;
 
-    shadowPipelineInfo = pipelineInfo;
-	auto shadowColorBlending = colorBlending;
-	shadowColorBlending.attachmentCount = 0; // No color attachments for shadow pipeline
-	shadowColorBlending.pAttachments = nullptr;
-	shadowPipelineInfo.pColorBlendState = &shadowColorBlending;
+	shadowPipelineInfo = pipelineInfo;
 	shadowPipelineInfo.renderPass = shadowMapRenderPass;
+
+	// shadowPipelineInfo.pStages = shaderStages.data();
+	// shadowPipelineInfo.pDynamicState = &dynamicState;
+	// shadowPipelineInfo.pVertexInputState = &vertexInputInfo;
+	// shadowPipelineInfo.pRasterizationState = &rasterizer;
+	// shadowPipelineInfo.pViewportState = &viewportState;
+	// shadowPipelineInfo.pInputAssemblyState = &inputAssembly;
+	// shadowPipelineInfo.pMultisampleState = &multisampling;
+	// shadowPipelineInfo.pDepthStencilState = &depthStencil;
+	// shadowPipelineInfo.layout = shader->getGraphicsPipelineLayout();
+
+	
+
+    // shadowPipelineInfo = pipelineInfo;
+	// auto shadowColorBlending = colorBlending;
+	// shadowColorBlending.attachmentCount = 0; // No color attachments for shadow pipeline
+	// shadowColorBlending.pAttachments = nullptr;
+	// shadowPipelineInfo.pColorBlendState = nullptr; // No color blending for shadow pipeline
+	// shadowPipelineInfo.renderPass = shadowMapRenderPass;
+	// multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	// shadowPipelineInfo.pMultisampleState = &multisampling;
+	
 
 
 	VkPipeline graphicsPipeline[2];
@@ -5584,8 +5681,8 @@ void Graphics::callShaderNewFrame()
 	// once per frame in beginFrame(). A second call would double-advance the
 	// UBO ring buffer every 60 frames, writing frame N+1 data into the slot
 	// still being read by the GPU for frame N → causes flickering every 60 frames.
-	for (const auto &shader : usedShadersInFrame)
-		shader->newFrame();
+	// for (const auto &shader : usedShadersInFrame)
+	// 	shader->newFrame();
 	usedShadersInFrame.clear();
 }
 

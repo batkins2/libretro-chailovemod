@@ -61,7 +61,7 @@ public:
     VkSampler getSampler() const { return sampler; }
 	VkRenderPass createShadowMapRenderPass(love::gfx::vulkan::Graphics* vulkanGraphics);
 	VkFramebuffer createShadowFramebuffer(ShadowMap* shadowMap, VkRenderPass renderPass, love::gfx::vulkan::Graphics* vulkanGraphics);
-	VkPipeline createShadowPipeline(love::gfx::vulkan::Graphics* vulkanGraphics, VkRenderPass shadowRenderPass, Shader* shader);
+	VkGraphicsPipelineCreateInfo createShadowPipelineInfo(love::gfx::vulkan::Graphics* vulkanGraphics, VkRenderPass shadowRenderPass, Shader* shader);
 	VkDescriptorSetLayout createShadowDescriptorSetLayout(love::gfx::vulkan::Graphics* vulkanGraphics);
 	void updateShadowDescriptorSet(VkDescriptorSet descriptorSet, int location, VkSampler shadowSampler, VkImageView shadowImageView, love::gfx::vulkan::Graphics* vulkanGraphics);
 
@@ -405,7 +405,7 @@ public:
 		return descriptorSet;
 	}
 
-	void beginShadowRenderPass(gfx::Shader *shadowShader);
+	void beginShadowRenderPass(gfx::Shader *shadowShader, gfx::Texture *shadowMap);
 	void endShadowRenderPass(chai_shader *shadowShader);
 
 	void setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void *data);
@@ -423,6 +423,11 @@ public:
 	void endRecordingGraphicsCommandsImpl() {
 		endRecordingGraphicsCommands();
 	}
+
+	bool isShadowPass = false;
+	bool startShadowPass = false;
+
+	std::vector<std::unique_ptr<ShadowMap>> shadowMaps;
 
 protected:
 	gfx::ShaderStage *newShaderStageInternal(ShaderStageType stage, const std::string &cachekey, const std::string &source, bool gles) override;
@@ -543,10 +548,10 @@ private:
 	std::set<StrongRef<Shader>> usedShadersInFrame;
 	RenderpassState renderPassState;
 
-	std::vector<std::unique_ptr<ShadowMap>> shadowMaps;
     VkRenderPass shadowMapRenderPass;
 	VkFramebuffer shadowFramebuffer;
 	VkPipeline shadowPipeline;
+	VkGraphicsPipelineCreateInfo shadowPipelineInfo{};
 
 	bool libretroMode = false;
 	bool commandBufferRecording = false;  // Track if command buffer is in recording state
@@ -561,7 +566,6 @@ private:
     VkQueue externalQueue = VK_NULL_HANDLE;
     VkCommandPool externalCommandPool = VK_NULL_HANDLE;
 	bool ownsCommandPool = false;  // Track if we created the command pool ourselves
-        bool isShadowPass = false;
 
 	VmaVulkanFunctions vmaVulkanFunctions = {};
 
