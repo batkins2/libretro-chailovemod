@@ -406,7 +406,7 @@ public:
 	}
 
 	void beginShadowRenderPass(gfx::Shader *shadowShader, gfx::Texture *shadowMap);
-	void endShadowRenderPass(chai_shader *shadowShader);
+	void endShadowRenderPass(chai_shader *shadowShader, gfx::Texture *shadowMap);
 
 	void setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void *data);
 	

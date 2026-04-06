@@ -61,6 +61,9 @@ public:
 	ptrdiff_t getRenderTargetHandle() const override;
 	ptrdiff_t getSamplerHandle() const override;
 
+	VkImage getImage() {
+		return imageData.image;
+	};
 	VkImageView getRenderTargetView(int mip, int layer);
 	VkImageView getMSAARenderTargetView(int mip, int layer);
 	VkSampleCountFlagBits getMsaaSamples() const;

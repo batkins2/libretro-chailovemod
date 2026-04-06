@@ -198,7 +198,7 @@ void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &l
     
     // For shadow map rendering, we MUST use a temporary color attachment because
     // Vulkan requires at least one color attachment. However, we set it to depth-only mode.
-    gfx::Graphics::RenderTargets shadowRenderTargets;
+    // gfx::Graphics::RenderTargets shadowRenderTargets;
     
     // Create temporary color texture (needed for render pass, but won't be written to)
     // auto tempColorTex = cg.instance->getTemporaryTexture(PIXELFORMAT_RGBA8_UNORM, 
@@ -206,7 +206,7 @@ void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &l
     //                                                      shadowMapTexture->getPixelHeight(0), 
     //                                                      1);
     // shadowRenderTargets.colors.push_back(gfx::Graphics::RenderTarget(tempColorTex));
-    shadowRenderTargets.colors.push_back(gfx::Graphics::RenderTarget(shadowMapTexture));
+    // shadowRenderTargets.colors.push_back(gfx::Graphics::RenderTarget(shadowMapTexture));
     
     // printf("[SHADOW] Setting shadow render targets: colors=%zu, depth=%p, tempColor=%p\n", 
     //        shadowRenderTargets.colors.size(), shadowMapTexture, tempColorTex);
@@ -285,7 +285,7 @@ void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &l
     // miscDataReset.push_back(glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
     // sceneShader->sendConstant("miscInfo", miscDataReset);
     
-    vulkanGfx->endShadowRenderPass(sceneShader);
+    vulkanGfx->endShadowRenderPass(sceneShader, shadowMapTexture);
     // cg.instance->setColorMask({true, true, true, true});
     printf("[SHADOW] === SHADOW PASS COMPLETE ===\n");
     

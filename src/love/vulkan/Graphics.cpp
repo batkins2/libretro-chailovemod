@@ -140,8 +140,8 @@ VkFramebuffer ShadowMap::createShadowFramebuffer(ShadowMap* shadowMap, VkRenderP
     framebufferInfo.renderPass = renderPass;
     framebufferInfo.attachmentCount = 2;
     framebufferInfo.pAttachments = attachments;
-    framebufferInfo.width = 1024; // Shadow map size
-    framebufferInfo.height = 1024;
+    framebufferInfo.width = 2048; // Shadow map size
+    framebufferInfo.height = 2048;
     framebufferInfo.layers = 1;
 
 	auto device = vulkanGraphics->getDevice();
@@ -152,15 +152,29 @@ VkFramebuffer ShadowMap::createShadowFramebuffer(ShadowMap* shadowMap, VkRenderP
 }
 
 VkRenderPass ShadowMap::createShadowMapRenderPass(love::gfx::vulkan::Graphics* vulkanGraphics) {
-    VkAttachmentDescription depthAttachment{};
-    depthAttachment.format = VK_FORMAT_D32_SFLOAT;
-    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    std::array<VkAttachmentDescription, 2> attachments{};
+
+	attachments[0].format = VK_FORMAT_R8G8B8A8_UNORM;
+	attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+	attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    attachments[1].format = VK_FORMAT_D32_SFLOAT;
+    attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+    attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+	VkAttachmentReference colorAttachmentRef{};
+	colorAttachmentRef.attachment = 0;
+	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkAttachmentReference depthAttachmentRef{};
     depthAttachmentRef.attachment = 1;
@@ -168,6 +182,7 @@ VkRenderPass ShadowMap::createShadowMapRenderPass(love::gfx::vulkan::Graphics* v
 
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.pColorAttachments = &colorAttachmentRef;
     subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
 	std::array<VkSubpassDependency, 2> dependencies{};
@@ -187,15 +202,14 @@ VkRenderPass ShadowMap::createShadowMapRenderPass(love::gfx::vulkan::Graphics* v
 	dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 	dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
-	const VkAttachmentDescription attachments[] = { depthAttachment, depthAttachment };
-    VkRenderPassCreateInfo renderPassInfo{};
+	VkRenderPassCreateInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     renderPassInfo.attachmentCount = 2;
-    renderPassInfo.pAttachments = attachments;
+    renderPassInfo.pAttachments = attachments.data();
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
-	renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
-	renderPassInfo.pDependencies = dependencies.data();
+	// renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+	// renderPassInfo.pDependencies = dependencies.data();
 
 	VkRenderPass renderPass;
     vkCreateRenderPass(vulkanGraphics->getDevice(), &renderPassInfo, nullptr, &renderPass);
@@ -2584,15 +2598,18 @@ void Graphics::beginShadowRenderPass(gfx::Shader *shadowShader, gfx::Texture *sh
 	gfx::Graphics::RenderTargets shadowRenderTargets;
 	auto targets = gfx::Graphics::RenderTarget(shadowMap);
 	shadowRenderTargets.depthStencil = targets;
+	// auto tempColorTexture = getTemporaryTexture(love::PixelFormat::PIXELFORMAT_RGBA8_UNORM, 2048, 2048, 1);
+	// shadowRenderTargets.colors.push_back(gfx::Graphics::RenderTarget(tempColorTexture));
 	setRenderTargetsInternal(shadowRenderTargets, 1024, 1024, false);
 	// vShader->cmdPushDescriptorSets(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS);
-	
+	renderPassState.beginInfo.renderPass = shadowMapRenderPass;
+	renderPassState.beginInfo.framebuffer = shadowFramebuffer;
 }
 
-void Graphics::endShadowRenderPass(chai_shader *shadowShader)
+void Graphics::endShadowRenderPass(chai_shader *shadowShader, gfx::Texture *shadowMap)
 {
 
-    // End render pass
+	// End render pass
     vkCmdEndRenderPass(commandBuffers.at(currentFrame));
 
 	// Create pipeline barrier to ensure shadow pass writes are visible to subsequent passes
@@ -2602,7 +2619,7 @@ void Graphics::endShadowRenderPass(chai_shader *shadowShader)
 	barrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.image = shadowMaps[0]->getImage();
+	barrier.image = swapChainImages.empty() ? depthImage : swapChainImages[imageIndex];
 	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 	barrier.subresourceRange.baseMipLevel = 0;
 	barrier.subresourceRange.levelCount = 1;
@@ -2619,7 +2636,7 @@ void Graphics::endShadowRenderPass(chai_shader *shadowShader)
 		0, nullptr,
 		1, &barrier
 	);
-
+	
 	// End command buffer recording
     vkEndCommandBuffer(commandBuffers.at(currentFrame));
 
@@ -2630,6 +2647,8 @@ void Graphics::endShadowRenderPass(chai_shader *shadowShader)
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffers.at(currentFrame);
     submitInfo.signalSemaphoreCount = 0;
+
+	vkQueueWaitIdle(graphicsQueue);  // Ensure the queue is idle before submitting shadow pass
 
     VkResult submitResult = vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
     if (submitResult != VK_SUCCESS) {
@@ -2645,6 +2664,10 @@ void Graphics::endShadowRenderPass(chai_shader *shadowShader)
     commandBufferRecording = false;
 
 	startShadowPass = true;
+
+	renderPassState.beginInfo.renderPass = VK_NULL_HANDLE;
+	renderPassState.beginInfo.framebuffer = VK_NULL_HANDLE;
+	setRenderTarget();
 }
 
 void Graphics::setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void *data)
@@ -3682,6 +3705,7 @@ VkRenderPass Graphics::createRenderPass(RenderPassConfiguration &configuration)
 	VkRenderPassCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 	createInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+	std::printf("[RENDER PASS] createRenderPass: Creating render pass with %u attachments", static_cast<uint32_t>(attachments.size()));
 	createInfo.pAttachments = attachments.data();
 	createInfo.subpassCount = 1;
 	createInfo.pSubpasses = &subPass;
@@ -5377,6 +5401,7 @@ std::array<VkPipeline, 2> Graphics::createGraphicsPipeline(Shader *shader, const
 	colorBlending.logicOpEnable = VK_FALSE;
 	colorBlending.logicOp = VK_LOGIC_OP_COPY;
 	colorBlending.attachmentCount = static_cast<uint32_t>(colorBlendAttachments.size());
+	std::printf("[CHAILOVE DEBUG] Creating graphics pipeline with %zu color attachments\n", colorBlendAttachments.size());
 	colorBlending.pAttachments = colorBlendAttachments.data();
 	colorBlending.blendConstants[0] = 0.0f;
 	colorBlending.blendConstants[1] = 0.0f;

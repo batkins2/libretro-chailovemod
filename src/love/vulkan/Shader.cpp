@@ -359,7 +359,7 @@ void Shader::cmdPushDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBind
 		}
 	}
 
-	if (resourceDescriptorsDirty || currentDescriptorSet == VK_NULL_HANDLE)
+	if (currentDescriptorSet == VK_NULL_HANDLE)
 	{
 		// VkDescriptorSet prevDescriptorSet = VK_NULL_HANDLE;
 

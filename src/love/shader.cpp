@@ -155,6 +155,7 @@ vec4 textureCubeDeprecated(samplerCube s, vec3 c) { return texture(s, c) + depre
 
 #ifdef PIXEL
 vec4 texture2DDeprecated(sampler2D s, vec2 c, float b) { return texture(s, c, b) + deprecatedTextureCall; }
+float texture2DDeprecated(sampler2DShadow s, vec2 c) { return texture(s, vec3(c, 0.0), 0.0) + deprecatedTextureCall; }
 vec4 textureCubeDeprecated(samplerCube s, vec3 c, float b) { return texture(s, c, b) + deprecatedTextureCall; }
 #endif
 
