@@ -221,10 +221,16 @@ void Shader::unloadVolatile()
 		vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
 		if (computePipeline != VK_NULL_HANDLE)
 			vkDestroyPipeline(device, computePipeline, nullptr);
-		for (const auto &kvp : graphicsPipelinesCore)
+		for (const auto &kvp : graphicsPipelinesCore) {
 			vkDestroyPipeline(device, kvp.second[0], nullptr);
-		for (const auto &kvp : graphicsPipelinesFull)
+			if (kvp.second[1] != VK_NULL_HANDLE)
+				vkDestroyPipeline(device, kvp.second[1], nullptr);
+		}
+		for (const auto &kvp : graphicsPipelinesFull) {
 			vkDestroyPipeline(device, kvp.second[0], nullptr);
+			if (kvp.second[1] != VK_NULL_HANDLE)
+				vkDestroyPipeline(device, kvp.second[1], nullptr);
+		}
 	});
 
 	shaderModules.clear();
@@ -271,7 +277,6 @@ VkPipeline Shader::getComputePipeline() const
 
 void Shader::newFrame()
 {
-	return;
 	currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 	currentDescriptorPool = 0;
 	// PERF: Don't reset descriptor set - let it persist if resources don't change
@@ -330,6 +335,10 @@ void Shader::cmdPushDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBind
 	}
 
 	// Sampler updates need to happen here because the handles may change after sendTextures.
+	// Also transition any render-target textures that moved to COLOR_ATTACHMENT_OPTIMAL since
+	// the last setTextureDescriptor call (e.g. fakeBackbuffer after endRenderPass), so the
+	// imageLayout stored in descriptorImages is always valid for COMBINED_IMAGE_SAMPLER before
+	// vkUpdateDescriptorSets is called (VUID-VkWriteDescriptorSet-descriptorType-04150).
 	for (const auto &u : reflection.sampledTextures)
 	{
 		const auto &info = u.second;
@@ -347,19 +356,89 @@ void Shader::cmdPushDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBind
 			if (vkTexture == nullptr)
 				throw love::Exception("uniform variable %s is not set.", info.name.c_str());
 
-			auto sampler = (VkSampler)vkTexture->getSamplerHandle();
-
 			VkDescriptorImageInfo &imageInfo = descriptorImages[info.bindingStartIndex + i];
+
+			// Feedback-loop guard (VUID-vkCmdDraw-None-09002):
+			// The same VkImageView cannot simultaneously be a framebuffer attachment
+			// and a shader sampler descriptor in the same draw without
+			// VK_EXT_attachment_feedback_loop.
+			//
+			// Case 1: fakeBackbuffer is the color attachment during the window pass.
+			// Case 2: shadow depth texture is the depth attachment during the shadow pass.
+			//
+			// In both cases replace the bound descriptor with a compatible default texture.
+			// Also skip transitionForSampling() — it calls getCommandBufferForDataTransfer()
+			// which would end the active render pass prematurely.
+			{
+				bool isFakeBackbufferFeedback =
+					vkTexture == vgfx->getFakeBackbufferRaw() && vgfx->isWindowRenderPassActive();
+				bool isShadowDepthFeedback =
+					vkTexture == vgfx->currentShadowDepthTexture && vgfx->isShadowPass;
+
+				if (isFakeBackbufferFeedback || isShadowDepthFeedback) {
+					// The shadow map is a plain sampler2D (no depthSampleMode), so both
+					// feedback-loop cases fall back to the plain 1×1 RGBA8 default texture.
+					auto fallback = dynamic_cast<Texture*>(
+						vgfx->getDefaultTexture(TEXTURE_2D, DATA_BASETYPE_FLOAT, false));
+					if (fallback != nullptr) {
+						VkImageView fallbackView    = (VkImageView)fallback->getHandle();
+						VkSampler   fallbackSampler = (VkSampler)fallback->getSamplerHandle();
+						VkImageLayout fallbackLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+						if (imageInfo.imageView   != fallbackView ||
+						    imageInfo.sampler      != fallbackSampler ||
+						    imageInfo.imageLayout  != fallbackLayout) {
+							imageInfo.imageView   = fallbackView;
+							imageInfo.sampler     = fallbackSampler;
+							imageInfo.imageLayout = fallbackLayout;
+							resourceDescriptorsDirty = true;
+						}
+					}
+					continue; // skip transitionForSampling and normal sampler update
+				}
+			}
+
+			auto sampler = (VkSampler)vkTexture->getSamplerHandle();
 			// PERF: Don't mark dirty on sampler changes - causes 89 descriptor reallocations per frame
 			// if (sampler != imageInfo.sampler)
 			// {
 				imageInfo.sampler = sampler;
 			// 	resourceDescriptorsDirty = true;
 			// }
+
+			// Per-frame layout sync: if the texture became a color attachment since the last
+			// setTextureDescriptor call (imageData.layout == COLOR_ATTACHMENT_OPTIMAL), transition
+			// it to SHADER_READ_ONLY_OPTIMAL now so the descriptor update uses a valid layout.
+			//
+			// IMPORTANT: Only call transitionForSampling() when NO render pass is active.
+			// transitionForSampling() calls getCommandBufferForDataTransfer() which calls
+			// endRenderPass() to issue the barrier outside a render pass.  Calling it mid-pass
+			// (e.g. fakeBackbuffer is in COLOR_ATTACHMENT_OPTIMAL when the shadow pass begins)
+			// terminates the active shadow/window render pass prematurely, causing every draw
+			// in that pass to execute outside a render pass and be silently discarded.
+			// When a render pass is active, skip the transition and let the layout clamp below
+			// pick a valid COMBINED_IMAGE_SAMPLER layout; the real transition will happen once
+			// the render pass ends and the next frame's pre-pass flush runs.
+			if (!vgfx->isInRenderPass())
+				vkTexture->transitionForSampling();
+			VkImageLayout currentLayout = vkTexture->getImageLayout();
+			// Clamp to a valid COMBINED_IMAGE_SAMPLER layout.
+			if (currentLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
+			    currentLayout != VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL &&
+			    currentLayout != VK_IMAGE_LAYOUT_GENERAL &&
+			    currentLayout != VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL &&
+			    currentLayout != VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL)
+			{
+				currentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			}
+			if (imageInfo.imageLayout != currentLayout)
+			{
+				imageInfo.imageLayout = currentLayout;
+				resourceDescriptorsDirty = true;
+			}
 		}
 	}
 
-	if (currentDescriptorSet == VK_NULL_HANDLE)
+	if (resourceDescriptorsDirty || currentDescriptorSet == VK_NULL_HANDLE)
 	{
 		// VkDescriptorSet prevDescriptorSet = VK_NULL_HANDLE;
 
@@ -371,21 +450,32 @@ void Shader::cmdPushDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBind
 
 		for (auto &write : descriptorWrites) 
 			write.dstSet = currentDescriptorSet;
-		
-		// if (prevDescriptorSet != VK_NULL_HANDLE)
-		// {
-		// 	for (auto &write : descriptorWrites) { 
-		// 		if (write.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER && write.dstBinding == 2) 
-		// 		{
-					// VkDescriptorImageInfo imageInfo{};
-					// imageInfo.sampler = vgfx->shadowMaps[0]->getSampler();
-					// imageInfo.imageView = vgfx->shadowMaps[0]->getView();
-					// imageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-					// write.pImageInfo = &imageInfo;
-					// std::printf("[SHADER] Updated shadow map descriptor for uniform '%s' with imageView %pin new descriptor set %p\n", write.pImageInfo->sampler, (void*)write.pImageInfo->imageView, (void*)currentDescriptorSet);
-		// 		}
-		// 	}
-		// }
+
+		// VUID-VkWriteDescriptorSet-descriptorType-04150: COMBINED_IMAGE_SAMPLER descriptors must
+		// not use VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL (or other attachment-only layouts).
+		// Clamp any such entries to SHADER_READ_ONLY_OPTIMAL as a final safety net here so that
+		// setTextureDescriptor misses cannot cause a validation error at vkUpdateDescriptorSets.
+		for (auto &write : descriptorWrites)
+		{
+			if (write.descriptorType != VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+				continue;
+			auto *images = const_cast<VkDescriptorImageInfo *>(write.pImageInfo);
+			if (!images)
+				continue;
+			for (uint32_t i = 0; i < write.descriptorCount; i++)
+			{
+				VkImageLayout &lay = images[i].imageLayout;
+				if (lay != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
+				    lay != VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL &&
+				    lay != VK_IMAGE_LAYOUT_GENERAL &&
+				    lay != VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL &&
+				    lay != VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL)
+				{
+					std::printf("[SHADER] WARNING: clamping invalid descriptor imageLayout %d to SHADER_READ_ONLY_OPTIMAL (binding %u, index %u)\n", (int)lay, write.dstBinding, i);
+					lay = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				}
+			}
+		}
 
 		vkUpdateDescriptorSets(device, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
 
@@ -1255,6 +1345,9 @@ void Shader::compileShaders()
 		for (int i = 0; i < info.count; i++)
 		{
 			VkDescriptorImageInfo imageInfo{};
+			// Default to a valid layout for COMBINED_IMAGE_SAMPLER so unbound
+			// slots don't produce VUID-VkWriteDescriptorSet-descriptorType-04150.
+			imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			// if (info.name.c_str() == std::string("shadowMap") && !vgfx->shadowMaps.empty())
 			// {
 			// 	imageInfo.sampler = vgfx->shadowMaps[0]->getSampler();
@@ -1570,7 +1663,8 @@ void Shader::setTextureDescriptor(const UniformInfo *info, love::gfx::Texture *t
         if (!vkTexture)
         {
             // Write directly by index, not via reference
-            descriptorImages[descriptorIndex].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            // UNDEFINED is invalid for COMBINED_IMAGE_SAMPLER; use a safe fallback.
+            descriptorImages[descriptorIndex].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             descriptorImages[descriptorIndex].imageView = VK_NULL_HANDLE;
             allTextureInfo[descriptorIndex].texture = nullptr;
             resourceDescriptorsDirty = true;
@@ -1588,8 +1682,20 @@ void Shader::setTextureDescriptor(const UniformInfo *info, love::gfx::Texture *t
 		{
 			vkTexture->transitionForSampling();
 		}
-		// Now use the actual layout from the texture (which should be SHADER_READ_ONLY_OPTIMAL after transition)
-		VkImageLayout newLayout = vkTexture != nullptr ? vkTexture->getImageLayout() : VK_IMAGE_LAYOUT_UNDEFINED;
+		// Now use the actual layout from the texture (should be SHADER_READ_ONLY_OPTIMAL after transition).
+		VkImageLayout newLayout = vkTexture != nullptr
+			? vkTexture->getImageLayout()
+			: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		// Clamp to a layout that is valid for COMBINED_IMAGE_SAMPLER
+		// (VUID-VkWriteDescriptorSet-descriptorType-04150).
+		if (newLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
+		    newLayout != VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL &&
+		    newLayout != VK_IMAGE_LAYOUT_GENERAL &&
+		    newLayout != VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL &&
+		    newLayout != VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL)
+		{
+			newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		}
 		// Write directly by index after all potentially-reallocating calls
 		descriptorImages[descriptorIndex].imageLayout = newLayout;
 		descriptorImages[descriptorIndex].imageView = view;
@@ -1598,6 +1704,28 @@ void Shader::setTextureDescriptor(const UniformInfo *info, love::gfx::Texture *t
 	}
 	else
 	{
+		// View is unchanged, but the texture may have been used as a render target since the last
+		// binding, changing its image layout.  Re-check and update the descriptor layout so that
+		// vkUpdateDescriptorSets never receives VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+		// (VUID-VkWriteDescriptorSet-descriptorType-04150).
+		if (vkTexture != nullptr)
+		{
+			vkTexture->transitionForSampling();
+			VkImageLayout actualLayout = vkTexture->getImageLayout();
+			if (actualLayout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
+			    actualLayout != VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL &&
+			    actualLayout != VK_IMAGE_LAYOUT_GENERAL &&
+			    actualLayout != VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL &&
+			    actualLayout != VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL)
+			{
+				actualLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			}
+			if (descriptorImages[descriptorIndex].imageLayout != actualLayout)
+			{
+				descriptorImages[descriptorIndex].imageLayout = actualLayout;
+				resourceDescriptorsDirty = true;
+			}
+		}
 	}
 }
 
@@ -1735,15 +1863,16 @@ std::array<VkPipeline, 2> Shader::getCachedGraphicsPipeline(Graphics *vgfx, cons
 
 std::array<VkPipeline, 2> Shader::getCachedGraphicsPipeline(Graphics *vgfx, const GraphicsPipelineConfigurationFull &configuration)
 {
-	for (const auto &pair : graphicsPipelinesNoDynamicState)
-	{
-		return pair.second;
-	}
 	auto it = graphicsPipelinesNoDynamicState.find(configuration);
 	if (it != graphicsPipelinesNoDynamicState.end())
 		return it->second;
 
+	std::printf("[PIPELINE] Creating new pipeline pair for renderPass=%p numColorAtts=%u\n",
+		(void*)configuration.core.renderPass, configuration.core.numColorAttachments);
+	fflush(stdout);
 	std::array<VkPipeline, 2> pipeline = vgfx->createGraphicsPipeline(this, configuration.core, &configuration.noDynamicState);
+	std::printf("[PIPELINE] Created: normal=%p shadow=%p\n", (void*)pipeline[0], (void*)pipeline[1]);
+	fflush(stdout);
 	graphicsPipelinesNoDynamicState.insert({ configuration, pipeline });
 	
 	return pipeline;

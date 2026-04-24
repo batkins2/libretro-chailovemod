@@ -3,6 +3,25 @@
 // #include "../../vendor/MemPlumber/memplumber.h"
 // #include "../../vendor/MemPlumber/memplumber-internals.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#include <psapi.h>
+static SIZE_T _ramSnap() {
+    PROCESS_MEMORY_COUNTERS_EX pmc = {};
+    pmc.cb = sizeof(pmc);
+    GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
+    return pmc.PrivateUsage;
+}
+#define RAM_SNAP(var) SIZE_T var = _ramSnap()
+#define RAM_DELTA(label, before, after) do { \
+    long long d = (long long)((after) - (before)); \
+    if (d > 4096) std::printf("[DRAW LEAK] %s: +%lld bytes\n", label, d); \
+} while(0)
+#else
+#define RAM_SNAP(var) (void)0
+#define RAM_DELTA(label, before, after) (void)0
+#endif
+
 namespace love {
 chai_scene::chai_scene() {
     
@@ -144,21 +163,78 @@ void chai_scene::initShadowMap() {
     // Create shadow map texture as a depth texture
     // Using DEPTH32_FLOAT for maximum compatibility as a readable render target
     gfx::Texture::Settings shadowSettings;
-    shadowSettings.width = SHADOW_MAP_SIZE;
-    shadowSettings.height = SHADOW_MAP_SIZE;
-    shadowSettings.format = PIXELFORMAT_DEPTH32_FLOAT; // 32-bit float depth, widely supported
+    shadowSettings.width = 1440;
+    shadowSettings.height = 1080;
+    shadowSettings.format = PIXELFORMAT_DEPTH32_FLOAT;
     shadowSettings.renderTarget = true;
     shadowSettings.readable = true;
     
     auto shadowSlices = gfx::Texture::Slices(gfx::TextureType::TEXTURE_2D);
     shadowMapTexture = gfx->newTexture(shadowSettings, &shadowSlices);
     
+    // Do NOT set depthSampleMode: the shader samples shadowMap as a plain sampler2D
+    // (texture2D(shadowMap, uv).r) and does the depth comparison manually.
+    // depthSampleMode would require declaring the uniform as DepthImage (sampler2DShadow)
+    // and using a vec3 coordinate, which this shader doesn't do.
+
     if (shadowMapTexture) {
         shadowMapInitialized = true;
         printf("[SHADOW] Shadow map initialized: %dx%d (DEPTH32_FLOAT format)\n", SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     } else {
         printf("[SHADOW] Error: Failed to create shadow map texture\n");
     }
+}
+
+glm::mat4 chai_scene::calculateLightProjection(const glm::mat4 &cameraView, const glm::mat4 &cameraProjection, const glm::mat4 &lightView) {
+    // printf("[LIGHT PROJECTION] Starting calculation\n");
+    // fflush(stdout);
+
+    // Derive camera lookat point in world space:
+    // Camera position = inverse(cameraView)[3]
+    // Camera forward  = -third column of cameraView (view matrix row extraction)
+    glm::mat4 invCameraView = glm::inverse(cameraView);
+    glm::vec3 camPos = glm::vec3(cameraView[3]);
+    glm::vec3 camForward = -glm::vec3(cameraView[2][0], cameraView[2][1], cameraView[2][2]);
+
+    // Project the lookat point a fixed distance ahead of the camera
+    float lookAtDist = 0.0f;
+    glm::vec3 lookAtWorld = camPos + camForward * lookAtDist;
+
+    // printf("[LIGHT PROJECTION] camPos=(%.2f, %.2f, %.2f) camForward=(%.2f, %.2f, %.2f)\n",
+    //        camPos.x, camPos.y, camPos.z, camForward.x, camForward.y, camForward.z);
+    // printf("[LIGHT PROJECTION] lookAtWorld=(%.2f, %.2f, %.2f)\n",
+    //        lookAtWorld.x, lookAtWorld.y, lookAtWorld.z);
+
+    // Transform lookat point into light space to get the center (x, z) of the ortho box
+    glm::vec4 lookAtLight = lightView * glm::vec4(lookAtWorld, 1.0f);
+    float cx = lookAtLight.x;
+    float cz = lookAtLight.z;
+
+    // printf("[LIGHT PROJECTION] lookAtLight=(%.2f, %.2f, %.2f)\n",
+    //        lookAtLight.x, lookAtLight.y, lookAtLight.z);
+
+    // Shadow map is 1440x1080, aspect ratio 1.33:1
+    float shadowWorldSize = 65.0f;
+    float aspect = 1440.0f / 1080.0f;
+
+    float orthoWidth  = shadowWorldSize;
+    float orthoHeight = shadowWorldSize / aspect;
+
+    // Center the ortho box on the camera lookat point (x, z in light space)
+    float left   = cx - orthoWidth  / 2.0f;
+    float right  = cx + orthoWidth  / 2.0f;
+    float bottom = cz - orthoHeight / 2.0f;
+    float top    = cz + orthoHeight / 2.0f;
+
+    // Depth range centered on the lookat z in light space
+    float nearPlane = cz - 100.0f;
+    float farPlane  = cz + 100.0f;
+
+    // printf("[LIGHT PROJECTION] Fixed ortho: [%.2f, %.2f] x [%.2f, %.2f], depth [%.2f, %.2f]\n",
+    //        left, right, bottom, top, nearPlane, farPlane);
+    // fflush(stdout);
+
+    return glm::ortho(left, right, bottom, top, nearPlane, farPlane);
 }
 
 void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &lightProjection, int view) {
@@ -173,10 +249,10 @@ void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &l
     //     printf("[SHADOW] ABORTING: Pipeline not initialized\n");
     //     return;
     // }
-    printf("[SHADOW] === SHADOW PASS START ===\n");
+    // printf("[SHADOW] === SHADOW PASS START ===\n");
     
     if (!shadowMapInitialized) {
-        printf("[SHADOW] shadowMapInitialized=false, calling initShadowMap()\n");
+        // printf("[SHADOW] shadowMapInitialized=false, calling initShadowMap()\n");
         initShadowMap();
     }
     
@@ -185,7 +261,7 @@ void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &l
         return;
     }
     
-    printf("[SHADOW] shadowMapTexture OK, sceneShader OK\n");
+    // printf("[SHADOW] shadowMapTexture OK, sceneShader OK\n");
     
 
     vulkanGfx->beginShadowRenderPass(sceneShader->shader, shadowMapTexture);
@@ -213,22 +289,22 @@ void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &l
     
     // Switch to shadow map render target - this will start a NEW render pass
     // cg.instance->setRenderTargets(shadowRenderTargets);
-    printf("[SHADOW] setRenderTargets completed\n");
+    // printf("[SHADOW] setRenderTargets completed\n");
     
     // Disable ALL color writes immediately - we ONLY write depth
     // cg.instance->setColorMask({false, false, false, false});
-    printf("[SHADOW] Color mask disabled\n");
+    // printf("[SHADOW] Color mask disabled\n");
     
     // Enable depth testing and depth writes for shadow pass
     // cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LESS, true);
-    printf("[SHADOW] Depth mode set\n");
+    // printf("[SHADOW] Depth mode set\n");
     
     // Clear the depth buffer to far depth (1.0)
     // gfx::OptionalColorD clearColor;  // No color clear needed
     // love::OptionalInt clearStencil;  // No stencil in DEPTH32_FLOAT
     // love::OptionalDouble clearDepth(1.0);
     // cg.instance->clear(clearColor, clearStencil, clearDepth);
-    printf("[SHADOW] Clear completed\n");
+    // printf("[SHADOW] Clear completed\n");
     
     // Set shader uniforms for shadow pass
     // sceneShader->sendInt("shadow", 0);  // Not sampling shadows during shadow pass
@@ -251,10 +327,28 @@ void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &l
     // sceneShader->send("viewMatrix", m_vmCache[0]);
     // printf("[SHADOW] View matrix sent\n");
     
-    // Render meshes from light's perspective to shadow map
-    printf("[SHADOW] About to call drawMeshes(true, %d)\n", view);
+    // Send the light-space transform so the vertex shader places geometry correctly in
+    // the shadow map's depth range.  Without these, the shadow pass inherits the previous
+    // 2D orthographic projection from the normal rendering pass, which maps 3D geometry to
+    // clip-space z ≈ 1.0 (the far plane) for all vertices — COMPARE_LESS(1.0, 1.0) = false,
+    // so every fragment fails the depth test and nothing is written.
+    // glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+    // sceneShader->send("lightSpaceMatrix", lightSpaceMatrix);
+    // std::vector<glm::mat4> projVec = { lightProjection };
+    // sceneShader->send("projectionMatrix",  projVec);
+    // sceneShader->send("projectionMatrix2", projVec);
+    // std::vector<glm::mat4> viewVec = { lightView };
+    // sceneShader->send("viewMatrix", viewVec[0]);
+
+    // Signal the fragment shader that this is the shadow pass (miscInfo.x = 1.0).
+    // The effect() function returns vec4(0.0) immediately when miscInfo.x > 0.5,
+    // skipping all lighting/texturing and allowing only the depth write to complete.
+    // sceneShader->sendConstant("miscInfo", {glm::vec4(1.0f, 0.0f, 0.0f, 0.0f)});
+    // printf("[SHADOW] About to call drawMeshes(true, %d)\n", view);
     drawMeshes(true, view);
-    printf("[SHADOW] Returned from drawMeshes\n");
+    // Reset miscInfo.x so normal-pass draws don't discard their fragments.
+    // sceneShader->sendConstant("miscInfo", {glm::vec4(0.0f, 0.0f, 0.0f, 0.0f)});
+    // printf("[SHADOW] Returned from drawMeshes\n");
     
     // CRITICAL: Flush batched draw state IMMEDIATELY
     // This ensures all shadow geometry is actually rendered to the shadow map
@@ -271,7 +365,7 @@ void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &l
     // printf("[SHADOW] Returned from second submitGpuCommands\n");
     
     // Restore default render target (back to screen) - this will start ANOTHER NEW render pass
-    printf("[SHADOW] Restoring screen render target\n");
+    // printf("[SHADOW] Restoring screen render target\n");
     // cg.instance->setRenderTarget();
     // printf("[SHADOW] setRenderTarget() completed\n");
     
@@ -287,7 +381,7 @@ void chai_scene::renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &l
     
     vulkanGfx->endShadowRenderPass(sceneShader, shadowMapTexture);
     // cg.instance->setColorMask({true, true, true, true});
-    printf("[SHADOW] === SHADOW PASS COMPLETE ===\n");
+    // printf("[SHADOW] === SHADOW PASS COMPLETE ===\n");
     
     // vulkanGfx->submitGpuCommands(love::gfx::vulkan::SUBMIT_NOPRESENT, nullptr);
 	// vulkanGfx->advanceFrame();
@@ -351,8 +445,8 @@ void chai_scene::drawMeshes(bool shadows, int view) {
     size_t leakCountBefore, leakCountAfter;
     uint64_t leakSizeBefore, leakSizeAfter;
     
-    printf("[DRAWMESHES] Called with shadows=%s, view=%d, meshes.size()=%zu\n", 
-           shadows ? "TRUE" : "FALSE", view, meshes.size());
+    // printf("[DRAWMESHES] Called with shadows=%s, view=%d, meshes.size()=%zu\n", 
+    //        shadows ? "TRUE" : "FALSE", view, meshes.size());
     
     sceneFrameCount++;
     
@@ -442,8 +536,8 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         // __mem_leak_check(leakCountBefore, leakSizeBefore, false, "", false);
         
         m_lightIntensityCache.clear();
-        m_lightIntensityCache.push_back(glm::vec3(1.2f));
-        sceneShader->send("lightIntensity", 1.2f);
+        m_lightIntensityCache.push_back(glm::vec3(0.7f));
+        sceneShader->send("lightIntensity", 0.7f);
 
         // __mem_leak_check(leakCountAfter, leakSizeAfter, false, "", false);
     
@@ -556,7 +650,7 @@ void chai_scene::drawMeshes(bool shadows, int view) {
             t2 = glm::perspective(fov, aspectRatio, nearClip, farClip);
             auto pm = glm::value_ptr(t2);
 
-            auto lightParams = mesh->lightParams[view];
+            auto lightParams = mesh->lightParams[0];
 
             m_lightDirectionCache.clear();
             // TODO: lightParams returns what type? Store as vec3
@@ -586,28 +680,36 @@ void chai_scene::drawMeshes(bool shadows, int view) {
             // m_intensityCache.push_back(glm::vec3());
             sceneShader->send("lightIntensity", lightParams["intensity"][0]);
 
-            // Calculate lightSpaceMatrix
+            // Use cached light matrices calculated in draw() to ensure consistency
+            // between shadow pass and main rendering pass
             glm::vec3 lightPos = glm::vec3(lightParams["position"][0], lightParams["position"][1], lightParams["position"][2]);
-            // glm::vec3 lightDir = glm::vec3(lightParams["direction"][0], lightParams["direction"][1], lightParams["direction"][2]);
-            glm::vec3 lightDir = glm::vec3(0.0f, -1.0f, 0.0f);
-            glm::mat4 lightView = glm::lookAt(lightPos, lightPos + lightDir, glm::vec3(0.0f, 0.0f, -1.0f));
-            glm::mat4 lightProjection = glm::ortho(-7.5f, 7.5f, -7.5f, 7.5f, 1.0f, 1000.0f);
-            glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+            
+            // std::printf("Light Position: (%f, %f, %f)\n", lightPos.x, lightPos.y, lightPos.z);
+            // std::printf("Cached Light View Matrix:\n%f %f %f %f\n%f %f %f %f\n%f %f %f %f\n%f %f %f %f\n",
+            //     m_cachedLightView[0][0], m_cachedLightView[0][1], m_cachedLightView[0][2], m_cachedLightView[0][3],
+            //     m_cachedLightView[1][0], m_cachedLightView[1][1], m_cachedLightView[1][2], m_cachedLightView[1][3],
+            //     m_cachedLightView[2][0], m_cachedLightView[2][1], m_cachedLightView[2][2], m_cachedLightView[2][3],
+            //     m_cachedLightView[3][0], m_cachedLightView[3][1], m_cachedLightView[3][2], m_cachedLightView[3][3]);
+            // std::printf("Cached Light Space Matrix:\n%f %f %f %f\n%f %f %f %f\n%f %f %f %f\n%f %f %f %f\n",
+            //     m_cachedLightSpaceMatrix[0][0], m_cachedLightSpaceMatrix[0][1], m_cachedLightSpaceMatrix[0][2], m_cachedLightSpaceMatrix[0][3],
+            //     m_cachedLightSpaceMatrix[1][0], m_cachedLightSpaceMatrix[1][1], m_cachedLightSpaceMatrix[1][2], m_cachedLightSpaceMatrix[1][3],
+            //     m_cachedLightSpaceMatrix[2][0], m_cachedLightSpaceMatrix[2][1], m_cachedLightSpaceMatrix[2][2], m_cachedLightSpaceMatrix[2][3],
+            //     m_cachedLightSpaceMatrix[3][0], m_cachedLightSpaceMatrix[3][1], m_cachedLightSpaceMatrix[3][2], m_cachedLightSpaceMatrix[3][3]);
 
             m_lightSpaceMatrixCache.clear();
-            m_lightSpaceMatrixCache.push_back(lightSpaceMatrix);
+            m_lightSpaceMatrixCache.push_back(m_cachedLightSpaceMatrix);
             sceneShader->send("lightSpaceMatrix", m_lightSpaceMatrixCache[0]);
 
             m_projectionMatrixCache.clear();
-            m_projectionMatrixCache.push_back(t2);  // Always use camera projection for rendering
+            m_projectionMatrixCache.push_back(t2);  // Camera projection for normal pass
             sceneShader->send("projectionMatrix", m_projectionMatrixCache);
             sceneShader->send("projectionMatrix2", m_projectionMatrixCache);
 
             if (shadows == true) {
-                // Shadow pass: rendering TO shadow map (not sampling from it)
-                // Light space matrices are already set in renderShadowPass()
-                // Just use the pre-computed light space matrix for this pass
-                viewProjectionMatrix = lightSpaceMatrix;
+                // Shadow pass: vertex shader must transform vertices into light clip-space.
+                // Use cached matrices for perfect consistency
+                sceneShader->send("lightViewMatrix", m_cachedLightView);
+                viewProjectionMatrix = m_cachedLightSpaceMatrix; // Already lightProjection * lightView
             } else {
                 // Normal rendering pass: sample FROM shadow map
                 sceneShader->sendInt("shadow", 1);
@@ -691,14 +793,14 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         bool isMultiGroup = meshGroups[mesh->getId()] > 1;
         
         if (sceneFrameCount % 60 == 1 && isMultiGroup) {
-            printf("[MULTI-GROUP] Loop index i=%d | Mesh ID=%d | Groups=%d | hasChildren=%s\n", 
-                   i, mesh->getId(), meshGroups[mesh->getId()],
-                   (meshChildren.find(i) != meshChildren.end()) ? "YES" : "NO");
+            // printf("[MULTI-GROUP] Loop index i=%d | Mesh ID=%d | Groups=%d | hasChildren=%s\n", 
+            //        i, mesh->getId(), meshGroups[mesh->getId()],
+            //        (meshChildren.find(i) != meshChildren.end()) ? "YES" : "NO");
         }
         
         if (mesh->visible == false) {
             if (sceneFrameCount % 60 == 0 && isMultiGroup) {
-                printf("[SKIP INVISIBLE] Mesh %d (multi-group) is invisible\n", i);
+                // printf("[SKIP INVISIBLE] Mesh %d (multi-group) is invisible\n", i);
             }
             i++;
             continue;
@@ -712,10 +814,10 @@ void chai_scene::drawMeshes(bool shadows, int view) {
         //     data[8], data[9], data[10], data[11],
         //     data[12], data[13], data[14], data[15]
         // );
-        // Perform frustum culling
-        if (!isMeshInFrustum(mesh, viewProjectionMatrix)) {
+        // Perform frustum culling (but skip culling during shadow pass to capture all shadow casters)
+        if (!shadows && !isMeshInFrustum(mesh, viewProjectionMatrix)) {
             if (sceneFrameCount % 60 == 0 && isMultiGroup) {
-                printf("[SKIP CULLED] Mesh %d (multi-group) outside frustum\n", i);
+                // printf("[SKIP CULLED] Mesh %d (multi-group) outside frustum\n", i);
             }
             i++;            
             continue; // Skip meshes outside the frustum
@@ -1171,22 +1273,54 @@ void chai_scene::draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2
             }
             cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
             if (sceneShader) {
+                RAM_SNAP(r0);
+                // Reset per-frame model counters (modelCount, modelJointOffset, m_nextMatrixSlot).
+                // This is chai_shader::newFrame(), NOT Shader::newFrame() — it does NOT
+                // touch descriptor pools or ring buffers. Without this, modelCount grows
+                // unbounded → out-of-bounds writes to info->floats → SIGSEGV.
                 sceneShader->newFrame();
                 
                 // Calculate light space matrices for shadow rendering
                 if (meshes.size() > 0 && shadowMapInitialized) {
                     auto mesh = meshes[0];
-                    if (!mesh->lightParams.empty() && mesh->lightParams.size() > 0) {
+                    if (!mesh->lightParams.empty() && mesh->lightParams.size() > 0 && mesh->cameraParams.size() > 0) {
                         auto lightParams = mesh->lightParams[0];
+                        auto cameraParams = mesh->cameraParams[0];
                         
-                        glm::vec3 lightPos = glm::vec3(lightParams["position"][0], lightParams["position"][1], lightParams["position"][2]);
-                        glm::vec3 lightDir = glm::vec3(0.0f, -1.0f, 0.0f);
-                        glm::mat4 lightView = glm::lookAt(lightPos, lightPos + lightDir, glm::vec3(0.0f, 1.0f, 0.0f));  // UP VECTOR FIX
-                        glm::mat4 lightProjection = glm::ortho(-7.5f, 7.5f, -7.5f, 7.5f, 1.0f, 1000.0f);
-                        glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+                        // Get camera parameters
+                        float fov = cameraParams.at("fov")[0];
+                        float aspectRatio = cameraParams.at("aspectRatio")[0];
+                        float nearClip = cameraParams.at("near")[0];
+                        float farClip = cameraParams.at("far")[0];
+                        glm::mat4 cameraProjection = glm::perspective(fov, aspectRatio, nearClip, farClip);
+                        
+                        glm::vec3 lightPos = glm::vec3(lightParams["position"][0], lightParams["position"][2], lightParams["position"][1]);
+                        
+                        // Extract actual light direction from lightParams
+                        glm::vec3 lightDir = glm::vec3(0.0f, -1.0f, 0.0f);  // Default fallback
+                        int dirIndex = 0;
+                        for (auto axis : lightParams["direction"]) {
+                            if (dirIndex < 3) {
+                                lightDir[dirIndex] = axis;
+                                dirIndex++;
+                            }
+                        }
+                        
+                        // Create light view matrix and rotate -90 degrees on Y axis
+                        glm::mat4 baseLightView = glm::lookAt(lightPos, lightPos + lightDir, glm::vec3(1.0f, 0.0f, 0.0f));
+                        // glm::mat4 xRotation = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 1.0f, 0.0f));
+                        m_cachedLightView = baseLightView; // Move light view forward to encompass scene better
+
+                        
+                        // Calculate camera-aligned light projection
+                        m_cachedLightProjection = calculateLightProjection(viewMatrix1, cameraProjection, m_cachedLightView);
+                        m_cachedLightSpaceMatrix = m_cachedLightProjection * m_cachedLightView;
                         
                         // Render shadow pass to shadow map texture
-                        renderShadowPass(lightView, lightProjection, 0);
+                        RAM_SNAP(r1);
+                        renderShadowPass(m_cachedLightView, m_cachedLightProjection, 0);
+                        RAM_SNAP(r2);
+                        RAM_DELTA("renderShadowPass", r1, r2);
                         // auto vgfx = dynamic_cast<gfx::vulkan::Graphics*>(cg.instance);
                         // vgfx->beginFrame();
                         // Bind shadow map for main rendering
@@ -1201,8 +1335,14 @@ void chai_scene::draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2
                         cg.instance->setColorMask({true, true, true, true});
                     }
                 }
+                // Reset modelCount after shadow pass so main pass reuses model slots 0..N-1.
+                // Shadow pass draws are already recorded, so its slots can be overwritten.
                 sceneShader->newFrame();
+                RAM_SNAP(r3);
                 sceneShader->send("viewMatrix", viewMatrix1);
+                RAM_SNAP(r4);
+                RAM_DELTA("newFrame+sendView", r0, r4);
+                RAM_DELTA("sendViewMatrix", r3, r4);
             }
             
             // Draw background BEFORE scene meshes so scene draws on top
@@ -1244,7 +1384,10 @@ void chai_scene::draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2
             }
             // sceneShader->sendConstant("miscInfo", {glm::vec4(0.0f, 1.0f, 1.0f, 0.0f)});  // Disable multiview, use standard rendering
             
+            RAM_SNAP(r5);
             drawMeshes(false, 0);
+            RAM_SNAP(r6);
+            RAM_DELTA("drawMeshes", r5, r6);
             cg.instance->setShader(); 
 
             // drawMeshes(false, 0);
@@ -1284,30 +1427,43 @@ void chai_scene::draw(const glm::mat4 &viewMatrix1, const glm::mat4 &viewMatrix2
             
             cg.instance->setShader(sceneShader->shader);
             cg.instance->setDepthMode(gfx::CompareMode::COMPARE_LEQUAL, true);
+            // Reset per-frame model counters — see viewCount==1 path for details.
             sceneShader->newFrame();
             
             // Render shadow maps for both views if shadow mapping is enabled
             if (meshes.size() > 0 && shadowMapInitialized) {
                 auto mesh = meshes[0];
-                if (!mesh->lightParams.empty() && mesh->lightParams.size() > 0) {
+                if (!mesh->lightParams.empty() && mesh->lightParams.size() > 0 && mesh->cameraParams.size() > 0) {
                     auto lightParams = mesh->lightParams[0];
+                    auto cameraParams = mesh->cameraParams[0];
+                    
+                    // Get camera parameters
+                    float fov = cameraParams.at("fov")[0];
+                    float aspectRatio = cameraParams.at("aspectRatio")[0];
+                    float nearClip = cameraParams.at("near")[0];
+                    float farClip = cameraParams.at("far")[0];
+                    glm::mat4 cameraProjection = glm::perspective(fov, aspectRatio, nearClip, farClip);
+                    
                     glm::vec3 lightPos = glm::vec3(
                         lightParams["position"][0], 
                         lightParams["position"][1], 
                         lightParams["position"][2]
                     );
                     glm::vec3 lightDir = glm::vec3(0.0f, -1.0f, 0.0f);
-                    glm::mat4 lightView = glm::lookAt(lightPos, lightPos + lightDir, glm::vec3(0.0f, 1.0f, 0.0f));
-                    glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 1.0f, 100.0f);
+                    m_cachedLightView = glm::lookAt(lightPos, lightPos + lightDir, glm::vec3(0.0f, 0.0f, -1.0f));
                     
-                    printf("[SCENE RENDER] About to call renderShadowPass\n");
+                    // Calculate camera-aligned light projection
+                    m_cachedLightProjection = calculateLightProjection(viewMatrix1, cameraProjection, m_cachedLightView);
+                    m_cachedLightSpaceMatrix = m_cachedLightProjection * m_cachedLightView;
+                    
+                // printf("[SCENE RENDER] About to call renderShadowPass\n");
                     // Render shadow pass (can be shared between views if light is the same)
-                    renderShadowPass(lightView, lightProjection, 0);
-                    printf("[SCENE RENDER] Returned from renderShadowPass\n");
+                    renderShadowPass(m_cachedLightView, m_cachedLightProjection, 0);
+                // printf("[SCENE RENDER] Returned from renderShadowPass\n");
                     
                     // Bind shadow map for main rendering
                     if (shadowMapTexture) {
-                        printf("[SCENE RENDER] Binding shadow map texture\n");
+                        // printf("[SCENE RENDER] Binding shadow map texture\n");
                         sceneShader->sendTexture("shadowMap", shadowMapTexture);
                     }
                     // NOTE: renderShadowPass already restored render target and color mask

@@ -422,6 +422,22 @@ void Texture::transitionForSampling()
 		
 		msaaImageData.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	}
+
+	// Render target textures that have never been rendered to start in UNDEFINED.
+	// A COMBINED_IMAGE_SAMPLER descriptor bound to them expects SHADER_READ_ONLY_OPTIMAL,
+	// so transition lazily here (UNASSIGNED-CoreValidation-DrawState-InvalidImageLayout).
+	if (renderTarget && imageData.image != VK_NULL_HANDLE && imageData.layout == VK_IMAGE_LAYOUT_UNDEFINED)
+	{
+		auto commandBuffer = vgfx->getCommandBufferForDataTransfer();
+
+		Vulkan::cmdTransitionImageLayout(commandBuffer, imageData.image, format, renderTarget,
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			0, VK_REMAINING_MIP_LEVELS,
+			0, VK_REMAINING_ARRAY_LAYERS);
+
+		imageData.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	}
 }
 
 void Texture::createTextureImageView()

@@ -59,339 +59,6 @@ namespace gfx
 namespace vulkan
 {
 
-ShadowMap::ShadowMap(int width, int height, love::gfx::vulkan::Graphics* vulkanGraphics) {
-    createImage(width, height, vulkanGraphics);
-    createImageView(vulkanGraphics);
-    createSampler(vulkanGraphics);
-}
-
-ShadowMap::~ShadowMap() {
-	auto& cg = ChaiLove::getInstance()->chai_gfx;
-	auto* vulkanGraphics = static_cast<love::gfx::vulkan::Graphics*>(cg.instance);
-    vkDestroySampler(vulkanGraphics->getDevice(), sampler, nullptr);
-    vkDestroyImageView(vulkanGraphics->getDevice(), imageView, nullptr);
-    vmaFreeMemory(vulkanGraphics->getVmaAllocator(), memory);
-    vkDestroyImage(vulkanGraphics->getDevice(), image, nullptr);
-}
-
-void ShadowMap::createImage(int width, int height, love::gfx::vulkan::Graphics* vulkanGraphics) {
-    VkImageCreateInfo imageInfo{};
-    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imageInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageInfo.format = VK_FORMAT_D32_SFLOAT;
-    imageInfo.extent.width = width;
-    imageInfo.extent.height = height;
-    imageInfo.extent.depth = 1;
-    imageInfo.mipLevels = 1;
-    imageInfo.arrayLayers = 1;
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-    imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-    VmaAllocationCreateInfo allocInfo{};
-    allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-
-	vmaCreateImage(vulkanGraphics->getVmaAllocator(), &imageInfo, &allocInfo, &image, &memory, nullptr);
-}
-
-void ShadowMap::createImageView(love::gfx::vulkan::Graphics* vulkanGraphics) {
-    VkImageViewCreateInfo viewInfo{};
-    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewInfo.image = image;
-    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewInfo.format = VK_FORMAT_D32_SFLOAT;
-    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    viewInfo.subresourceRange.baseMipLevel = 0;
-    viewInfo.subresourceRange.levelCount = 1;
-    viewInfo.subresourceRange.baseArrayLayer = 0;
-    viewInfo.subresourceRange.layerCount = 1;
-
-    vkCreateImageView(vulkanGraphics->getDevice(), &viewInfo, nullptr, &imageView);
-
-	std::printf("[SHADOW MAP] Created shadow map image view %p for image %p\n", (void*)imageView, (void*)image);
-}
-
-void ShadowMap::createSampler(love::gfx::vulkan::Graphics* vulkanGraphics) {
-    VkSamplerCreateInfo samplerInfo{};
-    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = VK_FILTER_LINEAR;
-    samplerInfo.minFilter = VK_FILTER_LINEAR;
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    // samplerInfo.anisotropyEnable = VK_TRUE;
-    // samplerInfo.maxAnisotropy = 1.0f;
-    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    samplerInfo.unnormalizedCoordinates = VK_FALSE;
-    samplerInfo.compareEnable = VK_TRUE;
-    samplerInfo.compareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-
-    vkCreateSampler(vulkanGraphics->getDevice(), &samplerInfo, nullptr, &sampler);
-
-}
-
-VkFramebuffer ShadowMap::createShadowFramebuffer(ShadowMap* shadowMap, VkRenderPass renderPass, love::gfx::vulkan::Graphics* vulkanGraphics) {
-    VkImageView attachments[] = { shadowMap->getView(), shadowMap->getView() };
-    VkFramebufferCreateInfo framebufferInfo{};
-    framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    framebufferInfo.renderPass = renderPass;
-    framebufferInfo.attachmentCount = 2;
-    framebufferInfo.pAttachments = attachments;
-    framebufferInfo.width = 2048; // Shadow map size
-    framebufferInfo.height = 2048;
-    framebufferInfo.layers = 1;
-
-	auto device = vulkanGraphics->getDevice();
-
-    VkFramebuffer framebuffer;
-    vkCreateFramebuffer(device, &framebufferInfo, nullptr, &framebuffer);
-    return framebuffer;
-}
-
-VkRenderPass ShadowMap::createShadowMapRenderPass(love::gfx::vulkan::Graphics* vulkanGraphics) {
-    std::array<VkAttachmentDescription, 2> attachments{};
-
-	attachments[0].format = VK_FORMAT_R8G8B8A8_UNORM;
-	attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-	attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-    attachments[1].format = VK_FORMAT_D32_SFLOAT;
-    attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-
-	VkAttachmentReference colorAttachmentRef{};
-	colorAttachmentRef.attachment = 0;
-	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference depthAttachmentRef{};
-    depthAttachmentRef.attachment = 1;
-    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpass{};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.pColorAttachments = &colorAttachmentRef;
-    subpass.pDepthStencilAttachment = &depthAttachmentRef;
-
-	std::array<VkSubpassDependency, 2> dependencies{};
-	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-	dependencies[0].dstSubpass = 0;
-	dependencies[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	dependencies[0].dstStageMask = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
-	dependencies[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-	dependencies[0].dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-	dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-	dependencies[1].srcSubpass = 0;
-	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-	dependencies[1].srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-	dependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	dependencies[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-	dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-	dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-	VkRenderPassCreateInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 2;
-    renderPassInfo.pAttachments = attachments.data();
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpass;
-	// renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
-	// renderPassInfo.pDependencies = dependencies.data();
-
-	VkRenderPass renderPass;
-    vkCreateRenderPass(vulkanGraphics->getDevice(), &renderPassInfo, nullptr, &renderPass);
-    return renderPass;
-}
-
-VkGraphicsPipelineCreateInfo ShadowMap::createShadowPipelineInfo(love::gfx::vulkan::Graphics* vulkanGraphics, VkRenderPass shadowRenderPass, Shader* shader)
-{
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 0;
-    pipelineLayoutInfo.pSetLayouts = nullptr;
-
-    VkDescriptorSetLayout shadowDescriptorSetLayout = createShadowDescriptorSetLayout(vulkanGraphics);
-
-    VkPipelineLayoutCreateInfo shadowPipelineLayoutInfo{};
-    shadowPipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    shadowPipelineLayoutInfo.setLayoutCount = 1;
-    shadowPipelineLayoutInfo.pSetLayouts = &shadowDescriptorSetLayout;
-
-	auto device = vulkanGraphics->getDevice();
-	auto pipelineCache = vulkanGraphics->getPipelineCache();
-
-    VkPipelineLayout shadowPipelineLayout{};
-    if (vkCreatePipelineLayout(device, &shadowPipelineLayoutInfo, nullptr, &shadowPipelineLayout) != VK_SUCCESS)
-        throw love::Exception("failed to create shadow pipeline layout");
-
-
-	// auto shaderModule = shader->getShaderModules();
-
-    // VkPipelineShaderStageCreateInfo shaderStageInfo[2];
-	// shaderStageInfo[0] = {};
-    // shaderStageInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    // shaderStageInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-	// shaderStageInfo[0].module = shaderModule[0];
-    // shaderStageInfo[0].pName = "main";
-	// shaderStageInfo[1] = {};
-	// shaderStageInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	// shaderStageInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	// shaderStageInfo[1].module = shaderModule[1];
-	// shaderStageInfo[1].pName = "main";
-
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = 0;
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;
-
-    VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo{};
-    inputAssemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    inputAssemblyInfo.primitiveRestartEnable = VK_FALSE;
-
-    VkPipelineViewportStateCreateInfo viewportInfo{};
-    viewportInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewportInfo.viewportCount = 1;
-    viewportInfo.scissorCount = 1;
-
-    VkPipelineRasterizationStateCreateInfo rasterizerInfo{};
-    rasterizerInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizerInfo.depthClampEnable = VK_FALSE;
-    rasterizerInfo.rasterizerDiscardEnable = VK_FALSE;
-    rasterizerInfo.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizerInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizerInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    rasterizerInfo.depthBiasEnable = VK_FALSE;
-    rasterizerInfo.lineWidth = 1.0f;
-
-    VkPipelineMultisampleStateCreateInfo multisampleInfo{};
-    multisampleInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampleInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-    multisampleInfo.sampleShadingEnable = VK_FALSE;
-
-    VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable = VK_FALSE;
-    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-    colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-    colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-    colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
-    colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-    colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-
-    VkPipelineColorBlendStateCreateInfo colorBlendInfo{};
-    colorBlendInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlendInfo.logicOpEnable = VK_FALSE;
-    colorBlendInfo.attachmentCount = 1;
-    colorBlendInfo.pAttachments = &colorBlendAttachment;
-
-    VkPipelineDepthStencilStateCreateInfo depthStencilInfo{};
-    depthStencilInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencilInfo.depthTestEnable = VK_TRUE;
-    depthStencilInfo.depthWriteEnable = VK_TRUE;
-    depthStencilInfo.depthCompareOp = VK_COMPARE_OP_LESS;
-    depthStencilInfo.stencilTestEnable = VK_FALSE;
-
-	VkPipelineDynamicStateCreateInfo dynamicStateInfo{};
-	VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
-	dynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	dynamicStateInfo.pDynamicStates = dynamicStates;
-	dynamicStateInfo.dynamicStateCount = sizeof(dynamicStates) / sizeof(dynamicStates[0]);
-
-    VkGraphicsPipelineCreateInfo shadowPipelineInfo{};
-    shadowPipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    shadowPipelineInfo.layout = shadowPipelineLayout;
-    shadowPipelineInfo.renderPass = shadowRenderPass;
-    shadowPipelineInfo.stageCount = 2; // Shader stages will be set later when creating the actual pipeline, as they depend on the shader used for the shadow pass
-    // shadowPipelineInfo.pStages = shaderStageInfo;
-	shadowPipelineInfo.pStages = nullptr; // Shader stages will be set later when creating the actual pipeline, as they depend on the shader used for the shadow pass
-    shadowPipelineInfo.pVertexInputState = &vertexInputInfo;
-    shadowPipelineInfo.pInputAssemblyState = &inputAssemblyInfo;
-    shadowPipelineInfo.pViewportState = &viewportInfo;
-    shadowPipelineInfo.pRasterizationState = &rasterizerInfo;
-    shadowPipelineInfo.pMultisampleState = &multisampleInfo;
-    shadowPipelineInfo.pColorBlendState = &colorBlendInfo;
-    shadowPipelineInfo.pDepthStencilState = &depthStencilInfo;
-    shadowPipelineInfo.pDynamicState = &dynamicStateInfo;
-    shadowPipelineInfo.subpass = 0;
-    shadowPipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
-
-	return shadowPipelineInfo;
-    VkPipeline shadowPipeline{};
-    if (vkCreateGraphicsPipelines(device, pipelineCache, 1, &shadowPipelineInfo, nullptr, &shadowPipeline) != VK_SUCCESS)
-        throw love::Exception("failed to create shadow pipeline");
-
-    // return shadowPipeline;
-}
-
-VkDescriptorSetLayout ShadowMap::createShadowDescriptorSetLayout(love::gfx::vulkan::Graphics* vulkanGraphics)
-{
-    // ✅ CORRECT: Create layout with BOTH bindings
-    VkDescriptorSetLayoutBinding bindings[2]{};
-
-    // Binding 0: Uniform Block
-    bindings[0].binding = 0;
-    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    bindings[0].descriptorCount = 1;
-    // ✅ INCLUDE BOTH STAGES if both use it
-    bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-    bindings[0].pImmutableSamplers = NULL;
-
-    // Binding 1: Texture
-    bindings[1].binding = 1;
-    bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    bindings[1].descriptorCount = 1;
-    // ✅ FRAGMENT STAGE ONLY
-    bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    bindings[1].pImmutableSamplers = NULL;
-
-    VkDescriptorSetLayoutCreateInfo layoutInfo{};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 2;
-    layoutInfo.pBindings = bindings;
-
-    VkDescriptorSetLayout shadowDescriptorSetLayout{};
-    if (vkCreateDescriptorSetLayout(vulkanGraphics->getDevice(), &layoutInfo, nullptr, &shadowDescriptorSetLayout) != VK_SUCCESS)
-        throw love::Exception("failed to create shadow descriptor set layout");
-
-    return shadowDescriptorSetLayout;
-}
-
-void ShadowMap::updateShadowDescriptorSet(VkDescriptorSet descriptorSet, int location, VkSampler shadowSampler, VkImageView shadowImageView, love::gfx::vulkan::Graphics* vulkanGraphics)
-{
-	// Update the descriptor set with the shadow map texture
-	VkDescriptorImageInfo imageInfo{};
-	imageInfo.sampler = shadowSampler;
-	imageInfo.imageView = shadowImageView;
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-
-	VkWriteDescriptorSet descriptorWrite{};
-	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrite.dstSet = descriptorSet;
-	descriptorWrite.dstBinding = location; // Use the provided location
-	descriptorWrite.dstArrayElement = 0;
-	descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	descriptorWrite.descriptorCount = 1;
-	descriptorWrite.pImageInfo = &imageInfo;
-
-	auto device = vulkanGraphics->getDevice();
-
-	vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
-}
-
 static const std::vector<const char*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
 };
@@ -589,8 +256,9 @@ love::gfx::Texture *Graphics::newTexture(const love::gfx::Texture::Settings &set
 {
 	static int textureCreationCount = 0;
 	auto tex = new Texture(this, settings, data);
-	std::printf("[GFX PIPELINE] Texture created #%d: %p (size: %dx%d)\n",
-	       ++textureCreationCount, (void*)tex, settings.width, settings.height);
+	// std::printf("[GFX PIPELINE] Texture created #%d: %p (size: %dx%d)\n",
+	//        ++textureCreationCount, (void*)tex, settings.width, settings.height);
+	++textureCreationCount;
 	return tex;
 }
 
@@ -603,8 +271,9 @@ love::gfx::Buffer *Graphics::newBuffer(const love::gfx::Buffer::Settings &settin
 {
 	static int bufferCreationCount = 0;
 	auto buf = new Buffer(this, settings, format, data, size, arraylength);
-	std::printf("[GFX PIPELINE] Buffer created #%d: %p (size: %zu bytes)\n",
-	       ++bufferCreationCount, (void*)buf, size);
+	// std::printf("[GFX PIPELINE] Buffer created #%d: %p (size: %zu bytes)\n",
+	//        ++bufferCreationCount, (void*)buf, size);
+	++bufferCreationCount;
 	return buf;
 }
 
@@ -1203,26 +872,6 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
 
         transitionColorDepthLayouts = true;
 
-        // Create our render target texture for libretro
-        auto settings = love::gfx::Texture::Settings{
-                    width, height, 1,
-                    love::gfx::TEXTURE_2D,
-                    love::gfx::Texture::MipmapsMode::MIPMAPS_NONE,
-                    0,
-                    love::PixelFormat::PIXELFORMAT_NORMAL,
-                    false,
-                    1.0f,
-                    1,
-                    true  // isRenderTarget = true
-                };
-        fakeBackbuffer.set(new Texture(this, settings, nullptr), Acquire::NORETAIN);
-
-		shadowMaps.push_back(std::make_unique<ShadowMap>(1024, 1024, this));
-
-		shadowMapRenderPass = shadowMaps[0]->createShadowMapRenderPass(this);
-		shadowFramebuffer = shadowMaps[0]->createShadowFramebuffer(shadowMaps[0].get(), shadowMapRenderPass, this);
-		shadowPipelineInfo = shadowMaps[0]->createShadowPipelineInfo(this, shadowMapRenderPass, dynamic_cast<Shader*>(Shader::current));
-
         // Create default shaders
         createDefaultShaders();
 
@@ -1253,8 +902,21 @@ bool Graphics::setMode(void *context, int width, int height, int pixelwidth, int
             quadIndexBuffer = new Buffer(this, quadIndexBufferSettings, quadIndexFormat, quadIndices.data(), quadIndexDataSize, quadIndices.size());
         }
 
-        // Begin frame to initialize command buffer state
+        // Begin frame to initialize command buffer state.
+        // beginFrame() resets command buffers, so fakeBackbuffer and shadow map creation
+        // must happen AFTER this call so their init barriers are in the submitted CB.
         beginFrame();
+
+        // fakeBackbuffer is created by startRecordingGraphicsCommands (called inside beginFrame)
+        // if it is null. We create shadow maps here so their init barriers land in the
+        // post-reset command buffer and are actually submitted (not discarded by beginFrame).
+        if (shadowMapRenderPass == VK_NULL_HANDLE) {
+            // Create the shadow render pass directly — no ShadowMap object needed.
+            // The old ShadowMap class allocated a VkImage + VmaAllocation + VkImageView +
+            // VkSampler + VkFramebuffer (~6 MB VRAM) that were NEVER used for rendering
+            // (the shadow pass renders into the Love Texture, not the ShadowMap's image).
+            shadowMapRenderPass = createShadowRenderPass();
+        }
 
         // Final setup
         restoreState(states.back());
@@ -2246,25 +1908,7 @@ void Graphics::beginFrame()
 	// Don't reset windowClearRequested here - it's set by clear() and needed for next frame
 	// renderPassState.windowClearRequested = false;  // This was breaking rendering in libretro
 
-	// Log VMA statistics every 60 frames to track memory usage
-	static int statsFrameCounter = 0;
-	if (++statsFrameCounter >= 60)
-	{
-		statsFrameCounter = 0;
-		VmaTotalStatistics stats;
-		vmaCalculateStatistics(vmaAllocator, &stats);
 
-		size_t inUseCount = 0;
-		for (const auto& sb : stagingBufferPool)
-			if (sb.inUse) inUseCount++;
-
-		// std::printf("[VMA] Memory: %llu MB, Allocs: %llu | Staging: %zu buffers (%zu in use)\n",
-		// 	stats.total.statistics.allocationBytes / (1024 * 1024),
-		// 	stats.total.statistics.allocationCount,
-		// 	stagingBufferPool.size(),
-		// 	inUseCount);
-		// fflush(stdout);
-	}
 
 	// In libretro mode, wait for RetroArch's sync
 	if (libretroMode) {
@@ -2386,9 +2030,9 @@ void Graphics::beginFrame()
 
 	Vulkan::resetShaderSwitches();
 
-	// PERF: Call shader newFrame() to reset descriptor pools and recycle descriptor sets
-	// for (const auto &shader : usedShadersInFrame)
-	// 	shader->newFrame();
+	// Reset descriptor pools and recycle descriptor sets for each shader used this frame
+	for (const auto &shader : usedShadersInFrame)
+		shader->newFrame();
 	usedShadersInFrame.clear();
 
 	// CRITICAL FIX: Advance all stream buffers to next frame
@@ -2525,6 +2169,11 @@ void Graphics::endRecordingGraphicsCommands()
 	if (renderPassState.active)
 		endRenderPass();
 
+	// If no draw code ran this frame, the command buffer was never begun.
+	// Start it now so we can end it cleanly (RetroArch needs a valid buffer).
+	if (!commandBufferRecording)
+		startRecordingGraphicsCommands(currentFrame);
+
 	if (vkEndCommandBuffer(commandBuffers.at(currentFrame)) != VK_SUCCESS) {
 		throw love::Exception("failed to record command buffer");
     }
@@ -2536,7 +2185,7 @@ void Graphics::beginShadowRenderPass(gfx::Shader *shadowShader, gfx::Texture *sh
 {
     // Ensure we're recording a command buffer
     if (!commandBufferRecording) {
-		std::printf("[SHADOW PASS] Command buffer not recording, starting recording for shadow pass on frame %zu\n", currentFrame);
+		// std::printf("[SHADOW PASS] Command buffer not recording, starting recording for shadow pass on frame %zu\n", currentFrame);
         startRecordingGraphicsCommands(currentFrame);
     }
 
@@ -2548,8 +2197,8 @@ void Graphics::beginShadowRenderPass(gfx::Shader *shadowShader, gfx::Texture *sh
     // renderPassInfo.renderArea.offset = {0, 0};
 
     // // Use actual shadow map dimensions
-    // renderPassInfo.renderArea.extent.width = 1024;
-    // renderPassInfo.renderArea.extent.height = 1024;
+    // renderPassInfo.renderArea.extent.width = 1440;
+    // renderPassInfo.renderArea.extent.height = 1080;
 
     // // Clear depth buffer
     // VkClearValue clearValue{};
@@ -2594,80 +2243,202 @@ void Graphics::beginShadowRenderPass(gfx::Shader *shadowShader, gfx::Texture *sh
 	startShadowPass = true;
     // renderPassState.active = true;
 
+	// Store the shadow depth texture so startRenderPass and endRenderPass can update
+	// Love's layout tracking without relying on states.back().renderTargets (which is
+	// NOT updated by the direct setRenderTargetsInternal call below).
+	currentShadowDepthTexture = static_cast<Texture*>(shadowMap);
+	// Pre-set the tracked layout to GENERAL; the shadow render pass subpass reference
+	// uses GENERAL, so any descriptor built before vkCmdBeginRenderPass will use the
+	// correct layout and avoid VUID-VkDescriptorImageInfo-imageLayout-00344.
+	if (currentShadowDepthTexture)
+		currentShadowDepthTexture->setImageLayout(VK_IMAGE_LAYOUT_GENERAL);
+
 	auto vShader = static_cast<Shader *>(shadowShader);
 	gfx::Graphics::RenderTargets shadowRenderTargets;
 	auto targets = gfx::Graphics::RenderTarget(shadowMap);
 	shadowRenderTargets.depthStencil = targets;
 	// auto tempColorTexture = getTemporaryTexture(love::PixelFormat::PIXELFORMAT_RGBA8_UNORM, 2048, 2048, 1);
 	// shadowRenderTargets.colors.push_back(gfx::Graphics::RenderTarget(tempColorTexture));
-	setRenderTargetsInternal(shadowRenderTargets, 1024, 1024, false);
-	// vShader->cmdPushDescriptorSets(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS);
-	renderPassState.beginInfo.renderPass = shadowMapRenderPass;
-	renderPassState.beginInfo.framebuffer = shadowFramebuffer;
+	// Pass the actual shadow texture dimensions, not the current window renderPassState
+	// dimensions. Passing window dimensions would set renderPassState.width/height to e.g.
+	// 1920 while shadowFramebuffer and the texture are only 1440 wide, violating
+	// VUID-VkRenderPassBeginInfo-renderArea-02848.
+	int shadowTexW = static_cast<int>(shadowMap->getPixelWidth(0));
+	int shadowTexH = static_cast<int>(shadowMap->getPixelHeight(0));
+	setRenderTargetsInternal(shadowRenderTargets, shadowTexW, shadowTexH, false);
+
+	// Actually begin the Vulkan render pass now so draws that follow land inside it.
+	// setRenderTargetsInternal() only configures the render pass state; it does not
+	// call vkCmdBeginRenderPass.  Without this call the shadow draw calls arrive with
+	// renderPassState.active == false and prepareDraw() overwrites the depth-only config
+	// with the default window config before starting the pass.
+	// startRenderPass(currentFrame);
+
+	// Set viewport/scissor to shadow map dimensions.
+	// VkViewport shadowViewport{};
+	// shadowViewport.x = 0.0f;
+	// shadowViewport.y = 0.0f;
+	// shadowViewport.width  = static_cast<float>(renderPassState.width);
+	// shadowViewport.height = static_cast<float>(renderPassState.height);
+	// shadowViewport.minDepth = 0.0f;
+	// shadowViewport.maxDepth = 1.0f;
+	// vkCmdSetViewport(commandBuffers.at(currentFrame), 0, 1, &shadowViewport);
+
+	// VkRect2D shadowScissor{};
+	// shadowScissor.offset = {0, 0};
+	// shadowScissor.extent.width  = static_cast<uint32_t>(renderPassState.width);
+	// shadowScissor.extent.height = static_cast<uint32_t>(renderPassState.height);
+	// vkCmdSetScissor(commandBuffers.at(currentFrame), 0, 1, &shadowScissor);
+
+	// Eagerly bind the shadow pipeline variant ([1]) for the current shader so the
+	// first draw inside the shadow pass does not have to discover and bind it lazily.
+	// This also ensures prepareDraw() sees pipeline[1] already set and skips
+	// re-binding on the very first draw, avoiding a spurious descriptor flush.
+	// if (vShader) {
+	// 	GraphicsPipelineConfigurationFull shadowCfg{};
+	// 	shadowCfg.core.renderPass              = renderPassState.beginInfo.renderPass;
+	// 	shadowCfg.core.primitiveType           = PRIMITIVE_TRIANGLES;
+	// 	shadowCfg.core.msaaSamples             = renderPassState.msaa;
+	// 	shadowCfg.core.numColorAttachments     = 0;
+	// 	shadowCfg.core.packedColorAttachmentFormats = 0;
+	// 	shadowCfg.core.depthWriteEnable        = VK_TRUE;
+	// 	shadowCfg.core.depthCompareOp          = VK_COMPARE_OP_LESS;
+	// 	shadowCfg.core.colorChannelMask        = ColorChannelMask{false, false, false, false};
+	// 	shadowCfg.noDynamicState.cullmode      = CULL_BACK;
+	// 	shadowCfg.noDynamicState.winding       = WINDING_CCW;
+	// 	shadowCfg.noDynamicState.stencilAction = STENCIL_KEEP;
+	// 	shadowCfg.noDynamicState.stencilCompare = COMPARE_ALWAYS;
+
+	// 	VkPipeline shadowPipeline = vShader->getCachedGraphicsPipeline(this, shadowCfg)[1];
+	// 	if (shadowPipeline != VK_NULL_HANDLE) {
+	// 		vkCmdBindPipeline(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, shadowPipeline);
+	// 		renderPassState.pipeline[1] = shadowPipeline;
+	// 		std::printf("[SHADOW PASS] Bound shadow pipeline %p on frame %zu\n", (void*)shadowPipeline, currentFrame);
+	// 		fflush(stdout);
+	// 	}
+	// }
 }
 
 void Graphics::endShadowRenderPass(chai_shader *shadowShader, gfx::Texture *shadowMap)
 {
 
+	
+
 	// End render pass
-    vkCmdEndRenderPass(commandBuffers.at(currentFrame));
+    // vkCmdEndRenderPass(commandBuffers.at(currentFrame));
 
 	// Create pipeline barrier to ensure shadow pass writes are visible to subsequent passes
-	VkImageMemoryBarrier barrier{};
-	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-	barrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-	barrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.image = swapChainImages.empty() ? depthImage : swapChainImages[imageIndex];
-	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-	barrier.subresourceRange.baseMipLevel = 0;
-	barrier.subresourceRange.levelCount = 1;
-	barrier.subresourceRange.baseArrayLayer = 0;
-	barrier.subresourceRange.layerCount = 1;
-	barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-	vkCmdPipelineBarrier(
-		commandBuffers.at(currentFrame),
-		VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-		VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
-		VK_DEPENDENCY_BY_REGION_BIT,
-		0, nullptr,
-		0, nullptr,
-		1, &barrier
-	);
+	// VkImageMemoryBarrier barrier{};
+	// barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	// barrier.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+	// barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	// barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	// barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	// barrier.image = shadowMaps[0]->getImage();
+	// barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	// barrier.subresourceRange.baseMipLevel = 0;
+	// barrier.subresourceRange.levelCount = 1;
+	// barrier.subresourceRange.baseArrayLayer = 0;
+	// barrier.subresourceRange.layerCount = 1;
+	// barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	// barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	// vkCmdPipelineBarrier(
+	// 	commandBuffers.at(currentFrame),
+	// 	VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+	// 	VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+	// 	VK_DEPENDENCY_BY_REGION_BIT,
+	// 	0, nullptr,
+	// 	0, nullptr,
+	// 	1, &barrier
+	// );
 	
 	// End command buffer recording
-    vkEndCommandBuffer(commandBuffers.at(currentFrame));
-
+    
     // Submit shadow pass commands
-    VkSubmitInfo submitInfo = {};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.waitSemaphoreCount = 0;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffers.at(currentFrame);
-    submitInfo.signalSemaphoreCount = 0;
+    // VkSubmitInfo submitInfo = {};
+    // submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    // submitInfo.waitSemaphoreCount = 0;
+    // submitInfo.commandBufferCount = 1;
+    // submitInfo.pCommandBuffers = &commandBuffers.at(currentFrame);
+    // submitInfo.signalSemaphoreCount = 0;
 
-	vkQueueWaitIdle(graphicsQueue);  // Ensure the queue is idle before submitting shadow pass
+	// vkQueueWaitIdle(graphicsQueue);  // Ensure the queue is idle before submitting shadow pass
 
-    VkResult submitResult = vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-    if (submitResult != VK_SUCCESS) {
-        // Handle error appropriately
-        return;
-    }
+    // VkResult submitResult = vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    // if (submitResult != VK_SUCCESS) {
+    //     // Handle error appropriately
+    //     return;
+    // }
 
-    // Reset shadow pass state
-    // shadowRenderPassActive = false;
-    renderPassState.active = false;
+	endRenderPass();
+
+    // Reset shadow pass state BEFORE restoring the window render target so that
+    // setDefaultRenderPass() (called inside setRenderTargetsInternal) does not see
+    // isShadowPass=true and accidentally build another depth-only config.
     isShadowPass = false;
-
-    commandBufferRecording = false;
-
 	startShadowPass = true;
+	// Release the shadow texture pointer — endRenderPass has already updated its layout
+	// to GENERAL (the finalLayout of shadowMapRenderPass).
+	currentShadowDepthTexture = nullptr;
 
-	renderPassState.beginInfo.renderPass = VK_NULL_HANDLE;
-	renderPassState.beginInfo.framebuffer = VK_NULL_HANDLE;
-	setRenderTarget();
+	// Restore the window (default) render target so subsequent normal draws go to
+	// fakeBackbuffer rather than the shadow depth texture.
+	setDefaultRenderPass();
+}
+
+VkRenderPass Graphics::createShadowRenderPass()
+{
+	VkAttachmentDescription depthAttachment{};
+	depthAttachment.format = VK_FORMAT_D32_SFLOAT;
+	depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+	depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	depthAttachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	VkAttachmentReference depthAttachmentRef{};
+	depthAttachmentRef.attachment = 0;
+	depthAttachmentRef.layout = VK_IMAGE_LAYOUT_GENERAL;
+
+	VkSubpassDescription subpass{};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.colorAttachmentCount = 0;
+	subpass.pColorAttachments = nullptr;
+	subpass.pDepthStencilAttachment = &depthAttachmentRef;
+
+	std::array<VkSubpassDependency, 2> dependencies{};
+	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[0].dstSubpass = 0;
+	dependencies[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	dependencies[0].dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	dependencies[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	dependencies[0].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+	dependencies[1].srcSubpass = 0;
+	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[1].srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+	dependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	dependencies[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+	VkRenderPassCreateInfo renderPassInfo{};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	renderPassInfo.attachmentCount = 1;
+	renderPassInfo.pAttachments = &depthAttachment;
+	renderPassInfo.subpassCount = 1;
+	renderPassInfo.pSubpasses = &subpass;
+	renderPassInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+	renderPassInfo.pDependencies = dependencies.data();
+
+	VkRenderPass renderPass;
+	if (vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS)
+		throw love::Exception("failed to create shadow render pass");
+
+	return renderPass;
 }
 
 void Graphics::setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void *data)
@@ -3053,7 +2824,7 @@ void Graphics::createLogicalDevice()
 	}
 
 	VkPhysicalDeviceFeatures deviceFeatures{};
-	deviceFeatures.samplerAnisotropy = VK_TRUE;
+	deviceFeatures.samplerAnisotropy = VK_FALSE;
 	deviceFeatures.fillModeNonSolid = VK_TRUE;
 
 	VkDeviceCreateInfo createInfo{};
@@ -3621,7 +3392,10 @@ VkRenderPass Graphics::createRenderPass(RenderPassConfiguration &configuration)
 		}
 		else
 		{
-			colorDescription.initialLayout = colorAttachment.layout;
+			// Use UNDEFINED for initialLayout unless we are loading previous contents;
+			// the image may be in UNDEFINED on first use / after swapchain recreation.
+			colorDescription.initialLayout = (colorAttachment.loadOp == VK_ATTACHMENT_LOAD_OP_LOAD)
+				? colorAttachment.layout : VK_IMAGE_LAYOUT_UNDEFINED;
 			colorDescription.finalLayout = colorAttachment.layout;
 		}
 		attachments.push_back(colorDescription);
@@ -3657,7 +3431,11 @@ VkRenderPass Graphics::createRenderPass(RenderPassConfiguration &configuration)
 		depthStencilAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		depthStencilAttachment.stencilLoadOp = configuration.staticData.depthStencilAttachment.stencilLoadOp;
 		depthStencilAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-		depthStencilAttachment.initialLayout = configuration.staticData.depthStencilAttachment.layout;
+		// Use UNDEFINED for initialLayout unless loading previous contents.
+		depthStencilAttachment.initialLayout =
+			(configuration.staticData.depthStencilAttachment.depthLoadOp == VK_ATTACHMENT_LOAD_OP_LOAD)
+			? configuration.staticData.depthStencilAttachment.layout
+			: VK_IMAGE_LAYOUT_UNDEFINED;
 		depthStencilAttachment.finalLayout = configuration.staticData.depthStencilAttachment.layout;
 		attachments.push_back(depthStencilAttachment);
 
@@ -3705,7 +3483,7 @@ VkRenderPass Graphics::createRenderPass(RenderPassConfiguration &configuration)
 	VkRenderPassCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 	createInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-	std::printf("[RENDER PASS] createRenderPass: Creating render pass with %u attachments", static_cast<uint32_t>(attachments.size()));
+	// std::printf("[RENDER PASS] createRenderPass: Creating render pass with %u attachments", static_cast<uint32_t>(attachments.size()));
 	createInfo.pAttachments = attachments.data();
 	createInfo.subpassCount = 1;
 	createInfo.pSubpasses = &subPass;
@@ -3722,8 +3500,8 @@ VkRenderPass Graphics::createRenderPass(RenderPassConfiguration &configuration)
 		multiviewInfo.correlationMaskCount = 1;
 		multiviewInfo.pCorrelationMasks = &configuration.staticData.correlationMask;
 		createInfo.pNext = &multiviewInfo;
-		std::printf("[MULTIVIEW] createRenderPass: Creating %u-view render pass (mask=0x%x, correlationMask=0x%x)\n",
-			configuration.staticData.viewCount, configuration.staticData.viewMask, configuration.staticData.correlationMask);
+		// std::printf("[MULTIVIEW] createRenderPass: Creating %u-view render pass (mask=0x%x, correlationMask=0x%x)\n",
+		// 	configuration.staticData.viewCount, configuration.staticData.viewMask, configuration.staticData.correlationMask);
 	}
 
 	VkRenderPass renderPass;
@@ -3885,15 +3663,23 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
 			startRecordingGraphicsCommands(currentFrame);
 		} else {
 			// Command buffer is already recording, but we still need to set up render pass configuration
-			// CRITICAL: Don't reset render pass config if loadOp is already set to LOAD (preserving framebuffer)
-			bool shouldPreserve = !renderPassState.renderPassConfiguration.colorAttachments.empty() &&
-			                      renderPassState.renderPassConfiguration.colorAttachments[0].loadOp == VK_ATTACHMENT_LOAD_OP_LOAD;
+			// CRITICAL: Don't reset render pass config if:
+			//   1. loadOp is already set to LOAD (preserving framebuffer contents)
+			//   2. This is a non-window render pass (e.g. shadow/depth-only), configured via
+			//      setRenderPass() -- calling setDefaultRenderPass() would overwrite the carefully
+			//      built depth-only config with a window (color) config, causing the shadow render
+			//      pass to never be started (missing depth-only pass in capture).
+			bool shouldPreserve = !renderPassState.isWindow ||
+			                      (!renderPassState.renderPassConfiguration.colorAttachments.empty() &&
+			                       renderPassState.renderPassConfiguration.colorAttachments[0].loadOp == VK_ATTACHMENT_LOAD_OP_LOAD);
 
 			if (!shouldPreserve) {
-				// std::printf("[CHAILOVE DEBUG] prepareDraw: Setting default render pass (will clear)\n");
-				// setDefaultRenderPass();
+				// Command buffer is already recording but render pass is inactive (e.g. after
+				// getCommandBufferForDataTransfer called endRenderPass).  Restore window render
+				// pass config so the next draw goes to the correct target.
+				setDefaultRenderPass();
 			}
-			// else: Keep existing config with LOAD operation to preserve framebuffer
+			// else: Keep existing config (LOAD op, or explicit non-window RT like shadow map)
 		}
 
 		// std::printf("[CHAILOVE DEBUG] prepareDraw: No active render pass, starting one automatically\n");
@@ -3946,8 +3732,14 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
     // LIBRETRO FIX: Handle pipeline creation when render pass is null
     GraphicsPipelineConfigurationFull configuration{};
 
-    // If we don't have a render pass (direct rendering mode), we need to create one for pipeline compatibility
-    VkRenderPass pipelineRenderPass = renderPassState.beginInfo.renderPass;
+    // For the shadow pass, the pipeline MUST be compiled against shadowMapRenderPass (depth-only,
+    // 0 color attachments, D32_SFLOAT).  Using the regular window render pass produces a
+    // render-pass-incompatible pipeline, causing undefined behaviour and depth test failures.
+    VkRenderPass pipelineRenderPass = isShadowPass ? shadowMapRenderPass : renderPassState.beginInfo.renderPass;
+
+    // std::printf("[PREPAREDRAW] frame=%zu isShadowPass=%d active=%d pipelineRenderPass=%p\n",
+    //     currentFrame, (int)isShadowPass, (int)renderPassState.active, (void*)pipelineRenderPass);
+    // fflush(stdout);
 
     if (pipelineRenderPass == VK_NULL_HANDLE) {
         // std::printf("[CHAILOVE ERROR] prepareDraw: No render pass available for pipeline creation!\n");
@@ -3983,12 +3775,15 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
     configuration.core.blendStateKey = states.back().blend.toKey();
     configuration.core.colorChannelMask = states.back().colorMask;
     configuration.core.msaaSamples = renderPassState.msaa;
-    configuration.core.numColorAttachments = renderPassState.numColorAttachments;
-    configuration.core.packedColorAttachmentFormats = renderPassState.packedColorAttachmentFormats;
+    // shadowMapRenderPass is depth-only (0 color attachments).  Passing the window's
+    // numColorAttachments would create a pipeline with color blend state incompatible
+    // with the shadow render pass, leading to validation errors and depth test failures.
+    configuration.core.numColorAttachments = isShadowPass ? 0 : renderPassState.numColorAttachments;
+    configuration.core.packedColorAttachmentFormats = isShadowPass ? 0 : renderPassState.packedColorAttachmentFormats;
     configuration.core.primitiveType = primitiveType;
     configuration.core.depthWriteEnable = states.back().depthWrite;
     // if (states.back().depthTest == COMPARE_ALWAYS)
-    configuration.core.depthCompareOp = VK_COMPARE_OP_LESS;
+    configuration.core.depthCompareOp = VK_COMPARE_OP_ALWAYS; // LOVE's depth test mode COMPARE_ALWAYS is actually "always pass, but still write depth" (equivalent to D3D11's DEPTH_WRITE_ALWAYS), which can be implemented in Vulkan by using a regular depth test (e.g. LESS_OR_EQUAL) combined with depthWriteEnable = true.  Using VK_COMPARE_OP_ALWAYS would cause depth writes to be skipped entirely, breaking shadow maps and anything else relying on depth.
 
     VkPipeline pipeline = VK_NULL_HANDLE;
 
@@ -4009,14 +3804,10 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
         return;
     }
 
-	bool pushDescriptor = false;
-
     if (startShadowPass || (isShadowPass && pipeline != renderPassState.pipeline[1]) || (!isShadowPass && pipeline != renderPassState.pipeline[0])) {
-        std::printf("[CHAILOVE DEBUG] Binding new pipeline: %p\n", (void*)pipeline);
+        // std::printf("[CHAILOVE DEBUG] Binding new pipeline: %p\n", (void*)pipeline);
         vkCmdBindPipeline(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 		s->invalidateDescriptorSets();
-			
-		pushDescriptor = true;
 		if (isShadowPass) 
             renderPassState.pipeline[1] = pipeline;		
         else
@@ -4030,11 +3821,11 @@ void Graphics::prepareDraw(VertexAttributes attributes, const BufferBindings &bu
         if (texture != nullptr) {
             s->setMainTex(texture);
         }
-        if (pushDescriptor || startShadowPass) {
-			std::printf("[CHAILOVE DEBUG] Pushing descriptor sets (pushDescriptor=%s, startShadowPass=%s)\n",
-				pushDescriptor ? "true" : "false", startShadowPass ? "true" : "false");
-        	s->cmdPushDescriptorSets(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS);
-		}
+        // Always call cmdPushDescriptorSets every draw — it is cheap when nothing
+        // changed (resourceDescriptorsDirty == false) and only updates the descriptor
+        // set + rebinds via vkCmdBindDescriptorSets when textures, layouts, or uniform
+        // buffers have actually changed since the last call.
+        s->cmdPushDescriptorSets(commandBuffers.at(currentFrame), VK_PIPELINE_BIND_POINT_GRAPHICS);
         // std::printf("[CHAILOVE DEBUG] Descriptor sets bound successfully\n");
     } catch (const std::exception& e) {
         // std::printf("[CHAILOVE ERROR] Failed to bind descriptor sets: %s\n", e.what());
@@ -4622,10 +4413,15 @@ void Graphics::startRenderPass(int bufferIndex)
     if (libretroMode) {
         // std::printf("[CHAILOVE DEBUG] Using libretro-compatible rendering with minimal render pass\n");
 
-        // CRITICAL FIX: Always use actual pixelWidth and pixelHeight for render pass dimensions
-        // This ensures split-screen viewports are calculated correctly
-        renderPassState.width = static_cast<float>(pixelWidth);
-        renderPassState.height = static_cast<float>(pixelHeight);
+        // Only override render pass dimensions for the window (default) render target.
+        // For non-window passes (e.g. shadow/depth-only), keep the dimensions that were
+        // set by setRenderPass() from the actual texture size.  Overriding here would
+        // produce a render-area/framebuffer mismatch (e.g. 1920x1080 render area against
+        // a 1440x1080 shadow framebuffer), violating VUID-VkRenderPassBeginInfo-renderArea.
+        if (renderPassState.isWindow) {
+            renderPassState.width = static_cast<float>(pixelWidth);
+            renderPassState.height = static_cast<float>(pixelHeight);
+        }
 
         // std::printf("[STARTRRP] Frame %zu, Buffer %u: Set renderPassState dimensions to actual: w=%d, h=%d\n",
         //     currentFrame,
@@ -4636,6 +4432,13 @@ void Graphics::startRenderPass(int bufferIndex)
         // Check if we should preserve framebuffer (used for render pass creation and shader state)
         bool shouldLoad = !renderPassState.renderPassConfiguration.colorAttachments.empty() &&
                           renderPassState.renderPassConfiguration.colorAttachments[0].loadOp == VK_ATTACHMENT_LOAD_OP_LOAD;
+
+        // CRITICAL: Reset stale handles to ensure the correct render pass and framebuffer are
+        // selected below, regardless of whether setDefaultRenderPass() was called this frame.
+        // If the command buffer was started via getCommandBufferForDataTransfer() (bypassing
+        // startRecordingGraphicsCommands), the handles may be left over from a previous pass.
+        renderPassState.beginInfo.renderPass = VK_NULL_HANDLE;
+        renderPassState.beginInfo.framebuffer = VK_NULL_HANDLE;
 
         // CRITICAL: Create minimal render pass for pipeline compatibility
         if (renderPassState.beginInfo.renderPass == VK_NULL_HANDLE) {
@@ -4687,13 +4490,17 @@ void Graphics::startRenderPass(int bufferIndex)
             // Initial layout is always UNDEFINED for a fresh frame clear
             depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-			minimalConfig.colorAttachments.push_back({
-				colorAttachment.format,
-				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-				colorAttachment.loadOp,
-				VK_SAMPLE_COUNT_1_BIT
-			});
+			// Shadow render pass is depth-only: no color attachments.
+			// Normal render pass gets 1 color attachment from the backbuffer.
+			if (!isShadowPass) {
+				minimalConfig.colorAttachments.push_back({
+					colorAttachment.format,
+					VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+					VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+					colorAttachment.loadOp,
+					VK_SAMPLE_COUNT_1_BIT
+				});
+			}
             // Only add depth attachment if format is actually supported
             if (depthFormatSupported) {
                 minimalConfig.staticData.depthStencilAttachment = {
@@ -4714,20 +4521,35 @@ void Graphics::startRenderPass(int bufferIndex)
                 };
             }
 
-            VkRenderPass minimalRenderPass = getRenderPass(minimalConfig);
+            VkRenderPass minimalRenderPass = isShadowPass ? shadowMapRenderPass : getRenderPass(minimalConfig);
             renderPassState.beginInfo.renderPass = minimalRenderPass;
+            // std::printf("[STARTRP] isShadowPass=%d minimalRenderPass=%p shadowMapRenderPass=%p frame=%zu\n",
+            //     (int)isShadowPass, (void*)minimalRenderPass, (void*)shadowMapRenderPass, currentFrame);
+            // fflush(stdout);
 
             // Update renderPassConfiguration to match minimalConfig
             renderPassState.renderPassConfiguration = minimalConfig;
-            renderPassState.isWindow = true;  // Mark as window render pass for proper state handling
+            // Mark this pass as a window render pass only when it actually IS the window
+            // render target.  Setting isWindow=true for the shadow pass causes endRenderPass()
+            // to misidentify the shadow texture as fakeBackbuffer and update the wrong layout.
+            renderPassState.isWindow = !isShadowPass;
+
+            // For the shadow pass: depth-only, 0 color attachments.
+            // For the normal pass: 1 color attachment.
+            if (isShadowPass) {
+                renderPassState.numColorAttachments = 0;
+                renderPassState.packedColorAttachmentFormats = 0;
+            }
 
 			// Set initial clear values matching attachment count
-			uint32_t clearCount = depthFormatSupported ? 2u : 1u;
-			renderPassState.beginInfo.clearValueCount = clearCount;  // Color (+ Depth/Stencil if supported)
+			uint32_t clearCount = isShadowPass ? 1u : (depthFormatSupported ? 2u : 1u);
+			renderPassState.beginInfo.clearValueCount = clearCount;
 			renderPassState.clearColors.resize(clearCount);
-			renderPassState.clearColors[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};  // Black clear color
-			if (depthFormatSupported) {
-				renderPassState.clearColors[1].depthStencil = {1.0f, 0};  // Clear depth to 1.0, stencil to 0
+			if (!isShadowPass) {
+				renderPassState.clearColors[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};  // Black clear color
+			}
+			if (isShadowPass || depthFormatSupported) {
+				renderPassState.clearColors[clearCount - 1].depthStencil = {1.0f, 0};
 			}
 			renderPassState.beginInfo.pClearValues = renderPassState.clearColors.data();
 
@@ -4744,12 +4566,12 @@ void Graphics::startRenderPass(int bufferIndex)
         if (renderPassState.beginInfo.framebuffer == VK_NULL_HANDLE) {
             // Create minimal framebuffer configuration
             FramebufferConfiguration fbConfig{};
-            fbConfig.staticData.renderPass = renderPassState.beginInfo.renderPass;
+            fbConfig.staticData.renderPass = isShadowPass ? shadowMapRenderPass : renderPassState.beginInfo.renderPass;
             fbConfig.staticData.width = static_cast<uint32_t>(renderPassState.width);
             fbConfig.staticData.height = static_cast<uint32_t>(renderPassState.height);
 
             // Use fakeBackbuffer view if available
-			if (fakeBackbuffer != nullptr) {
+			if (!isShadowPass && fakeBackbuffer != nullptr) {
 				VkImageView colorView = fakeBackbuffer->getRenderTargetView(0, 0);
 				fbConfig.colorViews.push_back(colorView);
 				// Only set depth view if render pass actually contains a depth attachment
@@ -4757,12 +4579,17 @@ void Graphics::startRenderPass(int bufferIndex)
 											  ? depthImageView
 											  : VK_NULL_HANDLE;
                 // std::printf("[CHAILOVE DEBUG] Using fakeBackbuffer for framebuffer: %p\n", fakeBackbuffer.get());
-            } else {
-				// ERROR: fakeBackbuffer should always exist in libretro mode
-				throw love::Exception("fakeBackbuffer is null in libretro mode!");
             }
 
-            renderPassState.beginInfo.framebuffer = getFramebuffer(fbConfig);
+			if (isShadowPass) {
+				// Write depth into the texture the game actually samples from (stored in
+				// renderPassState.framebufferConfiguration by setRenderPass via setRenderTargetsInternal).
+				VkImageView shadowDepthView = renderPassState.framebufferConfiguration.staticData.depthView;
+				fbConfig.staticData.depthView = shadowDepthView;
+				renderPassState.beginInfo.framebuffer = getFramebuffer(fbConfig);
+			} else {
+				renderPassState.beginInfo.framebuffer = getFramebuffer(fbConfig);
+			}
             // Update framebufferConfiguration to match
             renderPassState.framebufferConfiguration = fbConfig;
             // std::printf("[CHAILOVE DEBUG] Minimal framebuffer created: %p with %zu color views\n",
@@ -4783,43 +4610,49 @@ void Graphics::startRenderPass(int bufferIndex)
 
 		renderPassState.active = true;
 
-		// Determine if we should clear attachments for this begin
-		bool doClear = renderPassState.windowClearRequested;
+		// Determine if we should clear attachments for this begin.
+		// The shadow pass uses its own VkRenderPassBeginInfo (renderPassInfo) with a
+		// dedicated clear value, so skip the window-oriented doClear logic entirely
+		// and — crucially — do NOT consume windowClearRequested so the subsequent
+		// window render pass still gets its proper clear.
+		if (!isShadowPass) {
+			bool doClear = renderPassState.windowClearRequested;
 
-		if (doClear) {
-			// Clear color attachments and depth/stencil
-			for (auto &att : renderPassState.renderPassConfiguration.colorAttachments) {
-				att.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			}
-			renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.depthLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			if (doClear) {
+				// Clear color attachments and depth/stencil
+				for (auto &att : renderPassState.renderPassConfiguration.colorAttachments) {
+					att.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+				}
+				renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.depthLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+				renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 
-			// Set clear values
-			if (renderPassState.clearColors.size() < 2) {
-				renderPassState.clearColors.resize(2);
-			}
-			if (renderPassState.mainWindowClearColorValue.hasValue) {
-				auto texture = nullptr;
-				renderPassState.clearColors[0].color = Texture::getClearColor(texture, renderPassState.mainWindowClearColorValue.value);
+				// Set clear values
+				if (renderPassState.clearColors.size() < 2) {
+					renderPassState.clearColors.resize(2);
+				}
+				if (renderPassState.mainWindowClearColorValue.hasValue) {
+					auto texture = nullptr;
+					renderPassState.clearColors[0].color = Texture::getClearColor(texture, renderPassState.mainWindowClearColorValue.value);
+				} else {
+					renderPassState.clearColors[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+				}
+				renderPassState.clearColors[1].depthStencil = {1.0f, 0};
+				renderPassState.beginInfo.clearValueCount = 2;
+				renderPassState.beginInfo.pClearValues = renderPassState.clearColors.data();
 			} else {
-				renderPassState.clearColors[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+				// Preserve framebuffer contents (LOAD) if no clear requested
+				for (auto &att : renderPassState.renderPassConfiguration.colorAttachments) {
+					att.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+				}
+				renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.depthLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+				renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+				renderPassState.beginInfo.clearValueCount = 2;
+				renderPassState.beginInfo.pClearValues = renderPassState.clearColors.data();
 			}
-			renderPassState.clearColors[1].depthStencil = {1.0f, 0};
-			renderPassState.beginInfo.clearValueCount = 2;
-			renderPassState.beginInfo.pClearValues = renderPassState.clearColors.data();
-		} else {
-			// Preserve framebuffer contents (LOAD) if no clear requested
-			for (auto &att : renderPassState.renderPassConfiguration.colorAttachments) {
-				att.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-			}
-			renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.depthLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-			renderPassState.renderPassConfiguration.staticData.depthStencilAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-			renderPassState.beginInfo.clearValueCount = 2;
-			renderPassState.beginInfo.pClearValues = renderPassState.clearColors.data();
-		}
 
-		// Consume the clear request on begin so present() doesn't start a second pass
-		renderPassState.windowClearRequested = false;
+			// Consume the clear request on begin so present() doesn't start a second pass
+			renderPassState.windowClearRequested = false;
+		}
 
         // if (renderPassState.isWindow && renderPassState.windowClearRequested)
         //     renderPassState.renderPassConfiguration.colorAttachments.at(0).loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -4892,9 +4725,60 @@ void Graphics::startRenderPass(int bufferIndex)
         //                      0, nullptr,
         //                      1, &barrierToGeneralColor);
 
+		VkRenderPassBeginInfo renderPassInfo{};
+		// Declared at the same scope as renderPassInfo so it stays alive
+		// through the vkCmdBeginRenderPass call below.
+		VkClearValue shadowClearValue{};
+
+		if (isShadowPass) {
+			
+			renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			renderPassInfo.renderPass = shadowMapRenderPass;
+			renderPassInfo.framebuffer = renderPassState.beginInfo.framebuffer; // texture the game samples, not shadowMaps[0]
+			renderPassInfo.renderArea.offset = {0, 0};
+
+			// Use actual shadow map dimensions
+			renderPassInfo.renderArea.extent.width = static_cast<uint32_t>(renderPassState.width);
+			renderPassInfo.renderArea.extent.height = static_cast<uint32_t>(renderPassState.height);
+
+			// Clear depth buffer (depth-only pass: 1 attachment at index 0)
+			shadowClearValue.depthStencil = {1.0f, 0};
+
+			renderPassInfo.pClearValues = &shadowClearValue;
+			renderPassInfo.clearValueCount = 1;
+		}
         // CRITICAL: Actually begin the render pass
-        // std::printf("[CHAILOVE DEBUG] Beginning minimal render pass for libretro\n");
-        vkCmdBeginRenderPass(currentCommandBuffer, &renderPassState.beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+        // std::printf("[BEGINRP] vkCmdBeginRenderPass: isShadowPass=%d rp=%p frame=%zu\n",
+        //     (int)isShadowPass,
+        //     (void*)(isShadowPass ? renderPassInfo.renderPass : renderPassState.beginInfo.renderPass),
+        //     currentFrame);
+        // fflush(stdout);
+        vkCmdBeginRenderPass(currentCommandBuffer, isShadowPass ? &renderPassInfo : &renderPassState.beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+		// Keep renderPassState.beginInfo.renderPass in sync: prepareDraw, cmdPushDescriptorSets,
+		// and any code that caches the active render pass handle should see shadowMapRenderPass
+		// (not the stale window render pass) while the shadow pass is active.
+		if (isShadowPass) {
+			renderPassState.beginInfo.renderPass = shadowMapRenderPass;
+		}
+
+		// After vkCmdBeginRenderPass the render pass performs an implicit layout transition
+		// on the depth attachment (initialLayout=UNDEFINED → subpassRef.layout=GENERAL).
+		// Confirm the tracking is GENERAL (already set in beginShadowRenderPass, but sync
+		// here as belt-and-suspenders in case beginShadowRenderPass was skipped).
+		if (isShadowPass && currentShadowDepthTexture) {
+			currentShadowDepthTexture->setImageLayout(VK_IMAGE_LAYOUT_GENERAL);
+		}
+
+		// Re-emit depth dynamic state INSIDE the render pass.  Some drivers (notably AMD)
+		// ignore vkCmdSetDepth*EXT commands that were recorded before vkCmdBeginRenderPass.
+		// Repeating them here guarantees the shadow-pass pipeline sees COMPARE_LESS + write=true.
+		if (isShadowPass && optionalDeviceExtensions.extendedDynamicState) {
+			vkCmdSetDepthWriteEnableEXT(currentCommandBuffer, VK_TRUE);
+			vkCmdSetDepthCompareOpEXT(currentCommandBuffer, VK_COMPARE_OP_ALWAYS);
+			vkCmdSetCullModeEXT(currentCommandBuffer, VK_CULL_MODE_NONE);
+			vkCmdSetFrontFaceEXT(currentCommandBuffer, VK_FRONT_FACE_COUNTER_CLOCKWISE);
+		}
 
         // CRITICAL: Invalidate shader and pipeline state to force complete rebind
         if (shouldLoad) {
@@ -5070,9 +4954,40 @@ void Graphics::endRenderPass()
     //     std::printf("[RENDER PASS] endRenderPass() called #%d (last 60 frames had 60 calls)\n", endRenderPassCount);
     // }
 
+    // Guard: only call vkCmdEndRenderPass when there is actually an active Vulkan render pass.
+    // Without this, unguarded callers (e.g. endShadowRenderPass) can call vkCmdEndRenderPass
+    // outside a render pass or on a non-recording command buffer, producing validation errors
+    // that corrupt the validation layer's layout-state machine and cause cascading failures.
+    if (!renderPassState.active || !commandBufferRecording)
+    {
+        renderPassState.active = false;
+        return;
+    }
+
     renderPassState.active = false;
 
     vkCmdEndRenderPass(commandBuffers.at(currentFrame));
+
+    // Update tracked image layouts for attached textures to match the render pass finalLayout.
+    // The minimalConfig window render pass uses finalLayout=COLOR_ATTACHMENT_OPTIMAL for its
+    // color attachment (fakeBackbuffer). Tracking this ensures transitionForSampling() correctly
+    // handles the image when it's later bound as a shader texture.
+    if (renderPassState.isWindow && fakeBackbuffer != nullptr && !isShadowPass)
+    {
+        // The minimalConfig render pass transitions fakeBackbuffer to COLOR_ATTACHMENT_OPTIMAL.
+        fakeBackbuffer->setImageLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    }
+
+    // Update the shadow texture's tracked layout to match shadowMapRenderPass.finalLayout
+    // (SHADER_READ_ONLY_OPTIMAL).  Love's Texture class does not know about render pass
+    // finalLayout transitions, so we sync it here so subsequent getSampler / descriptor
+    // binding sees the correct layout.
+    if (isShadowPass && currentShadowDepthTexture)
+    {
+        // finalLayout of shadowMapRenderPass is VK_IMAGE_LAYOUT_GENERAL — keep Love's
+        // tracking in sync so any descriptor built after this pass uses the correct layout.
+        currentShadowDepthTexture->setImageLayout(VK_IMAGE_LAYOUT_GENERAL);
+    }
 
     for (auto &colorAttachment : renderPassState.renderPassConfiguration.colorAttachments)
         colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
@@ -5215,7 +5130,7 @@ VkSampler Graphics::createSampler(const SamplerState &samplerState)
 	samplerInfo.addressModeW = Vulkan::getWrapMode(samplerState.wrapW);
 	// Only enable anisotropy if actually supported (check capabilities, not features, since in libretro mode device is managed externally)
 	bool anisotropySupported = (capabilities.limits[LIMIT_ANISOTROPY] > 1.0);
-	samplerInfo.anisotropyEnable = anisotropySupported ? VK_TRUE : VK_FALSE;
+	samplerInfo.anisotropyEnable = anisotropySupported ? VK_FALSE : VK_FALSE;
 	samplerInfo.maxAnisotropy = anisotropySupported ? static_cast<float>(samplerState.maxAnisotropy) : 1.0f;
 
 	// TODO: This probably needs to branch on a pixel format to determine whether
@@ -5336,7 +5251,7 @@ std::array<VkPipeline, 2> Graphics::createGraphicsPipeline(Shader *shader, const
 		// depthStencil.depthWriteEnable = Vulkan::getBool(noDynamicStateConfiguration->depthState.write);
 		// depthStencil.depthCompareOp = Vulkan::getCompareOp(noDynamicStateConfiguration->depthState.compare);
         depthStencil.depthWriteEnable = configuration.depthWriteEnable ? VK_TRUE : VK_FALSE;
-        depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+        depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL; // Use a default compare op since dynamic state will handle it if available
 	}
 	depthStencil.depthBoundsTestEnable = VK_FALSE;
 	depthStencil.minDepthBounds = 0.0f;
@@ -5401,7 +5316,7 @@ std::array<VkPipeline, 2> Graphics::createGraphicsPipeline(Shader *shader, const
 	colorBlending.logicOpEnable = VK_FALSE;
 	colorBlending.logicOp = VK_LOGIC_OP_COPY;
 	colorBlending.attachmentCount = static_cast<uint32_t>(colorBlendAttachments.size());
-	std::printf("[CHAILOVE DEBUG] Creating graphics pipeline with %zu color attachments\n", colorBlendAttachments.size());
+	// std::printf("[CHAILOVE DEBUG] Creating graphics pipeline with %zu color attachments\n", colorBlendAttachments.size());
 	colorBlending.pAttachments = colorBlendAttachments.data();
 	colorBlending.blendConstants[0] = 0.0f;
 	colorBlending.blendConstants[1] = 0.0f;
@@ -5454,30 +5369,60 @@ std::array<VkPipeline, 2> Graphics::createGraphicsPipeline(Shader *shader, const
 	pipelineInfo.renderPass = configuration.renderPass;
 
 	shadowPipelineInfo = pipelineInfo;
-	shadowPipelineInfo.renderPass = shadowMapRenderPass;
 
-	// shadowPipelineInfo.pStages = shaderStages.data();
-	// shadowPipelineInfo.pDynamicState = &dynamicState;
-	// shadowPipelineInfo.pVertexInputState = &vertexInputInfo;
-	// shadowPipelineInfo.pRasterizationState = &rasterizer;
-	// shadowPipelineInfo.pViewportState = &viewportState;
-	// shadowPipelineInfo.pInputAssemblyState = &inputAssembly;
-	// shadowPipelineInfo.pMultisampleState = &multisampling;
-	// shadowPipelineInfo.pDepthStencilState = &depthStencil;
-	// shadowPipelineInfo.layout = shader->getGraphicsPipelineLayout();
+	// --- Shadow pipeline depth/stencil state ---
+	// The shadow render pass (VK_FORMAT_D32_SFLOAT) has no stencil component.
+	// VUID-VkGraphicsPipelineCreateInfo-renderPass-06040 requires stencilTestEnable=VK_FALSE
+	// when the render pass has no stencil attachment.
+	// Force depthWriteEnable=VK_TRUE regardless of current game state so the shadow map
+	// is always fully written.
+	VkPipelineDepthStencilStateCreateInfo shadowDepthStencil = depthStencil;
+	shadowDepthStencil.stencilTestEnable   = VK_FALSE;
+	shadowDepthStencil.depthTestEnable     = VK_TRUE;
+	shadowDepthStencil.depthWriteEnable    = VK_TRUE;
+	// Bake LESS_OR_EQUAL explicitly — when extendedDynamicState is active the base depthStencil
+	// struct skips setting depthCompareOp (left as VK_COMPARE_OP_NEVER=0).  The dynamic state
+	// command overrides this at draw time, but having VK_COMPARE_OP_NEVER baked in causes
+	// failures on drivers that re-read the baked value after vkCmdBindPipeline.
+	// NOTE: The shadow depth buffer is cleared to 1.0 (far).  LESS_OR_EQUAL writes fragments
+	// that are closer than the current stored depth — the standard forward-Z convention.
+	shadowDepthStencil.depthCompareOp      = VK_COMPARE_OP_ALWAYS;
+	shadowDepthStencil.front               = {};
+	shadowDepthStencil.back                = {};
+	shadowPipelineInfo.pDepthStencilState  = &shadowDepthStencil;
 
-	
+	// --- Shadow pipeline rasterizer: enable depth bias to avoid shadow acne ---
+	VkPipelineRasterizationStateCreateInfo shadowRasterizer = rasterizer;
+	shadowRasterizer.depthBiasEnable          = VK_TRUE;
+	shadowRasterizer.depthBiasConstantFactor  = 1.25f;
+	shadowRasterizer.depthBiasSlopeFactor     = 1.75f;
+	shadowRasterizer.depthBiasClamp           = 0.0f;
+	shadowPipelineInfo.pRasterizationState    = &shadowRasterizer;
 
-    // shadowPipelineInfo = pipelineInfo;
-	// auto shadowColorBlending = colorBlending;
-	// shadowColorBlending.attachmentCount = 0; // No color attachments for shadow pipeline
-	// shadowColorBlending.pAttachments = nullptr;
-	// shadowPipelineInfo.pColorBlendState = nullptr; // No color blending for shadow pipeline
-	// shadowPipelineInfo.renderPass = shadowMapRenderPass;
-	// multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-	// shadowPipelineInfo.pMultisampleState = &multisampling;
-	
+	// --- Shadow pipeline color blend state: suppress all color output ---
+	std::vector<VkPipelineColorBlendAttachmentState> shadowColorAttachmentStates(
+		colorBlendAttachments.size(), colorBlendAttachment);
+	for (auto &att : shadowColorAttachmentStates) {
+		att.colorWriteMask = 0;
+		att.blendEnable = VK_FALSE;
+	}
+	VkPipelineColorBlendStateCreateInfo shadowColorBlending = colorBlending;
+	shadowColorBlending.attachmentCount = static_cast<uint32_t>(shadowColorAttachmentStates.size());
+	shadowColorBlending.pAttachments = shadowColorAttachmentStates.data();
+	shadowPipelineInfo.pColorBlendState = &shadowColorBlending;
+	shadowPipelineInfo.renderPass = configuration.renderPass;
 
+	// The shadow render pass (shadowMapRenderPass) uses VK_FORMAT_D32_SFLOAT — depth only,
+	// no stencil component.  VUID-VkGraphicsPipelineCreateInfo-renderPass-06040 requires
+	// stencilTestEnable = VK_FALSE for every pipeline variant compiled against that render
+	// pass.  The shadow variant already has it off; fix the base variant here.
+	if (configuration.renderPass == shadowMapRenderPass) {
+		depthStencil.stencilTestEnable = VK_FALSE;
+		depthStencil.front = {};
+		depthStencil.back  = {};
+		// pipelineInfo.pDepthStencilState already points to &depthStencil, so the
+		// updated struct is used automatically in pipelineInfos[0] below.
+	}
 
 	VkPipeline graphicsPipeline[2];
     VkGraphicsPipelineCreateInfo pipelineInfos[2] = {pipelineInfo, shadowPipelineInfo};
@@ -5695,20 +5640,67 @@ void Graphics::processCleanupCallbacks()
 	readbackCallbacks.at(currentFrame).clear();
 }
 
+void Graphics::logVmaStats()
+{
+	if (vmaAllocator != VK_NULL_HANDLE)
+	{
+		static uint64_t frameNum = 0;
+		static uint64_t baselineBytes = 0;
+		static uint64_t baselineAllocs = 0;
+		frameNum++;
+
+		VmaTotalStatistics stats;
+		vmaCalculateStatistics(vmaAllocator, &stats);
+
+		uint64_t currentBytes = stats.total.statistics.allocationBytes;
+		uint64_t currentAllocs = stats.total.statistics.allocationCount;
+
+		if (frameNum == 1) {
+			baselineBytes = currentBytes;
+			baselineAllocs = currentAllocs;
+		}
+
+		int64_t deltaBytes = (int64_t)currentBytes - (int64_t)baselineBytes;
+		int64_t deltaAllocs = (int64_t)currentAllocs - (int64_t)baselineAllocs;
+
+		size_t inUseCount = 0;
+		for (const auto& sb : stagingBufferPool)
+			if (sb.inUse) inUseCount++;
+
+		// Only print every 60 frames, or if allocations changed
+		if (frameNum % 60 == 0 || deltaAllocs != 0) {
+			std::printf("[VMA] F%llu | Mem: %llu MB (%+lld KB) | Allocs: %llu (%+lld) | Staging: %zu (%zu used)\n",
+				(unsigned long long)frameNum,
+				(unsigned long long)(currentBytes / (1024 * 1024)),
+				(long long)(deltaBytes / 1024),
+				(unsigned long long)currentAllocs,
+				(long long)deltaAllocs,
+				stagingBufferPool.size(),
+				inUseCount);
+			fflush(stdout);
+		}
+	}
+}
+
 void Graphics::callShaderNewFrame()
 {
-	// NOTE: beginFrame() (called every frame via advanceFrame()) already calls
-	// shader->newFrame() for all usedShadersInFrame and also calls
-	// localUniformBuffer->nextFrame(). By the time this function is invoked
-	// (every 60 frames from retro_run), usedShadersInFrame has already been
-	// cleared by beginFrame(), so the loop below is a no-op for shaders.
-	// DO NOT call localUniformBuffer->nextFrame() here — it is already advanced
-	// once per frame in beginFrame(). A second call would double-advance the
-	// UBO ring buffer every 60 frames, writing frame N+1 data into the slot
-	// still being read by the GPU for frame N → causes flickering every 60 frames.
-	// for (const auto &shader : usedShadersInFrame)
-	// 	shader->newFrame();
+	// LIBRETRO FIX: In libretro mode, beginFrame()/advanceFrame() are never called,
+	// so none of the per-frame reset work from beginFrame() ever runs.
+	// Without shader->newFrame(), descriptor pools are never reset
+	// via vkResetDescriptorPool, causing ~110 MB/frame leak on AMD drivers.
+	// Without stream buffer nextFrame(), frameGPUReadOffset grows unbounded.
+	for (const auto &shader : usedShadersInFrame)
+		shader->newFrame();
 	usedShadersInFrame.clear();
+
+	// Advance stream buffer ring buffers to reset per-frame write offsets.
+	// Without this, frameGPUReadOffset grows until it overflows bufferSize.
+	localUniformBuffer->nextFrame();
+	for (int i = 0; i < 2; i++)
+	{
+		if (batchedDrawState.vb[i] != nullptr)
+			batchedDrawState.vb[i]->nextFrame();
+	}
 }
 
 void Graphics::recycleCommandPool(bool recreatePipelineCache)
@@ -6062,6 +6054,7 @@ void Graphics::cleanup()
 	cleanupStagingBufferPool();
 
 	vmaDestroyAllocator(vmaAllocator);
+	vmaAllocator = VK_NULL_HANDLE;
 
 	for (const auto &s : renderFinishedSemaphores)
 		vkDestroySemaphore(device, s, nullptr);
@@ -6091,6 +6084,12 @@ void Graphics::cleanup()
 		vkDestroyFramebuffer(device, entry.second, nullptr);
 	framebuffers.clear();
 	framebufferUsages.clear();
+
+	if (shadowMapRenderPass != VK_NULL_HANDLE)
+		vkDestroyRenderPass(device, shadowMapRenderPass, nullptr);
+
+	if (descriptorSetLayout != VK_NULL_HANDLE)
+		vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
 	vkDestroyCommandPool(device, commandPool, nullptr);
 	vkDestroyDescriptorPool(device, descriptorPool, nullptr);

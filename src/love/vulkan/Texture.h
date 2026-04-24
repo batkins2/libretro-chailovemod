@@ -52,6 +52,9 @@ public:
 	VkImageLayout getImageLayout() const;
 	VkImageLayout getMSAAImageLayout() const;
 
+	// Update the tracked image layout (must match the actual GPU layout).
+	void setImageLayout(VkImageLayout layout) { imageData.layout = layout; }
+
 	// Transition render target from COLOR_ATTACHMENT_OPTIMAL to SHADER_READ_ONLY_OPTIMAL if needed
 	void transitionForSampling();
 

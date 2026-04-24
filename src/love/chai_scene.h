@@ -39,6 +39,7 @@ public:
     void initFramebuffer();
     void initShadowMap();
     void renderShadowPass(const glm::mat4 &lightView, const glm::mat4 &lightProjection, int view);
+    glm::mat4 calculateLightProjection(const glm::mat4 &cameraView, const glm::mat4 &cameraProjection, const glm::mat4 &lightView);
     float getFramerate();
     float getAverageFramerate();
     float getMinFramerate();
@@ -59,6 +60,9 @@ private:
     love::gfx::Texture *shadowMapTexture = nullptr;
     bool shadowMapInitialized = false;
     static constexpr int SHADOW_MAP_SIZE = 2048;
+    glm::mat4 m_cachedLightSpaceMatrix = glm::mat4(1.0f); // Store for reuse between shadow and main pass
+    glm::mat4 m_cachedLightView = glm::mat4(1.0f);        // Cache light view matrix
+    glm::mat4 m_cachedLightProjection = glm::mat4(1.0f);  // Cache light projection matrix
     love::gfx::Texture *background_tex = nullptr;
     love::gfx::Mesh *background_mesh = nullptr;
     bool frameOddEven = false;

@@ -51,31 +51,6 @@ namespace gfx
 namespace vulkan
 {
 
-class ShadowMap {
-public:
-    ShadowMap(int width, int height, love::gfx::vulkan::Graphics* vulkanGraphics);
-    ~ShadowMap();
-
-	VkImage getImage() const { return image; }
-    VkImageView getView() const { return imageView; }
-    VkSampler getSampler() const { return sampler; }
-	VkRenderPass createShadowMapRenderPass(love::gfx::vulkan::Graphics* vulkanGraphics);
-	VkFramebuffer createShadowFramebuffer(ShadowMap* shadowMap, VkRenderPass renderPass, love::gfx::vulkan::Graphics* vulkanGraphics);
-	VkGraphicsPipelineCreateInfo createShadowPipelineInfo(love::gfx::vulkan::Graphics* vulkanGraphics, VkRenderPass shadowRenderPass, Shader* shader);
-	VkDescriptorSetLayout createShadowDescriptorSetLayout(love::gfx::vulkan::Graphics* vulkanGraphics);
-	void updateShadowDescriptorSet(VkDescriptorSet descriptorSet, int location, VkSampler shadowSampler, VkImageView shadowImageView, love::gfx::vulkan::Graphics* vulkanGraphics);
-
-private:
-    VkImage image;
-    VmaAllocation memory;
-    VkImageView imageView;
-    VkSampler sampler;
-
-    void createImage(int width, int height, love::gfx::vulkan::Graphics* vulkanGraphics);
-    void createImageView(love::gfx::vulkan::Graphics* vulkanGraphics);
-    void createSampler(love::gfx::vulkan::Graphics* vulkanGraphics);
-};	
-
 struct ColorAttachment
 {
 	VkFormat format = VK_FORMAT_UNDEFINED;
@@ -353,6 +328,7 @@ public:
 	
 	// Process queued cleanup callbacks (needed for libretro mode)
 	void processCleanupCallbacks();
+	void logVmaStats();
 	
 	// Call newFrame() on all used shaders (for libretro mode where beginFrame isn't called)
 	void callShaderNewFrame();
@@ -375,6 +351,12 @@ public:
 
     // LIBRETRO BUFFER UPLOAD FIX
     bool isInRenderPass() const { return renderPassState.active; }
+    // Returns the raw fakeBackbuffer pointer so Shader.cpp can detect feedback loops.
+    Texture* getFakeBackbufferRaw() const { return fakeBackbuffer.get(); }
+    // True when the window (non-shadow) render pass is currently active.
+    // Used to detect feedback loops where fakeBackbuffer is both a color attachment
+    // and a sampler descriptor in the same draw (VUID-vkCmdDraw-None-09002).
+    bool isWindowRenderPassActive() const { return renderPassState.active && renderPassState.isWindow; }
     VkPipeline getCurrentPipeline() const { return renderPassState.pipeline[0]; }
     VkPipeline getCurrentShadowPipeline() const { return renderPassState.pipeline[1]; }
     VkRenderPass getCurrentRenderPass() const { return renderPassState.beginInfo.renderPass; }
@@ -407,6 +389,7 @@ public:
 
 	void beginShadowRenderPass(gfx::Shader *shadowShader, gfx::Texture *shadowMap);
 	void endShadowRenderPass(chai_shader *shadowShader, gfx::Texture *shadowMap);
+	VkRenderPass createShadowRenderPass();
 
 	void setPushConstants(VkPipelineLayout pipelineLayout, VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void *data);
 	
@@ -426,8 +409,7 @@ public:
 
 	bool isShadowPass = false;
 	bool startShadowPass = false;
-
-	std::vector<std::unique_ptr<ShadowMap>> shadowMaps;
+	Texture* currentShadowDepthTexture = nullptr; // set in beginShadowRenderPass, cleared in endShadowRenderPass
 
 protected:
 	gfx::ShaderStage *newShaderStageInternal(ShaderStageType stage, const std::string &cachekey, const std::string &source, bool gles) override;
@@ -548,9 +530,7 @@ private:
 	std::set<StrongRef<Shader>> usedShadersInFrame;
 	RenderpassState renderPassState;
 
-    VkRenderPass shadowMapRenderPass;
-	VkFramebuffer shadowFramebuffer;
-	VkPipeline shadowPipeline;
+    VkRenderPass shadowMapRenderPass = VK_NULL_HANDLE;
 	VkGraphicsPipelineCreateInfo shadowPipelineInfo{};
 
 	bool libretroMode = false;

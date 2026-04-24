@@ -1377,6 +1377,58 @@ int runCount = 0;
 /**
  * libretro callback; Run a game loop in the core.
  */
+// ─── RAM LEAK TRACKER ───
+// Snapshots process private bytes (heap + driver allocations, excludes shared/mapped pages).
+// Call ramCheckpoint("label") around operations. Every 60 frames it prints per-phase deltas.
+#ifdef _WIN32
+struct RamTracker {
+	struct Snap { const char* label; SIZE_T bytes; };
+	Snap snaps[16];
+	int count = 0;
+	int frameNum = 0;
+	// Accumulate deltas over 60 frames then print averages
+	SIZE_T accum[16] = {};
+	SIZE_T lastBytes[16] = {};
+	bool baselined = false;
+
+	void reset() { count = 0; }
+
+	void snap(const char* label) {
+		if (count >= 16) return;
+		PROCESS_MEMORY_COUNTERS_EX pmc = {};
+		pmc.cb = sizeof(pmc);
+		GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc));
+		snaps[count] = { label, pmc.PrivateUsage };
+		count++;
+	}
+
+	void endFrame() {
+		frameNum++;
+		// Total frame delta (last snap - first snap)
+		SIZE_T frameDelta = 0;
+		if (count >= 2) {
+			frameDelta = (snaps[count-1].bytes >= snaps[0].bytes) ? (snaps[count-1].bytes - snaps[0].bytes) : 0;
+		}
+
+		SIZE_T totalMB = (count > 0) ? snaps[count-1].bytes / (1024*1024) : 0;
+		std::printf("[RAM LEAK] F%d | %llu MB | delta: %lld bytes",
+			frameNum, (unsigned long long)totalMB, (long long)frameDelta);
+		for (int i = 1; i < count; i++) {
+			SIZE_T delta = (snaps[i].bytes >= snaps[i-1].bytes) ? (snaps[i].bytes - snaps[i-1].bytes) : 0;
+			if (delta > 0) {
+				std::printf(" | %s->%s:+%llu",
+					snaps[i-1].label, snaps[i].label, (unsigned long long)delta);
+			}
+		}
+		std::printf("\n");
+		std::fflush(stdout);
+		reset();
+	}
+};
+static RamTracker g_ramTracker;
+#endif
+// ─── END RAM LEAK TRACKER ───
+
 void retro_run(void) {
 	// Ensure there is a game running.
 	if (!ChaiLove::hasInstance()) {
@@ -1388,6 +1440,10 @@ void retro_run(void) {
 	if (app->event.m_shouldclose) {
 		return;
 	}
+
+#ifdef _WIN32
+	g_ramTracker.snap("frame_start");
+#endif
 	
 	// Log VMA statistics every 60 frames to track memory usage
 	// WARNING: This causes RenderDoc to lock up at frame 58-60 due to _heapwalk() and memory operations
@@ -1401,6 +1457,10 @@ void retro_run(void) {
 		auto& cg = ChaiLove::getInstance()->chai_gfx;
 		auto* vulkanGraphics = static_cast<love::gfx::vulkan::Graphics*>(cg.instance);
 		
+		if (!vulkanGraphics || vulkanGraphics->getAllocator() == VK_NULL_HANDLE)
+			goto skip_libretro_vma_stats;
+		
+		{
 		VmaTotalStatistics stats;
 		vmaCalculateStatistics(vulkanGraphics->getAllocator(), &stats);
 		
@@ -1529,7 +1589,9 @@ void retro_run(void) {
 			// printf("[DRIVER WORKAROUND] Vulkan resources reset + working set trim (known driver leak)\n");
 			// fflush(stdout);
 		}
+		} // end guarded stats block
 	}
+	skip_libretro_vma_stats:;
 
 	bool updated = false;
 	if (ChaiLove::environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated) {
@@ -1544,9 +1606,15 @@ void retro_run(void) {
 	frameNumber++;
 	
 	// Update the game.
+#ifdef _WIN32
+	g_ramTracker.snap("pre_update");
+#endif
 	auto updateStart = std::chrono::high_resolution_clock::now();
 	app->update();
 	auto updateEnd = std::chrono::high_resolution_clock::now();
+#ifdef _WIN32
+	g_ramTracker.snap("post_update");
+#endif
 
 	// Clear the color and depth buffers
     // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1568,9 +1636,15 @@ void retro_run(void) {
     }	
 
 	// Render the game.
+#ifdef _WIN32
+	g_ramTracker.snap("pre_draw");
+#endif
 	auto drawStart = std::chrono::high_resolution_clock::now();
 	app->draw();
 	auto drawEnd = std::chrono::high_resolution_clock::now();
+#ifdef _WIN32
+	g_ramTracker.snap("post_draw");
+#endif
 
 	#ifdef JPH_DEBUG_RENDERER
 	#if ENABLE_DEBUG_GEOMETRY_RENDERING
@@ -1741,16 +1815,27 @@ void retro_run(void) {
 	// CRITICAL FIX: Process cleanup callbacks EVERY frame to release staging buffers immediately
 	// Staging buffers, StreamBuffers, and other resources queue cleanup via queueCleanUp()
 	// In normal mode, beginFrame() processes these every frame - libretro mode must do the same
+#ifdef _WIN32
+	g_ramTracker.snap("post_submit");
+#endif
 	vulkanGraphics->processCleanupCallbacks();
+	vulkanGraphics->logVmaStats();
+#ifdef _WIN32
+	g_ramTracker.snap("post_cleanup");
+	g_ramTracker.endFrame();
+#endif
 	
-	// PERF: Throttle shader resets and staging buffer cleanup to reduce per-frame overhead
+	// CRITICAL: Call shader newFrame EVERY frame to reset descriptor pools
+	// Without this, descriptor sets accumulate (never reset) causing ~110 MB/frame leak
+	// The AMD Vulkan driver allocates private memory per descriptor set that is only
+	// reclaimed when the pool is reset via vkResetDescriptorPool in newFrame().
+	vulkanGraphics->callShaderNewFrame();
+
+	// PERF: Throttle staging buffer cleanup to reduce per-frame overhead
 	static int shaderResetCounter = 0;
 	if (++shaderResetCounter >= 60)
 	{
 		shaderResetCounter = 0;
-		// Call shader newFrame() to prevent descriptor pool/pipeline memory leaks
-		// The shader newFrame() has built-in throttling (pools every 10 frames, pipelines every 60)
-		vulkanGraphics->callShaderNewFrame();
 		
 		// CRITICAL FIX: Clean up unused staging buffers to prevent pool accumulation
 		// Staging buffers are released via callbacks but remain in pool - remove unused ones

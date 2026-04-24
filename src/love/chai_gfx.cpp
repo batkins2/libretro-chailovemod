@@ -310,16 +310,19 @@ chai_shader *chai_gfx::wrap_newShader(const std::string *FileName, const std::st
             c += "projCoords = projCoords * 0.5 + 0.5;";
             c += "if (projCoords.z < 0.0 || projCoords.z > 1.0) { return 0.0; }";  // Out of depth range
             c += "if (projCoords.x < 0.0 || projCoords.x > 1.0 || projCoords.y < 0.0 || projCoords.y > 1.0) { return 0.0; }";  // Out of shadow map
-            c += "float closestDepth = texture2D(shadowMap, projCoords.xy).r;";
+            c += "float closestDepth = texture2D(shadowMap, vec2(projCoords.x, 1.0 - projCoords.y)).r;";
             c += "float currentDepth = projCoords.z;";
             // Fragment is in shadow if its depth is greater than the closest depth in shadow map
             c += "float shadow = currentDepth > closestDepth ? 1.0 : 0.0;";
             c += "return shadow;";
             c += "}";
             c += "vec4 effect( vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords ){ ";
-            // During shadow pass (miscInfo.x > 0.5), discard all fragments after depth write
-            // Depth is written automatically by rasterizer, we just need to skip color output
-            c += "if (miscInfo.x > 0.5) { discard; }";
+            // During shadow pass (miscInfo.x > 0.5), return early to allow the depth write to
+            // complete.  Using 'discard' would cancel the depth write entirely (GLSL discard
+            // throws away the whole fragment including depth), leaving the shadow map all 1.0.
+            // 'return' lets the rasterizer commit the depth value; the color output is ignored
+            // because the shadow render pass has no color attachment.
+            c += "if (miscInfo.x > 0.5) { return vec4(0.0); }";
             c += "vec4 pixel = Texel(texture, texture_coords );";
             c += "float shadows = 0.0;";
             c += "// Sample shadows only during normal rendering pass (shadow == 1)";
